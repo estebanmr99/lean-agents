@@ -41,7 +41,7 @@ export function doctor({ home, state, exec }) {
     }
     for (const c of state.commands) add(c.desc, c.ok ? 'ok' : 'error', c.ok ? '' : 'failed at install time');
     if (exec) {
-      for (const [bin, tool] of [['claude', 'claude'], ['opencode', 'opencode-v2'], ['rtk', 'rtk'], ['context-mode', 'context-mode'], ['uvx', 'serena']]) {
+      for (const [bin, tool] of [['claude', 'claude'], ['opencode', 'opencode-v1'], ['opencode', 'opencode-v2'], ['rtk', 'rtk'], ['context-mode', 'context-mode'], ['uvx', 'serena']]) {
         const needed = o.agents.includes(tool) || o.tools.includes(tool);
         if (!needed) continue;
         const v = version(bin);
@@ -53,7 +53,7 @@ export function doctor({ home, state, exec }) {
           add(`claude mcp ${s}`, mcp.ok && mcp.out.includes(s) ? 'ok' : 'error', mcp.ok ? '' : 'claude mcp list failed');
         }
       }
-      if (o.agents.includes('opencode-v2')) checkOpenCode(o, add);
+      if (o.agents.some((a) => a.startsWith('opencode'))) checkOpenCode(o, add);
     }
   }
   print(rows);
@@ -67,10 +67,15 @@ function checkOpenCode(o, add) {
   try { cfg = resolvedOpenCodeConfig(r.out); } catch { return add('opencode resolved config', 'changed', 'could not parse output; check by hand'); }
   cfg = redact(cfg);
   const servers = cfg.mcp?.servers ?? cfg.mcp ?? {};
-  for (const s of ['context-mode', 'serena', 'playwright'].filter((t) => o.tools.includes(t))) {
+  const v1 = o.agents.includes('opencode-v1');
+  for (const s of ['context-mode', 'serena', 'playwright'].filter((t) => o.tools.includes(t) && !(v1 && t === 'context-mode'))) {
     add(`opencode mcp ${s}`, servers[s] ? 'ok' : 'error', servers[s] ? '' : 'not in resolved config');
   }
   const plugins = [...(cfg.plugins ?? []), ...(cfg.plugin ?? [])].map(String);
+  if (v1 && o.tools.includes('context-mode')) {
+    const loaded = plugins.some((p) => p.includes('context-mode'));
+    add('opencode plugin context-mode', loaded ? 'ok' : 'error', loaded ? '' : 'not in resolved config');
+  }
   if (plugins.some((p) => p.includes('context-mode')) && servers['context-mode']) {
     add('context-mode duplicate', 'error', 'enabled as plugin and MCP; keep one');
   }
