@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parse } from 'jsonc-parser';
 import { applyJsonEdits, revertJsonEdits } from '../scripts/lib/fsops.mjs';
 import { diffModels } from '../scripts/models-refresh.mjs';
+import { releaseNotes } from '../scripts/release.mjs';
 import { prereqFor } from '../scripts/lib/system.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -359,4 +360,14 @@ test('real-binary scripts run no agent CLI before HOME is a throwaway', () => {
     const cli = lines.findIndex((l) => /^("\$agy_bin"|agy|claude|copilot|opencode|rtk|npx|npm|node|bash) /.test(l));
     assert.ok(home >= 0 && cli > home, `${f}: line ${cli + 1} runs before HOME is set`);
   }
+});
+
+test('release notes come from one CHANGELOG section, and a wrong version stops the build', () => {
+  const log = '## [Unreleased]\n\n- soon\n\n## [1.2.0] - 2026-01-02\n\n- first\n- second\n\n## [1.1.0] - 2026-01-01\n\n- old\n';
+  assert.equal(releaseNotes(log, '1.2.0'), '- first\n- second');
+  assert.equal(releaseNotes(log, '1.1.0'), '- old');
+  assert.equal(releaseNotes(log, '9.9.9'), '');
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'release.mjs'), '9.9.9'], { encoding: 'utf8' });
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /does not match package.json/);
 });

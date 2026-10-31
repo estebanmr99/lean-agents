@@ -76,6 +76,25 @@ jobs:
           node scripts/lean.mjs --uninstall --yes --no-exec
           test -z "$(find "$HOME" -type f -not -path "$HOME/.config/lean-agents/*")"
 
+  release-build:
+    # The steps of release.yml up to the publish, plus a look inside the archives.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Build, then check notes and archives on disk
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          node scripts/release.mjs "$version" </dev/null
+          grep -q '^- ' dist/notes.md
+          tar -tzf "dist/lean-agents-$version.tar.gz" > dist/tar.txt
+          grep -q "^lean-agents-$version/install.sh$" dist/tar.txt
+          unzip -l "dist/lean-agents-$version.zip" > dist/zip.txt
+          grep -q "lean-agents-$version/install.ps1$" dist/zip.txt
+
   real-opencode:
     # Real OpenCode 2 binary, throwaway HOME: proves the keys we write are accepted.
     runs-on: ubuntu-latest
