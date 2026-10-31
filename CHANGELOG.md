@@ -11,6 +11,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- Without a TTY and without `--yes`, the installer stops with a clear message instead of a crash, and `--dry-run` exits 0.
 - The OpenCode undo no longer leaves `~/.agents/skills` when another agent is detected.
 - Real-binary test scripts run agent CLIs only after HOME is a throwaway.
 - With `--home`, `XDG_CACHE_HOME`, `XDG_DATA_HOME` and `XDG_STATE_HOME` outside it are dropped.

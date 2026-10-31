@@ -371,3 +371,18 @@ test('release notes come from one CHANGELOG section, and a wrong version stops t
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /does not match package.json/);
 });
+
+test('without a TTY and without --yes: asks nothing, changes nothing, says why', { skip: process.platform === 'win32' }, () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const args = ['--no-exec', '--agents', 'claude', '--tools', 'serena', '--privacy', 'standard', '--lang', 'en'];
+  // detached starts a new session, which has no controlling terminal: /dev/tty cannot open.
+  const noTty = (extra) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args, ...extra], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], detached: true, timeout: 20000 });
+  const apply = noTty([]);
+  assert.equal(apply.status, 1);
+  assert.match(apply.stderr, /no terminal to ask on: pass --yes/);
+  assert.deepEqual(fs.readdirSync(home), []);
+  const dry = noTty(['--dry-run']);
+  assert.equal(dry.status, 0, dry.stderr);
+  assert.match(dry.stdout, /Dry run: nothing was changed/);
+  assert.deepEqual(fs.readdirSync(home), []);
+});
