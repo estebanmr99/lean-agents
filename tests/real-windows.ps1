@@ -1,0 +1,38 @@
+# Real tool installs on Windows through install.ps1, with OpenCode 1.x from npm. Used by CI.
+# The USERPROFILE has a space on purpose: paths must survive the .cmd shim handling.
+$ErrorActionPreference = 'Stop'
+$repo = Split-Path $PSScriptRoot
+
+$dir = Join-Path $env:RUNNER_TEMP "lean agents $([guid]::NewGuid())"
+New-Item -ItemType Directory -Path $dir | Out-Null
+$env:USERPROFILE = $dir
+$env:APPDATA = "$dir\AppData\Roaming"
+$env:NPM_CONFIG_PREFIX = "$dir\npm"
+New-Item -ItemType Directory -Path $env:NPM_CONFIG_PREFIX | Out-Null
+$env:Path = "$dir\npm;$env:Path"
+
+npm install -g opencode-ai@1.19.0
+if ($LASTEXITCODE -ne 0) { throw 'npm install opencode-ai failed' }
+opencode --version
+
+# winget is not on the runner image, so this also proves the release zip route.
+$rtkDir = "$dir\tools\rtk"
+Invoke-WebRequest 'https://github.com/rtk-ai/rtk/releases/latest/download/rtk-x86_64-pc-windows-msvc.zip' -OutFile "$dir\rtk.zip"
+Expand-Archive "$dir\rtk.zip" $rtkDir
+
+function Get-UserPath { [Environment]::GetEnvironmentVariable('Path', 'User') -split ';' }
+
+& "$repo\install.ps1" -Yes -Agents opencode-v1 -Tools playwright, ponytail, caveman, i-have-adhd, dcp -Privacy strict -Profile anthropic-api -Lang en --ponytail-mode lite --adhd-always
+if ((Get-UserPath) -notcontains $rtkDir) { throw 'rtk folder was not added to the user PATH' }
+if (-not (Get-ChildItem "$dir\.config\opencode\skills" -ErrorAction SilentlyContinue)) { throw 'Caveman skills did not arrive' }
+if (-not (Test-Path "$dir\.config\opencode\vendor\i-have-adhd\.opencode")) { throw 'i-have-adhd clone is missing' }
+
+& "$repo\install.ps1" -Doctor
+
+opencode agent list | Tee-Object -Variable agents
+foreach ($name in 'explore', 'research', 'review', 'debug', 'planner') {
+  if (($agents -join "`n") -notmatch $name) { throw "subagent $name not loaded" }
+}
+
+& "$repo\install.ps1" -Uninstall -Yes
+if ((Get-UserPath) -contains $rtkDir) { throw 'rtk folder was not removed from the user PATH' }
