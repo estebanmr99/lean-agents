@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: shellcheck
-        run: shellcheck install.sh scripts/check-private.sh
+        run: shellcheck install.sh scripts/check-private.sh tests/real-opencode.sh
 
   test:
     strategy:
@@ -42,3 +42,19 @@ jobs:
           node scripts/lean.mjs --doctor --no-exec
           node scripts/lean.mjs --uninstall --yes --no-exec
           test -z "$(find "$HOME" -type f -not -path "$HOME/.config/lean-agents/*")"
+
+  real-opencode:
+    # Real OpenCode 2 binary, throwaway HOME: proves the keys we write are accepted.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Install OpenCode 2
+        run: |
+          curl -fsSL https://opencode.ai/v2/install | bash
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+      - name: Install lean-agents and check what OpenCode resolved
+        run: bash tests/real-opencode.sh
