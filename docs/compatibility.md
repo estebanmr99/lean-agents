@@ -7,7 +7,7 @@ What lean-agents configures per agent, how, and when each command or key was las
 | Global rules | `@` import in `~/.claude/CLAUDE.md` | `instructions` entry | `instructions` entry | planned | planned |
 | Subagents by tier | `~/.claude/agents/*.md` | `~/.config/opencode/agents/*.md` | `~/.config/opencode/agents/*.md` | planned | planned |
 | Primary agent models | `model` in settings (only if unset) | `agents.plan` / `agents.build` from profile | `agent.plan` / `agent.build` from profile | planned | planned |
-| RTK | `rtk init -g` (hook) | `rtk init -g --opencode` (plugin) | `rtk init -g --opencode` (plugin) | `rtk init -g --copilot` | `rtk init -g --agent antigravity` |
+| RTK | `rtk init -g --auto-patch` (hook) | `rtk init -g --opencode` (plugin) | `rtk init -g --opencode` (plugin) | `rtk init -g --copilot` | `rtk init -g --agent antigravity` |
 | Context Mode | plugin `context-mode@context-mode` | MCP (`mcp.servers`) | `plugin` entry, needs Node.js 22.5+ | planned | planned |
 | Serena, Playwright | `claude mcp add --scope user` | `mcp.servers` | flat `mcp.<name>` | planned | planned |
 | Ponytail | plugin `ponytail@ponytail` | `plugins` entry | `plugin` entry | ➖ | ➖ |
@@ -47,6 +47,7 @@ What lean-agents configures per agent, how, and when each command or key was las
 | Skills CLI: `--skill <names>` and `-y` are needed without a TTY; `skills remove` takes skill names; `-a opencode -g` writes `~/.agents/skills`, `-a claude-code -g` writes `~/.claude/skills` | `npx skills --help` and a real run in a throwaway HOME; `real-tools`, `real-windows` in CI | 2026-10-30 |
 | OpenCode 1.x and 2.x read global skills from `~/.agents/skills` | [1.x docs](https://opencode.ai/docs/skills), [2.x docs](https://opencode.ai/v2/docs/skills) | 2026-10-30 |
 | Claude Code native installer `claude.ai/install.sh`; privacy env names `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`, `DISABLE_BUG_COMMAND`, `DISABLE_AUTOUPDATER`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | [setup docs](https://code.claude.com/docs/en/setup), [env vars](https://code.claude.com/docs/en/env-vars) | 2026-10-30 |
+| `rtk init -g` without a TTY prints a manual step and skips the hook; `--auto-patch` writes it to `settings.json` | `rtk init --help` 1.1.0, `real-claude` in CI | 2026-10-30 |
 | `claude mcp add`, `claude mcp list`, `claude plugin marketplace add`, `claude plugin install` and `claude plugin uninstall` work without login | `real-claude` in CI | 2026-10-30 |
 | `opencode-ai` on npm provides the 1.19.0 binary | npm, `tests/real-windows.ps1` in CI | 2026-10-30 |
 

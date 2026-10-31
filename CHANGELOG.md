@@ -21,6 +21,8 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- RTK hook on Claude Code is now registered without a terminal, as in `curl | bash` installs.
+- Caveman installs only its three skills, without a terminal, and uninstalls cleanly.
 - Windows: only `.cmd` shims run through a shell, so paths with spaces work.
 - Windows: Ponytail config stays inside `--home`.
 - Windows: rule paths use forward slashes.
