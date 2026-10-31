@@ -33,6 +33,13 @@ export function envDir(home, name, fallback) {
 
 export const configHome = (home) => envDir(home, 'XDG_CONFIG_HOME', path.join(home, '.config'));
 
+// External tools read HOME, not --home, so a run with --home hands it down to every child.
+export function isolate(home) {
+  if (home === os.homedir()) return;
+  const env = { XDG_CONFIG_HOME: configHome(home), COPILOT_HOME: envDir(home, 'COPILOT_HOME', path.join(home, '.copilot')) };
+  Object.assign(process.env, env, { HOME: home, USERPROFILE: home });
+}
+
 export function detectAgents() {
   const found = {};
   const claude = version('claude');

@@ -314,3 +314,29 @@ test('diffModels reports missing IDs and newer family members, and skips aliases
     newer: [{ profile: 'p', model: 'acme/a-1', latest: 'acme/a-3' }],
   });
 });
+
+test('--home reaches child tools, and a failed undo exits 1', { skip: process.platform === 'win32' }, () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const real = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-real-'));
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-bin-'));
+  const rtk = path.join(bin, 'rtk');
+  fs.writeFileSync(rtk, '#!/bin/sh\necho "$XDG_CONFIG_HOME" > "$HOME/rtk-ran"\n', { mode: 0o755 });
+  fs.writeFileSync(path.join(bin, 'context-mode'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  const env = { ...process.env, HOME: real, XDG_CONFIG_HOME: path.join(real, '.config'), PATH: `${bin}${path.delimiter}${process.env.PATH}` };
+  const engine = (args) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args], { encoding: 'utf8', env });
+  const r = engine(['--yes', '--agents', 'opencode-v2', '--tools', 'rtk', '--privacy', 'standard', '--lang', 'en', '--profile', 'none']);
+  assert.equal(r.status, 0, r.stdout);
+  assert.ok(!fs.existsSync(path.join(real, 'rtk-ran')));
+  assert.equal(fs.readFileSync(path.join(home, 'rtk-ran'), 'utf8').trim(), path.join(home, '.config'));
+
+  assert.notEqual(engine(['--uninstall', '--yes', '--no-exec']).status, 0, 'undo commands would be lost');
+  fs.writeFileSync(rtk, '#!/bin/sh\nexit 1\n');
+  assert.equal(engine(['--uninstall', '--yes']).status, 1);
+});
+
+test('GSD ignores --profile when no OpenCode agent is selected', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  lean(home, [...NEW, '--agents', 'copilot-cli', '--tools', 'gsd', '--profile', 'anthropic-api']);
+  const models = JSON.parse(fs.readFileSync(path.join(home, '.gsd', 'defaults.json'), 'utf8')).model_overrides;
+  assert.equal(models['gsd-debugger'], 'claude-opus-5.5');
+});

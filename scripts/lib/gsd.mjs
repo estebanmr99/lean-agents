@@ -8,7 +8,8 @@ const PACKAGE = '@opengsd/gsd-core@latest';
 const FLAGS = { claude: '--claude', 'opencode-v1': '--opencode', 'opencode-v2': '--opencode', 'copilot-cli': '--copilot', antigravity: '--antigravity' };
 
 export function gsdProfileName(o) {
-  if (o.profile) return o.profile;
+  // --profile only selects OpenCode models; its IDs mean nothing to the other runtimes.
+  if (o.profile && o.agents.some((a) => a.startsWith('opencode'))) return o.profile;
   if (o.agents.includes('copilot-cli')) return 'github-copilot';
   return o.agents.includes('claude') ? 'claude-subscription' : null;
 }

@@ -15,7 +15,7 @@ import { copilotAdapter } from './lib/adapters/copilot-cli.mjs';
 import { antigravityAdapter } from './lib/adapters/antigravity.mjs';
 import { gsdPlan } from './lib/gsd.mjs';
 import { adhdCommand } from './lib/adhd.mjs';
-import { detectAgents, packageManager, prereqFor, which, run, quiet, exists } from './lib/system.mjs';
+import { detectAgents, packageManager, prereqFor, which, run, quiet, exists, isolate } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -262,10 +262,14 @@ async function uninstall(o) {
   console.log(`This restores ${state.files.length} files and undoes ${state.commands.length} commands.`);
   if (o.dryRun || !yesNo(await p.ask('Uninstall?', o.yes ? 'y' : 'n'))) { p.close(); console.log('Nothing changed.'); return; }
   p.close();
+  if (!o.exec && state.commands.length) throw new Error('--no-exec cannot undo the commands this install ran; run --uninstall without it');
   if (o.exec) {
     for (const c of [...state.commands].reverse()) {
       for (const argv of c.undo ?? []) {
-        if (!run(argv, { dryRun: false, log: console.log })) console.log('  ! failed. Run the command above by hand.');
+        if (!run(argv, { dryRun: false, log: console.log })) {
+          console.log('  ! failed. Run the command above by hand.');
+          process.exitCode = 1;
+        }
       }
     }
   }
@@ -276,6 +280,7 @@ async function uninstall(o) {
 
 async function main() {
   const o = parseArgs(process.argv.slice(2));
+  isolate(o.home);
   if (o.command === 'help') return console.log(HELP);
   if (o.command === 'doctor') return process.exit(doctor({ home: o.home, state: readState(o.home), exec: o.exec }) ? 0 : 1);
   if (o.command === 'uninstall') return uninstall(o);

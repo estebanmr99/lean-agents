@@ -56,6 +56,7 @@ What lean-agents configures per agent, how, and when each command or key was las
 | Antigravity CLI 1.4.12: binary `agy`, `antigravity.google/cli/install.sh` and `install.ps1`; `~/.gemini/config/{rules,agents,plugins}`, `mcp_config.json`; agent frontmatter `subagent`, `model` (`inherit`, `flash`, `pro`), `tools` | [docs](https://antigravity.google/docs) and real binary, no login | 2026-10-30 |
 | `agy agents`, `agy mcp list`, `agy plugin list --json` work without login; `agy models` needs sign-in | real binary | 2026-10-30 |
 | `rtk init -g --copilot` and `--agent antigravity` work without a TTY; `--uninstall` removes them. On Copilot it also adds a block to `copilot-instructions.md` | rtk 1.1.0, real binary | 2026-10-30 |
+| `rtk init` does not read `COPILOT_HOME`: with that variable set, the RTK hook still lands in `~/.copilot` | rtk 1.1.0, real binary | 2026-10-30 |
 | Context Mode plugin routes for both agents install and uninstall without a TTY. Copilot warns that direct plugin installs are deprecated | real binaries | 2026-10-30 |
 | Skills CLI ids `github-copilot`, `antigravity-cli`. `skills remove -a <agent>` reports success but keeps `~/.agents/skills` while another detected agent may share it, so the Copilot and Antigravity undo drops `-a` | real binary | 2026-10-30 |
 | Codeburn: npm `codeburn` 0.9.27, repo `getagentseal/codeburn`, MIT, Node 22.13+; `report -p week --format json` | npm, real binary | 2026-10-30 |
