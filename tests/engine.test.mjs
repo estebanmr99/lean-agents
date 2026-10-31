@@ -116,6 +116,7 @@ test('rules mention only installed tools and honor the language', () => {
 test('OpenCode 1.x gets singular keys, no Context Mode MCP, and a clean uninstall', () => {
   const home = userHome();
   const before = snapshot(home);
+  assert.match(lean(home, ['--dry-run', '--yes', '--no-exec', '--agents', 'opencode-v1', '--tools', 'context-mode', '--lang', 'en']), /npm install -g context-mode/);
   const args = ['--yes', '--no-exec', '--agents', 'opencode-v1', '--all-tools', '--privacy', 'strict', '--lang', 'en', '--profile', 'anthropic-api', '--ponytail-mode', 'lite'];
   lean(home, args);
   const oc = parse(fs.readFileSync(path.join(home, '.config', 'opencode', 'opencode.jsonc'), 'utf8'), [], { allowTrailingComma: true });

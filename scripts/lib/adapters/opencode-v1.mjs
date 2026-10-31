@@ -20,7 +20,16 @@ export function opencodeV1Adapter({ home, core, profile, opts, rulesPath }) {
     if (tools.includes(name)) edits.push({ path: ['mcp', name], value: localServer(core, name), mode: 'setIfAbsent' });
   }
   // Context Mode is plugin-only here: plugin plus MCP breaks OpenCode tool registration.
-  if (tools.includes('context-mode')) edits.push({ path: ['plugin'], value: 'context-mode', mode: 'arrayAdd' });
+  if (tools.includes('context-mode')) {
+    edits.push({ path: ['plugin'], value: 'context-mode', mode: 'arrayAdd' });
+    commands.push({
+      tool: 'context-mode',
+      desc: 'Context Mode package for OpenCode',
+      run: [['npm', 'install', '-g', 'context-mode']],
+      undo: [['npm', 'uninstall', '-g', 'context-mode']],
+      skipIfOutput: { cmd: ['npm', 'ls', '-g', 'context-mode'], ok: true },
+    });
+  }
   if (tools.includes('ponytail')) edits.push({ path: ['plugin'], value: '@dietrichgebert/ponytail', mode: 'arrayAdd' });
   if (tools.includes('dcp')) {
     edits.push({ path: ['plugin'], value: '@tarquinen/opencode-dcp@latest', mode: 'arrayAdd' });
