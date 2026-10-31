@@ -451,6 +451,7 @@ Mark each `[x]` when merged.
 
 - [x] **Session 1 — Foundation** (PR #1). Spec, rules, neutral subagents, README (EN/ES), contributing files, privacy check, secret scan.
 - [x] **Session 2 — Claude Code + OpenCode 2.x** (PR #2). Node engine, `install.sh`, Claude Code and OpenCode 2 adapters, profiles, docs, CI on Ubuntu and macOS, real OpenCode 2.2.5 check in CI.
+- [x] **Session 3 — Windows + OpenCode 1.x + wider CI** (PR #4). `install.ps1`, OpenCode 1.x adapter, optional DCP, tool rules, CI with real binaries on Windows, OpenCode 1.19, Claude Code and real tool installs.
 
 ### Session 3 — Windows + OpenCode 1.x + wider CI
 
@@ -501,6 +502,10 @@ Branch: `session-4-more-agents`.
 5. **Profiles:** add `github-copilot`, `opencode-go`, `openai-api`; verify model IDs on the build date; `.github/workflows/models-refresh.yml` (monthly + manual) opens a PR or an issue when models change.
 6. `INSTALL_WITH_AGENT.md`: final prompts per agent.
 7. CI: a real-binary job per new agent where the CLI installs without login.
+8. **Carried over from session 3:**
+   - Engine: honor `XDG_CONFIG_HOME`. Today it always writes `~/.config/opencode`, so OpenCode misses the config when that variable is set. Prove it with a test that sets the variable.
+   - Windows: exercise the winget route (`rtk-ai.rtk`, `astral-sh.uv`, `--scope user`) on a machine or runner that has winget.
+   - Migration doc: check `policies` and `cli.json` against a real OpenCode 2 binary and remove the **VERIFY** marks.
 
 ### Session 5 — Launch
 
