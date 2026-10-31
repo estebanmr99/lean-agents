@@ -102,6 +102,8 @@ jobs:
   real-claude:
     # Real Claude Code, throwaway HOME, no login: MCP servers go through the claude CLI.
     runs-on: ubuntu-latest
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -112,20 +114,31 @@ jobs:
         run: |
           curl -fsSL https://claude.ai/install.sh | bash
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-      - name: Install, check MCP servers and settings, uninstall
+      - name: Use the runner's Linuxbrew
+        run: echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
+      - name: Install every tool, check them, uninstall
         run: |
           export HOME="$(mktemp -d)"
           claude --version
-          bash install.sh --yes --agents claude --tools serena,playwright --privacy standard --lang en
+          bash install.sh --yes --agents claude --all-tools --privacy standard --lang en --ponytail-mode lite > "$HOME/install.txt"
+          cat "$HOME/install.txt"
+          ! grep -qE '^ *! ' "$HOME/install.txt"
           claude mcp list > "$HOME/mcp.txt"
           cat "$HOME/mcp.txt"
           grep -q serena "$HOME/mcp.txt"
           grep -q playwright "$HOME/mcp.txt"
+          grep -q 'plugin:context-mode' "$HOME/mcp.txt"
+          grep -q 'rtk hook' "$HOME/.claude/settings.json"
+          test -f "$HOME/.claude/skills/caveman/SKILL.md"
           node -e 'JSON.parse(require("fs").readFileSync(process.env.HOME + "/.claude/settings.json", "utf8"))'
-          node scripts/lean.mjs --uninstall --yes
+          node scripts/lean.mjs --uninstall --yes > "$HOME/uninstall.txt"
+          cat "$HOME/uninstall.txt"
+          ! grep -qE '^ *! ' "$HOME/uninstall.txt"
           claude mcp list > "$HOME/mcp-after.txt"
           cat "$HOME/mcp-after.txt"
-          ! grep -qE 'serena|playwright' "$HOME/mcp-after.txt"
+          ! grep -qE 'serena|playwright|context-mode' "$HOME/mcp-after.txt"
+          ! grep -q 'rtk hook' "$HOME/.claude/settings.json"
+          test ! -e "$HOME/.claude/skills/caveman"
 
   real-tools:
     # Real tool installs through the engine, throwaway HOME, real OpenCode 2 for the doctor.
