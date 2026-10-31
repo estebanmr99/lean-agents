@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: shellcheck
-        run: shellcheck install.sh scripts/check-private.sh tests/real-opencode.sh tests/real-opencode-v1.sh
+        run: shellcheck install.sh scripts/check-private.sh tests/*.sh
 
   test:
     strategy:
@@ -122,7 +122,7 @@ jobs:
           claude --version
           bash install.sh --yes --agents claude --all-tools --privacy standard --lang en --ponytail-mode lite > "$HOME/install.txt"
           cat "$HOME/install.txt"
-          ! grep -qE '^ *! ' "$HOME/install.txt"
+          if grep -qE '^ *! ' "$HOME/install.txt"; then exit 1; fi
           claude mcp list > "$HOME/mcp.txt"
           cat "$HOME/mcp.txt"
           grep -q serena "$HOME/mcp.txt"
@@ -133,11 +133,11 @@ jobs:
           node -e 'JSON.parse(require("fs").readFileSync(process.env.HOME + "/.claude/settings.json", "utf8"))'
           node scripts/lean.mjs --uninstall --yes > "$HOME/uninstall.txt"
           cat "$HOME/uninstall.txt"
-          ! grep -qE '^ *! ' "$HOME/uninstall.txt"
+          if grep -qE '^ *! ' "$HOME/uninstall.txt"; then exit 1; fi
           claude mcp list > "$HOME/mcp-after.txt"
           cat "$HOME/mcp-after.txt"
-          ! grep -qE 'serena|playwright|context-mode' "$HOME/mcp-after.txt"
-          ! grep -q 'rtk hook' "$HOME/.claude/settings.json"
+          if grep -qE 'serena|playwright|context-mode' "$HOME/mcp-after.txt"; then exit 1; fi
+          if grep -q 'rtk hook' "$HOME/.claude/settings.json"; then exit 1; fi
           test ! -e "$HOME/.claude/skills/caveman"
 
   real-tools:

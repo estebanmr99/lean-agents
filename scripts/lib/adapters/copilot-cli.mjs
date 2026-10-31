@@ -27,7 +27,8 @@ const skills = (tool, desc, repo, names) => ({
   tool,
   desc,
   run: [['npx', '-y', 'skills', 'add', repo, '--skill', ...names, '-a', 'github-copilot', '-g', '-y']],
-  undo: [['npx', '-y', 'skills', 'remove', ...names, '-a', 'github-copilot', '-g', '-y']],
+  // Without -a: `remove -a` keeps ~/.agents/skills while another detected agent may share that folder.
+  undo: [['npx', '-y', 'skills', 'remove', ...names, '-g', '-y']],
 });
 
 export function copilotAdapter({ home, core, profile, opts, rules, adhdCommand }) {
