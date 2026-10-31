@@ -4,17 +4,17 @@ What lean-agents configures per agent, how, and when each command or key was las
 
 | Feature | Claude Code | OpenCode 2.x | OpenCode 1.x | Copilot CLI | Antigravity CLI |
 | --- | --- | --- | --- | --- | --- |
-| Global rules | `@` import in `~/.claude/CLAUDE.md` | `instructions` entry | `instructions` entry | planned | planned |
-| Subagents by tier | `~/.claude/agents/*.md` | `~/.config/opencode/agents/*.md` | `~/.config/opencode/agents/*.md` | planned | planned |
+| Global rules | `@` import in `~/.claude/CLAUDE.md` | `instructions` entry | `instructions` entry | marked block in `~/.copilot/copilot-instructions.md` | `~/.gemini/config/rules/lean-agents.md` |
+| Subagents by tier | `~/.claude/agents/*.md` | `~/.config/opencode/agents/*.md` | `~/.config/opencode/agents/*.md` | `~/.copilot/agents/*.agent.md` | `~/.gemini/config/agents/*.md` (`subagent: true`) |
 | Primary agent models | `model` in settings (only if unset) | `agents.plan` / `agents.build` from profile | `agent.plan` / `agent.build` from profile | planned | planned |
 | RTK | `rtk init -g --auto-patch` (hook) | `rtk init -g --opencode` (plugin) | `rtk init -g --opencode` (plugin) | `rtk init -g --copilot` | `rtk init -g --agent antigravity` |
-| Context Mode | plugin `context-mode@context-mode` | MCP (`mcp.servers`) | `plugin` entry, needs Node.js 22.5+ | planned | planned |
-| Serena, Playwright | `claude mcp add --scope user` | `mcp.servers` | flat `mcp.<name>` | planned | planned |
+| Context Mode | plugin `context-mode@context-mode` | MCP (`mcp.servers`) | `plugin` entry, needs Node.js 22.5+ | `copilot plugin install mksglu/context-mode:configs/copilot-cli` | `agy plugin install` from `configs/antigravity-cli` |
+| Serena, Playwright | `claude mcp add --scope user` | `mcp.servers` | flat `mcp.<name>` | `~/.copilot/mcp-config.json` | `~/.gemini/config/mcp_config.json` |
 | Ponytail | plugin `ponytail@ponytail` | `plugins` entry | `plugin` entry | ➖ | ➖ |
-| i-have-adhd | plugin `i-have-adhd@i-have-adhd` + flag | vendor checkout + loader + flag | vendor checkout + loader + flag | ➖ | ➖ |
-| Caveman | `npx skills add … -a claude-code -g` | `npx skills add … -a opencode -g` | `npx skills add … -a opencode -g` | planned | planned |
+| i-have-adhd | plugin `i-have-adhd@i-have-adhd` + flag | vendor checkout + loader + flag | vendor checkout + loader + flag | `npx skills add … -a github-copilot -g` | `npx skills add … -a antigravity-cli -g` (partial) |
+| Caveman | `npx skills add … -a claude-code -g` | `npx skills add … -a opencode -g` | `npx skills add … -a opencode -g` | `npx skills add … -a github-copilot -g` | `npx skills add … -a antigravity-cli -g` (partial) |
 | Compaction | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=80` | `compaction.auto` + `compaction.buffer` | `compaction.auto` + `compaction.reserved`, optional DCP | planned | planned |
-| Strict privacy | env flags (below) | `share`, `update`, `policies` | `share`, `autoupdate`, `experimental.openTelemetry`, `disabled_providers` | planned | planned |
+| Strict privacy | env flags (below) | `share`, `update`, `policies` | `share`, `autoupdate`, `experimental.openTelemetry`, `disabled_providers` | `autoUpdate: false`; telemetry only through the `--disable-client-telemetry` flag | account setting only, printed as a reminder |
 
 ## Windows
 
@@ -50,7 +50,25 @@ What lean-agents configures per agent, how, and when each command or key was las
 | `rtk init -g` without a TTY prints a manual step and skips the hook; `--auto-patch` writes it to `settings.json` | `rtk init --help` 1.1.0, `real-claude` in CI | 2026-10-30 |
 | `claude mcp add`, `claude mcp list`, `claude plugin marketplace add`, `claude plugin install` and `claude plugin uninstall` work without login | `real-claude` in CI | 2026-10-30 |
 | `opencode-ai` on npm provides the 1.19.0 binary | npm, `tests/real-windows.ps1` in CI | 2026-10-30 |
+| Copilot CLI 1.0.105: `npm i -g @github/copilot` (Node 22+), `gh.io/copilot-install`, `winget install GitHub.Copilot`; `COPILOT_HOME`; `copilot-instructions.md`, `agents/*.agent.md`, `mcp-config.json`, `hooks/`, `settings.json`; `autoUpdate`; tool aliases `read`, `edit`, `search`, `execute`, `web` | [docs](https://docs.github.com/en/copilot/how-tos/copilot-cli) and real binary, no login | 2026-10-30 |
+| `copilot mcp list --json`, `instruction list`, `skill list`, `plugin list` work without login. Piping them to `grep -q` kills copilot with EPIPE; read from a file | real binary | 2026-10-30 |
+| Copilot telemetry has no setting, only `--disable-client-telemetry` | real binary (`copilot config --list`, `--help`) | 2026-10-30 |
+| Antigravity CLI 1.4.12: binary `agy`, `antigravity.google/cli/install.sh` and `install.ps1`; `~/.gemini/config/{rules,agents,plugins}`, `mcp_config.json`; agent frontmatter `subagent`, `model` (`inherit`, `flash`, `pro`), `tools` | [docs](https://antigravity.google/docs) and real binary, no login | 2026-10-30 |
+| `agy agents`, `agy mcp list`, `agy plugin list --json` work without login; `agy models` needs sign-in | real binary | 2026-10-30 |
+| `rtk init -g --copilot` and `--agent antigravity` work without a TTY; `--uninstall` removes them. On Copilot it also adds a block to `copilot-instructions.md` | rtk 1.1.0, real binary | 2026-10-30 |
+| Context Mode plugin routes for both agents install and uninstall without a TTY. Copilot warns that direct plugin installs are deprecated | real binaries | 2026-10-30 |
+| Skills CLI ids `github-copilot`, `antigravity-cli`. `skills remove -a <agent>` reports success but keeps `~/.agents/skills` while another detected agent may share it, so the Copilot and Antigravity undo drops `-a` | real binary | 2026-10-30 |
+| Codeburn: npm `codeburn` 0.9.27, repo `getagentseal/codeburn`, MIT, Node 22.13+; `report -p week --format json` | npm, real binary | 2026-10-30 |
+| AutoSkills: npm `autoskills` 0.4.1, repo `midudev/autoskills`, CC-BY-NC-4.0. Identity confirmed: npm `gitHead` is the `release: v0.4.1` commit in that repo, and autoskills.sh links it. No `--version`, doctor uses `--help` | npm, GitHub, real binary | 2026-10-30 |
+| GSD Core: `@opengsd/gsd-core` 1.19.0, MIT, repo `open-gsd/gsd-core`. `--copilot`, `--antigravity`, `--opencode`, `--claude` with `--global`, `--uninstall`. `model_overrides` is read from `~/.gsd/defaults.json` (`bin/lib/config-loader.cjs`) | npm, package source, real binary | 2026-10-30 |
+| Model IDs for `github-copilot`, `openai-api`, `opencode-go` exist | [models.dev](https://models.dev/api.json), `scripts/models-refresh.mjs --check` | 2026-10-30 |
+| OpenCode Go training terms: the default models are marked not used for training; Contributor and Free models may train; DeepSeek needs a region setting, so it is not a default | [docs](https://opencode.ai/docs/go) | 2026-10-30 |
+| OpenCode 2: `cli.json` replaces `tui.json` (migration code and docs inside the binary); `policies` accepted | real binary 2.1.4, `tests/real-opencode.sh` | 2026-10-30 |
+| i-have-adhd ships `disable-model-invocation: true`: a prompt cannot load it, only `/i-have-adhd` or the always-on flag. lean-agents sets it to `false` in the installed copies | plugin 0.4.1 | 2026-10-30 |
 
 ## Not yet verified
 
 - `reasoningEffort` as the pass-through option for Gemini on Vertex.
+- **VERIFY:** the `model` value format in Copilot `*.agent.md`. Without a login, Copilot cannot show which model it picked.
+- **VERIFY:** Antigravity loading `~/.gemini/config/rules` and `~/.agents/skills`. No list command shows them without a login, so README marks both as partial.
+- **VERIFY:** `brew install copilot-cli` (README) against `brew install --cask copilot-cli` (docs). lean-agents does not use either.

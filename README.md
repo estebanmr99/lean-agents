@@ -16,7 +16,7 @@ The same rules, cheap-by-default subagents, context-saving tools and MCP servers
 
 </div>
 
-> **Status: v0.3 preview.** The installer works for **Claude Code** and **OpenCode 1.x and 2.x** on macOS, Linux and Windows. Copilot CLI and Antigravity are next ([roadmap](#roadmap)). Star the repo to get notified when `v1.0.0` ships.
+> **Status: v0.4 preview.** The installer works for **Claude Code**, **OpenCode 1.x and 2.x**, **GitHub Copilot CLI** and **Antigravity CLI** on macOS, Linux and Windows (Antigravity: macOS and Linux). Star the repo to get notified when `v1.0.0` ships.
 
 <!-- TODO(session 5): demo GIF -->
 
@@ -52,23 +52,25 @@ Context Mode needs Node.js 22.5 or newer. Everything else works on Node.js 20.
 
 | Feature | Claude Code | OpenCode 2.x | OpenCode 1.x | Copilot CLI | Antigravity CLI |
 | --- | --- | --- | --- | --- | --- |
-| Global rules (AGENTS.md) | ✅ | ✅ | ✅ | 🔎 | 🔎 |
-| Subagents by cost tier | ✅ | ✅ | ✅ | 🔎 | 🔎 |
-| RTK (shell output compression) | ✅ | ✅ | ✅ | 🔜 | 🔜 |
-| Context Mode | ✅ plugin | ✅ MCP | ✅ plugin | 🔎 | 🔎 |
-| Serena + Playwright MCP | ✅ | ✅ | ✅ | 🔎 | 🔎 |
-| Ponytail, i-have-adhd | ✅ | ✅ | ✅ | ➖ | ➖ |
-| Caveman and other skills | ✅ | ✅ | ✅ | 🔎 | 🔎 |
-| Context compaction | ✅ auto 80% | ✅ native | ✅ native, optional DCP | 🔎 | 🔎 |
+| Global rules (AGENTS.md) | ✅ | ✅ | ✅ | ✅ | ⚠️ written, load unproven |
+| Subagents by cost tier | ✅ | ✅ | ✅ | ✅ | ✅ flash, pro |
+| RTK (shell output compression) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Context Mode | ✅ plugin | ✅ MCP | ✅ plugin | ✅ plugin | ✅ plugin |
+| Serena + Playwright MCP | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Ponytail | ✅ | ✅ | ✅ | ➖ | ➖ |
+| i-have-adhd | ✅ | ✅ | ✅ | ✅ | ⚠️ written, load unproven |
+| Caveman and other skills | ✅ | ✅ | ✅ | ✅ | ⚠️ written, load unproven |
+| Context compaction | ✅ auto 80% | ✅ native | ✅ native, optional DCP | ➖ | ➖ |
 
-✅ supported · 🔜 next release · 🔎 being verified · ➖ not available for this agent. Details and verification dates: [docs/compatibility.md](docs/compatibility.md).
+✅ supported · ⚠️ partial · ➖ not available for this agent. Details and verification dates: [docs/compatibility.md](docs/compatibility.md).
 
 ## Install tiers
 
 | Tier | What | Default |
 | --- | --- | --- |
 | Minimal | Rules, tiered subagents, compaction, output limits, RTK, Context Mode | Always |
-| Optional tools | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0) | Asked one by one |
+| Optional tools | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0), Codeburn | Asked one by one |
+| Opt-in tools | GSD Core, AutoSkills (CC BY-NC 4.0: non-commercial use only) | Asked one by one, never in `--all-tools` |
 | Strict privacy | No telemetry, no auto-updates, no session sharing, no providers that train on your prompts | Off, opt in with `--privacy strict` |
 
 ## Models that stay current
@@ -96,14 +98,14 @@ lean-agents is glue. The heavy lifting is done by these projects; please star th
 [OpenCode DCP](https://github.com/Opencode-DCP/opencode-dynamic-context-pruning) ·
 [GSD Core](https://github.com/open-gsd/gsd-core) ·
 [andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills) ·
-Codeburn · AutoSkills · [Skills CLI](https://vercel.com/changelog/introducing-skills-the-open-agent-skills-ecosystem)
+[Codeburn](https://github.com/getagentseal/codeburn) · [AutoSkills](https://github.com/midudev/autoskills) · [Skills CLI](https://vercel.com/changelog/introducing-skills-the-open-agent-skills-ecosystem)
 
 ## Roadmap
 
 - [x] Spec, rules and subagent definitions
 - [x] Installer for Claude Code and OpenCode 2.x (macOS, Linux)
 - [x] Windows installer and OpenCode 1.x
-- [ ] Copilot CLI, Antigravity CLI, Codeburn, AutoSkills, GSD, original skills, model profiles
+- [x] Copilot CLI, Antigravity CLI, Codeburn, AutoSkills, GSD, original skills, model profiles
 - [ ] `v1.0.0`
 - Later: Codex CLI, Gemini CLI, Cursor
 

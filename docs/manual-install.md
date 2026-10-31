@@ -55,6 +55,19 @@ OpenCode 1 uses the same commands and files, with these config differences:
 
 Windows without winget: download `rtk-x86_64-pc-windows-msvc.zip` from the [RTK releases](https://github.com/rtk-ai/rtk/releases) and extract it into `%USERPROFILE%\tools\rtk`. `install.ps1` adds that folder to your user PATH; open a new terminal afterwards.
 
+Copilot CLI and Antigravity CLI:
+
+| Tool | Copilot CLI | Antigravity CLI |
+| --- | --- | --- |
+| Rules | Paste `core/AGENTS.md` into `~/.copilot/copilot-instructions.md` | Copy to `~/.gemini/config/rules/` |
+| Subagents | `~/.copilot/agents/<name>.agent.md` | `~/.gemini/config/agents/<name>.md` with `subagent: true` |
+| RTK | `rtk init -g --copilot` | `rtk init -g --agent antigravity` |
+| Context Mode | `copilot plugin install mksglu/context-mode:configs/copilot-cli` | `agy plugin install https://github.com/mksglu/context-mode/tree/main/configs/antigravity-cli` |
+| Serena, Playwright | `mcpServers` in `~/.copilot/mcp-config.json`, with `"type": "local"` and `"tools": ["*"]` | `mcpServers` in `~/.gemini/config/mcp_config.json` |
+| Caveman | `npx skills add JuliusBrussee/caveman --skill caveman caveman-compress caveman-stats -a github-copilot -g -y` | Same with `-a antigravity-cli` |
+
+Opt-in tools: `npx -y @opengsd/gsd-core@latest --copilot --global` (also `--claude`, `--opencode`, `--antigravity`), and `npx autoskills` inside a project.
+
 Add `.serena/` to your global git ignore (`~/.config/git/ignore`).
 
 ## 5. Strict privacy
