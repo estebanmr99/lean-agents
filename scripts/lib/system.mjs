@@ -1,6 +1,8 @@
 // Detection of agents and prerequisites, and running external commands.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 const isWin = process.platform === 'win32';
 
@@ -19,12 +21,28 @@ export function version(bin, args = ['--version']) {
   return m ? m[0] : 'unknown';
 }
 
+// A config dir from the environment counts only for the real home or inside --home:
+// a run with --home must never write outside it, even when the variable is set.
+export function envDir(home, name, fallback) {
+  const value = process.env[name];
+  if (!value || !path.isAbsolute(value)) return fallback;
+  const rel = path.relative(home, value);
+  const inside = !rel.startsWith('..') && !path.isAbsolute(rel);
+  return home === os.homedir() || inside ? value : fallback;
+}
+
+export const configHome = (home) => envDir(home, 'XDG_CONFIG_HOME', path.join(home, '.config'));
+
 export function detectAgents() {
   const found = {};
   const claude = version('claude');
   if (claude) found.claude = claude;
   const oc = version('opencode');
   if (oc) found[oc.startsWith('1.') ? 'opencode-v1' : 'opencode-v2'] = oc;
+  const copilot = version('copilot');
+  if (copilot) found['copilot-cli'] = copilot;
+  const agy = version('agy');
+  if (agy) found.antigravity = agy;
   return found;
 }
 
@@ -36,7 +54,7 @@ export function packageManager() {
 // What each tool needs on PATH, and how to get it. Agent CLIs are never installed here.
 export function prereqFor(tool, pm) {
   const brew = (f) => (pm === 'brew' ? [['brew', 'install', f]] : null);
-  const winget = (id) => (pm === 'winget' ? [['winget', 'install', '--id', id, '-e', '--scope', 'user']] : null);
+  const winget = (id) => (pm === 'winget' ? [['winget', 'install', '--id', id, '-e', '--scope', 'user', '--accept-source-agreements', '--accept-package-agreements']] : null);
   switch (tool) {
     case 'rtk':
       return { bin: 'rtk', install: brew('rtk') ?? winget('rtk-ai.rtk'), manual: 'https://github.com/rtk-ai/rtk#installation' };
@@ -46,6 +64,9 @@ export function prereqFor(tool, pm) {
       return { bin: 'uvx', install: brew('uv') ?? winget('astral-sh.uv'), manual: 'https://docs.astral.sh/uv/getting-started/installation/' };
     case 'playwright':
     case 'caveman':
+    case 'codeburn':
+    case 'autoskills':
+    case 'gsd':
       return { bin: 'npx', install: null, manual: 'https://nodejs.org/' };
     case 'i-have-adhd':
       return { bin: 'git', install: brew('git') ?? winget('Git.Git'), manual: 'https://git-scm.com/downloads' };
@@ -61,8 +82,8 @@ export function run(argv, { dryRun, log }) {
   return r.status === 0;
 }
 
-export function quiet(argv) {
-  const r = spawnSync(argv[0], argv.slice(1), { encoding: 'utf8', shell: useShell(argv[0]), timeout: 30000 });
+export function quiet(argv, timeout = 30000) {
+  const r = spawnSync(argv[0], argv.slice(1), { encoding: 'utf8', shell: useShell(argv[0]), timeout });
   return { ok: r.status === 0, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
 }
 

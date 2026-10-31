@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { OWNED_MARK } from '../fsops.mjs';
 import { tierFor, modelFor } from '../render.mjs';
+import { configHome } from '../system.mjs';
 
 const PERMISSIONS = {
   'read-only': ['  edit: deny', '  bash: deny'],
@@ -53,7 +54,7 @@ export function profileEdits(profile, agentsKey) {
 }
 
 function ponytailConfig(home) {
-  if (process.platform !== 'win32') return path.join(home, '.config', 'ponytail', 'config.json');
+  if (process.platform !== 'win32') return path.join(configHome(home), 'ponytail', 'config.json');
   // Only the real home may use %APPDATA%: --home must keep every write inside the temp dir.
   const appData = home === os.homedir() && process.env.APPDATA ? process.env.APPDATA : path.join(home, 'AppData', 'Roaming');
   return path.join(appData, 'ponytail', 'config.json');
@@ -101,7 +102,7 @@ export function opencodeShared({ home, dir, core, profile, opts }) {
 }
 
 export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
-  const dir = path.join(home, '.config', 'opencode');
+  const dir = path.join(configHome(home), 'opencode');
   const tools = opts.tools;
   const { actions, commands } = opencodeShared({ home, dir, core, profile, opts });
   const edits = [

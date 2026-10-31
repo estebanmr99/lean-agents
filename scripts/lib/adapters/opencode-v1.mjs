@@ -2,9 +2,10 @@
 // and commands are shared with the 2.x adapter, only config keys differ.
 import path from 'node:path';
 import { configPath, localServer, opencodeShared, profileEdits } from './opencode-v2.mjs';
+import { configHome } from '../system.mjs';
 
 export function opencodeV1Adapter({ home, core, profile, opts, rulesPath }) {
-  const dir = path.join(home, '.config', 'opencode');
+  const dir = path.join(configHome(home), 'opencode');
   const tools = opts.tools;
   const { actions, commands } = opencodeShared({ home, dir, core, profile, opts });
   const edits = [

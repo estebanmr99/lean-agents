@@ -101,11 +101,11 @@ function readState(home) {
 
 async function choose(o, saved) {
   const p = prompter(o.yes);
-  const detected = detectAgents();
-  const supported = Object.keys(detected).filter((a) => ADAPTERS[a]);
   if (!o.agents) {
     o.agents = saved?.agents ?? [];
     if (!saved) {
+      const detected = detectAgents();
+      const supported = Object.keys(detected).filter((a) => ADAPTERS[a]);
       if (!supported.length) console.log('No supported agent found on PATH (claude, opencode). Use --agents to configure anyway.');
       for (const a of supported) {
         if (yesNo(await p.ask(`Configure ${a} ${detected[a]}?`, 'y'))) o.agents.push(a);
@@ -195,14 +195,15 @@ async function install(o) {
   const backupDir = path.join(stateDir(o.home), 'backups', stamp);
   const files = apply(planned, backupDir, o.home);
   const ran = [];
+  let failed = 0;
   if (o.exec) {
     for (const c of commands) {
-      if (c.manual) { console.log(`! ${c.desc}`); continue; }
+      if (c.manual) { console.log(`! ${c.desc}`); failed++; continue; }
       if (c.skipIfExists && exists(c.skipIfExists)) continue;
       if (c.skipIfOutput && quiet(c.skipIfOutput.cmd).ok) continue;
       console.log(`- ${c.desc}`);
       const ok = c.run.every((argv) => run(argv, { dryRun: false, log: console.log }));
-      if (!ok) console.log(`  ! failed: ${c.desc}. Run the command above by hand, then --doctor.`);
+      if (!ok) { console.log(`  ! failed: ${c.desc}. Run the command above by hand, then --doctor.`); failed++; }
       ran.push({ desc: c.desc, ok, undo: c.undo });
     }
   }
@@ -217,6 +218,11 @@ async function install(o) {
   };
   fs.mkdirSync(stateDir(o.home), { recursive: true });
   fs.writeFileSync(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(state, null, 2)}\n`);
+  if (failed) {
+    console.log(`\n${failed} step(s) failed; see the lines marked ! above. Backups: ${backupDir}`);
+    process.exitCode = 1;
+    return;
+  }
   console.log(`\nDone. Backups: ${backupDir}`);
   console.log('Next: restart your agents, log in to your providers, then run --doctor.');
   if (o.privacy === 'strict' && o.agents.includes('claude')) {

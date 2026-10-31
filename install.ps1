@@ -35,12 +35,12 @@ function Assert-Success($What) { if ($LASTEXITCODE -ne 0) { throw "lean-agents: 
 function Install-Prerequisite($Bin, $Id, $Url) {
   if (Test-Command $Bin) { return }
   if (-not (Test-Command 'winget')) { throw "lean-agents: $Bin is required. Install it from $Url and run this again." }
-  $command = "winget install --id $Id -e --scope user"
+  $command = "winget install --id $Id -e --scope user --accept-source-agreements --accept-package-agreements"
   if ($DryRun) { Write-Output "Would run: $command"; return }
   if (-not $Yes -and (Read-Host "$Bin is missing. Install it with '$command'? [y/N]") -notmatch '^(y|yes|s|si)$') {
     throw "lean-agents: $Bin is required. Install it from $Url and run this again."
   }
-  winget install --id $Id -e --scope user
+  winget install --id $Id -e --scope user --accept-source-agreements --accept-package-agreements
   Assert-Success 'winget install'
   $env:Path = @('Machine', 'User' | ForEach-Object { [Environment]::GetEnvironmentVariable('Path', $_) }) -join ';'
 }

@@ -8,12 +8,13 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'jsonc-parser';
 import { applyJsonEdits, revertJsonEdits } from '../scripts/lib/fsops.mjs';
+import { prereqFor } from '../scripts/lib/system.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ALL = ['--yes', '--no-exec', '--agents', 'claude,opencode-v2', '--all-tools', '--privacy', 'strict', '--lang', 'en', '--profile', 'vertex-gemini', '--adhd-always', '--ponytail-mode', 'lite'];
 
-function lean(home, args) {
-  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args], { encoding: 'utf8' });
+function lean(home, args, env = process.env) {
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args], { encoding: 'utf8', env });
   assert.equal(r.status, 0, r.stderr || r.stdout);
   return r.stdout;
 }
@@ -174,4 +175,37 @@ test('json edits round-trip', () => {
   const { text, applied } = applyJsonEdits(original, edits);
   assert.deepEqual(parse(text), { a: 1, b: { c: 2 }, list: ['x'] });
   assert.equal(revertJsonEdits(text, applied), original);
+});
+
+test('XDG_CONFIG_HOME inside --home moves the OpenCode and Ponytail config', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const xdg = path.join(home, 'xdg');
+  lean(home, [...ALL, '--agents', 'opencode-v2'], { ...process.env, XDG_CONFIG_HOME: xdg });
+  assert.ok(fs.existsSync(path.join(xdg, 'opencode', 'opencode.jsonc')));
+  assert.ok(fs.existsSync(path.join(xdg, 'opencode', 'agents', 'planner.md')));
+  if (process.platform !== 'win32') assert.ok(fs.existsSync(path.join(xdg, 'ponytail', 'config.json')));
+  assert.ok(!fs.existsSync(path.join(home, '.config', 'opencode')));
+});
+
+test('XDG_CONFIG_HOME outside --home is ignored, so a test run cannot escape', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-outside-'));
+  lean(home, [...ALL, '--agents', 'opencode-v2'], { ...process.env, XDG_CONFIG_HOME: outside });
+  assert.deepEqual(fs.readdirSync(outside), []);
+  assert.ok(fs.existsSync(path.join(home, '.config', 'opencode', 'opencode.jsonc')));
+});
+
+test('a failed install command exits 1 and still records state', { skip: process.platform === 'win32' }, () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-bin-'));
+  for (const name of ['rtk', 'context-mode']) fs.writeFileSync(path.join(bin, name), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+  const args = ['--yes', '--agents', 'opencode-v2', '--tools', 'rtk', '--privacy', 'standard', '--lang', 'en', '--profile', 'none'];
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args], { encoding: 'utf8', env: { ...process.env, PATH: bin } });
+  assert.equal(r.status, 1, r.stdout);
+  assert.match(r.stdout, /1 step\(s\) failed/);
+  assert.ok(fs.existsSync(path.join(home, '.config', 'lean-agents', 'state.json')));
+});
+
+test('winget installs accept agreements, or they stop at a prompt without a TTY', () => {
+  for (const tool of ['rtk', 'serena']) assert.ok(prereqFor(tool, 'winget').install[0].includes('--accept-package-agreements'));
 });
