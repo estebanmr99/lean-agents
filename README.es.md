@@ -10,7 +10,7 @@ Las mismas reglas, subagentes baratos por defecto, herramientas que ahorran cont
 
 </div>
 
-> **Estado: versión preliminar v0.3.** El instalador ya funciona para **Claude Code** y **OpenCode 1.x y 2.x** en macOS, Linux y Windows. Copilot CLI y Antigravity vienen después. Dale una estrella al repo para enterarte cuando salga `v1.0.0`.
+> **Estado: versión preliminar v0.4.** El instalador funciona para **Claude Code**, **OpenCode 1.x y 2.x**, **GitHub Copilot CLI** y **Antigravity CLI** en macOS, Linux y Windows (Antigravity: macOS y Linux). Dale una estrella al repo para enterarte cuando salga `v1.0.0`.
 
 ## Inicio rápido
 
@@ -42,23 +42,25 @@ Context Mode necesita Node.js 22.5 o superior. Todo lo demás funciona con Node.
 
 | Función | Claude Code | OpenCode 2.x | OpenCode 1.x | Copilot CLI | Antigravity CLI |
 | --- | --- | --- | --- | --- | --- |
-| Reglas globales (AGENTS.md) | ✅ | ✅ | ✅ | 🔎 | 🔎 |
-| Subagentes por costo | ✅ | ✅ | ✅ | 🔎 | 🔎 |
-| RTK (comprime la salida del shell) | ✅ | ✅ | ✅ | 🔜 | 🔜 |
-| Context Mode | ✅ plugin | ✅ MCP | ✅ plugin | 🔎 | 🔎 |
-| Serena + Playwright MCP | ✅ | ✅ | ✅ | 🔎 | 🔎 |
-| Ponytail, i-have-adhd | ✅ | ✅ | ✅ | ➖ | ➖ |
-| Caveman y otras skills | ✅ | ✅ | ✅ | 🔎 | 🔎 |
-| Compactación de contexto | ✅ auto 80% | ✅ nativa | ✅ nativa, DCP opcional | 🔎 | 🔎 |
+| Reglas globales (AGENTS.md) | ✅ | ✅ | ✅ | ✅ | ⚠️ se escriben, carga sin probar |
+| Subagentes por costo | ✅ | ✅ | ✅ | ✅ | ✅ flash, pro |
+| RTK (comprime la salida del shell) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Context Mode | ✅ plugin | ✅ MCP | ✅ plugin | ✅ plugin | ✅ plugin |
+| Serena + Playwright MCP | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Ponytail | ✅ | ✅ | ✅ | ➖ | ➖ |
+| i-have-adhd | ✅ | ✅ | ✅ | ✅ | ⚠️ se escribe, carga sin probar |
+| Caveman y otras skills | ✅ | ✅ | ✅ | ✅ | ⚠️ se escriben, carga sin probar |
+| Compactación de contexto | ✅ auto 80% | ✅ nativa | ✅ nativa, DCP opcional | ➖ | ➖ |
 
-✅ soportado · 🔜 próxima versión · 🔎 en verificación · ➖ no disponible para este agente. Detalles y fechas de verificación: [docs/compatibility.md](docs/compatibility.md).
+✅ soportado · ⚠️ parcial · ➖ no disponible para este agente. Detalles y fechas de verificación: [docs/compatibility.md](docs/compatibility.md).
 
 ## Niveles de instalación
 
 | Nivel | Qué incluye | Por defecto |
 | --- | --- | --- |
 | Mínimo | Reglas, subagentes por costo, compactación, límites de salida, RTK, Context Mode | Siempre |
-| Herramientas opcionales | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0) | Se pregunta una por una |
+| Herramientas opcionales | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0), Codeburn | Se pregunta una por una |
+| Herramientas por elección | GSD Core, AutoSkills (CC BY-NC 4.0: solo uso no comercial) | Se pregunta una por una, nunca en `--all-tools` |
 | Privacidad estricta | Sin telemetría, sin auto updates, sin compartir sesiones, sin proveedores que entrenan con tus prompts | Apagado, se activa con `--privacy strict` |
 
 ## Modelos siempre al día

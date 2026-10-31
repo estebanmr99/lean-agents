@@ -1,0 +1,12 @@
+{
+  "name": "antigravity",
+  "description": "Antigravity CLI tiers. Subagents take flash, pro or inherit, not model IDs.",
+  "verified_on": "2026-10-30",
+  "agents": ["antigravity"],
+  "tiers": {
+    "fast": { "model": "flash" },
+    "balanced": { "model": "flash" },
+    "strong": { "model": "pro" }
+  },
+  "notes": "Set by the adapter; not a choice for --profile."
+}

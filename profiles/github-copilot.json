@@ -1,0 +1,17 @@
+{
+  "name": "github-copilot",
+  "description": "GitHub Copilot subscription, in Copilot CLI or in OpenCode through /connect.",
+  "verified_on": "2026-10-30",
+  "agents": ["copilot-cli", "opencode-v2", "opencode-v1"],
+  "provider": "github-copilot",
+  "tiers": {
+    "fast": { "model": "github-copilot/claude-haiku-5.5" },
+    "balanced": { "model": "github-copilot/claude-sonnet-5.5" },
+    "strong": { "model": "github-copilot/claude-opus-5.5" }
+  },
+  "primary": {
+    "plan": "strong", "build": "balanced"
+  },
+  "main_model": "github-copilot/claude-sonnet-5.5",
+  "notes": "Copilot CLI uses the IDs without the github-copilot/ prefix. Copilot bills by usage since 2026-06-01, so check current rates. Your plan or organization may hide some models; the update-models skill lists what you can use."
+}

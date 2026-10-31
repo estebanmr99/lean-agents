@@ -1,6 +1,6 @@
 # Install with your agent
 
-Paste this into Claude Code, OpenCode or Copilot CLI. Your agent will ask before changing anything.
+Paste this into Claude Code, OpenCode, Copilot CLI or Antigravity CLI. Your agent will ask before changing anything.
 
 ```text
 Install lean-agents for me from https://github.com/estebanmr99/lean-agents.
@@ -14,4 +14,4 @@ Install lean-agents for me from https://github.com/estebanmr99/lean-agents.
 Never read, print or store my API keys or tokens.
 ```
 
-> Today the installer configures Claude Code and OpenCode 2.x on macOS and Linux. Windows support arrives in the next release.
+> The installer configures Claude Code, OpenCode 1.x and 2.x, and Copilot CLI on macOS, Linux and Windows, and Antigravity CLI on macOS and Linux. On Windows, use `install.ps1` instead of `bash install.sh`.

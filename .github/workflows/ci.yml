@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: shellcheck
-        run: shellcheck install.sh scripts/check-private.sh tests/real-opencode.sh tests/real-opencode-v1.sh
+        run: shellcheck install.sh scripts/check-private.sh tests/*.sh
 
   test:
     strategy:
@@ -41,7 +41,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $issues = Invoke-ScriptAnalyzer -Path install.ps1 -Severity Warning,Error
+          $issues = 'install.ps1', 'tests/real-copilot.ps1' | ForEach-Object { Invoke-ScriptAnalyzer -Path $_ -Severity Warning,Error }
           $issues | Format-List
           if ($issues) { exit 1 }
       - name: install.ps1 on PowerShell 5.1
@@ -58,6 +58,15 @@ jobs:
           export HOME="$(mktemp -d)"
           bash install.sh --dry-run --yes --no-exec --agents claude,opencode-v2 --all-tools --privacy strict --profile vertex-gemini
           test -z "$(ls -A "$HOME")"
+      - name: Skills install from the checkout
+        if: runner.os == 'Linux'
+        run: |
+          export HOME="$(mktemp -d)"
+          npx -y skills add "$PWD" --skill setup-doctor token-audit update-models -a github-copilot -g -y
+          for s in setup-doctor token-audit update-models; do test -f "$HOME/.agents/skills/$s/SKILL.md"; done
+      - name: Every profile model exists upstream
+        if: runner.os == 'Linux'
+        run: node scripts/models-refresh.mjs --check
       - name: Real install, doctor and uninstall in a temporary HOME
         if: runner.os != 'Windows'
         run: |
@@ -82,6 +91,29 @@ jobs:
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - name: Install lean-agents and check what OpenCode resolved
         run: bash tests/real-opencode.sh
+
+  real-opencode-xdg:
+    # Its own job: OpenCode's background service holds a fixed port and keeps the first HOME.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Install OpenCode 2
+        run: |
+          curl -fsSL https://opencode.ai/v2/install | bash
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+      - name: Non-default XDG_CONFIG_HOME reaches the real OpenCode
+        run: |
+          export HOME="$(mktemp -d)"
+          export XDG_CONFIG_HOME="$HOME/custom-config"
+          bash install.sh --yes --no-exec --agents opencode-v2 --privacy strict --profile anthropic-api
+          test -d "$XDG_CONFIG_HOME/opencode"
+          test ! -e "$HOME/.config/opencode"
+          opencode debug config > "$HOME/resolved.txt"
+          grep -q lean-agents "$HOME/resolved.txt"
 
   real-opencode-v1:
     # Real OpenCode 1.x binary, throwaway HOME: proves the 1.x keys are accepted.
@@ -122,7 +154,7 @@ jobs:
           claude --version
           bash install.sh --yes --agents claude --all-tools --privacy standard --lang en --ponytail-mode lite > "$HOME/install.txt"
           cat "$HOME/install.txt"
-          ! grep -qE '^ *! ' "$HOME/install.txt"
+          if grep -qE '^ *! ' "$HOME/install.txt"; then exit 1; fi
           claude mcp list > "$HOME/mcp.txt"
           cat "$HOME/mcp.txt"
           grep -q serena "$HOME/mcp.txt"
@@ -130,14 +162,15 @@ jobs:
           grep -q 'plugin:context-mode' "$HOME/mcp.txt"
           grep -q 'rtk hook' "$HOME/.claude/settings.json"
           test -f "$HOME/.claude/skills/caveman/SKILL.md"
+          grep -q '^disable-model-invocation: false$' "$HOME"/.claude/plugins/cache/i-have-adhd/i-have-adhd/*/skills/i-have-adhd/SKILL.md
           node -e 'JSON.parse(require("fs").readFileSync(process.env.HOME + "/.claude/settings.json", "utf8"))'
           node scripts/lean.mjs --uninstall --yes > "$HOME/uninstall.txt"
           cat "$HOME/uninstall.txt"
-          ! grep -qE '^ *! ' "$HOME/uninstall.txt"
+          if grep -qE '^ *! ' "$HOME/uninstall.txt"; then exit 1; fi
           claude mcp list > "$HOME/mcp-after.txt"
           cat "$HOME/mcp-after.txt"
-          ! grep -qE 'serena|playwright|context-mode' "$HOME/mcp-after.txt"
-          ! grep -q 'rtk hook' "$HOME/.claude/settings.json"
+          if grep -qE 'serena|playwright|context-mode' "$HOME/mcp-after.txt"; then exit 1; fi
+          if grep -q 'rtk hook' "$HOME/.claude/settings.json"; then exit 1; fi
           test ! -e "$HOME/.claude/skills/caveman"
 
   real-tools:
@@ -166,10 +199,95 @@ jobs:
         run: |
           export HOME="$(mktemp -d)"
           export XDG_CONFIG_HOME="$HOME/.config"
-          bash install.sh --yes --agents opencode-v2 --all-tools --privacy standard --lang en --profile anthropic-api --ponytail-mode lite
+          bash install.sh --yes --agents opencode-v2 --tools serena,playwright,ponytail,caveman,i-have-adhd,dcp,codeburn,gsd,autoskills \
+            --privacy standard --lang en --profile anthropic-api --ponytail-mode lite
           node scripts/lean.mjs --doctor
           test -f "$HOME/.agents/skills/caveman/SKILL.md"
+          grep -q '"gsd-debugger": "anthropic/claude-opus-5-5"' "$HOME/.gsd/defaults.json"
           uvx -p 3.13 --from git+https://github.com/oraios/serena serena --help
+          node scripts/lean.mjs --uninstall --yes > "$HOME/uninstall.txt"
+          cat "$HOME/uninstall.txt"
+          if grep -qE '^ *! ' "$HOME/uninstall.txt"; then exit 1; fi
+          test ! -e "$HOME/.gsd/defaults.json"
+
+  real-copilot:
+    # Real Copilot CLI and real tools, throwaway HOME, no login and no TTY.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm install -g @github/copilot
+      - name: Use the runner's Linuxbrew
+        if: runner.os == 'Linux'
+        run: echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
+      - name: Install, ask Copilot what loaded, doctor, uninstall
+        run: bash tests/real-copilot.sh
+
+  real-copilot-windows:
+    # Real Copilot CLI on Windows through install.ps1, throwaway USERPROFILE.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Install, ask Copilot what loaded, doctor, uninstall
+        shell: pwsh
+        run: ./tests/real-copilot.ps1
+
+  real-antigravity:
+    # Real Antigravity CLI and real tools, throwaway HOME, no login and no TTY.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Install Antigravity CLI
+        run: |
+          curl -fsSL https://antigravity.google/cli/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Use the runner's Linuxbrew
+        if: runner.os == 'Linux'
+        run: echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
+      - name: Install, ask agy what loaded, doctor, uninstall
+        run: bash tests/real-antigravity.sh
+
+  real-winget:
+    # The winget commands from prereqFor, with the runner's image missing winget.
+    runs-on: windows-latest
+    steps:
+      - name: Install winget
+        shell: pwsh
+        run: |
+          Install-Module Microsoft.WinGet.Client -Force -Repository PSGallery
+          Repair-WinGetPackageManager -Latest -Force
+          winget --version
+      - name: Install uv and rtk without a TTY
+        shell: pwsh
+        run: |
+          foreach ($id in 'astral-sh.uv', 'rtk-ai.rtk') {
+            winget install --id $id -e --scope user --accept-source-agreements --accept-package-agreements
+            if ($LASTEXITCODE -ne 0) { throw "winget install $id failed" }
+            if ((winget list --id $id | Out-String) -notmatch [regex]::Escape($id)) { throw "$id is not installed" }
+          }
 
   real-windows:
     # Real OpenCode 1.x and real tools through install.ps1, throwaway USERPROFILE.

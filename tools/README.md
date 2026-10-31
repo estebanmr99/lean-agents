@@ -12,4 +12,8 @@ lean-agents installs these from upstream and never vendors them. Each one is opt
 | i-have-adhd | Skimmable, action-first answers | see repo | [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd) |
 | Caveman | Extra-compressed answers on request | see repo | [juliusbrussee/caveman](https://github.com/juliusbrussee/caveman) |
 
-Codeburn, AutoSkills and GSD arrive in v0.4.
+| Codeburn | Usage and cost report across agents, run with `npx` | MIT | [getagentseal/codeburn](https://github.com/getagentseal/codeburn) |
+| AutoSkills | Picks skills per project, run with `npx autoskills` in the project. Opt-in | CC BY-NC 4.0, non-commercial use only | [midudev/autoskills](https://github.com/midudev/autoskills) |
+| GSD Core | Spec-driven workflow skills and agents. Opt-in | MIT | [open-gsd/gsd-core](https://github.com/open-gsd/gsd-core) |
+
+i-have-adhd ships with `disable-model-invocation: true`, so a prompt cannot load it: only `/i-have-adhd` or the always-on flag (`--adhd-always`) can. lean-agents sets it to `false` in the installed copies, so an agent can load it when asked. A plugin update resets it; the doctor reports that, and `--update` applies it again. `--uninstall` restores it.

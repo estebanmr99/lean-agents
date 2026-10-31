@@ -1,0 +1,17 @@
+{
+  "name": "opencode-go",
+  "description": "OpenCode Go subscription: low-cost open models, in OpenCode through /connect.",
+  "verified_on": "2026-10-30",
+  "agents": ["opencode-v2", "opencode-v1"],
+  "provider": "opencode-go",
+  "tiers": {
+    "fast": { "model": "opencode-go/glm-5.3-flash" },
+    "balanced": { "model": "opencode-go/kimi-k3" },
+    "strong": { "model": "opencode-go/kimi-k3.1-pro" }
+  },
+  "primary": {
+    "plan": "strong", "build": "balanced"
+  },
+  "main_model": "opencode-go/kimi-k3",
+  "notes": "Chosen models are not used for training per opencode.ai/docs/go. Avoid models named Contributor or Free: some train on your prompts. Confirm IDs with `opencode models opencode-go`."
+}

@@ -15,6 +15,9 @@ repo="$(cd "$(dirname "$0")/.." && pwd)"
 bash "$repo/install.sh" --yes --no-exec --agents opencode-v2 \
   --tools serena,playwright,ponytail --privacy strict --profile anthropic-api
 
+# Proves the file name the migration guide gives for the old tui.json.
+LC_ALL=C grep -aq 'opencode/cli.json' "$(command -v opencode)"
+
 opencode debug config > "$HOME/resolved.txt" 2>"$HOME/stderr.txt" || { cat "$HOME/resolved.txt" "$HOME/stderr.txt"; exit 1; }
 
 opencode debug agents > "$HOME/agents.txt" 2>&1 || true

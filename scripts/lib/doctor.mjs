@@ -3,7 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { sha } from './fsops.mjs';
 import { version, quiet } from './system.mjs';
+import { adhdSkillFiles } from './adhd.mjs';
 
+const CORE_AGENTS = ['debug', 'explore', 'planner', 'research', 'review'];
 const SECRET_KEY = /(key|token|secret|password|auth)/i;
 
 export function redact(value) {
@@ -24,6 +26,31 @@ export function resolvedOpenCodeConfig(text) {
   return merged;
 }
 
+function checkCopilot(o, add) {
+  const mcp = quiet(['copilot', 'mcp', 'list', '--json']);
+  for (const s of ['serena', 'playwright'].filter((t) => o.tools.includes(t))) {
+    add(`copilot mcp ${s}`, mcp.ok && mcp.out.includes(`"${s}"`) ? 'ok' : 'error', mcp.ok ? '' : 'copilot mcp list failed');
+  }
+  const rules = quiet(['copilot', 'instruction', 'list']);
+  add('copilot rules loaded', rules.ok && rules.out.includes('copilot-instructions.md') ? 'ok' : 'error');
+  if (o.tools.includes('context-mode')) {
+    add('copilot plugin context-mode', quiet(['copilot', 'plugin', 'list']).out.includes('context-mode') ? 'ok' : 'error');
+  }
+}
+
+function checkAntigravity(o, core, add) {
+  const agents = quiet(['agy', 'agents']).out;
+  add('agy subagents loaded', core.every((a) => agents.includes(a)) ? 'ok' : 'error');
+  const mcp = quiet(['agy', 'mcp', 'list']);
+  for (const s of ['serena', 'playwright'].filter((t) => o.tools.includes(t))) {
+    add(`agy mcp ${s}`, mcp.ok && mcp.out.includes(s) ? 'ok' : 'error', mcp.ok ? '' : 'agy mcp list failed');
+  }
+  const plugins = quiet(['agy', 'plugin', 'list', '--json']).out;
+  for (const t of ['rtk', 'context-mode'].filter((p) => o.tools.includes(p))) {
+    add(`agy plugin ${t}`, plugins.includes(`"${t}"`) ? 'ok' : 'error');
+  }
+}
+
 export function doctor({ home, state, exec }) {
   const rows = [];
   const add = (item, status, detail = '') => rows.push({ item, status, detail });
@@ -40,8 +67,12 @@ export function doctor({ home, state, exec }) {
       add(rel, same ? 'ok' : 'changed', same ? '' : 'edited since install (fine if on purpose)');
     }
     for (const c of state.commands) add(c.desc, c.ok ? 'ok' : 'error', c.ok ? '' : 'failed at install time');
+    if (o.tools.includes('i-have-adhd')) {
+      const reset = adhdSkillFiles(home).filter((f) => fs.readFileSync(f, 'utf8').includes('disable-model-invocation: true'));
+      if (reset.length) add('i-have-adhd skill', 'changed', 'a plugin update reset it; run --update');
+    }
     if (exec) {
-      for (const [bin, tool] of [['claude', 'claude'], ['opencode', 'opencode-v1'], ['opencode', 'opencode-v2'], ['rtk', 'rtk'], ['context-mode', 'context-mode'], ['uvx', 'serena']]) {
+      for (const [bin, tool] of [['claude', 'claude'], ['opencode', 'opencode-v1'], ['opencode', 'opencode-v2'], ['copilot', 'copilot-cli'], ['agy', 'antigravity'], ['rtk', 'rtk'], ['context-mode', 'context-mode'], ['uvx', 'serena']]) {
         const needed = o.agents.includes(tool) || o.tools.includes(tool);
         if (!needed) continue;
         const v = version(bin);
@@ -54,6 +85,11 @@ export function doctor({ home, state, exec }) {
         }
       }
       if (o.agents.some((a) => a.startsWith('opencode'))) checkOpenCode(o, add);
+      if (o.agents.includes('copilot-cli')) checkCopilot(o, add);
+      if (o.agents.includes('antigravity')) checkAntigravity(o, CORE_AGENTS, add);
+      // npx may have to download, which takes longer than a local check.
+      if (o.tools.includes('codeburn')) add('codeburn runs', quiet(['npx', '-y', 'codeburn', '--version'], 120000).ok ? 'ok' : 'error');
+      if (o.tools.includes('autoskills')) add('autoskills runs', quiet(['npx', '-y', 'autoskills', '--help'], 120000).ok ? 'ok' : 'error');
     }
   }
   print(rows);

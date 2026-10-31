@@ -1,0 +1,29 @@
+name: models-refresh
+
+on:
+  schedule:
+    - cron: '0 9 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Open an issue when models changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/models-refresh.mjs > report.md
+          cat report.md
+          title="Model profiles need review"
+          if [ "$(grep -c '^None\.$' report.md)" = 2 ]; then exit 0; fi
+          if [ -n "$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')" ]; then exit 0; fi
+          gh issue create --title "$title" --body-file report.md

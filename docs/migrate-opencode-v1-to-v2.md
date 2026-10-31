@@ -19,9 +19,9 @@ Back up `~/.config/opencode` first, then change these keys.
 | `plugin` | `plugins` |
 | `autoupdate: false` | `update: "disable"` |
 | flat `mcp.<name>` | `mcp.servers.<name>` |
-| `experimental.policies`, `disabled_providers` | `policies` (**VERIFY**) |
+| `experimental.policies`, `disabled_providers` | `policies` |
 | `compaction.reserved` | `compaction.buffer` |
-| `tui.json` | `cli.json` (**VERIFY**) |
+| `tui.json` | `cli.json` |
 
 Then:
 

@@ -1,0 +1,26 @@
+{
+  "_comment": "Maps GSD agents to tiers; lean-agents resolves each tier to this profile's model and writes model_overrides to ~/.gsd/defaults.json.",
+  "model_overrides": {
+    "gsd-planner": "strong",
+    "gsd-roadmapper": "strong",
+    "gsd-debugger": "strong",
+    "gsd-debug-session-manager": "strong",
+    "gsd-security-auditor": "strong",
+    "gsd-executor": "balanced",
+    "gsd-verifier": "balanced",
+    "gsd-advisor-researcher": "balanced",
+    "gsd-code-fixer": "balanced",
+    "gsd-code-reviewer": "balanced",
+    "gsd-phase-researcher": "fast",
+    "gsd-project-researcher": "fast",
+    "gsd-research-synthesizer": "fast",
+    "gsd-domain-researcher": "fast",
+    "gsd-ai-researcher": "fast",
+    "gsd-ui-researcher": "fast",
+    "gsd-plan-checker": "fast",
+    "gsd-integration-checker": "fast",
+    "gsd-ui-checker": "fast",
+    "gsd-codebase-mapper": "fast",
+    "gsd-pattern-mapper": "fast"
+  }
+}

@@ -4,6 +4,27 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Added
+
+- GitHub Copilot CLI adapter: rules, subagents, MCP servers, RTK, Context Mode plugin, Caveman, i-have-adhd.
+- Antigravity CLI adapter: same set, except that rules and skills loading is not proven (see `docs/compatibility.md`).
+- Tools: Codeburn. GSD Core and AutoSkills are opt-in and stay out of `--all-tools`. AutoSkills is CC BY-NC 4.0, non-commercial use only.
+- Profiles `github-copilot`, `opencode-go`, `openai-api`, and per-agent GSD models in `profiles/<name>/gsd-defaults.json`.
+- Skills `setup-doctor`, `token-audit`, `update-models`.
+- `scripts/models-refresh.mjs` and a monthly workflow that opens an issue when profile models change.
+- CI jobs with real Copilot CLI (Linux, macOS, Windows), real Antigravity CLI, real winget, and a non-default `XDG_CONFIG_HOME`.
+
+### Changed
+
+- i-have-adhd: lean-agents sets `disable-model-invocation: false` in installed copies so a prompt can load the skill. The doctor reports when an update resets it.
+- The installer exits 1 when an install step fails.
+
+### Fixed
+
+- `XDG_CONFIG_HOME` is honored for the OpenCode and Ponytail config paths. With `--home`, it counts only inside that directory.
+- winget no longer stops at an agreement prompt without a TTY.
+- CI negative checks written as `! cmd` never failed a job; they now do.
+
 ## [0.3.0] - 2026-10-30
 
 ### Added
