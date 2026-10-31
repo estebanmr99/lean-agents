@@ -93,8 +93,8 @@ export function opencodeShared({ home, dir, core, profile, opts }) {
     commands.push({
       tool: 'caveman',
       desc: 'Caveman skills for OpenCode',
-      run: [['npx', '-y', 'skills', 'add', 'JuliusBrussee/caveman', '-a', 'opencode', '-g']],
-      undo: [['npx', '-y', 'skills', 'remove', 'JuliusBrussee/caveman', '-a', 'opencode', '-g']],
+      run: [['npx', '-y', 'skills', 'add', 'JuliusBrussee/caveman', '--skill', 'caveman', 'caveman-compress', 'caveman-stats', '-a', 'opencode', '-g', '-y']],
+      undo: [['npx', '-y', 'skills', 'remove', 'caveman', 'caveman-compress', 'caveman-stats', '-a', 'opencode', '-g', '-y']],
     });
   }
   return { actions, commands };

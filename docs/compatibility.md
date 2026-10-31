@@ -21,7 +21,7 @@ What lean-agents configures per agent, how, and when each command or key was las
 - `install.ps1` runs on PowerShell 5.1 and 7 and needs no admin rights.
 - Tools come from winget (`rtk-ai.rtk`, `astral-sh.uv`). The winget RTK build lags upstream: 0.50.0 against 1.1.0 on 2026-10-30.
 - Without winget, extract `rtk-x86_64-pc-windows-msvc.zip` into `%USERPROFILE%\tools\rtk`; `install.ps1` adds it to the user PATH.
-- No directory junctions are needed: the Skills CLI installs straight into `~/.claude/skills` and `~/.config/opencode/skills`.
+- No directory junctions are needed: the Skills CLI installs into `~/.claude/skills` and `~/.agents/skills`, and OpenCode reads `~/.agents/skills`.
 - **VERIFY:** winget routes are not exercised in CI because the runner image does not list winget.
 
 ## Verification log
@@ -43,7 +43,8 @@ What lean-agents configures per agent, how, and when each command or key was las
 | Ponytail one package serves V1 and V2 plugin APIs; config at `$XDG_CONFIG_HOME/ponytail`, `~/.config/ponytail`, Windows `%APPDATA%\ponytail` | [plugin source](https://github.com/DietrichGebert/ponytail/blob/main/.opencode/plugins/ponytail.mjs), [config source](https://github.com/DietrichGebert/ponytail/blob/main/hooks/ponytail-config.js) | 2026-10-30 |
 | i-have-adhd supports OpenCode V1 1.18.29+ and V2 with the same loader | [README](https://github.com/ayghri/i-have-adhd) | 2026-10-30 |
 | RTK: core formula `rtk`, winget `rtk-ai.rtk`, zip `rtk-x86_64-pc-windows-msvc.zip` | [installation guide](https://github.com/rtk-ai/rtk/blob/master/docs/guide/getting-started/installation.md), [Homebrew](https://formulae.brew.sh/formula/rtk), [winget-pkgs](https://github.com/microsoft/winget-pkgs/tree/master/manifests/r/rtk-ai/rtk) | 2026-10-30 |
-| Skills CLI global paths: `~/.claude/skills`, `~/.config/opencode/skills` | [agents list](https://github.com/vercel-labs/skills/blob/main/docs/agents.md) | 2026-10-30 |
+| Skills CLI: `--skill <names>` and `-y` are needed without a TTY; `skills remove` takes skill names; `-a opencode -g` writes `~/.agents/skills`, `-a claude-code -g` writes `~/.claude/skills` | `npx skills --help` and a real run in a throwaway HOME; `real-tools`, `real-windows` in CI | 2026-10-30 |
+| OpenCode 1.x and 2.x read global skills from `~/.agents/skills` | [1.x docs](https://opencode.ai/docs/skills), [2.x docs](https://opencode.ai/v2/docs/skills) | 2026-10-30 |
 | Claude Code native installer `claude.ai/install.sh`; privacy env names `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`, `DISABLE_BUG_COMMAND`, `DISABLE_AUTOUPDATER`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | [setup docs](https://code.claude.com/docs/en/setup), [env vars](https://code.claude.com/docs/en/env-vars) | 2026-10-30 |
 | `opencode-ai` on npm provides the 1.19.0 binary | npm, `tests/real-windows.ps1` in CI | 2026-10-30 |
 

@@ -152,9 +152,10 @@ jobs:
       - name: Install every tool, then run the doctor
         run: |
           export HOME="$(mktemp -d)"
+          export XDG_CONFIG_HOME="$HOME/.config"
           bash install.sh --yes --agents opencode-v2 --all-tools --privacy standard --lang en --profile anthropic-api --ponytail-mode lite
           node scripts/lean.mjs --doctor
-          test -n "$(ls "$HOME/.config/opencode/skills")"
+          test -f "$HOME/.agents/skills/caveman/SKILL.md"
           uvx -p 3.13 --from git+https://github.com/oraios/serena serena --help
 
   real-windows:

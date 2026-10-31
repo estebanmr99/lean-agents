@@ -25,7 +25,8 @@ function Get-UserPath { [Environment]::GetEnvironmentVariable('Path', 'User') -s
 
 & "$repo\install.ps1" -Yes -Agents opencode-v1 -Tools playwright, ponytail, caveman, i-have-adhd, dcp -Privacy strict -Profile anthropic-api -Lang en --ponytail-mode lite --adhd-always
 if ((Get-UserPath) -notcontains $rtkDir) { throw 'rtk folder was not added to the user PATH' }
-if (-not (Get-ChildItem "$dir\.config\opencode\skills" -ErrorAction SilentlyContinue)) { throw 'Caveman skills did not arrive' }
+if (-not (Test-Path "$dir\.agents\skills\caveman\SKILL.md")) { throw 'Caveman skills did not arrive' }
+if ((opencode debug skill | Out-String) -notmatch 'caveman') { throw 'OpenCode does not see the Caveman skills' }
 if (-not (Test-Path "$dir\.config\opencode\vendor\i-have-adhd\.opencode")) { throw 'i-have-adhd clone is missing' }
 if (-not (Test-Path "$dir\.config\opencode\plugins\rtk.ts")) { throw 'RTK plugin is missing' }
 
@@ -40,3 +41,4 @@ foreach ($name in 'explore', 'research', 'review', 'debug', 'planner') {
 if ((Get-UserPath) -contains $rtkDir) { throw 'rtk folder was not removed from the user PATH' }
 if (Test-Path "$dir\.config\opencode\plugins\rtk.ts") { throw 'RTK plugin was not removed' }
 if (Test-Path "$dir\.config\opencode\vendor\i-have-adhd") { throw 'i-have-adhd clone was not removed' }
+if (Test-Path "$dir\.agents\skills\caveman") { throw 'Caveman skills were not removed' }

@@ -45,7 +45,7 @@ OpenCode 1 uses `"compaction": { "auto": true, "reserved": 40000 }`.
 | Playwright | Node.js | `claude mcp add --scope user playwright -- npx -y @playwright/mcp@latest` | `mcp.servers.playwright` |
 | Ponytail | — | `claude plugin marketplace add DietrichGebert/ponytail` then `claude plugin install ponytail@ponytail` | `"plugins": ["@dietrichgebert/ponytail"]` |
 | i-have-adhd | — | `claude plugin marketplace add ayghri/i-have-adhd` then `claude plugin install i-have-adhd@i-have-adhd`; `touch ~/.claude/.i-have-adhd-always` | `git clone https://github.com/ayghri/i-have-adhd ~/.config/opencode/vendor/i-have-adhd`, loader `~/.config/opencode/plugins/i-have-adhd.ts`, `touch ~/.config/opencode/.i-have-adhd-always` |
-| Caveman | Node.js | `npx skills add JuliusBrussee/caveman -a claude-code -g` | `npx skills add JuliusBrussee/caveman -a opencode -g` |
+| Caveman | Node.js | `npx skills add JuliusBrussee/caveman --skill caveman caveman-compress caveman-stats -a claude-code -g -y` | `npx skills add JuliusBrussee/caveman --skill caveman caveman-compress caveman-stats -a opencode -g -y` |
 
 OpenCode 1 uses the same commands and files, with these config differences:
 

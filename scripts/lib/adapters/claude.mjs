@@ -83,8 +83,8 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath }) {
     commands.push({
       tool: 'caveman',
       desc: 'Caveman skills for Claude Code',
-      run: [['npx', '-y', 'skills', 'add', 'JuliusBrussee/caveman', '-a', 'claude-code', '-g']],
-      undo: [['npx', '-y', 'skills', 'remove', 'JuliusBrussee/caveman', '-a', 'claude-code', '-g']],
+      run: [['npx', '-y', 'skills', 'add', 'JuliusBrussee/caveman', '--skill', 'caveman', 'caveman-compress', 'caveman-stats', '-a', 'claude-code', '-g', '-y']],
+      undo: [['npx', '-y', 'skills', 'remove', 'caveman', 'caveman-compress', 'caveman-stats', '-a', 'claude-code', '-g', '-y']],
     });
   }
   return { actions, commands };
