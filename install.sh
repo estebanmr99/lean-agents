@@ -44,7 +44,8 @@ else
 fi
 
 # Use the checkout this script lives in, if any; otherwise clone or update ~/.config/lean-agents/src.
-here="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || true)"
+here=""
+if script_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"; then here="$script_dir"; fi
 if [[ -n "$here" && -f "$here/scripts/lean.mjs" ]]; then
   SRC="$here"
 elif [[ -d "$SRC/.git" ]]; then
