@@ -1,0 +1,4 @@
+{
+  "_comment": "Example only. Real, dated mappings live in profiles/<name>/profile.json and are refreshed by the update-models skill.",
+  "claude": { "fast": "haiku", "balanced": "sonnet", "strong": "opus" }
+}

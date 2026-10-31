@@ -1,0 +1,15 @@
+name: Agent support
+description: Request or help add support for another coding agent
+labels: [agent-support]
+body:
+  - type: input
+    id: agent
+    attributes:
+      label: Agent
+    validations:
+      required: true
+  - type: textarea
+    id: docs
+    attributes:
+      label: Docs links
+      description: Where the agent documents global instructions, subagents, MCP, plugins and skills.
