@@ -21,6 +21,10 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [22]
+        include:
+          - os: ubuntu-latest
+            node: 20
     runs-on: ${{ matrix.os }}
     env:
       LEAN_AGENTS_REPO: https://github.com/${{ github.event.pull_request.head.repo.full_name || github.repository }}
@@ -29,7 +33,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
       - run: npm ci
       - name: Engine tests
         run: npm test
@@ -113,12 +117,14 @@ jobs:
           export HOME="$(mktemp -d)"
           claude --version
           bash install.sh --yes --agents claude --tools serena,playwright --privacy standard --lang en
-          claude mcp list | tee "$HOME/mcp.txt"
+          claude mcp list > "$HOME/mcp.txt"
+          cat "$HOME/mcp.txt"
           grep -q serena "$HOME/mcp.txt"
           grep -q playwright "$HOME/mcp.txt"
           node -e 'JSON.parse(require("fs").readFileSync(process.env.HOME + "/.claude/settings.json", "utf8"))'
           node scripts/lean.mjs --uninstall --yes
-          claude mcp list | tee "$HOME/mcp-after.txt"
+          claude mcp list > "$HOME/mcp-after.txt"
+          cat "$HOME/mcp-after.txt"
           ! grep -qE 'serena|playwright' "$HOME/mcp-after.txt"
 
   real-tools:
