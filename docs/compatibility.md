@@ -22,6 +22,7 @@ What lean-agents configures per agent, how, and when each command or key was las
 - Tools come from winget (`rtk-ai.rtk`, `astral-sh.uv`). The winget RTK build lags upstream: 0.50.0 against 1.1.0 on 2026-10-30.
 - Without winget, extract `rtk-x86_64-pc-windows-msvc.zip` into `%USERPROFILE%\tools\rtk`; `install.ps1` adds it to the user PATH.
 - No directory junctions are needed: the Skills CLI installs into `~/.claude/skills` and `~/.agents/skills`, and OpenCode reads `~/.agents/skills`.
+- `rtk init` writes to the OS profile folder, not `USERPROFILE`. It only matters when testing with a temp `USERPROFILE`.
 - **VERIFY:** winget routes are not exercised in CI because the runner image does not list winget.
 
 ## Verification log

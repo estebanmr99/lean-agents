@@ -28,7 +28,9 @@ if ((Get-UserPath) -notcontains $rtkDir) { throw 'rtk folder was not added to th
 if (-not (Test-Path "$dir\.agents\skills\caveman\SKILL.md")) { throw 'Caveman skills did not arrive' }
 if ((opencode debug skill | Out-String) -notmatch 'caveman') { throw 'OpenCode does not see the Caveman skills' }
 if (-not (Test-Path "$dir\.config\opencode\vendor\i-have-adhd\.opencode")) { throw 'i-have-adhd clone is missing' }
-if (-not (Test-Path "$dir\.config\opencode\plugins\rtk.ts")) { throw 'RTK plugin is missing' }
+# rtk ignores USERPROFILE and uses the OS profile folder, here the disposable runner's.
+$rtkPlugin = "$([Environment]::GetFolderPath('UserProfile'))\.config\opencode\plugins\rtk.ts"
+if (-not (Test-Path $rtkPlugin)) { throw 'RTK plugin is missing' }
 
 & "$repo\install.ps1" -Doctor
 
@@ -39,6 +41,6 @@ foreach ($name in 'explore', 'research', 'review', 'debug', 'planner') {
 
 & "$repo\install.ps1" -Uninstall -Yes
 if ((Get-UserPath) -contains $rtkDir) { throw 'rtk folder was not removed from the user PATH' }
-if (Test-Path "$dir\.config\opencode\plugins\rtk.ts") { throw 'RTK plugin was not removed' }
+if (Test-Path $rtkPlugin) { throw 'RTK plugin was not removed' }
 if (Test-Path "$dir\.config\opencode\vendor\i-have-adhd") { throw 'i-have-adhd clone was not removed' }
 if (Test-Path "$dir\.agents\skills\caveman") { throw 'Caveman skills were not removed' }
