@@ -18,6 +18,8 @@ Instructions for coding agents (Claude Code, OpenCode, Copilot CLI) that work **
 | Try the installer safely | `node scripts/lean.mjs --home "$(mktemp -d)" --no-exec --yes --dry-run --agents claude,opencode-v2 --all-tools` |
 | Real OpenCode 2 check (needs `opencode` on PATH) | `bash tests/real-opencode.sh` |
 | Real OpenCode 1.x check (needs `opencode` 1.x on PATH) | `bash tests/real-opencode-v1.sh` |
+| Real Copilot CLI check (needs `copilot`, `rtk` and `uvx` on PATH) | `bash tests/real-copilot.sh` |
+| Real Antigravity check (needs `agy`, `rtk` and `uvx` on PATH) | `bash tests/real-antigravity.sh` |
 
 ## Hard rules
 
