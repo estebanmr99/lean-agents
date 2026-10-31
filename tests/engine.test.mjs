@@ -153,8 +153,8 @@ test('unknown tools are rejected and DCP only applies to OpenCode 1.x', () => {
   assert.equal(r.status, 1);
   assert.match(r.stderr, /unknown tools: playwrite/);
   lean(home, [...base, '--all-tools']);
-  const state = JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'state.json'), 'utf8'));
-  assert.ok(state.tools.includes('playwright') && !state.tools.includes('dcp'));
+  const { tools } = JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'state.json'), 'utf8')).options;
+  assert.ok(tools.includes('playwright') && !tools.includes('dcp'));
 });
 
 test('json edits round-trip', () => {
