@@ -110,7 +110,15 @@ test('rules mention only installed tools and honor the language', () => {
   lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--no-tools', '--lang', 'es', '--privacy', 'standard']);
   const rules = fs.readFileSync(path.join(home, '.config', 'lean-agents', 'AGENTS.md'), 'utf8');
   assert.match(rules, /Responde siempre en español/);
-  assert.doesNotMatch(rules, /Serena|Context Mode|\{\{/);
+  assert.doesNotMatch(rules, /Serena|Context Mode|Playwright|ToolSearch|\{\{/);
+});
+
+test('rules say when to use each installed tool', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--tools', 'playwright', '--lang', 'en', '--privacy', 'standard']);
+  const rules = fs.readFileSync(path.join(home, '.config', 'lean-agents', 'AGENTS.md'), 'utf8');
+  for (const text of ['ctx_batch_execute', 'ctx_fetch_and_index', 'Playwright', 'ToolSearch']) assert.ok(rules.includes(text), text);
+  assert.doesNotMatch(rules, /Serena|\{\{/);
 });
 
 test('OpenCode 1.x gets singular keys, no Context Mode MCP, and a clean uninstall', () => {

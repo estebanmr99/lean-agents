@@ -15,6 +15,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - `AGENTS.md`, `CLAUDE.md` and `.claude/settings.json` for agents working on this repo.
 - Detailed steps for sessions 3 to 5 and a current-state summary in `docs/SPEC.md`.
 
+### Changed
+
+- Global rules now say when to use Context Mode, Playwright and the shell, and to load deferred tools first.
+
 ### Fixed
 
 - Windows: only `.cmd` shims run through a shell, so paths with spaces work.

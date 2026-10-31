@@ -95,6 +95,7 @@ lean-agents is glue. The heavy lifting is done by these projects; please star th
 [i-have-adhd](https://github.com/ayghri/i-have-adhd) ·
 [OpenCode DCP](https://github.com/Opencode-DCP/opencode-dynamic-context-pruning) ·
 [GSD Core](https://github.com/open-gsd/gsd-core) ·
+[andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills) ·
 Codeburn · AutoSkills · [Skills CLI](https://vercel.com/changelog/introducing-skills-the-open-agent-skills-ecosystem)
 
 ## Roadmap
