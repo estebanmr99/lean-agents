@@ -68,7 +68,7 @@ Context Mode needs Node.js 22.5 or newer. Everything else works on Node.js 20.
 | Tier | What | Default |
 | --- | --- | --- |
 | Minimal | Rules, tiered subagents, compaction, output limits, RTK, Context Mode | Always |
-| Optional tools | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0), Codeburn, AutoSkills, GSD | Asked one by one |
+| Optional tools | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0) | Asked one by one |
 | Strict privacy | No telemetry, no auto-updates, no session sharing, no providers that train on your prompts | Off, opt in with `--privacy strict` |
 
 ## Models that stay current
@@ -102,7 +102,7 @@ Codeburn · AutoSkills · [Skills CLI](https://vercel.com/changelog/introducing-
 - [x] Spec, rules and subagent definitions
 - [x] Installer for Claude Code and OpenCode 2.x (macOS, Linux)
 - [x] Windows installer and OpenCode 1.x
-- [ ] Copilot CLI, Antigravity CLI, Codeburn, AutoSkills, original skills, model profiles
+- [ ] Copilot CLI, Antigravity CLI, Codeburn, AutoSkills, GSD, original skills, model profiles
 - [ ] `v1.0.0`
 - Later: Codex CLI, Gemini CLI, Cursor
 

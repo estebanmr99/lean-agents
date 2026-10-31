@@ -58,7 +58,7 @@ Context Mode necesita Node.js 22.5 o superior. Todo lo demás funciona con Node.
 | Nivel | Qué incluye | Por defecto |
 | --- | --- | --- |
 | Mínimo | Reglas, subagentes por costo, compactación, límites de salida, RTK, Context Mode | Siempre |
-| Herramientas opcionales | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0), Codeburn, AutoSkills, GSD | Se pregunta una por una |
+| Herramientas opcionales | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0) | Se pregunta una por una |
 | Privacidad estricta | Sin telemetría, sin auto updates, sin compartir sesiones, sin proveedores que entrenan con tus prompts | Apagado, se activa con `--privacy strict` |
 
 ## Modelos siempre al día
