@@ -4,10 +4,22 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-30
+
 ### Added
 
+- `install.ps1` for Windows on PowerShell 5.1 and 7, from a file or piped.
+- OpenCode 1.x adapter (`>=1.18.29`, reference 1.19.0), and `docs/migrate-opencode-v1-to-v2.md`.
+- Optional DCP tool for OpenCode 1.x.
+- CI on Windows, plus jobs with real OpenCode 1.19, Claude Code and tool installs.
 - `AGENTS.md`, `CLAUDE.md` and `.claude/settings.json` for agents working on this repo.
 - Detailed steps for sessions 3 to 5 and a current-state summary in `docs/SPEC.md`.
+
+### Fixed
+
+- Windows: only `.cmd` shims run through a shell, so paths with spaces work.
+- Windows: Ponytail config stays inside `--home`.
+- Windows: rule paths use forward slashes.
 
 ## [0.2.0] - 2026-10-31
 

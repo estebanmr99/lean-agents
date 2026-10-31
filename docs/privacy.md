@@ -6,7 +6,8 @@ Off by default. Turn it on with `--privacy strict` (or answer yes when asked). I
 | --- | --- |
 | Claude Code | `env`: `DISABLE_AUTOUPDATER=1`, `DISABLE_TELEMETRY=1`, `DISABLE_ERROR_REPORTING=1`, `DISABLE_BUG_COMMAND=1`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`. Manual step: turn off "Help improve Claude" in your claude.ai privacy settings. |
 | OpenCode 2 | `"share": "disabled"`, `"update": "disable"`, and a policy that denies the built-in `opencode` provider unless your profile uses it. |
+| OpenCode 1 | `"share": "disabled"`, `"autoupdate": false`, `"experimental": { "openTelemetry": false }`, and `"disabled_providers": ["opencode"]` unless your profile uses that provider. |
 
-With auto-updates off, update on purpose: `opencode upgrade`, `claude update`, then `install.sh --update` (see [update.md](update.md)).
+With auto-updates off, update on purpose: `opencode upgrade`, `claude update`, then `install.sh --update` or `install.ps1 -Update` (see [update.md](update.md)).
 
 Strict mode never installs tools that send data without opt-in. Pick model providers whose terms do not train on your prompts.

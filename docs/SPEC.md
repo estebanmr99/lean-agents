@@ -21,8 +21,9 @@ Repeat the same prompt for each session. Each session must leave the repository 
 
 ## 0. Current state (read first)
 
-- Installer architecture: thin bootstraps (`install.sh`, `install.ps1` planned) that hand over to the Node engine `scripts/lean.mjs`. Adapters live in `scripts/lib/adapters/`; tool prerequisites in `scripts/lib/system.mjs`; doctor in `scripts/lib/doctor.mjs`. The folders `agents/` and `tools/` hold documentation only. Where later sections mention `render.mjs`, `doctor.sh` or `tools/<tool>/install.sh`, the engine replaces them.
-- Supported today: Claude Code and OpenCode 2.x on macOS and Linux (v0.2.0).
+- Installer architecture: thin bootstraps (`install.sh`, `install.ps1`) that hand over to the Node engine `scripts/lean.mjs`. Adapters live in `scripts/lib/adapters/`; tool prerequisites in `scripts/lib/system.mjs`; doctor in `scripts/lib/doctor.mjs`. The folders `agents/` and `tools/` hold documentation only. Where later sections mention `render.mjs`, `doctor.sh` or `tools/<tool>/install.sh`, the engine replaces them.
+- Supported today: Claude Code and OpenCode 1.x and 2.x on macOS, Linux and Windows (v0.3.0).
+- OpenCode 1 facts verified on 1.19.0: singular `agent` and `plugin`, flat `mcp`, `compaction.reserved`, `autoupdate`, `disabled_providers`. `opencode debug config` prints one object; `opencode agent list` lists agents. DCP now also installs on OpenCode 2, but lean-agents keeps it 1.x only; the notes in sections 6 and 14 saying it has no V2 release are out of date.
 - OpenCode 2 facts verified on 2.2.5: native keys are `agents` (not `agent`), top-level `policies`, `plugins`, `mcp.servers`, `compaction.buffer`, `update`, `share`. `opencode debug config` prints a JSON array of config sources (`{type, path, info}`); `opencode debug agents` lists agents.
 - Testing policy: the owner does not test on their working machines. Every claim is proven in CI with throwaway HOME directories and real binaries (`tests/real-opencode.sh`).
 - Commits are authored by the owner (`git config user.name/user.email` set to their GitHub no-reply address) with a `Co-Authored-By` trailer for the agent.
