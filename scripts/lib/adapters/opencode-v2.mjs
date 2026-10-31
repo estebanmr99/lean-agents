@@ -1,5 +1,5 @@
-// OpenCode 2.x adapter. Keys that differ from 1.x (plugins, update, mcp.servers,
-// experimental.policies) are kept here in one place so they are easy to correct.
+// OpenCode 2.x adapter. Uses the native 2.x keys (agents, plugins, update, policies,
+// mcp.servers), confirmed against `opencode debug config` on OpenCode 2.2 in CI.
 import path from 'node:path';
 import fs from 'node:fs';
 import { OWNED_MARK } from '../fsops.mjs';
@@ -49,8 +49,8 @@ export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
     for (const [agent, tier] of Object.entries(profile.primary ?? {})) {
       const m = modelFor(profile, tier);
       if (!m) continue;
-      edits.push({ path: ['agent', agent, 'model'], value: m.model, mode: 'setIfAbsent' });
-      for (const [k, v] of Object.entries(m.options ?? {})) edits.push({ path: ['agent', agent, k], value: v, mode: 'setIfAbsent' });
+      edits.push({ path: ['agents', agent, 'model'], value: m.model, mode: 'setIfAbsent' });
+      for (const [k, v] of Object.entries(m.options ?? {})) edits.push({ path: ['agents', agent, k], value: v, mode: 'setIfAbsent' });
     }
   }
 
@@ -75,7 +75,7 @@ export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
     edits.push({ path: ['share'], value: 'disabled', mode: 'set' });
     edits.push({ path: ['update'], value: 'disable', mode: 'set' });
     if (profile?.provider !== 'opencode') {
-      edits.push({ path: ['experimental', 'policies'], value: { effect: 'deny', action: 'provider.use', resource: 'opencode' }, mode: 'arrayAdd' });
+      edits.push({ path: ['policies'], value: { effect: 'deny', action: 'provider.use', resource: 'opencode' }, mode: 'arrayAdd' });
     }
   }
   actions.push({ kind: 'json', path: configPath(dir), edits });

@@ -65,7 +65,7 @@ test('install keeps user values and comments, and is idempotent', () => {
   const oc = parse(ocText, [], { allowTrailingComma: true });
   assert.deepEqual(oc.instructions[0], 'mine.md');
   assert.ok(oc.instructions[1].endsWith(path.join('lean-agents', 'AGENTS.md')));
-  assert.equal(oc.agent.plan.model, 'google-vertex/gemini-4-argon');
+  assert.equal(oc.agents.plan.model, 'google-vertex/gemini-4-argon');
   assert.ok(oc.mcp.servers.serena && oc.mcp.servers.playwright && oc.mcp.servers['context-mode']);
   assert.equal(oc.share, 'disabled');
 

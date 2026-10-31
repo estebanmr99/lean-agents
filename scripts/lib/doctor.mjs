@@ -14,22 +14,14 @@ export function redact(value) {
   return value;
 }
 
-// `opencode debug config` may print log lines around the JSON: take the first balanced object.
-export function firstJsonObject(text) {
-  const lineStart = text.search(/^\{/m);
-  const start = lineStart >= 0 ? lineStart : text.indexOf('{');
-  let depth = 0;
-  let inString = false;
-  for (let i = start; i >= 0 && i < text.length; i++) {
-    const ch = text[i];
-    if (inString) {
-      if (ch === '\\') i++;
-      else if (ch === '"') inString = false;
-    } else if (ch === '"') inString = true;
-    else if (ch === '{') depth++;
-    else if (ch === '}' && --depth === 0) return JSON.parse(text.slice(start, i + 1));
-  }
-  throw new Error('no JSON object found');
+// OpenCode 2 prints a JSON array of config sources ({type, path, info}); 1.x printed one object.
+export function resolvedOpenCodeConfig(text) {
+  const start = text.search(/^[[{]/m);
+  const data = JSON.parse(text.slice(start).trim());
+  if (!Array.isArray(data)) return data;
+  const merged = {};
+  for (const src of data) if (src.type === 'document' && src.info) Object.assign(merged, src.info);
+  return merged;
 }
 
 export function doctor({ home, state, exec }) {
@@ -72,7 +64,7 @@ function checkOpenCode(o, add) {
   const r = quiet(['opencode', 'debug', 'config']);
   if (!r.ok) return add('opencode resolved config', 'error', '`opencode debug config` failed');
   let cfg;
-  try { cfg = firstJsonObject(r.out); } catch { return add('opencode resolved config', 'changed', 'could not parse output; check by hand'); }
+  try { cfg = resolvedOpenCodeConfig(r.out); } catch { return add('opencode resolved config', 'changed', 'could not parse output; check by hand'); }
   cfg = redact(cfg);
   const servers = cfg.mcp?.servers ?? cfg.mcp ?? {};
   for (const s of ['context-mode', 'serena', 'playwright'].filter((t) => o.tools.includes(t))) {
