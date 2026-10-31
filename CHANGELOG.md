@@ -4,6 +4,11 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Added
+
+- `AGENTS.md`, `CLAUDE.md` and `.claude/settings.json` for agents working on this repo.
+- Detailed steps for sessions 3 to 5 and a current-state summary in `docs/SPEC.md`.
+
 ## [0.2.0] - 2026-10-31
 
 ### Added

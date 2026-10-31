@@ -4,7 +4,7 @@ This file is the single source of truth for building and maintaining this reposi
 
 ## How to use this spec as a single prompt
 
-Open Claude Code in the repository root and send:
+The repository root has `AGENTS.md` (and `CLAUDE.md`, which imports it) with the commands and hard rules for agents working here. Open Claude Code in the repository root and send:
 
 ```text
 Read docs/SPEC.md completely before doing anything. Then implement the next
@@ -18,6 +18,15 @@ When the session is done, mark it done in this file in the same commit.
 Repeat the same prompt for each session. Each session must leave the repository in a working, tested state.
 
 ---
+
+## 0. Current state (read first)
+
+- Installer architecture: thin bootstraps (`install.sh`, `install.ps1` planned) that hand over to the Node engine `scripts/lean.mjs`. Adapters live in `scripts/lib/adapters/`; tool prerequisites in `scripts/lib/system.mjs`; doctor in `scripts/lib/doctor.mjs`. The folders `agents/` and `tools/` hold documentation only. Where later sections mention `render.mjs`, `doctor.sh` or `tools/<tool>/install.sh`, the engine replaces them.
+- Supported today: Claude Code and OpenCode 2.x on macOS and Linux (v0.2.0).
+- OpenCode 2 facts verified on 2.2.5: native keys are `agents` (not `agent`), top-level `policies`, `plugins`, `mcp.servers`, `compaction.buffer`, `update`, `share`. `opencode debug config` prints a JSON array of config sources (`{type, path, info}`); `opencode debug agents` lists agents.
+- Testing policy: the owner does not test on their working machines. Every claim is proven in CI with throwaway HOME directories and real binaries (`tests/real-opencode.sh`).
+- Commits are authored by the owner (`git config user.name/user.email` set to their GitHub no-reply address) with a `Co-Authored-By` trailer for the agent.
+- Private terms are blocked by `scripts/check-private.sh` using the `PRIVATE_DENYLIST` repository secret in CI and a gitignored `.private-denylist` locally.
 
 ## 1. Product
 
@@ -439,11 +448,68 @@ Launch kit (`docs/launch.md`, not linked from README): posts for X, LinkedIn, Re
 
 Mark each `[x]` when merged.
 
-- [x] **Session 1 — Foundation.** LICENSE, README draft (placeholders for numbers and GIF), README.es.md, CONTRIBUTING, CHANGELOG, SECURITY, `.gitignore`, `.editorconfig`, full folder skeleton with README stubs, `core/AGENTS.md` + `core/AGENTS.es.md`, `core/agents/*.md`, `scripts/check-private.sh`, `secret-scan.yml`, this spec. Done when: check-private passes, gitleaks passes, markdown renders.
-- [x] **Session 2 — Claude Code + OpenCode v2 on macOS.** `render.mjs` with snapshot tests, `install.sh` core flow (detect, plan, backup, render, merge, state, uninstall, dry-run), Claude and OpenCode v2 adapters, minimal-tier tools (RTK, Context Mode) and optional Serena, Playwright, Ponytail, Caveman, i-have-adhd, doctor.sh, `ci.yml` macOS + ubuntu jobs. Done when: dry-run and real install in temp HOME pass in CI; manual test on a real Mac against a copy of `~/.claude` and `~/.config/opencode`.
-- [ ] **Session 3 — Windows + OpenCode v1.** `install.ps1` with parity, `doctor.ps1`, OpenCode v1 adapter with DCP, migration doc, Windows CI, junctions for skills, PATH handling, `--no-admin`. Done when: Windows CI green and a manual run on a real Windows machine (Git Bash + PowerShell) passes doctor.
-- [ ] **Session 4 — Copilot CLI, Antigravity, Codeburn, AutoSkills, GSD, skills, models.** Research + adapters (honest support levels), tool recipes, three original skills, profiles with verified IDs, `models-refresh.yml`, `docs/compatibility.md` filled with verification dates, `INSTALL_WITH_AGENT.md`.
-- [ ] **Session 5 — Launch.** Banner, demo GIF, real Codeburn numbers, final README + README.es, `docs/launch.md`, CHANGELOG `1.0.0`, tag `v1.0.0`, GitHub description/topics/social preview checklist for the owner.
+- [x] **Session 1 — Foundation** (PR #1). Spec, rules, neutral subagents, README (EN/ES), contributing files, privacy check, secret scan.
+- [x] **Session 2 — Claude Code + OpenCode 2.x** (PR #2). Node engine, `install.sh`, Claude Code and OpenCode 2 adapters, profiles, docs, CI on Ubuntu and macOS, real OpenCode 2.2.5 check in CI.
+
+### Session 3 — Windows + OpenCode 1.x + wider CI
+
+Branch: `session-3-windows-opencode-v1`.
+
+1. **`install.ps1`** (PowerShell 5.1 and 7), parity with `install.sh`:
+   - Same flags in PascalCase (`-DryRun`, `-Yes`, `-Agents`, `-Tools`, `-AllTools`, `-NoTools`, `-Privacy`, `-Profile`, `-Lang`, `-Update`, `-Uninstall`, `-Doctor`); translate them to the engine's `--kebab-case` flags and call `node scripts/lean.mjs`.
+   - Ensure git and Node 20+ with `winget install --id Git.Git -e --scope user` / `winget install --id OpenJS.NodeJS.LTS -e --scope user` after asking; never require admin.
+   - Clone or update `%USERPROFILE%\.config\lean-agents\src`, run `npm ci --omit=dev`, then hand over to the engine.
+   - Works when piped: `& ([scriptblock]::Create((irm <raw url>))) -DryRun`.
+   - Lint with PSScriptAnalyzer in CI.
+2. **Engine on Windows** (`scripts/lib/*.mjs`):
+   - `system.mjs`: `which` via `where.exe`; commands through `shell: true` only where needed (`npx`, `npm` are `.cmd` shims).
+   - Ponytail config at `%APPDATA%\ponytail\config.json` (already handled), i-have-adhd loader paths with forward slashes inside the `.ts` file.
+   - Skills: if a tool installs into `~/.agents/skills`, link into `~/.claude/skills` with a directory junction (`fs.symlinkSync(target, link, 'junction')`).
+   - PATH: when RTK is installed from the release zip, add `%USERPROFILE%\tools\rtk` to the user PATH via `[Environment]::SetEnvironmentVariable('Path', …, 'User')` from `install.ps1`, and tell the user to open a new terminal.
+   - Make `tests/engine.test.mjs` path-separator agnostic (normalize `path.relative` keys to `/`).
+3. **OpenCode 1.x adapter** `scripts/lib/adapters/opencode-v1.mjs` (target `>=1.18.29`, reference 1.19.0):
+   - Detection already maps `opencode --version` `1.*` to `opencode-v1`; register the adapter in `ADAPTERS` in `scripts/lean.mjs`.
+   - Keys (from the docs, see `docs/compatibility.md`): `instructions`, `default_agent`, `agent.<name>.model` (singular `agent`), flat `mcp.<name>` with `enabled: true`, `plugin` (singular), `compaction.auto` + `compaction.reserved`, strict privacy `share: "disabled"`, `autoupdate: false`, `experimental.openTelemetry: false`, `disabled_providers: ["opencode"]` (unless the profile uses the `opencode` provider).
+   - Context Mode as plugin (`"plugin": ["context-mode"]` + `npm install -g context-mode`), never also as MCP.
+   - Ponytail: `"plugin": ["@dietrichgebert/ponytail"]`.
+   - DCP: `"plugin": ["@tarquinen/opencode-dcp@latest"]` plus `~/.config/opencode/dcp.jsonc` with `compress.minContextLimit` 100000 and `maxContextLimit` 160000 (scale for non-200K windows), only on OpenCode 1.x.
+   - Markdown subagents in `~/.config/opencode/agents/` (same renderer as v2 if the frontmatter matches; check `opencode debug agents` on 1.x).
+   - `docs/migrate-opencode-v1-to-v2.md`: back up; `agent` → `agents`, `plugin` → `plugins`, `autoupdate: false` → `update: "disable"`, flat `mcp` → `mcp.servers`, `experimental.policies` / `disabled_providers` → `policies`, `tui.json` → `cli.json`; drop DCP (no V2 release) in favor of `compaction.buffer`; move Context Mode from plugin to MCP; verify with `opencode debug config`.
+4. **Wider CI** (`.github/workflows/ci.yml`):
+   - Add `windows-latest` to the `test` matrix (engine tests + `install.ps1 -DryRun` in a temp `USERPROFILE`).
+   - `real-opencode-v1`: install OpenCode 1.19 (`curl -fsSL https://opencode.ai/install | bash`, pin the version if the installer supports it) and assert with `opencode debug config` like `tests/real-opencode.sh`.
+   - `real-claude`: install Claude Code with the native installer (`curl -fsSL https://claude.ai/install.sh | bash`), run the engine with exec on for MCP only (`claude mcp add --scope user …`), assert with `claude mcp list` and that `~/.claude/settings.json` parses. Plugins may need network access to marketplaces; if `claude plugin` needs login, keep plugin steps out of CI and document it.
+   - `real-tools` (Ubuntu + macOS): run the installer with exec on and `--all-tools` in a temp HOME, then `--doctor` with exec on; this proves RTK, Context Mode, uv/Serena and Caveman install for real.
+5. Docs: update `README.md` and `README.es.md` compatibility table (OpenCode 1.x → ✅, Windows badge), `docs/compatibility.md` with dates, CHANGELOG `0.3.0`.
+
+Done when: all CI jobs green on Ubuntu, macOS and Windows. The owner does not test on their working machines; CI with real binaries replaces manual tests.
+
+### Session 4 — Copilot CLI, Antigravity CLI, Codeburn, AutoSkills, GSD, skills, models
+
+Branch: `session-4-more-agents`.
+
+1. **Research first** with the `research` subagent and record findings (source + date) in `docs/compatibility.md` before writing code:
+   - GitHub Copilot CLI: install command, global instructions file, custom agents location and format, MCP config file, skills support, telemetry and auto-update settings.
+   - Antigravity CLI: binary name, install, global rules location, MCP config, subagents (if any), telemetry.
+   - Codeburn: confirm the package and repo (expected `getagentseal/codeburn`, run with `npx codeburn`), supported agents, output format for `token-audit`.
+   - AutoSkills: confirm the exact package identity before shipping (`npx autoskills`); if it cannot be confirmed, leave it out and say so.
+   - GSD Core: `npx @opengsd/gsd-core@latest`, supported agents, where defaults live (`~/.gsd/defaults.json`).
+2. **Adapters** `copilot-cli.mjs`, `antigravity.mjs` with honest support: rules (marker block or file), subagents if supported, MCP (Serena, Playwright, Context Mode), RTK (`rtk init -g --copilot`, `rtk init -g --agent antigravity`, already verified), Context Mode hooks for Copilot CLI if upstream documents them. Mark anything unsupported as ➖ in the README table.
+3. **Tools:** Codeburn (no install; doctor checks `npx codeburn --version`), AutoSkills (if confirmed), GSD (optional, off by default, back up `~/.gsd/defaults.json`; ship `profiles/<name>/gsd-defaults.json` mapping GSD agents to tiers).
+4. **Original skills** in `skills/<name>/SKILL.md` (Agent Skills format, installable with `npx skills add estebanmr99/lean-agents`): `setup-doctor`, `token-audit`, `update-models` (see section 10).
+5. **Profiles:** add `github-copilot`, `opencode-go`, `openai-api`; verify model IDs on the build date; `.github/workflows/models-refresh.yml` (monthly + manual) opens a PR or an issue when models change.
+6. `INSTALL_WITH_AGENT.md`: final prompts per agent.
+7. CI: a real-binary job per new agent where the CLI installs without login.
+
+### Session 5 — Launch
+
+Branch: `session-5-launch`.
+
+1. `docs/assets/banner.svg` and social preview PNG (1280×640).
+2. Demo GIF: `docs/assets/demo.tape` for [vhs](https://github.com/charmbracelet/vhs) showing `install.sh --dry-run` then the plan; render in CI or locally.
+3. Real numbers: the owner runs Codeburn for a week before and after; put the numbers and screenshot in the README "Why" section. Never invent numbers.
+4. Final README + README.es, `docs/launch.md` (posts for X, LinkedIn, Reddit, Show HN; awesome lists to submit to), CHANGELOG `1.0.0`, tag `v1.0.0`, `release.yml`.
+5. Checklist for the owner: repo description, topics, social preview, Discussions on, pin the repo on their profile.
 
 ## 15. Definition of done (every session)
 
