@@ -11,13 +11,21 @@ import { loadCore, renderRules, loadProfile } from './lib/render.mjs';
 import { claudeAdapter } from './lib/adapters/claude.mjs';
 import { opencodeV1Adapter } from './lib/adapters/opencode-v1.mjs';
 import { opencodeV2Adapter } from './lib/adapters/opencode-v2.mjs';
+import { copilotAdapter } from './lib/adapters/copilot-cli.mjs';
+import { antigravityAdapter } from './lib/adapters/antigravity.mjs';
+import { gsdPlan } from './lib/gsd.mjs';
+import { adhdCommand } from './lib/adhd.mjs';
 import { detectAgents, packageManager, prereqFor, which, run, quiet, exists } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const ADAPTERS = { claude: claudeAdapter, 'opencode-v1': opencodeV1Adapter, 'opencode-v2': opencodeV2Adapter };
+const ADAPTERS = { claude: claudeAdapter, 'opencode-v1': opencodeV1Adapter, 'opencode-v2': opencodeV2Adapter, 'copilot-cli': copilotAdapter, antigravity: antigravityAdapter };
+// Agents whose models do not depend on --profile.
+const FIXED_PROFILE = { claude: 'claude-subscription', 'copilot-cli': 'github-copilot', antigravity: 'antigravity' };
 const MINIMAL_TOOLS = ['rtk', 'context-mode'];
-const OPTIONAL_TOOLS = ['serena', 'playwright', 'ponytail', 'caveman', 'i-have-adhd', 'dcp'];
+const OPTIONAL_TOOLS = ['serena', 'playwright', 'ponytail', 'caveman', 'i-have-adhd', 'dcp', 'codeburn'];
+// Asked for one by one and never part of --all-tools.
+const OPT_IN_TOOLS = ['gsd', 'autoskills'];
 const TOOL_INFO = {
   serena: 'Serena MCP: symbol-level code navigation, so agents read less code',
   playwright: 'Playwright MCP: lets agents drive a browser to check web UIs',
@@ -25,6 +33,9 @@ const TOOL_INFO = {
   caveman: 'Caveman skills: extra-compressed answers when you ask for them',
   'i-have-adhd': 'i-have-adhd: skimmable, action-first formatting for every answer',
   dcp: 'DCP: prunes old context on OpenCode 1.x (AGPL-3.0)',
+  codeburn: 'Codeburn: usage and cost report across agents, run with npx',
+  gsd: 'GSD Core: spec-driven workflow skills and agents (large install)',
+  autoskills: 'AutoSkills: picks skills per project, run with npx (CC BY-NC 4.0: non-commercial use only)',
 };
 
 function parseArgs(argv) {
@@ -65,10 +76,11 @@ const HELP = `Usage: lean-agents [options]
 
   --dry-run              Show every file change and command; change nothing
   --yes                  Accept defaults without asking
-  --agents a,b           claude, opencode-v1, opencode-v2 (default: the ones installed)
+  --agents a,b           ${Object.keys(ADAPTERS).join(', ')}
+                         (default: the ones installed)
   --tools a,b            Optional tools on top of rtk and context-mode:
-                         ${OPTIONAL_TOOLS.join(', ')}
-  --all-tools / --no-tools
+                         ${[...OPTIONAL_TOOLS, ...OPT_IN_TOOLS].join(', ')}
+  --all-tools / --no-tools  (--all-tools leaves out ${OPT_IN_TOOLS.join(', ')})
   --privacy standard|strict
   --profile <name>       Model profile for OpenCode (see profiles/)
   --lang en|es           Language for rules and replies
@@ -106,7 +118,7 @@ async function choose(o, saved) {
     if (!saved) {
       const detected = detectAgents();
       const supported = Object.keys(detected).filter((a) => ADAPTERS[a]);
-      if (!supported.length) console.log('No supported agent found on PATH (claude, opencode). Use --agents to configure anyway.');
+      if (!supported.length) console.log('No supported agent found on PATH (claude, opencode, copilot, agy). Use --agents to configure anyway.');
       for (const a of supported) {
         if (yesNo(await p.ask(`Configure ${a} ${detected[a]}?`, 'y'))) o.agents.push(a);
       }
@@ -119,19 +131,20 @@ async function choose(o, saved) {
   if (!o.tools) {
     o.tools = saved?.tools ?? [...MINIMAL_TOOLS];
     if (!saved) {
-      for (const t of OPTIONAL_TOOLS) {
+      for (const t of [...OPTIONAL_TOOLS, ...OPT_IN_TOOLS]) {
         if (t === 'dcp' && !o.agents.includes('opencode-v1')) continue;
         if (yesNo(await p.ask(`Add ${TOOL_INFO[t]}?`, 'n'))) o.tools.push(t);
       }
     }
   }
-  const unknown = o.tools.filter((t) => !MINIMAL_TOOLS.includes(t) && !OPTIONAL_TOOLS.includes(t));
-  if (unknown.length) throw new Error(`unknown tools: ${unknown.join(', ')} (available: ${[...MINIMAL_TOOLS, ...OPTIONAL_TOOLS].join(', ')})`);
+  const known = [...MINIMAL_TOOLS, ...OPTIONAL_TOOLS, ...OPT_IN_TOOLS];
+  const unknown = o.tools.filter((t) => !known.includes(t));
+  if (unknown.length) throw new Error(`unknown tools: ${unknown.join(', ')} (available: ${known.join(', ')})`);
   if (!o.agents.includes('opencode-v1')) o.tools = o.tools.filter((t) => t !== 'dcp');
   o.privacy ??= saved?.privacy ?? (yesNo(await p.ask('Strict privacy (no telemetry, no auto-updates, no session sharing)?', 'n')) ? 'strict' : 'standard');
   o.lang ??= saved?.lang ?? (await p.ask('Language for rules and replies (en/es)?', 'en'));
   if (o.agents.some((a) => a.startsWith('opencode')) && !o.profile) {
-    o.profile = saved?.profile ?? (await p.ask('OpenCode model profile (vertex-gemini, anthropic-api, none)?', 'none'));
+    o.profile = saved?.profile ?? (await p.ask('OpenCode model profile (github-copilot, vertex-gemini, anthropic-api, opencode-go, openai-api, none)?', 'none'));
   }
   if (o.profile === 'none') o.profile = null;
   if (o.tools.includes('i-have-adhd')) o.adhdAlways ??= saved?.adhdAlways ?? yesNo(await p.ask('Use i-have-adhd on every answer?', 'y'));
@@ -142,13 +155,19 @@ async function choose(o, saved) {
 function buildPlan(o) {
   const core = loadCore(ROOT);
   const rulesPath = path.join(stateDir(o.home), 'AGENTS.md');
-  const actions = [{ kind: 'file', path: rulesPath, content: renderRules(ROOT, o) }];
+  const rules = renderRules(ROOT, o);
+  const actions = [{ kind: 'file', path: rulesPath, content: rules }];
   const commands = [];
   for (const agent of o.agents) {
-    const profile = agent === 'claude' ? loadProfile(ROOT, 'claude-subscription') : loadProfile(ROOT, o.profile);
-    const r = ADAPTERS[agent]({ home: o.home, core, profile, opts: o, rulesPath: rulesPath.split(path.sep).join('/') });
+    const profile = loadProfile(ROOT, FIXED_PROFILE[agent] ?? o.profile);
+    const r = ADAPTERS[agent]({ home: o.home, core, profile, opts: o, rules, adhdCommand: adhdCommand(o.home), rulesPath: rulesPath.split(path.sep).join('/') });
     actions.push(...r.actions);
     commands.push(...r.commands.map((c) => ({ ...c, agent })));
+  }
+  if (o.tools.includes('gsd')) {
+    const r = gsdPlan(ROOT, o.home, o);
+    actions.push(...r.actions);
+    commands.push(...r.commands);
   }
   return { planned: plan(actions), commands };
 }
@@ -227,6 +246,12 @@ async function install(o) {
   console.log('Next: restart your agents, log in to your providers, then run --doctor.');
   if (o.privacy === 'strict' && o.agents.includes('claude')) {
     console.log('Strict privacy: also turn off "Help improve Claude" in your claude.ai privacy settings.');
+  }
+  if (o.privacy === 'strict' && o.agents.includes('copilot-cli')) {
+    console.log('Strict privacy: Copilot CLI has no telemetry setting. Start it with --disable-client-telemetry.');
+  }
+  if (o.privacy === 'strict' && o.agents.includes('antigravity')) {
+    console.log('Strict privacy: turn off "Enable Telemetry" in Antigravity settings. It is stored on your account.');
   }
 }
 

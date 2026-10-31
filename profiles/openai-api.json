@@ -1,0 +1,17 @@
+{
+  "name": "openai-api",
+  "description": "OpenCode with an OpenAI API key.",
+  "verified_on": "2026-10-30",
+  "agents": ["opencode-v2", "opencode-v1"],
+  "provider": "openai",
+  "tiers": {
+    "fast": { "model": "openai/gpt-6-luna" },
+    "balanced": { "model": "openai/gpt-6.1-sol" },
+    "strong": { "model": "openai/gpt-6-astra" }
+  },
+  "primary": {
+    "plan": "strong", "build": "balanced"
+  },
+  "main_model": "openai/gpt-6.1-sol",
+  "notes": "Confirm IDs with `opencode models openai`."
+}

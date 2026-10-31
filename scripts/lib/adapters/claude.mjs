@@ -32,7 +32,7 @@ const plugin = (repo, id) => ({
   undo: [['claude', 'plugin', 'uninstall', id]],
 });
 
-export function claudeAdapter({ home, core, profile, opts, rulesPath }) {
+export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdCommand }) {
   const dir = path.join(home, '.claude');
   const actions = [];
   const commands = [];
@@ -63,7 +63,7 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath }) {
     commands.push({ tool: 'ponytail', desc: 'Ponytail plugin', ...plugin('DietrichGebert/ponytail', 'ponytail@ponytail') });
   }
   if (tools.includes('i-have-adhd')) {
-    commands.push({ tool: 'i-have-adhd', desc: 'i-have-adhd plugin', ...plugin('ayghri/i-have-adhd', 'i-have-adhd@i-have-adhd') });
+    commands.push({ tool: 'i-have-adhd', desc: 'i-have-adhd plugin', ...plugin('ayghri/i-have-adhd', 'i-have-adhd@i-have-adhd') }, adhdCommand);
     if (opts.adhdAlways) actions.push({ kind: 'file', path: path.join(dir, '.i-have-adhd-always'), content: '' , force: true });
   }
   for (const name of ['serena', 'playwright']) {

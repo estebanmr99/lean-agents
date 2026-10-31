@@ -209,3 +209,93 @@ test('a failed install command exits 1 and still records state', { skip: process
 test('winget installs accept agreements, or they stop at a prompt without a TTY', () => {
   for (const tool of ['rtk', 'serena']) assert.ok(prereqFor(tool, 'winget').install[0].includes('--accept-package-agreements'));
 });
+
+const NEW = ['--yes', '--no-exec', '--agents', 'copilot-cli,antigravity', '--all-tools', '--privacy', 'strict', '--lang', 'en', '--profile', 'none', '--adhd-always', '--ponytail-mode', 'off'];
+
+test('Copilot CLI and Antigravity: files, kept user values, full uninstall', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const copilot = path.join(home, '.copilot');
+  const gemini = path.join(home, '.gemini', 'config');
+  fs.mkdirSync(copilot, { recursive: true });
+  fs.mkdirSync(gemini, { recursive: true });
+  fs.writeFileSync(path.join(copilot, 'copilot-instructions.md'), '# mine\n');
+  fs.writeFileSync(path.join(copilot, 'mcp-config.json'), '{\n  "mcpServers": { "playwright": { "type": "http", "url": "https://mine" } }\n}\n');
+  fs.writeFileSync(path.join(gemini, 'mcp_config.json'), '{\n  // keep me\n  "mcpServers": {}\n}\n');
+  const before = snapshot(home);
+  lean(home, NEW);
+
+  const rules = fs.readFileSync(path.join(copilot, 'copilot-instructions.md'), 'utf8');
+  assert.match(rules, /^# mine/);
+  assert.match(rules, /lean-agents:start/);
+  const mcp = JSON.parse(fs.readFileSync(path.join(copilot, 'mcp-config.json'), 'utf8')).mcpServers;
+  assert.equal(mcp.playwright.url, 'https://mine');
+  assert.equal(mcp.serena.type, 'local');
+  assert.equal(mcp.serena.command, 'uvx');
+  assert.ok(!mcp['context-mode'], 'Context Mode comes from the plugin, never also as MCP');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(copilot, 'settings.json'), 'utf8')).autoUpdate, false);
+  const agent = fs.readFileSync(path.join(copilot, 'agents', 'explore.agent.md'), 'utf8');
+  assert.match(agent, /^model: claude-haiku-5\.5$/m);
+  assert.match(agent, /^tools: \["read","search"\]$/m);
+
+  assert.match(fs.readFileSync(path.join(gemini, 'rules', 'lean-agents.md'), 'utf8'), /managed by lean-agents/);
+  const agy = fs.readFileSync(path.join(gemini, 'agents', 'planner.md'), 'utf8');
+  assert.match(agy, /^subagent: true$/m);
+  assert.match(agy, /^model: pro$/m);
+  const agyMcp = parse(fs.readFileSync(path.join(gemini, 'mcp_config.json'), 'utf8'));
+  assert.equal(agyMcp.mcpServers.playwright.command, 'npx');
+  assert.equal(agyMcp.mcpServers.playwright.type, undefined);
+
+  lean(home, ['--uninstall', '--yes', '--no-exec']);
+  const after = Object.fromEntries(Object.entries(snapshot(home)).filter(([f]) => !f.startsWith('.config/lean-agents/')));
+  assert.deepEqual(after, before);
+});
+
+test('--all-tools leaves out opt-in tools; --tools adds them', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const all = lean(home, [...NEW, '--dry-run']);
+  assert.ok(!all.includes('gsd-core'));
+  assert.match(all, /tools: .*codeburn/);
+  assert.ok(!/tools: .*autoskills/.test(all));
+  const some = lean(home, [...NEW, '--dry-run', '--tools', 'gsd,autoskills']);
+  assert.match(some, /@opengsd\/gsd-core@latest --copilot --global/);
+  assert.match(some, /@opengsd\/gsd-core@latest --antigravity --global/);
+});
+
+test('GSD defaults use profile models, and existing defaults survive uninstall', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const file = path.join(home, '.gsd', 'defaults.json');
+  fs.mkdirSync(path.dirname(file));
+  const mine = '{\n  "model_overrides": { "gsd-planner": "mine" }\n}\n';
+  fs.writeFileSync(file, mine);
+  lean(home, [...NEW, '--agents', 'copilot-cli', '--tools', 'gsd']);
+  const on = JSON.parse(fs.readFileSync(file, 'utf8')).model_overrides;
+  assert.equal(on['gsd-planner'], 'mine');
+  assert.equal(on['gsd-debugger'], 'claude-opus-5.5');
+  assert.equal(on['gsd-plan-checker'], 'claude-haiku-5.5');
+  lean(home, ['--uninstall', '--yes', '--no-exec']);
+  assert.equal(fs.readFileSync(file, 'utf8'), mine);
+});
+
+test('every GSD defaults file maps agents to tiers of its profile', () => {
+  const dirs = fs.readdirSync(path.join(ROOT, 'profiles'), { withFileTypes: true }).filter((e) => e.isDirectory());
+  assert.ok(dirs.length >= 6);
+  for (const d of dirs) {
+    const profile = JSON.parse(fs.readFileSync(path.join(ROOT, 'profiles', `${d.name}.json`), 'utf8'));
+    const gsd = JSON.parse(fs.readFileSync(path.join(ROOT, 'profiles', d.name, 'gsd-defaults.json'), 'utf8'));
+    for (const tier of Object.values(gsd.model_overrides)) assert.ok(profile.tiers[tier], `${d.name}: ${tier}`);
+  }
+});
+
+test('adhd-skill flips the flag in every installed copy and back', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const a = path.join(home, '.claude', 'plugins', 'cache', 'i-have-adhd', 'i-have-adhd', '0.4.1', 'skills', 'i-have-adhd', 'SKILL.md');
+  const b = path.join(home, '.agents', 'skills', 'i-have-adhd', 'SKILL.md');
+  const text = '---\nname: i-have-adhd\ndisable-model-invocation: true\n---\nbody\n';
+  for (const f of [a, b]) { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); }
+  const script = (mode, h) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'adhd-skill.mjs'), mode, h], { encoding: 'utf8' }).status;
+  assert.equal(script('on', home), 0);
+  for (const f of [a, b]) assert.match(fs.readFileSync(f, 'utf8'), /disable-model-invocation: false/);
+  assert.equal(script('off', home), 0);
+  for (const f of [a, b]) assert.equal(fs.readFileSync(f, 'utf8'), text);
+  assert.equal(script('on', fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'))), 1, 'a missing skill must fail the install');
+});
