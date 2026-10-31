@@ -9,9 +9,12 @@ export function which(bin) {
   return r.status === 0 ? r.stdout.trim().split(/\r?\n/)[0] : null;
 }
 
+// Windows .cmd shims (npm, npx) need a shell; real .exe files must not get one, or paths with spaces split.
+const useShell = (bin) => isWin && !/\.exe$/i.test(which(bin) ?? '');
+
 export function version(bin, args = ['--version']) {
   if (!which(bin)) return null;
-  const r = spawnSync(bin, args, { encoding: 'utf8', shell: isWin, timeout: 20000 });
+  const r = spawnSync(bin, args, { encoding: 'utf8', shell: useShell(bin), timeout: 20000 });
   const m = `${r.stdout}${r.stderr}`.match(/(\d+)\.(\d+)\.(\d+)/);
   return m ? m[0] : 'unknown';
 }
@@ -54,12 +57,12 @@ export function prereqFor(tool, pm) {
 export function run(argv, { dryRun, log }) {
   log(`  $ ${argv.join(' ')}`);
   if (dryRun) return true;
-  const r = spawnSync(argv[0], argv.slice(1), { stdio: 'inherit', shell: isWin });
+  const r = spawnSync(argv[0], argv.slice(1), { stdio: 'inherit', shell: useShell(argv[0]) });
   return r.status === 0;
 }
 
 export function quiet(argv) {
-  const r = spawnSync(argv[0], argv.slice(1), { encoding: 'utf8', shell: isWin, timeout: 30000 });
+  const r = spawnSync(argv[0], argv.slice(1), { encoding: 'utf8', shell: useShell(argv[0]), timeout: 30000 });
   return { ok: r.status === 0, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
 }
 
