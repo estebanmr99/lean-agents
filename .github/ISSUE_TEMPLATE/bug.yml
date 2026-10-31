@@ -1,0 +1,26 @@
+name: Bug report
+description: Something in the installer or configs does not work
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Please remove usernames, paths, keys and company details from logs before posting.
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options: [macOS, Windows (PowerShell), Windows (Git Bash), Linux]
+    validations:
+      required: true
+  - type: input
+    id: agents
+    attributes:
+      label: Agents and versions
+      placeholder: claude 2.x, opencode 2.x
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Command you ran and the doctor output (`--doctor`).
+    validations:
+      required: true

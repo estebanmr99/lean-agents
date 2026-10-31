@@ -1,0 +1,12 @@
+# Local-only privacy denylist (see scripts/check-private.sh)
+.private-denylist
+# OS and editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+# Tooling
+node_modules/
+.serena/
+*.log
+tmp/
