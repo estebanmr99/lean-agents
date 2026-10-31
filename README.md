@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/banner.svg" alt="lean-agents banner" width="640">
+
 # lean-agents
 
 **One command. Every coding agent. Fewer tokens, clearer answers.**
@@ -11,6 +13,7 @@ The same rules, cheap-by-default subagents, context-saving tools and MCP servers
 ![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%7C%20OpenCode%20%7C%20Copilot%20CLI%20%7C%20Antigravity-8A2BE2)
 [![CI](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml)
 [![Secret scan](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml)
+![GitHub stars](https://img.shields.io/github/stars/estebanmr99/lean-agents?style=social)
 
 [Leer en español](README.es.md)
 

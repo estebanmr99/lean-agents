@@ -34,6 +34,7 @@ jobs:
           size="$(stat -c %s docs/assets/demo.gif)"
           test "$size" -gt 10000
           test "$size" -lt 5000000
+          test "$(stat -c %s docs/assets/social-preview.png)" -lt 1000000
           file docs/assets/social-preview.png > social.txt
           cat social.txt
           grep -q '1280 x 640' social.txt

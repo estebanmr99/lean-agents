@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/banner.svg" alt="Banner de lean-agents" width="640">
+
 # lean-agents
 
 **Un comando. Todos tus agentes de código. Menos tokens, respuestas más claras.**

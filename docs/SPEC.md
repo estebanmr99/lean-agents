@@ -27,6 +27,7 @@ Repeat the same prompt for each session. Each session must leave the repository 
 - Negative checks in test scripts must not start with `! `: `set -e` ignores that. Use `refute` or `if`.
 - OpenCode 1 facts verified on 1.19.0: singular `agent` and `plugin`, flat `mcp`, `compaction.reserved`, `autoupdate`, `disabled_providers`. `opencode debug config` prints one object; `opencode agent list` lists agents. DCP now also installs on OpenCode 2, but lean-agents keeps it 1.x only; the notes in sections 6 and 14 saying it has no V2 release are out of date.
 - OpenCode 2 facts verified on 2.2.5: native keys are `agents` (not `agent`), top-level `policies`, `plugins`, `mcp.servers`, `compaction.buffer`, `update`, `share`. `opencode debug config` prints a JSON array of config sources (`{type, path, info}`); `opencode debug agents` lists agents.
+- Session 5 is blocked on the owner's Codeburn data: the README "Why" keeps its TODO, and there is no `1.0.0`, tag or release until it arrives. `docs/launch.md`, `release.yml`, the banner and the `assets` workflow exist.
 - Testing policy: the owner does not test on their working machines. Every claim is proven in CI with throwaway HOME directories and real binaries (`tests/real-opencode.sh`).
 - Commits are authored by the owner (`git config user.name/user.email` set to their GitHub no-reply address) with a `Co-Authored-By` trailer for the agent.
 - Private terms are blocked by `scripts/check-private.sh` using the `PRIVATE_DENYLIST` repository secret in CI and a gitignored `.private-denylist` locally.
@@ -454,7 +455,7 @@ Mark each `[x]` when merged.
 - [x] **Session 1 — Foundation** (PR #1). Spec, rules, neutral subagents, README (EN/ES), contributing files, privacy check, secret scan.
 - [x] **Session 2 — Claude Code + OpenCode 2.x** (PR #2). Node engine, `install.sh`, Claude Code and OpenCode 2 adapters, profiles, docs, CI on Ubuntu and macOS, real OpenCode 2.2.5 check in CI.
 - [x] **Session 3 — Windows + OpenCode 1.x + wider CI** (PR #4). `install.ps1`, OpenCode 1.x adapter, optional DCP, tool rules, CI with real binaries on Windows, OpenCode 1.19, Claude Code and real tool installs.
-- [x] **Session 4 — Copilot CLI, Antigravity CLI, tools, skills, models** (PR #5). Both adapters, Codeburn, opt-in GSD and AutoSkills, three skills, three profiles, `models-refresh`, `XDG_CONFIG_HOME`, `--home` passed to child tools, real Copilot, Antigravity and winget jobs. Open: the OpenCode skills undo still uses `skills remove -a`, which can leave `~/.agents/skills`; Copilot `model` format and Antigravity rule and skill loading need a logged-in check.
+- [x] **Session 4 — Copilot CLI, Antigravity CLI, tools, skills, models** (PR #5). Both adapters, Codeburn, opt-in GSD and AutoSkills, three skills, three profiles, `models-refresh`, `XDG_CONFIG_HOME`, `--home` passed to child tools, real Copilot, Antigravity and winget jobs. Open: Copilot `model` format and Antigravity rule and skill loading need a logged-in check.
 
 ### Session 3 — Windows + OpenCode 1.x + wider CI
 

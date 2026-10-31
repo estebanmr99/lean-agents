@@ -6,6 +6,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Added
 
+- `docs/launch.md`, a README banner, and an `assets` workflow that renders the demo GIF and social preview in CI.
 - `release.yml`: a tag `v*` publishes the CHANGELOG notes and source archives. `scripts/release.mjs` builds them.
 - CI job `real-skills-undo`: real Skills CLI, throwaway HOME, Claude Code and OpenCode 1.x and 2.x.
 
