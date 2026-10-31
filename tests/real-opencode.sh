@@ -17,10 +17,12 @@ bash "$repo/install.sh" --yes --no-exec --agents opencode-v2 \
 
 opencode debug config > "$HOME/resolved.txt" 2>&1 || { cat "$HOME/resolved.txt"; exit 1; }
 
-node --input-type=module - "$HOME/resolved.txt" <<'JS'
+node --input-type=module - "$HOME/resolved.txt" "$repo" <<'JS'
 import fs from 'node:fs';
 const out = fs.readFileSync(process.argv[2], 'utf8');
-const cfg = JSON.parse(out.slice(out.indexOf('{')));
+const { firstJsonObject } = await import(`${process.argv[3]}/scripts/lib/doctor.mjs`);
+let cfg;
+try { cfg = firstJsonObject(out); } catch (e) { console.log(out); throw e; }
 const servers = cfg.mcp?.servers ?? cfg.mcp ?? {};
 const checks = {
   'rules in instructions': (cfg.instructions ?? []).some((i) => String(i).includes('lean-agents')),
