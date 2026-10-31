@@ -7,11 +7,12 @@ set -euo pipefail
 refute() { if "$@"; then echo "must not succeed: $*" >&2; exit 1; fi; }
 
 command -v copilot >/dev/null || { echo "copilot not on PATH" >&2; exit 1; }
-copilot --version
 
 HOME="$(mktemp -d)"
 export HOME
 export XDG_CONFIG_HOME="$HOME/.config"
+unset XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
+copilot --version
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 dir="$HOME/.copilot"
 

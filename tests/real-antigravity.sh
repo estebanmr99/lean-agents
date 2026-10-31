@@ -7,12 +7,13 @@ set -euo pipefail
 refute() { if "$@"; then echo "must not succeed: $*" >&2; exit 1; fi; }
 
 command -v agy >/dev/null || { echo "agy not on PATH" >&2; exit 1; }
-agy --version
 
 agy_bin="$(command -v agy)"
 HOME="$(mktemp -d)"
 export HOME
 export XDG_CONFIG_HOME="$HOME/.config"
+unset XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
+"$agy_bin" --version
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 dir="$HOME/.gemini/config"
 

@@ -37,6 +37,9 @@ export const configHome = (home) => envDir(home, 'XDG_CONFIG_HOME', path.join(ho
 export function isolate(home) {
   if (home === os.homedir()) return;
   const env = { XDG_CONFIG_HOME: configHome(home), COPILOT_HOME: envDir(home, 'COPILOT_HOME', path.join(home, '.copilot')) };
+  for (const name of ['XDG_CACHE_HOME', 'XDG_DATA_HOME', 'XDG_STATE_HOME']) {
+    if (!envDir(home, name, null)) delete process.env[name];
+  }
   Object.assign(process.env, env, { HOME: home, USERPROFILE: home });
 }
 

@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parse } from 'jsonc-parser';
 import { applyJsonEdits, revertJsonEdits } from '../scripts/lib/fsops.mjs';
 import { diffModels } from '../scripts/models-refresh.mjs';
@@ -339,4 +339,24 @@ test('GSD ignores --profile when no OpenCode agent is selected', () => {
   lean(home, [...NEW, '--agents', 'copilot-cli', '--tools', 'gsd', '--profile', 'anthropic-api']);
   const models = JSON.parse(fs.readFileSync(path.join(home, '.gsd', 'defaults.json'), 'utf8')).model_overrides;
   assert.equal(models['gsd-debugger'], 'claude-opus-5.5');
+});
+
+test('--home drops XDG cache, data and state dirs outside it', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const inside = path.join(home, 'state');
+  const code = `import('${pathToFileURL(path.join(ROOT, 'scripts/lib/system.mjs')).href}').then((m) => { m.isolate(process.argv[1]); console.log(JSON.stringify([process.env.XDG_CACHE_HOME ?? null, process.env.XDG_STATE_HOME])); })`;
+  const env = { ...process.env, XDG_CACHE_HOME: path.join(os.tmpdir(), 'real-cache'), XDG_STATE_HOME: inside };
+  const r = spawnSync(process.execPath, ['-e', code, home], { encoding: 'utf8', env });
+  assert.deepEqual(JSON.parse(r.stdout), [null, inside]);
+});
+
+test('real-binary scripts run no agent CLI before HOME is a throwaway', () => {
+  const scripts = fs.readdirSync(path.join(ROOT, 'tests')).filter((f) => /^real-.*\.sh$/.test(f));
+  assert.ok(scripts.length >= 4);
+  for (const f of scripts) {
+    const lines = fs.readFileSync(path.join(ROOT, 'tests', f), 'utf8').split('\n');
+    const home = lines.findIndex((l) => /^HOME="\$\(mktemp -d\)"/.test(l));
+    const cli = lines.findIndex((l) => /^("\$agy_bin"|agy|claude|copilot|opencode|rtk|npx|npm|node|bash) /.test(l));
+    assert.ok(home >= 0 && cli > home, `${f}: line ${cli + 1} runs before HOME is set`);
+  }
 });
