@@ -91,6 +91,20 @@ jobs:
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - name: Install lean-agents and check what OpenCode resolved
         run: bash tests/real-opencode.sh
+
+  real-opencode-xdg:
+    # Its own job: OpenCode's background service holds a fixed port and keeps the first HOME.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Install OpenCode 2
+        run: |
+          curl -fsSL https://opencode.ai/v2/install | bash
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - name: Non-default XDG_CONFIG_HOME reaches the real OpenCode
         run: |
           export HOME="$(mktemp -d)"

@@ -454,6 +454,7 @@ Mark each `[x]` when merged.
 - [x] **Session 1 — Foundation** (PR #1). Spec, rules, neutral subagents, README (EN/ES), contributing files, privacy check, secret scan.
 - [x] **Session 2 — Claude Code + OpenCode 2.x** (PR #2). Node engine, `install.sh`, Claude Code and OpenCode 2 adapters, profiles, docs, CI on Ubuntu and macOS, real OpenCode 2.2.5 check in CI.
 - [x] **Session 3 — Windows + OpenCode 1.x + wider CI** (PR #4). `install.ps1`, OpenCode 1.x adapter, optional DCP, tool rules, CI with real binaries on Windows, OpenCode 1.19, Claude Code and real tool installs.
+- [x] **Session 4 — Copilot CLI, Antigravity CLI, tools, skills, models** (PR #5). Both adapters, Codeburn, opt-in GSD and AutoSkills, three skills, three profiles, `models-refresh`, `XDG_CONFIG_HOME`, `--home` passed to child tools, real Copilot, Antigravity and winget jobs. Open: the OpenCode skills undo still uses `skills remove -a`, which can leave `~/.agents/skills`; Copilot `model` format and Antigravity rule and skill loading need a logged-in check.
 
 ### Session 3 — Windows + OpenCode 1.x + wider CI
 

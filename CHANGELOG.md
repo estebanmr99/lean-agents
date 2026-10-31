@@ -12,7 +12,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - Profiles `github-copilot`, `opencode-go`, `openai-api`, and per-agent GSD models in `profiles/<name>/gsd-defaults.json`.
 - Skills `setup-doctor`, `token-audit`, `update-models`.
 - `scripts/models-refresh.mjs` and a monthly workflow that opens an issue when profile models change.
-- CI jobs with real Copilot CLI (Linux, macOS, Windows), real Antigravity CLI, winget, and a non-default `XDG_CONFIG_HOME`.
+- CI jobs with real Copilot CLI (Linux, macOS, Windows), real Antigravity CLI, real winget, and a non-default `XDG_CONFIG_HOME`.
 
 ### Changed
 
