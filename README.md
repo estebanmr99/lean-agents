@@ -16,7 +16,7 @@ The same rules, cheap-by-default subagents, context-saving tools and MCP servers
 
 </div>
 
-> **Status: v0.2 preview.** The installer works for **Claude Code** and **OpenCode 2.x** on macOS and Linux. Windows, OpenCode 1.x, Copilot CLI and Antigravity are next ([roadmap](#roadmap)). Star the repo to get notified when `v1.0.0` ships.
+> **Status: v0.3 preview.** The installer works for **Claude Code** and **OpenCode 1.x and 2.x** on macOS, Linux and Windows. Copilot CLI and Antigravity are next ([roadmap](#roadmap)). Star the repo to get notified when `v1.0.0` ships.
 
 <!-- TODO(session 5): demo GIF -->
 
@@ -36,7 +36,9 @@ Windows PowerShell:
 
 Prefer your agent to do it? Paste a prompt from [INSTALL_WITH_AGENT.md](INSTALL_WITH_AGENT.md) into Claude Code, OpenCode or Copilot CLI.
 
-Always start with `--dry-run`: it shows every file and command before anything changes. Then run it again without `--dry-run`; it asks which agents, tools, privacy level, language and model profile you want. Useful flags: `--all-tools`, `--privacy strict`, `--lang es`, `--profile vertex-gemini`, `--update`, `--uninstall`, `--doctor` (`--help` lists them all).
+Always start with `--dry-run`: it shows every file and command before anything changes. Then run it again without `--dry-run`; it asks which agents, tools, privacy level, language and model profile you want. Useful flags: `--all-tools`, `--privacy strict`, `--lang es`, `--profile vertex-gemini`, `--update`, `--uninstall`, `--doctor` (`--help` lists them all). In PowerShell the same flags are PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`.
+
+Context Mode needs Node.js 22.5 or newer. Everything else works on Node.js 20.
 
 ## Why
 
@@ -50,14 +52,14 @@ Always start with `--dry-run`: it shows every file and command before anything c
 
 | Feature | Claude Code | OpenCode 2.x | OpenCode 1.x | Copilot CLI | Antigravity CLI |
 | --- | --- | --- | --- | --- | --- |
-| Global rules (AGENTS.md) | ✅ | ✅ | 🔜 | 🔎 | 🔎 |
-| Subagents by cost tier | ✅ | ✅ | 🔜 | 🔎 | 🔎 |
-| RTK (shell output compression) | ✅ | ✅ | 🔜 | 🔜 | 🔜 |
-| Context Mode | ✅ plugin | ✅ MCP | 🔜 plugin | 🔎 | 🔎 |
-| Serena + Playwright MCP | ✅ | ✅ | 🔜 | 🔎 | 🔎 |
-| Ponytail, i-have-adhd | ✅ | ✅ | 🔜 | ➖ | ➖ |
-| Caveman and other skills | ✅ | ✅ | 🔜 | 🔎 | 🔎 |
-| Context compaction | ✅ auto 80% | ✅ native | 🔜 DCP | 🔎 | 🔎 |
+| Global rules (AGENTS.md) | ✅ | ✅ | ✅ | 🔎 | 🔎 |
+| Subagents by cost tier | ✅ | ✅ | ✅ | 🔎 | 🔎 |
+| RTK (shell output compression) | ✅ | ✅ | ✅ | 🔜 | 🔜 |
+| Context Mode | ✅ plugin | ✅ MCP | ✅ plugin | 🔎 | 🔎 |
+| Serena + Playwright MCP | ✅ | ✅ | ✅ | 🔎 | 🔎 |
+| Ponytail, i-have-adhd | ✅ | ✅ | ✅ | ➖ | ➖ |
+| Caveman and other skills | ✅ | ✅ | ✅ | 🔎 | 🔎 |
+| Context compaction | ✅ auto 80% | ✅ native | ✅ native, optional DCP | 🔎 | 🔎 |
 
 ✅ supported · 🔜 next release · 🔎 being verified · ➖ not available for this agent. Details and verification dates: [docs/compatibility.md](docs/compatibility.md).
 
@@ -66,7 +68,7 @@ Always start with `--dry-run`: it shows every file and command before anything c
 | Tier | What | Default |
 | --- | --- | --- |
 | Minimal | Rules, tiered subagents, compaction, output limits, RTK, Context Mode | Always |
-| Optional tools | Serena, Playwright, Ponytail, Caveman, i-have-adhd, Codeburn, AutoSkills, GSD | Asked one by one |
+| Optional tools | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0) | Asked one by one |
 | Strict privacy | No telemetry, no auto-updates, no session sharing, no providers that train on your prompts | Off, opt in with `--privacy strict` |
 
 ## Models that stay current
@@ -93,14 +95,15 @@ lean-agents is glue. The heavy lifting is done by these projects; please star th
 [i-have-adhd](https://github.com/ayghri/i-have-adhd) ·
 [OpenCode DCP](https://github.com/Opencode-DCP/opencode-dynamic-context-pruning) ·
 [GSD Core](https://github.com/open-gsd/gsd-core) ·
+[andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills) ·
 Codeburn · AutoSkills · [Skills CLI](https://vercel.com/changelog/introducing-skills-the-open-agent-skills-ecosystem)
 
 ## Roadmap
 
 - [x] Spec, rules and subagent definitions
 - [x] Installer for Claude Code and OpenCode 2.x (macOS, Linux)
-- [ ] Windows installer and OpenCode 1.x
-- [ ] Copilot CLI, Antigravity CLI, Codeburn, AutoSkills, original skills, model profiles
+- [x] Windows installer and OpenCode 1.x
+- [ ] Copilot CLI, Antigravity CLI, Codeburn, AutoSkills, GSD, original skills, model profiles
 - [ ] `v1.0.0`
 - Later: Codex CLI, Gemini CLI, Cursor
 

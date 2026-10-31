@@ -42,7 +42,7 @@
 ## 6. Ahorro de tokens
 
 - Lee lo mínimo: busca primero (grep{{SERENA_HINT}}) y abre solo las partes relevantes.
-{{CONTEXT_MODE_RULE}}- No repitas en la respuesta contenido que ya está en archivos o en la conversación.
+{{TOOL_RULES}}- No repitas en la respuesta contenido que ya está en archivos o en la conversación.
 - Delega exploración y tareas acotadas a subagentes baratos (`explore`, `research`, `review`). El nivel fuerte solo para planear, arquitectura o bugs difíciles, y solo cuando se pida o se justifique.
 - Subagentes en paralelo solo si no tocan los mismos archivos; si chocan, en secuencia.
 - Cada subagente recibe objetivo, límites, archivos permitidos y formato de salida. Al final, un paso de `review`.

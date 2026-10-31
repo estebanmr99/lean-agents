@@ -14,28 +14,52 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: shellcheck
-        run: shellcheck install.sh scripts/check-private.sh tests/real-opencode.sh
+        run: shellcheck install.sh scripts/check-private.sh tests/real-opencode.sh tests/real-opencode-v1.sh
 
   test:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [22]
+        include:
+          - os: ubuntu-latest
+            node: 20
     runs-on: ${{ matrix.os }}
+    env:
+      LEAN_AGENTS_REPO: https://github.com/${{ github.event.pull_request.head.repo.full_name || github.repository }}
+      LEAN_AGENTS_REF: ${{ github.head_ref || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
       - run: npm ci
       - name: Engine tests
         run: npm test
+      - name: PSScriptAnalyzer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $issues = Invoke-ScriptAnalyzer -Path install.ps1 -Severity Warning,Error
+          $issues | Format-List
+          if ($issues) { exit 1 }
+      - name: install.ps1 on PowerShell 5.1
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./tests/windows-install.ps1
+      - name: install.ps1 on PowerShell 7
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./tests/windows-install.ps1
       - name: Installer dry run in a temporary HOME changes nothing
+        if: runner.os != 'Windows'
         run: |
           export HOME="$(mktemp -d)"
           bash install.sh --dry-run --yes --no-exec --agents claude,opencode-v2 --all-tools --privacy strict --profile vertex-gemini
           test -z "$(ls -A "$HOME")"
       - name: Real install, doctor and uninstall in a temporary HOME
+        if: runner.os != 'Windows'
         run: |
           export HOME="$(mktemp -d)"
           bash install.sh --yes --no-exec --agents claude,opencode-v2 --all-tools --profile anthropic-api
@@ -58,3 +82,104 @@ jobs:
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - name: Install lean-agents and check what OpenCode resolved
         run: bash tests/real-opencode.sh
+
+  real-opencode-v1:
+    # Real OpenCode 1.x binary, throwaway HOME: proves the 1.x keys are accepted.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Install OpenCode 1.19
+        run: |
+          curl -fsSL https://opencode.ai/install | bash -s -- --version 1.19.0
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+      - name: Install lean-agents and check what OpenCode resolved
+        run: bash tests/real-opencode-v1.sh
+
+  real-claude:
+    # Real Claude Code, throwaway HOME, no login: MCP servers go through the claude CLI.
+    runs-on: ubuntu-latest
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Install Claude Code
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Use the runner's Linuxbrew
+        run: echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
+      - name: Install every tool, check them, uninstall
+        run: |
+          export HOME="$(mktemp -d)"
+          claude --version
+          bash install.sh --yes --agents claude --all-tools --privacy standard --lang en --ponytail-mode lite > "$HOME/install.txt"
+          cat "$HOME/install.txt"
+          ! grep -qE '^ *! ' "$HOME/install.txt"
+          claude mcp list > "$HOME/mcp.txt"
+          cat "$HOME/mcp.txt"
+          grep -q serena "$HOME/mcp.txt"
+          grep -q playwright "$HOME/mcp.txt"
+          grep -q 'plugin:context-mode' "$HOME/mcp.txt"
+          grep -q 'rtk hook' "$HOME/.claude/settings.json"
+          test -f "$HOME/.claude/skills/caveman/SKILL.md"
+          node -e 'JSON.parse(require("fs").readFileSync(process.env.HOME + "/.claude/settings.json", "utf8"))'
+          node scripts/lean.mjs --uninstall --yes > "$HOME/uninstall.txt"
+          cat "$HOME/uninstall.txt"
+          ! grep -qE '^ *! ' "$HOME/uninstall.txt"
+          claude mcp list > "$HOME/mcp-after.txt"
+          cat "$HOME/mcp-after.txt"
+          ! grep -qE 'serena|playwright|context-mode' "$HOME/mcp-after.txt"
+          ! grep -q 'rtk hook' "$HOME/.claude/settings.json"
+          test ! -e "$HOME/.claude/skills/caveman"
+
+  real-tools:
+    # Real tool installs through the engine, throwaway HOME, real OpenCode 2 for the doctor.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Install OpenCode 2
+        run: |
+          curl -fsSL https://opencode.ai/v2/install | bash
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+      - name: Use the runner's Linuxbrew
+        if: runner.os == 'Linux'
+        run: echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
+      - name: Install every tool, then run the doctor
+        run: |
+          export HOME="$(mktemp -d)"
+          export XDG_CONFIG_HOME="$HOME/.config"
+          bash install.sh --yes --agents opencode-v2 --all-tools --privacy standard --lang en --profile anthropic-api --ponytail-mode lite
+          node scripts/lean.mjs --doctor
+          test -f "$HOME/.agents/skills/caveman/SKILL.md"
+          uvx -p 3.13 --from git+https://github.com/oraios/serena serena --help
+
+  real-windows:
+    # Real OpenCode 1.x and real tools through install.ps1, throwaway USERPROFILE.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Install, doctor and uninstall through install.ps1
+        shell: pwsh
+        run: ./tests/real-windows.ps1

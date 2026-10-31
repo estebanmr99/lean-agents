@@ -42,7 +42,7 @@
 ## 6. Token efficiency
 
 - Read the minimum: search first (grep{{SERENA_HINT}}) and open only the relevant parts.
-{{CONTEXT_MODE_RULE}}- Do not repeat in your answer content that is already in files or in the conversation.
+{{TOOL_RULES}}- Do not repeat in your answer content that is already in files or in the conversation.
 - Delegate exploration and bounded tasks to cheap subagents (`explore`, `research`, `review`). Use the strong tier only for planning, architecture or hard bugs, and only when asked or justified.
 - Run subagents in parallel only when they do not touch the same files; otherwise run them in sequence.
 - Give every subagent a goal, limits, allowed files and an output format. Finish with a `review` pass.

@@ -24,7 +24,7 @@ function snapshot(dir) {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
       const p = path.join(d, e.name);
       if (e.isDirectory()) walk(p);
-      else out[path.relative(dir, p)] = fs.readFileSync(p, 'utf8');
+      else out[path.relative(dir, p).split(path.sep).join('/')] = fs.readFileSync(p, 'utf8');
     }
   };
   walk(dir);
@@ -64,7 +64,7 @@ test('install keeps user values and comments, and is idempotent', () => {
   assert.match(ocText, /\/\/ keep me/);
   const oc = parse(ocText, [], { allowTrailingComma: true });
   assert.deepEqual(oc.instructions[0], 'mine.md');
-  assert.ok(oc.instructions[1].endsWith(path.join('lean-agents', 'AGENTS.md')));
+  assert.ok(oc.instructions[1].endsWith('lean-agents/AGENTS.md'));
   assert.equal(oc.agents.plan.model, 'google-vertex/gemini-4-argon');
   assert.ok(oc.mcp.servers.serena && oc.mcp.servers.playwright && oc.mcp.servers['context-mode']);
   assert.equal(oc.share, 'disabled');
@@ -101,7 +101,7 @@ test('existing unmanaged agent files are not overwritten', () => {
   fs.mkdirSync(path.join(home, '.claude', 'agents'));
   fs.writeFileSync(path.join(home, '.claude', 'agents', 'review.md'), 'my own reviewer\n');
   const out = lean(home, ALL);
-  assert.match(out, /skip\s+~\/\.claude\/agents\/review\.md/);
+  assert.match(out, /skip\s+~[\\/]\.claude[\\/]agents[\\/]review\.md/);
   assert.equal(fs.readFileSync(path.join(home, '.claude', 'agents', 'review.md'), 'utf8'), 'my own reviewer\n');
 });
 
@@ -110,7 +110,59 @@ test('rules mention only installed tools and honor the language', () => {
   lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--no-tools', '--lang', 'es', '--privacy', 'standard']);
   const rules = fs.readFileSync(path.join(home, '.config', 'lean-agents', 'AGENTS.md'), 'utf8');
   assert.match(rules, /Responde siempre en español/);
-  assert.doesNotMatch(rules, /Serena|Context Mode|\{\{/);
+  assert.doesNotMatch(rules, /Serena|Context Mode|Playwright|ToolSearch|\{\{/);
+});
+
+test('rules say when to use each installed tool', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--tools', 'playwright', '--lang', 'en', '--privacy', 'standard']);
+  const rules = fs.readFileSync(path.join(home, '.config', 'lean-agents', 'AGENTS.md'), 'utf8');
+  for (const text of ['ctx_batch_execute', 'ctx_fetch_and_index', 'Playwright', 'ToolSearch']) assert.ok(rules.includes(text), text);
+  assert.doesNotMatch(rules, /Serena|\{\{/);
+});
+
+test('OpenCode 1.x gets singular keys, no Context Mode MCP, and a clean uninstall', () => {
+  const home = userHome();
+  const before = snapshot(home);
+  assert.match(lean(home, ['--dry-run', '--yes', '--no-exec', '--agents', 'opencode-v1', '--tools', 'context-mode', '--lang', 'en']), /npm install -g context-mode/);
+  const args = ['--yes', '--no-exec', '--agents', 'opencode-v1', '--all-tools', '--privacy', 'strict', '--lang', 'en', '--profile', 'anthropic-api', '--ponytail-mode', 'lite'];
+  lean(home, args);
+  const oc = parse(fs.readFileSync(path.join(home, '.config', 'opencode', 'opencode.jsonc'), 'utf8'), [], { allowTrailingComma: true });
+  assert.equal(oc.agent.plan.model, 'anthropic/claude-opus-5-5');
+  assert.ok(oc.mcp.serena.enabled && oc.mcp.playwright.enabled);
+  assert.equal(oc.mcp['context-mode'], undefined);
+  assert.deepEqual(oc.plugin, ['context-mode', '@dietrichgebert/ponytail', '@tarquinen/opencode-dcp@latest']);
+  assert.equal(oc.compaction.reserved, 40000);
+  assert.equal(oc.autoupdate, false);
+  assert.equal(oc.experimental.openTelemetry, false);
+  assert.deepEqual(oc.disabled_providers, ['opencode']);
+  assert.equal(oc.agents ?? oc.plugins ?? oc.update ?? oc.policies, undefined, 'no 2.x keys');
+  const dcp = parse(fs.readFileSync(path.join(home, '.config', 'opencode', 'dcp.jsonc'), 'utf8'));
+  assert.deepEqual([dcp.compress.minContextLimit, dcp.compress.maxContextLimit], [100000, 160000]);
+
+  lean(home, ['--uninstall', '--yes', '--no-exec']);
+  const now = snapshot(home);
+  const left = Object.keys(now).filter((f) => !f.startsWith('.config/lean-agents/'));
+  assert.deepEqual(left.sort(), Object.keys(before).sort(), 'no files may be left behind');
+  assert.equal(now['.config/opencode/opencode.jsonc'], before['.config/opencode/opencode.jsonc']);
+});
+
+test('OpenCode 1.x and 2.x cannot be configured together', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, '--yes', '--no-exec', '--dry-run', '--agents', 'opencode-v1,opencode-v2'], { encoding: 'utf8' });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /pick one/);
+});
+
+test('unknown tools are rejected and DCP only applies to OpenCode 1.x', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const base = ['--yes', '--no-exec', '--agents', 'opencode-v2', '--privacy', 'standard', '--lang', 'en', '--profile', 'anthropic-api'];
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...base, '--tools', 'playwrite'], { encoding: 'utf8' });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /unknown tools: playwrite/);
+  lean(home, [...base, '--all-tools']);
+  const { tools } = JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'state.json'), 'utf8')).options;
+  assert.ok(tools.includes('playwright') && !tools.includes('dcp'));
 });
 
 test('json edits round-trip', () => {

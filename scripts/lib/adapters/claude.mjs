@@ -54,7 +54,7 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath }) {
   actions.push({ kind: 'json', path: path.join(dir, 'settings.json'), edits });
 
   if (tools.includes('rtk')) {
-    commands.push({ tool: 'rtk', desc: 'RTK hook for Claude Code', run: [['rtk', 'init', '-g']], undo: [['rtk', 'init', '-g', '--uninstall']] });
+    commands.push({ tool: 'rtk', desc: 'RTK hook for Claude Code', run: [['rtk', 'init', '-g', '--auto-patch']], undo: [['rtk', 'init', '-g', '--uninstall']] });
   }
   if (tools.includes('context-mode')) {
     commands.push({ tool: 'context-mode', desc: 'Context Mode plugin', ...plugin('mksglu/context-mode', 'context-mode@context-mode') });
@@ -83,8 +83,8 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath }) {
     commands.push({
       tool: 'caveman',
       desc: 'Caveman skills for Claude Code',
-      run: [['npx', '-y', 'skills', 'add', 'JuliusBrussee/caveman', '-a', 'claude-code', '-g']],
-      undo: [['npx', '-y', 'skills', 'remove', 'JuliusBrussee/caveman', '-a', 'claude-code', '-g']],
+      run: [['npx', '-y', 'skills', 'add', 'JuliusBrussee/caveman', '--skill', 'caveman', 'caveman-compress', 'caveman-stats', '-a', 'claude-code', '-g', '-y']],
+      undo: [['npx', '-y', 'skills', 'remove', 'caveman', 'caveman-compress', 'caveman-stats', '-a', 'claude-code', '-g', '-y']],
     });
   }
   return { actions, commands };

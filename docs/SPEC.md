@@ -21,8 +21,9 @@ Repeat the same prompt for each session. Each session must leave the repository 
 
 ## 0. Current state (read first)
 
-- Installer architecture: thin bootstraps (`install.sh`, `install.ps1` planned) that hand over to the Node engine `scripts/lean.mjs`. Adapters live in `scripts/lib/adapters/`; tool prerequisites in `scripts/lib/system.mjs`; doctor in `scripts/lib/doctor.mjs`. The folders `agents/` and `tools/` hold documentation only. Where later sections mention `render.mjs`, `doctor.sh` or `tools/<tool>/install.sh`, the engine replaces them.
-- Supported today: Claude Code and OpenCode 2.x on macOS and Linux (v0.2.0).
+- Installer architecture: thin bootstraps (`install.sh`, `install.ps1`) that hand over to the Node engine `scripts/lean.mjs`. Adapters live in `scripts/lib/adapters/`; tool prerequisites in `scripts/lib/system.mjs`; doctor in `scripts/lib/doctor.mjs`. The folders `agents/` and `tools/` hold documentation only. Where later sections mention `render.mjs`, `doctor.sh` or `tools/<tool>/install.sh`, the engine replaces them.
+- Supported today: Claude Code and OpenCode 1.x and 2.x on macOS, Linux and Windows (v0.3.0).
+- OpenCode 1 facts verified on 1.19.0: singular `agent` and `plugin`, flat `mcp`, `compaction.reserved`, `autoupdate`, `disabled_providers`. `opencode debug config` prints one object; `opencode agent list` lists agents. DCP now also installs on OpenCode 2, but lean-agents keeps it 1.x only; the notes in sections 6 and 14 saying it has no V2 release are out of date.
 - OpenCode 2 facts verified on 2.2.5: native keys are `agents` (not `agent`), top-level `policies`, `plugins`, `mcp.servers`, `compaction.buffer`, `update`, `share`. `opencode debug config` prints a JSON array of config sources (`{type, path, info}`); `opencode debug agents` lists agents.
 - Testing policy: the owner does not test on their working machines. Every claim is proven in CI with throwaway HOME directories and real binaries (`tests/real-opencode.sh`).
 - Commits are authored by the owner (`git config user.name/user.email` set to their GitHub no-reply address) with a `Co-Authored-By` trailer for the agent.
@@ -450,6 +451,7 @@ Mark each `[x]` when merged.
 
 - [x] **Session 1 — Foundation** (PR #1). Spec, rules, neutral subagents, README (EN/ES), contributing files, privacy check, secret scan.
 - [x] **Session 2 — Claude Code + OpenCode 2.x** (PR #2). Node engine, `install.sh`, Claude Code and OpenCode 2 adapters, profiles, docs, CI on Ubuntu and macOS, real OpenCode 2.2.5 check in CI.
+- [x] **Session 3 — Windows + OpenCode 1.x + wider CI** (PR #4). `install.ps1`, OpenCode 1.x adapter, optional DCP, tool rules, CI with real binaries on Windows, OpenCode 1.19, Claude Code and real tool installs.
 
 ### Session 3 — Windows + OpenCode 1.x + wider CI
 
@@ -500,6 +502,10 @@ Branch: `session-4-more-agents`.
 5. **Profiles:** add `github-copilot`, `opencode-go`, `openai-api`; verify model IDs on the build date; `.github/workflows/models-refresh.yml` (monthly + manual) opens a PR or an issue when models change.
 6. `INSTALL_WITH_AGENT.md`: final prompts per agent.
 7. CI: a real-binary job per new agent where the CLI installs without login.
+8. **Carried over from session 3:**
+   - Engine: honor `XDG_CONFIG_HOME`. Today it always writes `~/.config/opencode`, so OpenCode misses the config when that variable is set. Prove it with a test that sets the variable.
+   - Windows: exercise the winget route (`rtk-ai.rtk`, `astral-sh.uv`, `--scope user`) on a machine or runner that has winget.
+   - Migration doc: check `policies` and `cli.json` against a real OpenCode 2 binary and remove the **VERIFY** marks.
 
 ### Session 5 — Launch
 

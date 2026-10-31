@@ -10,7 +10,7 @@ Las mismas reglas, subagentes baratos por defecto, herramientas que ahorran cont
 
 </div>
 
-> **Estado: versión preliminar v0.2.** El instalador ya funciona para **Claude Code** y **OpenCode 2.x** en macOS y Linux. Windows, OpenCode 1.x, Copilot CLI y Antigravity vienen después. Dale una estrella al repo para enterarte cuando salga `v1.0.0`.
+> **Estado: versión preliminar v0.3.** El instalador ya funciona para **Claude Code** y **OpenCode 1.x y 2.x** en macOS, Linux y Windows. Copilot CLI y Antigravity vienen después. Dale una estrella al repo para enterarte cuando salga `v1.0.0`.
 
 ## Inicio rápido
 
@@ -28,7 +28,9 @@ Windows PowerShell:
 
 ¿Prefieres que lo haga tu agente? Pega un prompt de [INSTALL_WITH_AGENT.md](INSTALL_WITH_AGENT.md) en Claude Code, OpenCode o Copilot CLI. Usa `--lang es` para que las reglas y las respuestas queden en español.
 
-Empieza siempre con `--dry-run`: muestra cada archivo y comando antes de cambiar nada.
+Empieza siempre con `--dry-run`: muestra cada archivo y comando antes de cambiar nada. En PowerShell las mismas opciones van en PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`.
+
+Context Mode necesita Node.js 22.5 o superior. Todo lo demás funciona con Node.js 20.
 
 ## Por qué
 
@@ -36,12 +38,27 @@ Empieza siempre con `--dry-run`: muestra cada archivo y comando antes de cambiar
 - **Respuestas más claras.** Un solo set corto de reglas: primero la respuesta, supuestos explícitos, cambios quirúrgicos, verificar antes de decir que terminó.
 - **Igual en todos lados.** Las reglas se escriben una vez en `core/` y se adaptan a cada agente.
 
+## Qué incluye
+
+| Función | Claude Code | OpenCode 2.x | OpenCode 1.x | Copilot CLI | Antigravity CLI |
+| --- | --- | --- | --- | --- | --- |
+| Reglas globales (AGENTS.md) | ✅ | ✅ | ✅ | 🔎 | 🔎 |
+| Subagentes por costo | ✅ | ✅ | ✅ | 🔎 | 🔎 |
+| RTK (comprime la salida del shell) | ✅ | ✅ | ✅ | 🔜 | 🔜 |
+| Context Mode | ✅ plugin | ✅ MCP | ✅ plugin | 🔎 | 🔎 |
+| Serena + Playwright MCP | ✅ | ✅ | ✅ | 🔎 | 🔎 |
+| Ponytail, i-have-adhd | ✅ | ✅ | ✅ | ➖ | ➖ |
+| Caveman y otras skills | ✅ | ✅ | ✅ | 🔎 | 🔎 |
+| Compactación de contexto | ✅ auto 80% | ✅ nativa | ✅ nativa, DCP opcional | 🔎 | 🔎 |
+
+✅ soportado · 🔜 próxima versión · 🔎 en verificación · ➖ no disponible para este agente. Detalles y fechas de verificación: [docs/compatibility.md](docs/compatibility.md).
+
 ## Niveles de instalación
 
 | Nivel | Qué incluye | Por defecto |
 | --- | --- | --- |
 | Mínimo | Reglas, subagentes por costo, compactación, límites de salida, RTK, Context Mode | Siempre |
-| Herramientas opcionales | Serena, Playwright, Ponytail, Caveman, i-have-adhd, Codeburn, AutoSkills, GSD | Se pregunta una por una |
+| Herramientas opcionales | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0) | Se pregunta una por una |
 | Privacidad estricta | Sin telemetría, sin auto updates, sin compartir sesiones, sin proveedores que entrenan con tus prompts | Apagado, se activa con `--privacy strict` |
 
 ## Modelos siempre al día
