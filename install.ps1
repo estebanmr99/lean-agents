@@ -37,7 +37,7 @@ function Install-Prerequisite($Bin, $Id, $Url) {
   if (-not (Test-Command 'winget')) { throw "lean-agents: $Bin is required. Install it from $Url and run this again." }
   $command = "winget install --id $Id -e --scope user"
   if ($DryRun) { Write-Output "Would run: $command"; return }
-  if ((Read-Host "$Bin is missing. Install it with '$command'? [y/N]") -notmatch '^(y|yes|s|si)$') {
+  if (-not $Yes -and (Read-Host "$Bin is missing. Install it with '$command'? [y/N]") -notmatch '^(y|yes|s|si)$') {
     throw "lean-agents: $Bin is required. Install it from $Url and run this again."
   }
   winget install --id $Id -e --scope user
@@ -75,8 +75,8 @@ if (-not (Test-Path (Join-Path $Src 'node_modules\jsonc-parser'))) {
 # RTK from the release zip (when winget is not available) lives here. See docs/manual-install.md.
 $rtkDir = Join-Path $env:USERPROFILE 'tools\rtk'
 $userPath = @([Environment]::GetEnvironmentVariable('Path', 'User') -split ';' | Where-Object { $_ })
-if (-not $DryRun -and -not $Uninstall -and (Test-Path (Join-Path $rtkDir 'rtk.exe'))) {
-  if ($userPath -notcontains $rtkDir) {
+if (-not $DryRun -and (Test-Path (Join-Path $rtkDir 'rtk.exe'))) {
+  if (-not $Uninstall -and $userPath -notcontains $rtkDir) {
     [Environment]::SetEnvironmentVariable('Path', (($userPath + $rtkDir) -join ';'), 'User')
     Write-Output "Added $rtkDir to your user PATH. Open a new terminal after this install."
   }

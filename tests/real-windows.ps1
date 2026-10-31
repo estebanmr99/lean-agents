@@ -19,6 +19,7 @@ opencode --version
 $rtkDir = "$dir\tools\rtk"
 Invoke-WebRequest 'https://github.com/rtk-ai/rtk/releases/latest/download/rtk-x86_64-pc-windows-msvc.zip' -OutFile "$dir\rtk.zip"
 Expand-Archive "$dir\rtk.zip" $rtkDir
+if (-not (Test-Path "$rtkDir\rtk.exe")) { throw 'rtk.exe is not at the top of the release zip' }
 
 function Get-UserPath { [Environment]::GetEnvironmentVariable('Path', 'User') -split ';' }
 
@@ -26,6 +27,7 @@ function Get-UserPath { [Environment]::GetEnvironmentVariable('Path', 'User') -s
 if ((Get-UserPath) -notcontains $rtkDir) { throw 'rtk folder was not added to the user PATH' }
 if (-not (Get-ChildItem "$dir\.config\opencode\skills" -ErrorAction SilentlyContinue)) { throw 'Caveman skills did not arrive' }
 if (-not (Test-Path "$dir\.config\opencode\vendor\i-have-adhd\.opencode")) { throw 'i-have-adhd clone is missing' }
+if (-not (Test-Path "$dir\.config\opencode\plugins\rtk.ts")) { throw 'RTK plugin is missing' }
 
 & "$repo\install.ps1" -Doctor
 
@@ -36,3 +38,5 @@ foreach ($name in 'explore', 'research', 'review', 'debug', 'planner') {
 
 & "$repo\install.ps1" -Uninstall -Yes
 if ((Get-UserPath) -contains $rtkDir) { throw 'rtk folder was not removed from the user PATH' }
+if (Test-Path "$dir\.config\opencode\plugins\rtk.ts") { throw 'RTK plugin was not removed' }
+if (Test-Path "$dir\.config\opencode\vendor\i-have-adhd") { throw 'i-have-adhd clone was not removed' }

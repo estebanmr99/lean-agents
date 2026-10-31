@@ -146,6 +146,17 @@ test('OpenCode 1.x and 2.x cannot be configured together', () => {
   assert.match(r.stderr, /pick one/);
 });
 
+test('unknown tools are rejected and DCP only applies to OpenCode 1.x', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const base = ['--yes', '--no-exec', '--agents', 'opencode-v2', '--privacy', 'standard', '--lang', 'en', '--profile', 'anthropic-api'];
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...base, '--tools', 'playwrite'], { encoding: 'utf8' });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /unknown tools: playwrite/);
+  lean(home, [...base, '--all-tools']);
+  const state = JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'state.json'), 'utf8'));
+  assert.ok(state.tools.includes('playwright') && !state.tools.includes('dcp'));
+});
+
 test('json edits round-trip', () => {
   const original = '{\n  // c\n  "a": 1\n}\n';
   const edits = [

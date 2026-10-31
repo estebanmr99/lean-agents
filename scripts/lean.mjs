@@ -125,6 +125,9 @@ async function choose(o, saved) {
       }
     }
   }
+  const unknown = o.tools.filter((t) => !MINIMAL_TOOLS.includes(t) && !OPTIONAL_TOOLS.includes(t));
+  if (unknown.length) throw new Error(`unknown tools: ${unknown.join(', ')} (available: ${[...MINIMAL_TOOLS, ...OPTIONAL_TOOLS].join(', ')})`);
+  if (!o.agents.includes('opencode-v1')) o.tools = o.tools.filter((t) => t !== 'dcp');
   o.privacy ??= saved?.privacy ?? (yesNo(await p.ask('Strict privacy (no telemetry, no auto-updates, no session sharing)?', 'n')) ? 'strict' : 'standard');
   o.lang ??= saved?.lang ?? (await p.ask('Language for rules and replies (en/es)?', 'en'));
   if (o.agents.some((a) => a.startsWith('opencode')) && !o.profile) {
@@ -229,7 +232,11 @@ async function uninstall(o) {
   if (o.dryRun || !yesNo(await p.ask('Uninstall?', o.yes ? 'y' : 'n'))) { p.close(); console.log('Nothing changed.'); return; }
   p.close();
   if (o.exec) {
-    for (const c of [...state.commands].reverse()) for (const argv of c.undo ?? []) run(argv, { dryRun: false, log: console.log });
+    for (const c of [...state.commands].reverse()) {
+      for (const argv of c.undo ?? []) {
+        if (!run(argv, { dryRun: false, log: console.log })) console.log('  ! failed. Run the command above by hand.');
+      }
+    }
   }
   for (const [what, file] of undo(state.files)) console.log(`  ${what.padEnd(20)} ${file}`);
   fs.renameSync(path.join(stateDir(o.home), 'state.json'), path.join(stateDir(o.home), `state.uninstalled-${Date.now()}.json`));

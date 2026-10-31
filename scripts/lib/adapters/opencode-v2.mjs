@@ -79,7 +79,7 @@ export function opencodeShared({ home, dir, core, profile, opts }) {
       tool: 'i-have-adhd',
       desc: 'i-have-adhd checkout for OpenCode',
       run: [['git', 'clone', '--depth', '1', 'https://github.com/ayghri/i-have-adhd', vendor]],
-      undo: [],
+      undo: [['node', '-e', 'require("fs").rmSync(process.argv[1], { recursive: true, force: true })', vendor]],
       skipIfExists: vendor,
     });
     actions.push({
