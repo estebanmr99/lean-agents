@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: shellcheck install.sh scripts/check-private.sh
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Engine tests
+        run: npm test
+      - name: Installer dry run in a temporary HOME changes nothing
+        run: |
+          export HOME="$(mktemp -d)"
+          bash install.sh --dry-run --yes --no-exec --agents claude,opencode-v2 --all-tools --privacy strict --profile vertex-gemini
+          test -z "$(ls -A "$HOME")"
+      - name: Real install, doctor and uninstall in a temporary HOME
+        run: |
+          export HOME="$(mktemp -d)"
+          bash install.sh --yes --no-exec --agents claude,opencode-v2 --all-tools --profile anthropic-api
+          node scripts/lean.mjs --doctor --no-exec
+          node scripts/lean.mjs --uninstall --yes --no-exec
+          test -z "$(find "$HOME" -type f -not -path "$HOME/.config/lean-agents/*")"

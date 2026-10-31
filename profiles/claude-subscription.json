@@ -1,0 +1,17 @@
+{
+  "name": "claude-subscription",
+  "description": "Claude Code with a Claude Pro or Max plan. Uses aliases, so it always tracks the newest models.",
+  "verified_on": "2026-10-31",
+  "agents": ["claude"],
+  "tiers": {
+    "fast": { "model": "haiku" },
+    "balanced": { "model": "sonnet" },
+    "strong": { "model": "opus" }
+  },
+  "overrides": {
+    "review": "fast",
+    "debug": "balanced"
+  },
+  "main_model": "sonnet",
+  "notes": "Opus is for planning and hard problems only. Pro plans hit Opus limits quickly."
+}

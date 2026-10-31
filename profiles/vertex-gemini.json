@@ -1,0 +1,18 @@
+{
+  "name": "vertex-gemini",
+  "description": "OpenCode with Gemini models on Google Vertex AI (good fit for Google Cloud credits).",
+  "verified_on": "2026-10-26",
+  "agents": ["opencode-v2", "opencode-v1"],
+  "provider": "google-vertex",
+  "tiers": {
+    "fast": { "model": "google-vertex/gemini-3.5-flash-lite" },
+    "balanced": { "model": "google-vertex/gemini-3.8-flash" },
+    "strong": { "model": "google-vertex/gemini-4-argon", "options": { "reasoningEffort": "high" } }
+  },
+  "primary": {
+    "plan": "strong",
+    "build": "balanced"
+  },
+  "main_model": "google-vertex/gemini-3.8-flash",
+  "notes": "Requires GOOGLE_CLOUD_PROJECT and a Vertex location in your environment. Confirm IDs with `opencode models google-vertex`; the update-models skill refreshes them."
+}

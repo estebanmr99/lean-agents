@@ -9,13 +9,14 @@ The same rules, cheap-by-default subagents, context-saving tools and MCP servers
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-lightgrey)
 ![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%7C%20OpenCode%20%7C%20Copilot%20CLI%20%7C%20Antigravity-8A2BE2)
+[![CI](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml)
 [![Secret scan](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml)
 
 [Leer en español](README.es.md)
 
 </div>
 
-> **Status: under construction.** The installer lands in the next releases. Follow [the spec](docs/SPEC.md) and the [roadmap](#roadmap). Star the repo to get notified when `v1.0.0` ships.
+> **Status: v0.2 preview.** The installer works for **Claude Code** and **OpenCode 2.x** on macOS and Linux. Windows, OpenCode 1.x, Copilot CLI and Antigravity are next ([roadmap](#roadmap)). Star the repo to get notified when `v1.0.0` ships.
 
 <!-- TODO(session 5): demo GIF -->
 
@@ -35,7 +36,7 @@ Windows PowerShell:
 
 Prefer your agent to do it? Paste a prompt from [INSTALL_WITH_AGENT.md](INSTALL_WITH_AGENT.md) into Claude Code, OpenCode or Copilot CLI.
 
-Always start with `--dry-run`: it shows every file and command before anything changes.
+Always start with `--dry-run`: it shows every file and command before anything changes. Then run it again without `--dry-run`; it asks which agents, tools, privacy level, language and model profile you want. Useful flags: `--all-tools`, `--privacy strict`, `--lang es`, `--profile vertex-gemini`, `--update`, `--uninstall`, `--doctor` (`--help` lists them all).
 
 ## Why
 
@@ -49,16 +50,16 @@ Always start with `--dry-run`: it shows every file and command before anything c
 
 | Feature | Claude Code | OpenCode 2.x | OpenCode 1.x | Copilot CLI | Antigravity CLI |
 | --- | --- | --- | --- | --- | --- |
-| Global rules (AGENTS.md) | ✅ | ✅ | ✅ | 🔎 | 🔎 |
-| Subagents by cost tier | ✅ | ✅ | ✅ | 🔎 | 🔎 |
-| RTK (shell output compression) | ✅ | ✅ | ✅ | 🔎 | 🔎 |
-| Context Mode | ✅ plugin | ✅ MCP | ✅ plugin | 🔎 MCP | 🔎 MCP |
-| Serena + Playwright MCP | ✅ | ✅ | ✅ | 🔎 | 🔎 |
-| Ponytail, i-have-adhd | ✅ | ✅ | ✅ | ➖ | ➖ |
-| Caveman and other skills | ✅ | ✅ | ✅ | 🔎 | 🔎 |
-| Context compaction | ✅ auto 80% | ✅ native | ✅ DCP | 🔎 | 🔎 |
+| Global rules (AGENTS.md) | ✅ | ✅ | 🔜 | 🔎 | 🔎 |
+| Subagents by cost tier | ✅ | ✅ | 🔜 | 🔎 | 🔎 |
+| RTK (shell output compression) | ✅ | ✅ | 🔜 | 🔜 | 🔜 |
+| Context Mode | ✅ plugin | ✅ MCP | 🔜 plugin | 🔎 | 🔎 |
+| Serena + Playwright MCP | ✅ | ✅ | 🔜 | 🔎 | 🔎 |
+| Ponytail, i-have-adhd | ✅ | ✅ | 🔜 | ➖ | ➖ |
+| Caveman and other skills | ✅ | ✅ | 🔜 | 🔎 | 🔎 |
+| Context compaction | ✅ auto 80% | ✅ native | 🔜 DCP | 🔎 | 🔎 |
 
-✅ supported · 🔎 being verified · ➖ not available for this agent
+✅ supported · 🔜 next release · 🔎 being verified · ➖ not available for this agent. Details and verification dates: [docs/compatibility.md](docs/compatibility.md).
 
 ## Install tiers
 
@@ -97,7 +98,7 @@ Codeburn · AutoSkills · [Skills CLI](https://vercel.com/changelog/introducing-
 ## Roadmap
 
 - [x] Spec, rules and subagent definitions
-- [ ] Installer for Claude Code and OpenCode 2.x (macOS)
+- [x] Installer for Claude Code and OpenCode 2.x (macOS, Linux)
 - [ ] Windows installer and OpenCode 1.x
 - [ ] Copilot CLI, Antigravity CLI, Codeburn, AutoSkills, original skills, model profiles
 - [ ] `v1.0.0`
