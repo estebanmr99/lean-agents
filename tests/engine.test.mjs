@@ -8,6 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'jsonc-parser';
 import { applyJsonEdits, revertJsonEdits } from '../scripts/lib/fsops.mjs';
+import { diffModels } from '../scripts/models-refresh.mjs';
 import { prereqFor } from '../scripts/lib/system.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -298,4 +299,18 @@ test('adhd-skill flips the flag in every installed copy and back', () => {
   assert.equal(script('off', home), 0);
   for (const f of [a, b]) assert.equal(fs.readFileSync(f, 'utf8'), text);
   assert.equal(script('on', fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'))), 1, 'a missing skill must fail the install');
+});
+
+test('diffModels reports missing IDs and newer family members, and skips aliases', () => {
+  const catalog = { acme: { models: {
+    'a-1': { id: 'a-1', family: 'a', release_date: '2026-01-01' },
+    'a-2': { id: 'a-2', family: 'a', release_date: '2026-02-01' },
+    'a-3': { id: 'a-3', family: 'a', release_date: '2026-03-01' },
+    'b-1': { id: 'b-1', family: 'b', release_date: '2026-09-01' },
+  } } };
+  const tiers = { fast: { model: 'acme/a-1' }, balanced: { model: 'acme/b-1' }, strong: { model: 'acme/gone' }, alias: { model: 'opus' } };
+  assert.deepEqual(diffModels([{ name: 'p', tiers }], catalog), {
+    missing: [{ profile: 'p', model: 'acme/gone' }],
+    newer: [{ profile: 'p', model: 'acme/a-1', latest: 'acme/a-3' }],
+  });
 });
