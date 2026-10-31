@@ -32,7 +32,7 @@ Do not claim: token or cost savings, that Antigravity loads the rules or skills,
 >
 > lean-agents is one installer for all of that: Claude Code, OpenCode, GitHub Copilot CLI and Antigravity CLI. It installs one rule set, subagents by cost tier, and tools that keep big outputs out of the context window.
 >
-> It shows every change with `--dry-run`, keeps your existing config, and `--uninstall` undoes it. Each CI job runs real agent binaries in a throwaway HOME.
+> It shows every change with `--dry-run`, keeps your existing config, and `--uninstall` undoes it. The install jobs in CI run real agent binaries in a throwaway HOME.
 >
 > Every third-party tool comes from its upstream source, with credit and a link in the README.
 >
@@ -106,7 +106,7 @@ GitHub owners, from each repo. X handles are listed only when the repo links one
 
 ## Owner checklist
 
-1. Description: `One command. Every coding agent. Fewer tokens, clearer answers.`
+1. Description: `One command. The same rules, subagents and tools in every coding agent.` Add "fewer tokens" only after real Codeburn data.
 2. Topics (gear next to "About"): `claude-code`, `opencode`, `github-copilot`, `ai-agents`, `agents-md`, `mcp`, `token-optimization`, `dotfiles`, `developer-tools`.
 3. [Social preview](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/customizing-your-repositorys-social-media-preview): Settings, Social preview, upload `docs/assets/social-preview.png`.
 4. Settings, Features: turn Discussions on.

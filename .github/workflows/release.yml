@@ -16,6 +16,10 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
+      - run: npm test
+      - run: bash scripts/check-private.sh
+        env:
+          PRIVATE_DENYLIST: ${{ secrets.PRIVATE_DENYLIST }}
       - run: node scripts/release.mjs "${GITHUB_REF_NAME#v}"
       - name: Publish
         env:

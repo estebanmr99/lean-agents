@@ -68,7 +68,7 @@ What lean-agents configures per agent, how, and when each command or key was las
 | i-have-adhd ships `disable-model-invocation: true`: a prompt cannot load it, only `/i-have-adhd` or the always-on flag. lean-agents sets it to `false` in the installed copies | plugin 0.4.1 | 2026-10-30 |
 | vhs: needs `ttyd` and `ffmpeg`; tape commands `Output`, `Set`, `Hide`, `Show`, `Type`, `Enter`, `Sleep`. `charmbracelet/vhs-action` latest is v2.1.1, input `path`; the tag `v2` is used in `assets.yml` | [vhs README](https://github.com/charmbracelet/vhs), [action](https://github.com/charmbracelet/vhs-action), `assets` job | 2026-10-31 |
 | `gh release create` flags `--notes-file`, `--verify-tag` | `gh release create --help` on 2.103.0 | 2026-10-31 |
-| Installer with no TTY and no `--yes`: stops with a message, changes nothing; `--dry-run` exits 0 | test in a session with no controlling terminal, `tests/engine.test.mjs` | 2026-10-31 |
+| Installer with no TTY and no `--yes`: stops with a message, changes nothing; `--dry-run` with every choice as a flag exits 0. With `/dev/tty` and stdin from `/dev/null`, it asks and exits. Windows `CONIN$` is not tested | `tests/engine.test.mjs`, pty run in the `test` job | 2026-10-31 |
 | Awesome lists: `hesreallyhim/awesome-claude-code` (web issue form), `awesome-opencode/awesome-opencode` (YAML PR), `punkpeye/awesome-mcp-servers` (MCP servers only). Show HN rules. Social preview 1280x640, under 1 MB. Up to six pinned repos | each project's CONTRIBUTING, [Show HN](https://news.ycombinator.com/showhn.html), GitHub docs; all links in `docs/launch.md` fetched | 2026-10-31 |
 
 ## Not yet verified

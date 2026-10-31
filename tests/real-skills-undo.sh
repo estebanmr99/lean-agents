@@ -32,5 +32,6 @@ for name in caveman caveman-compress caveman-stats; do
   refute test -e "$skills/$name"
   refute test -e "$HOME/.claude/skills/$name"
 done
+test -z "$(ls -A "$skills" 2>/dev/null)"
 refute grep -qs caveman "$HOME/.agents/.skill-lock.json"
 echo "real-skills-undo: $agents OK"

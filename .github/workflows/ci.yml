@@ -58,6 +58,14 @@ jobs:
           export HOME="$(mktemp -d)"
           bash install.sh --dry-run --yes --no-exec --agents claude,opencode-v2 --all-tools --privacy strict --profile vertex-gemini
           test -z "$(ls -A "$HOME")"
+      - name: With a terminal and stdin from /dev/null, the installer asks, then exits
+        if: runner.os == 'Linux'
+        run: |
+          export HOME="$(mktemp -d)"
+          { sleep 3; echo n; } | timeout 30 script -qec 'node scripts/lean.mjs --home "$HOME" --no-exec --agents claude --tools serena --privacy standard --lang en </dev/null; echo "exit=$?"' /dev/null > "$HOME/tty.txt"
+          cat "$HOME/tty.txt"
+          grep -q Cancelled "$HOME/tty.txt"
+          grep -q 'exit=0' "$HOME/tty.txt"
       - name: Skills install from the checkout
         if: runner.os == 'Linux'
         run: |
@@ -192,7 +200,6 @@ jobs:
           if grep -qE 'serena|playwright|context-mode' "$HOME/mcp-after.txt"; then exit 1; fi
           if grep -q 'rtk hook' "$HOME/.claude/settings.json"; then exit 1; fi
           test ! -e "$HOME/.claude/skills/caveman"
-          if test -e "$HOME/.agents/skills/caveman"; then exit 1; fi
 
   real-tools:
     # Real tool installs through the engine, throwaway HOME, real OpenCode 2 for the doctor.

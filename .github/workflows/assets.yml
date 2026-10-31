@@ -27,6 +27,7 @@ jobs:
           path: docs/assets/demo.tape
       - name: Render the social preview
         run: |
+          sudo apt-get update
           sudo apt-get install -y librsvg2-bin
           rsvg-convert -w 1280 -h 640 docs/assets/banner.svg -o docs/assets/social-preview.png
       - name: Check both images and cut review frames
