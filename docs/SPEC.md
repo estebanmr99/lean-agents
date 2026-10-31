@@ -108,6 +108,8 @@ Install target on the user's machine: `~/.config/lean-agents/` (Windows: `%USERP
 
 ## 4. Installer behavior
 
+**Architecture (decided in session 2):** `install.sh` and `install.ps1` are thin bootstraps. They make sure git and Node.js 20+ exist, fetch the repo to `~/.config/lean-agents/src`, run `npm ci --omit=dev` (one dependency: `jsonc-parser`, so JSONC comments survive merges) and hand over to `scripts/lean.mjs`. All planning, rendering, merging, backups, tool commands, uninstall and the doctor live in the Node engine, so macOS and Windows share one implementation. Adapters are in `scripts/lib/adapters/<agent>.mjs`; tool prerequisites in `scripts/lib/system.mjs`. The `agents/` and `tools/` folders hold documentation only.
+
 Both installers implement the same flow and flags. Bash uses POSIX-friendly bash 3.2 (macOS default). PowerShell must work in 5.1.
 
 ### 4.1 One-liners
@@ -438,7 +440,7 @@ Launch kit (`docs/launch.md`, not linked from README): posts for X, LinkedIn, Re
 Mark each `[x]` when merged.
 
 - [x] **Session 1 — Foundation.** LICENSE, README draft (placeholders for numbers and GIF), README.es.md, CONTRIBUTING, CHANGELOG, SECURITY, `.gitignore`, `.editorconfig`, full folder skeleton with README stubs, `core/AGENTS.md` + `core/AGENTS.es.md`, `core/agents/*.md`, `scripts/check-private.sh`, `secret-scan.yml`, this spec. Done when: check-private passes, gitleaks passes, markdown renders.
-- [ ] **Session 2 — Claude Code + OpenCode v2 on macOS.** `render.mjs` with snapshot tests, `install.sh` core flow (detect, plan, backup, render, merge, state, uninstall, dry-run), Claude and OpenCode v2 adapters, minimal-tier tools (RTK, Context Mode) and optional Serena, Playwright, Ponytail, Caveman, i-have-adhd, doctor.sh, `ci.yml` macOS + ubuntu jobs. Done when: dry-run and real install in temp HOME pass in CI; manual test on a real Mac against a copy of `~/.claude` and `~/.config/opencode`.
+- [x] **Session 2 — Claude Code + OpenCode v2 on macOS.** `render.mjs` with snapshot tests, `install.sh` core flow (detect, plan, backup, render, merge, state, uninstall, dry-run), Claude and OpenCode v2 adapters, minimal-tier tools (RTK, Context Mode) and optional Serena, Playwright, Ponytail, Caveman, i-have-adhd, doctor.sh, `ci.yml` macOS + ubuntu jobs. Done when: dry-run and real install in temp HOME pass in CI; manual test on a real Mac against a copy of `~/.claude` and `~/.config/opencode`.
 - [ ] **Session 3 — Windows + OpenCode v1.** `install.ps1` with parity, `doctor.ps1`, OpenCode v1 adapter with DCP, migration doc, Windows CI, junctions for skills, PATH handling, `--no-admin`. Done when: Windows CI green and a manual run on a real Windows machine (Git Bash + PowerShell) passes doctor.
 - [ ] **Session 4 — Copilot CLI, Antigravity, Codeburn, AutoSkills, GSD, skills, models.** Research + adapters (honest support levels), tool recipes, three original skills, profiles with verified IDs, `models-refresh.yml`, `docs/compatibility.md` filled with verification dates, `INSTALL_WITH_AGENT.md`.
 - [ ] **Session 5 — Launch.** Banner, demo GIF, real Codeburn numbers, final README + README.es, `docs/launch.md`, CHANGELOG `1.0.0`, tag `v1.0.0`, GitHub description/topics/social preview checklist for the owner.

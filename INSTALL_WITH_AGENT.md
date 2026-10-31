@@ -9,9 +9,9 @@ Install lean-agents for me from https://github.com/estebanmr99/lean-agents.
 3. Detect which coding agents and tools I already have, then ask me:
    which agents to configure, which optional tools to add, whether I want
    strict privacy, which model profile matches my subscription, and my language.
-4. Run the installer with --dry-run and the flags from my answers. Show me the plan.
+4. Run `bash install.sh --dry-run` with the flags from my answers (see `--help`). Show me the plan.
 5. After I approve, run it for real, then run the doctor and explain any failures.
 Never read, print or store my API keys or tokens.
 ```
 
-> The installer ships in an upcoming release. Until then this prompt will stop at step 4.
+> Today the installer configures Claude Code and OpenCode 2.x on macOS and Linux. Windows support arrives in the next release.

@@ -1,0 +1,21 @@
+{
+  "name": "lean-agents",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Cross-agent, token-efficient AI coding setup.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "lean-agents": "scripts/lean.mjs"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "check-private": "bash scripts/check-private.sh"
+  },
+  "dependencies": {
+    "jsonc-parser": "^3.3.1"
+  }
+}

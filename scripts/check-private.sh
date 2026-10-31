@@ -6,6 +6,7 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
+# shellcheck disable=SC1003 # backslashes in the Windows path regex are intended
 patterns=(
   '/Users/[A-Za-z0-9._-]+/'                  # macOS home paths
   'C:\\\\Users\\\\[A-Za-z0-9._-]+\\\\'       # Windows home paths

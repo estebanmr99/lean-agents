@@ -10,7 +10,7 @@ Las mismas reglas, subagentes baratos por defecto, herramientas que ahorran cont
 
 </div>
 
-> **Estado: en construcción.** El instalador llega en las próximas versiones. Sigue [la especificación](docs/SPEC.md) y dale una estrella al repo para enterarte cuando salga `v1.0.0`.
+> **Estado: versión preliminar v0.2.** El instalador ya funciona para **Claude Code** y **OpenCode 2.x** en macOS y Linux. Windows, OpenCode 1.x, Copilot CLI y Antigravity vienen después. Dale una estrella al repo para enterarte cuando salga `v1.0.0`.
 
 ## Inicio rápido
 
