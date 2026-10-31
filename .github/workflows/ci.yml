@@ -152,6 +152,7 @@ jobs:
         run: |
           export HOME="$(mktemp -d)"
           claude --version
+          mkdir -p "$HOME/.gemini/antigravity-cli"
           bash install.sh --yes --agents claude --all-tools --privacy standard --lang en --ponytail-mode lite > "$HOME/install.txt"
           cat "$HOME/install.txt"
           if grep -qE '^ *! ' "$HOME/install.txt"; then exit 1; fi
@@ -172,6 +173,7 @@ jobs:
           if grep -qE 'serena|playwright|context-mode' "$HOME/mcp-after.txt"; then exit 1; fi
           if grep -q 'rtk hook' "$HOME/.claude/settings.json"; then exit 1; fi
           test ! -e "$HOME/.claude/skills/caveman"
+          if test -e "$HOME/.agents/skills/caveman"; then exit 1; fi
 
   real-tools:
     # Real tool installs through the engine, throwaway HOME, real OpenCode 2 for the doctor.
@@ -199,6 +201,7 @@ jobs:
         run: |
           export HOME="$(mktemp -d)"
           export XDG_CONFIG_HOME="$HOME/.config"
+          mkdir -p "$HOME/.gemini/antigravity-cli"
           bash install.sh --yes --agents opencode-v2 --tools serena,playwright,ponytail,caveman,i-have-adhd,dcp,codeburn,gsd,autoskills \
             --privacy standard --lang en --profile anthropic-api --ponytail-mode lite
           node scripts/lean.mjs --doctor
@@ -209,6 +212,23 @@ jobs:
           cat "$HOME/uninstall.txt"
           if grep -qE '^ *! ' "$HOME/uninstall.txt"; then exit 1; fi
           test ! -e "$HOME/.gsd/defaults.json"
+          if test -e "$HOME/.agents/skills/caveman"; then exit 1; fi
+
+  real-skills-undo:
+    # Real Skills CLI, throwaway HOME: uninstall must remove ~/.agents/skills for every agent.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        agents: [claude, opencode-v1, opencode-v2, 'claude,opencode-v2']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: bash tests/real-skills-undo.sh '${{ matrix.agents }}'
 
   real-copilot:
     # Real Copilot CLI and real tools, throwaway HOME, no login and no TTY.
