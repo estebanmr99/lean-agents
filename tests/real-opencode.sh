@@ -15,7 +15,8 @@ repo="$(cd "$(dirname "$0")/.." && pwd)"
 bash "$repo/install.sh" --yes --no-exec --agents opencode-v2 \
   --tools serena,playwright,ponytail --privacy strict --profile anthropic-api
 
-opencode debug config > "$HOME/resolved.txt" 2>&1 || { cat "$HOME/resolved.txt"; exit 1; }
+opencode debug config > "$HOME/resolved.txt" 2>"$HOME/stderr.txt" || { cat "$HOME/resolved.txt" "$HOME/stderr.txt"; exit 1; }
+opencode debug --help 2>&1 | head -30 || true
 
 node --input-type=module - "$HOME/resolved.txt" "$repo" <<'JS'
 import fs from 'node:fs';
@@ -41,5 +42,5 @@ for (const [name, ok] of Object.entries(checks)) {
 }
 console.log('compaction:', JSON.stringify(cfg.compaction ?? null));
 console.log('top-level keys:', Object.keys(cfg).sort().join(', '));
-if (failed) process.exit(1);
+if (failed) { console.log('--- raw output (first 150 lines) ---'); console.log(out.split('\n').slice(0, 150).join('\n')); process.exit(1); }
 JS
