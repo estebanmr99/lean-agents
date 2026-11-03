@@ -248,12 +248,22 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         agents: [claude, opencode-v1, opencode-v2, 'claude,opencode-v2']
     runs-on: ${{ matrix.os }}
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: npm ci
+      - name: Use the runner's Linuxbrew
+        if: runner.os == 'Linux'
+        run: echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
+      - name: Install Claude Code
+        if: contains(matrix.agents, 'claude')
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - run: bash tests/real-skills-undo.sh '${{ matrix.agents }}'
 
   real-copilot:
