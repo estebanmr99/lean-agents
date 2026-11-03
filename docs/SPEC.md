@@ -535,7 +535,7 @@ Branch: `session-6-enterprise`.
 3. **Network prompt:** one question with presets: all off (enterprise PC), all on (personal PC), or choose per category (telemetry, auto-update, other outbound calls). Each category also has a flag for `--yes` runs. Extends section 11; records the choice in `state.json`.
 4. **Prerequisites:** `git` (already) and `gh` asked and installed with brew or winget at user scope; `gh auth login` stays a manual step the installer prints.
 5. **Interactive CLI:** a polished interactive installer with select menus, a progress list and a final summary. The owner allows one dependency for it (candidate `@clack/prompts`, **VERIFY** it works in Git Bash, PowerShell 5.1 and without a TTY). `--yes` and the no-TTY path stay as they are; update the dependency rule in `AGENTS.md`.
-6. **`docs/SECURITY-REVIEW.md`:** a prompt any agent (VS Code Copilot, Cursor, Claude Code, OpenCode) runs on this repo before install. It lists every file written, command run, network host and third-party tool, and asks the user to paste internal IT or proxy wiki pages when no Confluence MCP or browser tool is available. Links it from both READMEs and `INSTALL_WITH_AGENT.md`.
+6. **`docs/SECURITY-REVIEW.md`:** a prompt any agent (VS Code Copilot, Cursor, Claude Code, OpenCode) runs on this repo before install. It lists every file written, command run, network host and third-party tool, and asks the user to paste internal IT or proxy wiki pages when no wiki MCP server or browser tool is available. Links it from both READMEs and `INSTALL_WITH_AGENT.md`.
 
 Done when: CI proves an install through a local proxy (for example a squid container) with outbound blocked otherwise, and the all-off preset leaves no telemetry or update switch on.
 
