@@ -14,6 +14,8 @@ Las mismas reglas, subagentes baratos por defecto, herramientas que ahorran cont
 
 > **Estado: versión preliminar v0.4.** El instalador funciona para **Claude Code**, **OpenCode 1.x y 2.x**, **GitHub Copilot CLI** y **Antigravity CLI** en macOS, Linux y Windows (Antigravity: macOS y Linux). Dale una estrella al repo para enterarte cuando salga `v1.0.0`.
 
+<img src="docs/assets/demo.gif" alt="install.sh --dry-run lista cada archivo y comando que cambiaría" width="720">
+
 ## Inicio rápido
 
 macOS, Linux o Git Bash:
@@ -29,8 +31,6 @@ Windows PowerShell:
 ```
 
 ¿Prefieres que lo haga tu agente? Pega un prompt de [INSTALL_WITH_AGENT.md](INSTALL_WITH_AGENT.md) en Claude Code, OpenCode o Copilot CLI. Usa `--lang es` para que las reglas y las respuestas queden en español.
-
-<img src="docs/assets/demo.gif" alt="install.sh --dry-run lista cada archivo y comando que cambiaría" width="720">
 
 Empieza siempre con `--dry-run`: muestra cada archivo y comando antes de cambiar nada. En PowerShell las mismas opciones van en PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`.
 

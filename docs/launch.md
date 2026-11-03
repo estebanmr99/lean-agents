@@ -1,6 +1,6 @@
 # Launch kit
 
-For the owner. Not linked from the README. Every claim below is something the repo shows today. There are no savings numbers on purpose: add them only from real Codeburn data, at the `TODO(owner)` marks, and only after the README "Why" section has them.
+For the owner. Not linked from the README. Every claim below is something the repo shows today. There are no savings numbers on purpose: the repo cannot show a before and after, so no post claims one.
 
 Do not post until the `v1.0.0` release exists, unless you want a preview launch. In that case say "preview".
 
@@ -23,8 +23,6 @@ Do not claim: token or cost savings, that Antigravity loads the rules or skills,
 > `--dry-run` shows every change first. `--uninstall` undoes it. MIT.
 >
 > https://github.com/estebanmr99/lean-agents
-
-`TODO(owner)`: second post with the real Codeburn before and after.
 
 ## LinkedIn
 
@@ -57,8 +55,6 @@ Title: `I made one installer for rules, subagents and context tools across Claud
 >
 > Known gaps: Antigravity rule and skill loading is not proven, because it needs a login. The README table marks each partial feature.
 >
-> I have no token numbers to share yet. `TODO(owner)`: replace this line with real Codeburn numbers, or keep it.
->
 > Feedback on what breaks on your setup is what I want most: https://github.com/estebanmr99/lean-agents
 
 ## Show HN
@@ -73,7 +69,7 @@ First comment:
 >
 > The part I cared about most is safety: `--dry-run` prints every file and command, edits keep your comments and values, and `--uninstall` undoes it. CI runs real agent binaries in a throwaway HOME, with no login, so a few things stay unproven. Those are listed in `docs/compatibility.md`.
 >
-> It installs third-party tools from upstream and ships only glue. I have no savings numbers yet. `TODO(owner)`: replace with real Codeburn numbers, or keep it.
+> It installs third-party tools from upstream and ships only glue.
 
 Tell readers it was built with coding agents: the repo history shows it.
 
@@ -106,7 +102,7 @@ GitHub owners, from each repo. X handles are listed only when the repo links one
 
 ## Owner checklist
 
-1. Description: `One command. The same rules, subagents and tools in every coding agent.` Add "fewer tokens" only after real Codeburn data.
+1. Description: `One command. The same rules, subagents and tools in every coding agent.` Do not add "fewer tokens": the repo has no numbers for it.
 2. Topics (gear next to "About"): `claude-code`, `opencode`, `github-copilot`, `ai-agents`, `agents-md`, `mcp`, `token-optimization`, `dotfiles`, `developer-tools`.
 3. [Social preview](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/customizing-your-repositorys-social-media-preview): Settings, Social preview, upload `docs/assets/social-preview.png`.
 4. Settings, Features: turn Discussions on.
