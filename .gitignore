@@ -10,3 +10,4 @@ node_modules/
 .serena/
 *.log
 tmp/
+dist/

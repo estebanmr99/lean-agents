@@ -58,7 +58,7 @@ What lean-agents configures per agent, how, and when each command or key was las
 | `rtk init -g --copilot` and `--agent antigravity` work without a TTY; `--uninstall` removes them. On Copilot it also adds a block to `copilot-instructions.md` | rtk 1.1.0, real binary | 2026-10-30 |
 | `rtk init` does not read `COPILOT_HOME`: with that variable set, the RTK hook still lands in `~/.copilot` | rtk 1.1.0, real binary | 2026-10-30 |
 | Context Mode plugin routes for both agents install and uninstall without a TTY. Copilot warns that direct plugin installs are deprecated | real binaries | 2026-10-30 |
-| Skills CLI ids `github-copilot`, `antigravity-cli`. `skills remove -a <agent>` reports success but keeps `~/.agents/skills` while another detected agent may share it, so the Copilot and Antigravity undo drops `-a` | real binary | 2026-10-30 |
+| Skills CLI ids `github-copilot`, `antigravity-cli`. `skills remove -a <agent>` reports success but keeps `~/.agents/skills` while another detected agent may share it, so the Copilot, Antigravity and OpenCode undo drops `-a`. Side effect: those skills go for every agent on the machine. On 1.7.4 the folder stays with `~/.gemini/antigravity-cli` and `~/.config/opencode`, but not in every folder mix, so `tests/real-skills-undo.sh` uses that pair. `-a claude-code` copies to `~/.claude/skills` and does not write `~/.agents/skills`, so the Claude Code undo keeps `-a` | real binary, `real-skills-undo` in CI | 2026-10-31 |
 | Codeburn: npm `codeburn` 0.9.27, repo `getagentseal/codeburn`, MIT, Node 22.13+; `report -p week --format json` | npm, real binary | 2026-10-30 |
 | AutoSkills: npm `autoskills` 0.4.1, repo `midudev/autoskills`, CC-BY-NC-4.0. Identity confirmed: npm `gitHead` is the `release: v0.4.1` commit in that repo, and autoskills.sh links it. No `--version`, doctor uses `--help` | npm, GitHub, real binary | 2026-10-30 |
 | GSD Core: `@opengsd/gsd-core` 1.19.0, MIT, repo `open-gsd/gsd-core`. `--copilot`, `--antigravity`, `--opencode`, `--claude` with `--global`, `--uninstall`. `model_overrides` is read from `~/.gsd/defaults.json` (`bin/lib/config-loader.cjs`) | npm, package source, real binary | 2026-10-30 |
@@ -66,10 +66,15 @@ What lean-agents configures per agent, how, and when each command or key was las
 | OpenCode Go training terms: the default models are marked not used for training; Contributor and Free models may train; DeepSeek needs a region setting, so it is not a default | [docs](https://opencode.ai/docs/go) | 2026-10-30 |
 | OpenCode 2: `cli.json` replaces `tui.json` (migration code and docs inside the binary); `policies` accepted | real binary 2.1.4, `tests/real-opencode.sh` | 2026-10-30 |
 | i-have-adhd ships `disable-model-invocation: true`: a prompt cannot load it, only `/i-have-adhd` or the always-on flag. lean-agents sets it to `false` in the installed copies | plugin 0.4.1 | 2026-10-30 |
+| vhs: needs `ttyd` and `ffmpeg`; tape commands `Output`, `Set`, `Hide`, `Show`, `Type`, `Enter`, `Sleep`. `charmbracelet/vhs-action` latest is v2.1.1, input `path`; the tag `v2` is used in `assets.yml` | [vhs README](https://github.com/charmbracelet/vhs), [action](https://github.com/charmbracelet/vhs-action), `assets` job | 2026-10-31 |
+| `gh release create` flags `--notes-file`, `--verify-tag` | `gh release create --help` on 2.103.0 | 2026-10-31 |
+| Installer with no TTY and no `--yes`: stops with a message, changes nothing; `--dry-run` with every choice as a flag exits 0. With `/dev/tty` and stdin from `/dev/null`, it asks and exits. Windows `CONIN$` is not tested | `tests/engine.test.mjs`, pty run in the `test` job | 2026-10-31 |
+| Awesome lists: `hesreallyhim/awesome-claude-code` (web issue form), `awesome-opencode/awesome-opencode` (YAML PR), `punkpeye/awesome-mcp-servers` (MCP servers only). Show HN rules. Social preview 1280x640, under 1 MB. Up to six pinned repos | each project's CONTRIBUTING, [Show HN](https://news.ycombinator.com/showhn.html), GitHub docs; all links in `docs/launch.md` fetched | 2026-10-31 |
 
 ## Not yet verified
 
 - `reasoningEffort` as the pass-through option for Gemini on Vertex.
 - **VERIFY:** the `model` value format in Copilot `*.agent.md`. Without a login, Copilot cannot show which model it picked.
 - **VERIFY:** Antigravity loading `~/.gemini/config/rules` and `~/.agents/skills`. No list command shows them without a login, so README marks both as partial.
+- **VERIFY:** subreddit rules, whether r/opencode exists, and X handles in `docs/launch.md`. Reddit blocked the fetch.
 - **VERIFY:** `brew install copilot-cli` (README) against `brew install --cask copilot-cli` (docs). lean-agents does not use either.

@@ -5,11 +5,12 @@
 set -euo pipefail
 
 command -v opencode >/dev/null || { echo "opencode not on PATH" >&2; exit 1; }
-opencode --version
 
 HOME="$(mktemp -d)"
 export HOME
 export XDG_CONFIG_HOME="$HOME/.config"
+unset XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
+opencode --version
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 
 bash "$repo/install.sh" --yes --no-exec --agents opencode-v1 \

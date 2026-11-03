@@ -27,6 +27,7 @@ Repeat the same prompt for each session. Each session must leave the repository 
 - Negative checks in test scripts must not start with `! `: `set -e` ignores that. Use `refute` or `if`.
 - OpenCode 1 facts verified on 1.19.0: singular `agent` and `plugin`, flat `mcp`, `compaction.reserved`, `autoupdate`, `disabled_providers`. `opencode debug config` prints one object; `opencode agent list` lists agents. DCP now also installs on OpenCode 2, but lean-agents keeps it 1.x only; the notes in sections 6 and 14 saying it has no V2 release are out of date.
 - OpenCode 2 facts verified on 2.2.5: native keys are `agents` (not `agent`), top-level `policies`, `plugins`, `mcp.servers`, `compaction.buffer`, `update`, `share`. `opencode debug config` prints a JSON array of config sources (`{type, path, info}`); `opencode debug agents` lists agents.
+- The owner dropped the before/after savings claim (2026-11-03): the repo cannot show one, so the README "Why" has no numbers. `docs/launch.md`, `release.yml`, the banner, the demo GIF and the `assets` workflow exist. `1.0.0`, the tag and the release still need the owner's separate go.
 - Testing policy: the owner does not test on their working machines. Every claim is proven in CI with throwaway HOME directories and real binaries (`tests/real-opencode.sh`).
 - Commits are authored by the owner (`git config user.name/user.email` set to their GitHub no-reply address) with a `Co-Authored-By` trailer for the agent.
 - Private terms are blocked by `scripts/check-private.sh` using the `PRIVATE_DENYLIST` repository secret in CI and a gitignored `.private-denylist` locally.
@@ -435,7 +436,7 @@ Order of `README.md`:
 2. "Leer en español" link.
 3. 15-second demo GIF of the installer (`docs/assets/demo.gif`, recorded with vhs or asciinema + agg; script in `docs/assets/demo.tape`).
 4. **Quick start**: the two one-liners, then "or let your agent install it" linking `INSTALL_WITH_AGENT.md`.
-5. **Why**: three bullets with real numbers from Codeburn (before/after one week; screenshot). Never invent numbers; leave a TODO until real data exists.
+5. **Why**: three bullets. No savings numbers: the owner dropped the before/after claim. Never invent numbers.
 6. **What you get**: compatibility table agent x feature (✅ / ⚠️ partial / ➖ n/a).
 7. Tiers (minimal / optional / strict privacy) in one table.
 8. Models that stay current (3 lines).
@@ -454,7 +455,12 @@ Mark each `[x]` when merged.
 - [x] **Session 1 — Foundation** (PR #1). Spec, rules, neutral subagents, README (EN/ES), contributing files, privacy check, secret scan.
 - [x] **Session 2 — Claude Code + OpenCode 2.x** (PR #2). Node engine, `install.sh`, Claude Code and OpenCode 2 adapters, profiles, docs, CI on Ubuntu and macOS, real OpenCode 2.2.5 check in CI.
 - [x] **Session 3 — Windows + OpenCode 1.x + wider CI** (PR #4). `install.ps1`, OpenCode 1.x adapter, optional DCP, tool rules, CI with real binaries on Windows, OpenCode 1.19, Claude Code and real tool installs.
-- [x] **Session 4 — Copilot CLI, Antigravity CLI, tools, skills, models** (PR #5). Both adapters, Codeburn, opt-in GSD and AutoSkills, three skills, three profiles, `models-refresh`, `XDG_CONFIG_HOME`, `--home` passed to child tools, real Copilot, Antigravity and winget jobs. Open: the OpenCode skills undo still uses `skills remove -a`, which can leave `~/.agents/skills`; Copilot `model` format and Antigravity rule and skill loading need a logged-in check.
+- [x] **Session 4 — Copilot CLI, Antigravity CLI, tools, skills, models** (PR #5). Both adapters, Codeburn, opt-in GSD and AutoSkills, three skills, three profiles, `models-refresh`, `XDG_CONFIG_HOME`, `--home` passed to child tools, real Copilot, Antigravity and winget jobs. Open: Copilot `model` format and Antigravity rule and skill loading need a logged-in check.
+- [x] **Session 5 — Launch** (PR #7). Banner, demo GIF, social preview, launch kit, release workflow, skills undo and HOME fixes.
+- [ ] **Session 6 — Enterprise and team basics.** Proxy, network presets, `gh`, interactive CLI, security review prompt.
+- [ ] **Session 7 — VS Code Copilot, Cursor, team repos, Claude through Copilot.**
+- [ ] **Session 8 — Terminals: Warp, Orca, or neither.**
+- [ ] **Session 9 — Showcase.** Logo, GIF per use case, who it is for.
 
 ### Session 3 — Windows + OpenCode 1.x + wider CI
 
@@ -516,9 +522,57 @@ Branch: `session-5-launch`.
 
 1. `docs/assets/banner.svg` and social preview PNG (1280×640).
 2. Demo GIF: `docs/assets/demo.tape` for [vhs](https://github.com/charmbracelet/vhs) showing `install.sh --dry-run` then the plan; render in CI or locally.
-3. Real numbers: the owner runs Codeburn for a week before and after; put the numbers and screenshot in the README "Why" section. Never invent numbers.
+3. Dropped: no before/after numbers (owner decision, 2026-11-03).
 4. Final README + README.es, `docs/launch.md` (posts for X, LinkedIn, Reddit, Show HN; awesome lists to submit to), CHANGELOG `1.0.0`, tag `v1.0.0`, `release.yml`.
 5. Checklist for the owner: repo description, topics, social preview, Discussions on, pin the repo on their profile.
+
+### Session 6 — Enterprise and team basics
+
+Branch: `session-6-enterprise`.
+
+1. **Research first** (`research` subagent, record source and date in `docs/compatibility.md`): how each supported agent and tool reads `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` and a corporate CA (`NODE_EXTRA_CA_CERTS`, `git http.proxy`, `npm proxy`, `uv` and `pip`); which telemetry, auto-update and other outbound switches exist per agent and tool.
+2. **Proxy:** detect the proxy variables, pass them to every child command, show them (redacted) in `--dry-run` and `--doctor`. Never write credentials to disk.
+3. **Network prompt:** one question with presets: all off (enterprise PC), all on (personal PC), or choose per category (telemetry, auto-update, other outbound calls). Each category also has a flag for `--yes` runs. Extends section 11; records the choice in `state.json`.
+4. **Prerequisites:** `git` (already) and `gh` asked and installed with brew or winget at user scope; `gh auth login` stays a manual step the installer prints.
+5. **Interactive CLI:** a polished interactive installer with select menus, a progress list and a final summary. The owner allows one dependency for it (candidate `@clack/prompts`, **VERIFY** it works in Git Bash, PowerShell 5.1 and without a TTY). `--yes` and the no-TTY path stay as they are; update the dependency rule in `AGENTS.md`.
+6. **`docs/SECURITY-REVIEW.md`:** a prompt any agent (VS Code Copilot, Cursor, Claude Code, OpenCode) runs on this repo before install. It lists every file written, command run, network host and third-party tool, and asks the user to paste internal IT or proxy wiki pages when no wiki MCP server or browser tool is available. Links it from both READMEs and `INSTALL_WITH_AGENT.md`.
+
+Done when: CI proves an install through a local proxy (for example a squid container) with outbound blocked otherwise, and the all-off preset leaves no telemetry or update switch on.
+
+### Session 7 — VS Code Copilot extension, Cursor, team repos, Claude through Copilot
+
+Branch: `session-7-ide-adapters`.
+
+1. **Research first:**
+   - VS Code Copilot: user-level instructions, custom agents (`.agent.md`), prompt files, skills, user `mcp.json`.
+   - Cursor IDE and Cursor CLI: install command, rules, MCP config, CLI config, the HTTP/1.1 setting for proxies.
+   - Claude through GitHub Copilot: the official route is Agent HQ partner agents (Copilot Pro, Pro+, Business or Enterprise; an admin enables Claude at enterprise and org level; VS Code 1.109+). Check whether Copilot CLI supports it now. Proxies that reuse a Copilot token for the Claude Code CLI are not official: document them as not supported, never install them.
+2. **Adapters** `vscode-copilot.mjs`, `cursor.mjs` (IDE and CLI) with honest ✅ / ⚠️ / ➖ marks in the README table.
+3. **`--project <dir>` mode:** writes the shared files into one repo (`AGENTS.md`, `.github/copilot-instructions.md`, `.github/agents/`, `.vscode/mcp.json`, Cursor rules) so a team gets the setup through git. User-level installs keep working.
+4. `docs/claude-with-copilot.md`: the allowed route step by step, what the admin must enable, and what is not allowed.
+
+Done when: CI renders and validates the project files, and real binaries (`cursor-agent`, VS Code `code --list-extensions` style checks where they run without login) pass in a throwaway HOME.
+
+### Session 8 — Terminals: Warp, Orca, or neither
+
+Branch: `session-8-terminals`.
+
+1. Research: install commands per OS (brew, winget, user scope), what each app adds on first run. Orca adds its own hooks and MCP servers and starts agents in bypass mode: document each one and how to turn bypass off (**VERIFY**).
+2. Installer asks: Warp, Orca, both or neither (PowerShell or Git Bash stay the default). The Warp OpenCode plugin stays rejected (FAQ only).
+3. `--uninstall` removes only what lean-agents installed; `--doctor` lists Orca hooks it finds in agent configs.
+
+Done when: CI installs each app in a throwaway HOME where the OS allows it, or the job documents why it cannot.
+
+### Session 9 — Showcase
+
+Branch: `session-9-showcase`.
+
+1. Logo (SVG) and an updated banner.
+2. Short GIFs rendered in CI with vhs, one per use case: dry run, uninstall, enterprise all-off preset, team `--project` mode.
+3. README sections: who it is for (solo dev, team on VS Code Copilot, enterprise PC behind a proxy) and what it does on a budget. Only claims the repo can show; any owner experience is quoted as personal, with no company budget figures.
+4. Update `docs/launch.md` and the social preview.
+
+Done when: the `assets` workflow renders every image and GIF, and the owner has checked the frames.
 
 ## 15. Definition of done (every session)
 

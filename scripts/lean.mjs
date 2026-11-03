@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
+import tty from 'node:tty';
 import { fileURLToPath } from 'node:url';
 import { plan, apply, undo, describe } from './lib/fsops.mjs';
 import { loadCore, renderRules, loadProfile } from './lib/render.mjs';
@@ -95,12 +96,23 @@ function prompter(yes) {
   if (yes) return { ask: async (_q, def) => def, close() {} };
   let input = process.stdin;
   if (!process.stdin.isTTY) {
-    try { input = fs.createReadStream(process.platform === 'win32' ? 'CONIN$' : '/dev/tty'); } catch { /* keep stdin */ }
+    // openSync reports a missing /dev/tty here, not later as a crash. A tty.ReadStream, unlike
+    // an fs stream, can close while a read is pending, so the process can exit.
+    try { input = new tty.ReadStream(fs.openSync(process.platform === 'win32' ? 'CONIN$' : '/dev/tty', 'r')); } catch { /* keep stdin */ }
   }
   const rl = readline.createInterface({ input, output: process.stdout });
+  // Never fall back to the default answer here: nobody approved these changes.
+  const noInput = () => new Error('no terminal to ask on: pass --yes to accept the defaults, or --dry-run with --agents and --tools to preview');
+  let closed = false;
+  let fail = null;
+  rl.once('close', () => { closed = true; fail?.(noInput()); });
   return {
-    ask: (q, def) => new Promise((res) => rl.question(`${q} [${def}] `, (a) => res(a.trim() || def))),
-    close: () => rl.close(),
+    ask: (q, def) => new Promise((res, rej) => {
+      if (closed) return rej(noInput());
+      fail = rej;
+      rl.question(`${q} [${def}] `, (a) => res(a.trim() || def));
+    }),
+    close: () => { fail = null; rl.close(); if (input !== process.stdin) input.destroy(); },
   };
 }
 const yesNo = (a) => /^(y|yes|s|si|sí)$/i.test(a);

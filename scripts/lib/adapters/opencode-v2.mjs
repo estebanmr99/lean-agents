@@ -95,7 +95,8 @@ export function opencodeShared({ home, dir, core, profile, opts }) {
       tool: 'caveman',
       desc: 'Caveman skills for OpenCode',
       run: [['npx', '-y', 'skills', 'add', 'JuliusBrussee/caveman', '--skill', 'caveman', 'caveman-compress', 'caveman-stats', '-a', 'opencode', '-g', '-y']],
-      undo: [['npx', '-y', 'skills', 'remove', 'caveman', 'caveman-compress', 'caveman-stats', '-a', 'opencode', '-g', '-y']],
+      // Without -a: `remove -a` keeps ~/.agents/skills while another detected agent may share that folder.
+      undo: [['npx', '-y', 'skills', 'remove', 'caveman', 'caveman-compress', 'caveman-stats', '-g', '-y']],
     });
   }
   return { actions, commands };

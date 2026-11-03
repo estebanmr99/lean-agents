@@ -58,6 +58,14 @@ jobs:
           export HOME="$(mktemp -d)"
           bash install.sh --dry-run --yes --no-exec --agents claude,opencode-v2 --all-tools --privacy strict --profile vertex-gemini
           test -z "$(ls -A "$HOME")"
+      - name: With a terminal and stdin from /dev/null, the installer asks, then exits
+        if: runner.os == 'Linux'
+        run: |
+          export HOME="$(mktemp -d)"
+          { sleep 3; echo n; } | timeout 30 script -qec 'node scripts/lean.mjs --home "$HOME" --no-exec --agents claude --tools serena --privacy standard --lang en </dev/null; echo "exit=$?"' /dev/null > "$HOME/tty.txt"
+          cat "$HOME/tty.txt"
+          grep -q Cancelled "$HOME/tty.txt"
+          grep -q 'exit=0' "$HOME/tty.txt"
       - name: Skills install from the checkout
         if: runner.os == 'Linux'
         run: |
@@ -75,6 +83,25 @@ jobs:
           node scripts/lean.mjs --doctor --no-exec
           node scripts/lean.mjs --uninstall --yes --no-exec
           test -z "$(find "$HOME" -type f -not -path "$HOME/.config/lean-agents/*")"
+
+  release-build:
+    # The steps of release.yml up to the publish, plus a look inside the archives.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Build, then check notes and archives on disk
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          node scripts/release.mjs "$version" </dev/null
+          grep -q '^- ' dist/notes.md
+          tar -tzf "dist/lean-agents-$version.tar.gz" > dist/tar.txt
+          grep -q "^lean-agents-$version/install.sh$" dist/tar.txt
+          unzip -l "dist/lean-agents-$version.zip" > dist/zip.txt
+          grep -q "lean-agents-$version/install.ps1$" dist/zip.txt
 
   real-opencode:
     # Real OpenCode 2 binary, throwaway HOME: proves the keys we write are accepted.
@@ -152,6 +179,7 @@ jobs:
         run: |
           export HOME="$(mktemp -d)"
           claude --version
+          mkdir -p "$HOME/.gemini/antigravity-cli"
           bash install.sh --yes --agents claude --all-tools --privacy standard --lang en --ponytail-mode lite > "$HOME/install.txt"
           cat "$HOME/install.txt"
           if grep -qE '^ *! ' "$HOME/install.txt"; then exit 1; fi
@@ -199,6 +227,7 @@ jobs:
         run: |
           export HOME="$(mktemp -d)"
           export XDG_CONFIG_HOME="$HOME/.config"
+          mkdir -p "$HOME/.gemini/antigravity-cli"
           bash install.sh --yes --agents opencode-v2 --tools serena,playwright,ponytail,caveman,i-have-adhd,dcp,codeburn,gsd,autoskills \
             --privacy standard --lang en --profile anthropic-api --ponytail-mode lite
           node scripts/lean.mjs --doctor
@@ -209,6 +238,33 @@ jobs:
           cat "$HOME/uninstall.txt"
           if grep -qE '^ *! ' "$HOME/uninstall.txt"; then exit 1; fi
           test ! -e "$HOME/.gsd/defaults.json"
+          if test -e "$HOME/.agents/skills/caveman"; then exit 1; fi
+
+  real-skills-undo:
+    # Real Skills CLI, throwaway HOME: uninstall must remove ~/.agents/skills for every agent.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        agents: [claude, opencode-v1, opencode-v2, 'claude,opencode-v2']
+    runs-on: ${{ matrix.os }}
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Use the runner's Linuxbrew
+        if: runner.os == 'Linux'
+        run: echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
+      - name: Install Claude Code
+        if: contains(matrix.agents, 'claude')
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - run: bash tests/real-skills-undo.sh '${{ matrix.agents }}'
 
   real-copilot:
     # Real Copilot CLI and real tools, throwaway HOME, no login and no TTY.

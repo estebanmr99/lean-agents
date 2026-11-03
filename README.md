@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/banner.svg" alt="lean-agents banner" width="640">
+
 # lean-agents
 
 **One command. Every coding agent. Fewer tokens, clearer answers.**
@@ -11,6 +13,7 @@ The same rules, cheap-by-default subagents, context-saving tools and MCP servers
 ![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%7C%20OpenCode%20%7C%20Copilot%20CLI%20%7C%20Antigravity-8A2BE2)
 [![CI](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml)
 [![Secret scan](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml)
+![GitHub stars](https://img.shields.io/github/stars/estebanmr99/lean-agents?style=social)
 
 [Leer en español](README.es.md)
 
@@ -18,7 +21,7 @@ The same rules, cheap-by-default subagents, context-saving tools and MCP servers
 
 > **Status: v0.4 preview.** The installer works for **Claude Code**, **OpenCode 1.x and 2.x**, **GitHub Copilot CLI** and **Antigravity CLI** on macOS, Linux and Windows (Antigravity: macOS and Linux). Star the repo to get notified when `v1.0.0` ships.
 
-<!-- TODO(session 5): demo GIF -->
+<img src="docs/assets/demo.gif" alt="install.sh --dry-run listing every file and command it would change" width="720">
 
 ## Quick start
 
@@ -41,8 +44,6 @@ Always start with `--dry-run`: it shows every file and command before anything c
 Context Mode needs Node.js 22.5 or newer. Everything else works on Node.js 20.
 
 ## Why
-
-<!-- TODO(session 5): real before/after numbers from Codeburn. No invented numbers. -->
 
 - **Fewer tokens.** Exploration, research and review go to cheap subagents. Big outputs stay out of the context window. Agents search symbols instead of reading whole files.
 - **Clearer answers.** One short set of global rules: answer first, state assumptions, surgical changes, verify before saying done.

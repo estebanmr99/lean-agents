@@ -6,6 +6,22 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Added
 
+- `docs/launch.md`, a README banner, and an `assets` workflow that renders the demo GIF and social preview in CI.
+- `release.yml`: a tag `v*` publishes the CHANGELOG notes and source archives. `scripts/release.mjs` builds them.
+- CI job `real-skills-undo`: real Skills CLI, throwaway HOME, Claude Code and OpenCode 1.x and 2.x.
+
+### Fixed
+
+- After the last prompt on `/dev/tty`, as in `curl | bash`, the installer exits instead of hanging.
+- Without a TTY and without `--yes`, the installer stops with a clear message instead of a crash, and `--dry-run` with every choice passed as a flag exits 0.
+- The OpenCode undo no longer leaves `~/.agents/skills` when another agent is detected.
+- Real-binary test scripts run agent CLIs only after HOME is a throwaway.
+- With `--home`, `XDG_CACHE_HOME`, `XDG_DATA_HOME` and `XDG_STATE_HOME` outside it are dropped.
+
+## [0.4.0] - 2026-10-31
+
+### Added
+
 - GitHub Copilot CLI adapter: rules, subagents, MCP servers, RTK, Context Mode plugin, Caveman, i-have-adhd.
 - Antigravity CLI adapter: same set, except that rules and skills loading is not proven (see `docs/compatibility.md`).
 - Tools: Codeburn. GSD Core and AutoSkills are opt-in and stay out of `--all-tools`. AutoSkills is CC BY-NC 4.0, non-commercial use only.
