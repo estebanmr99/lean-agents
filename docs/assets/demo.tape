@@ -10,7 +10,7 @@ Set Padding 20
 Set TypingSpeed 35ms
 
 Hide
-Type 'export HOME="$(mktemp -d)"; clear'
+Type 'export HOME="$(mktemp -d)"; unset XDG_CONFIG_HOME; clear'
 Enter
 Sleep 500ms
 Show
