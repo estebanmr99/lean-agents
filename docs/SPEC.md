@@ -571,7 +571,7 @@ Owner decision (2026-11-04): a user who already uses Warp or Orca gets that term
 
 1. Research: `docs/compatibility.md` "Terminals" (Orca `v1.4.247`, Warp docs, 2026-11-03). Open items stay **VERIFY** there.
 2. Detection per OS (app folder or CLI on PATH) in `scripts/lib/terminals.mjs`. Menu appears only when a terminal is found and preselects what was detected; `--yes` uses the detected ones; `--terminal warp|orca|both|none` overrides (`none` opts out). PO decision 2026-11-04. Nothing detected: no prompt, no change. The terminal apps are never installed.
-3. Warp: Claude Code plugin `warp@claude-code-warp`; OpenCode plugin `@warp-dot-dev/opencode-warp` (2.x `plugins`, 1.x `plugin`, pinned). Orca: `orca-cli` skill through the Skills CLI and `orca agent hooks on` when the `orca` CLI is on PATH. Undo for each is in `--uninstall`.
+3. Warp: Claude Code plugin `warp@claude-code-warp`; OpenCode plugin `@warp-dot-dev/opencode-warp` (2.x `plugins`, 1.x `plugin`, pinned). Orca: `orca-cli` skill through the Skills CLI (Orca's own status hooks are left to Orca). Undo for each is in `--uninstall`.
 4. All-off network preset prints the switches (Warp `[privacy] telemetry_enabled = false`, Orca `DO_NOT_TRACK=1` and Settings > Privacy) and never edits app settings.
 5. `--doctor` lists detected terminals and the integrations installed.
 

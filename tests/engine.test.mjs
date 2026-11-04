@@ -746,7 +746,18 @@ test('terminals: nothing detected means no integration; --terminal adds Warp and
   assert.deepEqual(detectTerminals(empty, { platform: 'darwin', env: {} }).filter((t) => t === 'warp'), ['warp']);
 
   fs.writeFileSync(path.join(bare, 'orca'), '#!/bin/sh\n', { mode: 0o755 });
-  assert.match(lean(userHome(), [...base, '--dry-run'], env), /terminals: .*orca/, 'detected terminal is the default');
+  fs.writeFileSync(path.join(bare, 'warp-terminal'), '#!/bin/sh\n', { mode: 0o755 });
+  process.env.PATH = bare;
+  try {
+    assert.deepEqual(detectTerminals(empty, { platform: 'darwin', system: true, env: {} }).sort(), ['orca', 'warp']);
+    assert.deepEqual(detectTerminals(empty, { platform: 'linux', system: true, env: {} }), ['warp'], 'linux orca is a screen reader');
+    assert.deepEqual(detectTerminals(empty, { platform: 'darwin', system: false, env: {} }).filter((t) => t === 'orca'), [], '--home ignores PATH');
+  } finally { process.env.PATH = oldPath; }
+  if (process.platform === 'darwin') {
+    const h = userHome();
+    fs.mkdirSync(path.join(h, 'Applications', 'Orca.app'), { recursive: true });
+    assert.match(lean(h, [...base, '--dry-run'], env), /terminals: orca/, 'detected terminal is the default');
+  }
   assert.doesNotMatch(lean(userHome(), [...base, '--dry-run', '--terminal', 'none'], env), /terminals:/);
 
   const home = userHome();

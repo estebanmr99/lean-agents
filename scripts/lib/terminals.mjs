@@ -17,8 +17,11 @@ export function detectTerminals(home, { platform = process.platform, env = proce
   // `system` is false for a run with --home: it looks only inside it, so a throwaway HOME behaves the same on every machine.
   const apps = platform === 'darwin' ? [path.join(home, 'Applications'), ...(system ? ['/Applications'] : [])] : [];
   const local = platform === 'win32' && system ? env.LOCALAPPDATA : null;
-  if (has(...apps.map((d) => path.join(d, 'Warp.app')), local && path.join(local, 'Programs', 'Warp')) || which('warp-terminal')) found.push('warp');
-  if (has(...apps.map((d) => path.join(d, 'Orca.app')), local && path.join(local, 'Programs', 'Orca')) || which('orca')) found.push('orca');
+  // PATH lookups are system-wide, so they follow `system` too. Linux `orca` is the GNOME screen reader: not a signal.
+  // Windows install folders under Programs: VERIFY.
+  const onPath = (bin) => system && which(bin);
+  if (has(...apps.map((d) => path.join(d, 'Warp.app')), local && path.join(local, 'Programs', 'Warp')) || onPath('warp-terminal')) found.push('warp');
+  if (has(...apps.map((d) => path.join(d, 'Orca.app')), local && path.join(local, 'Programs', 'Orca')) || (platform !== 'linux' && onPath('orca'))) found.push('orca');
   return found;
 }
 

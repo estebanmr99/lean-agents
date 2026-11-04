@@ -115,7 +115,8 @@ const HELP = `Usage: lean-agents [options]
   --profile <name>       Model profile for OpenCode (see profiles/)
   --lang en|es           Language for rules and replies
   --terminal warp|orca|both|none
-                         Agent integrations for a terminal you already have (default: the detected ones)
+                         Agent integrations for a terminal you already have (default: the detected ones;
+                         ignored with --project)
   --gh                   Install GitHub CLI (gh) if it is missing
   --bun / --no-bun       Install Bun for Context Mode (default: on; faster JS, TypeScript)
   --project <dir>        Write the shared team files into one repository
@@ -205,7 +206,7 @@ async function choose(o, saved) {
   else if (!o.terminals) {
     // Terminals are never installed, only detected; nothing found means no question.
     const found = detectTerminals(o.home, { system: o.home === REAL_HOME });
-    o.terminals = saved?.terminals ?? found;
+    o.terminals = saved ? saved.terminals ?? [] : found;
     if (!saved && found.length) {
       const items = found.map((t) => ({ value: t, label: t, ask: `Add the ${t} agent integration?` }));
       o.terminals = await p.multi({ message: 'Terminals found: add their agent integrations', items, defaults: found });
