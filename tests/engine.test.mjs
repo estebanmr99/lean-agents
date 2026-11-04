@@ -11,6 +11,7 @@ import { applyJsonEdits, revertJsonEdits } from '../scripts/lib/fsops.mjs';
 import { diffModels } from '../scripts/models-refresh.mjs';
 import { releaseNotes } from '../scripts/release.mjs';
 import { prereqFor } from '../scripts/lib/system.mjs';
+import { vscodeUserDir } from '../scripts/lib/adapters/vscode-copilot.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ALL = ['--yes', '--no-exec', '--agents', 'claude,opencode-v2', '--all-tools', '--privacy', 'strict', '--lang', 'en', '--profile', 'vertex-gemini', '--adhd-always', '--ponytail-mode', 'lite'];
@@ -358,7 +359,7 @@ test('real-binary scripts run no agent CLI before HOME is a throwaway', () => {
     const lines = fs.readFileSync(path.join(ROOT, 'tests', f), 'utf8').split('\n');
     const home = lines.findIndex((l) => /^HOME="\$\(mktemp -d\)"/.test(l));
     assert.ok(home >= 0, `${f}: no throwaway HOME`);
-    const early = lines.slice(0, home).filter((l) => !/^\s*#|command -v/.test(l) && /\b(agy|claude|copilot|opencode|rtk|npx|npm)\b/.test(l));
+    const early = lines.slice(0, home).filter((l) => !/^\s*#|command -v/.test(l) && /\b(agy|claude|copilot|opencode|rtk|npx|npm|agent|code)\b/.test(l));
     assert.deepEqual(early, [], `${f}: runs a CLI before HOME is set`);
   }
 });
@@ -517,4 +518,115 @@ test('--yes keeps every tool default for undocumented settings and writes no not
   const state = JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'state.json'), 'utf8'));
   assert.deepEqual(state.options.unverified, { antigravity: 'default', serena: 'default', 'download-hosts': 'default' });
   assert.ok(!fs.existsSync(path.join(home, '.config', 'lean-agents', 'notes')));
+});
+
+test('VS Code Copilot: user MCP and strict settings, shared ~/.copilot files written once, full uninstall', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const user = vscodeUserDir(home);
+  fs.mkdirSync(user, { recursive: true });
+  fs.writeFileSync(path.join(user, 'settings.json'), '{\n  // mine\n  "editor.fontSize": 14\n}\n');
+  fs.writeFileSync(path.join(user, 'mcp.json'), '{\n  "servers": { "playwright": { "type": "http", "url": "https://mine" } }\n}\n');
+  const before = snapshot(home);
+  const out = lean(home, ['--yes', '--no-exec', '--agents', 'vscode-copilot', '--all-tools', '--privacy', 'strict', '--lang', 'en', '--adhd-always', '--ponytail-mode', 'off']);
+  assert.match(out, /Caveman skills for VS Code Copilot/);
+
+  const mcp = parse(fs.readFileSync(path.join(user, 'mcp.json'), 'utf8')).servers;
+  assert.equal(mcp.playwright.url, 'https://mine');
+  assert.equal(mcp.serena.type, 'stdio');
+  assert.equal(mcp['context-mode'].command, 'npx');
+  const settings = parse(fs.readFileSync(path.join(user, 'settings.json'), 'utf8'));
+  assert.equal(settings['editor.fontSize'], 14);
+  assert.equal(settings['telemetry.telemetryLevel'], 'off');
+  assert.equal(settings['update.mode'], 'none');
+  assert.match(fs.readFileSync(path.join(home, '.copilot', 'copilot-instructions.md'), 'utf8'), /lean-agents:start/);
+  assert.match(fs.readFileSync(path.join(home, '.copilot', 'agents', 'explore.agent.md'), 'utf8'), /^model: claude-haiku-5\.5$/m);
+
+  lean(home, ['--uninstall', '--yes', '--no-exec']);
+  const after = Object.fromEntries(Object.entries(snapshot(home)).filter(([f]) => !f.startsWith('.config/lean-agents/')));
+  assert.deepEqual(after, before);
+
+  // With Copilot CLI too, the shared ~/.copilot files and skills come from one adapter only.
+  const both = lean(fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-')), ['--yes', '--no-exec', '--dry-run', '--agents', 'copilot-cli,vscode-copilot', '--all-tools', '--privacy', 'standard', '--lang', 'en', '--adhd-always', '--ponytail-mode', 'off']);
+  assert.equal(both.match(/copilot-instructions\.md/g).length, 1);
+  assert.doesNotMatch(both, /for VS Code Copilot/);
+});
+
+test('--project writes the team files into the repo, keeps user content, and undoes cleanly', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const repo = path.join(home, 'repo');
+  fs.mkdirSync(repo);
+  fs.writeFileSync(path.join(repo, 'AGENTS.md'), '# Team rules\n');
+  fs.mkdirSync(path.join(repo, '.vscode'));
+  fs.writeFileSync(path.join(repo, '.vscode', 'mcp.json'), '{\n  // ours\n  "servers": { "docs": { "type": "http", "url": "https://docs" } }\n}\n');
+  const before = snapshot(repo);
+  const out = lean(home, ['--yes', '--project', repo, '--tools', 'serena,playwright', '--privacy', 'standard', '--lang', 'en']);
+  assert.match(out, /commit these files/);
+  assert.doesNotMatch(out, /Commands:/);
+
+  const files = snapshot(repo);
+  assert.match(files['AGENTS.md'], /^# Team rules[\s\S]*lean-agents:start/);
+  assert.match(files['.github/copilot-instructions.md'], /AGENTS\.md/);
+  assert.match(files['.cursor/rules/lean-agents.mdc'], /^---\ndescription: .+\nalwaysApply: true\n---\n/);
+  assert.match(files['.github/agents/planner.agent.md'], /^model: claude-opus-5\.5$/m);
+  const vscode = parse(files['.vscode/mcp.json']).servers;
+  assert.equal(vscode.docs.url, 'https://docs');
+  assert.deepEqual(Object.keys(vscode).sort(), ['context-mode', 'docs', 'playwright', 'serena']);
+  assert.match(files['.cursor/agents/review.md'], /^readonly: true$/m);
+  const cursor = JSON.parse(files['.cursor/mcp.json']).mcpServers;
+  assert.equal(cursor.serena.command, 'uvx');
+  for (const [f, text] of Object.entries(files)) {
+    assert.ok(!text.includes(home) && !text.includes(repo) && !text.includes(os.homedir()), `${f} holds a local path`);
+  }
+  // State stays in the user's home, never in the repo; a user install is not touched.
+  assert.ok(!fs.existsSync(path.join(home, '.config', 'lean-agents', 'state.json')));
+  assert.equal(fs.readdirSync(path.join(home, '.config', 'lean-agents', 'projects')).length, 1);
+
+  // Another spelling of the same folder finds the same state.
+  const spelled = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, '--project', '.', '--doctor'], { encoding: 'utf8', cwd: repo });
+  assert.equal(spelled.status, 0, spelled.stdout);
+  assert.match(spelled.stdout, /AGENTS\.md/);
+  lean(home, ['--project', repo, '--uninstall', '--yes']);
+  assert.deepEqual(snapshot(repo), before);
+});
+
+test('--project refuses --agents', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, '--project', home, '--agents', 'claude', '--dry-run', '--yes'], { encoding: 'utf8' });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /--project writes repository files only/);
+});
+
+test('Cursor: subagents, MCP, kept user values, no global rules, full uninstall', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const dir = path.join(home, '.cursor');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'mcp.json'), '{\n  "mcpServers": { "serena": { "command": "mine" } }\n}\n');
+  const before = snapshot(home);
+  const out = lean(home, ['--yes', '--no-exec', '--agents', 'cursor', '--all-tools', '--privacy', 'strict', '--lang', 'en', '--adhd-always', '--ponytail-mode', 'off']);
+  assert.match(out, /rtk init -g --agent cursor/);
+  assert.match(out, /skills add JuliusBrussee\/caveman .* -a cursor -g/);
+  assert.match(out, /Privacy Mode in Cursor/);
+
+  const mcp = JSON.parse(fs.readFileSync(path.join(dir, 'mcp.json'), 'utf8')).mcpServers;
+  assert.equal(mcp.serena.command, 'mine');
+  assert.equal(mcp.playwright.command, 'npx');
+  assert.equal(mcp['context-mode'].command, 'npx');
+  const agent = fs.readFileSync(path.join(dir, 'agents', 'debug.md'), 'utf8');
+  assert.match(agent, /^model: inherit$/m);
+  assert.match(agent, /^readonly: false$/m);
+  assert.ok(!fs.existsSync(path.join(dir, 'rules')), 'Cursor user rules live in its settings UI');
+
+  lean(home, ['--uninstall', '--yes', '--no-exec']);
+  const after = Object.fromEntries(Object.entries(snapshot(home)).filter(([f]) => !f.startsWith('.config/lean-agents/')));
+  assert.deepEqual(after, before);
+});
+
+test('with --home, %APPDATA% outside it is never written (Ponytail, VS Code)', { skip: process.platform !== 'win32' }, () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const appData = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-appdata-'));
+  lean(home, ['--yes', '--no-exec', '--agents', 'opencode-v2,vscode-copilot', '--tools', 'ponytail,serena', '--privacy', 'strict', '--lang', 'en', '--profile', 'none', '--ponytail-mode', 'lite'], { ...process.env, APPDATA: appData });
+  assert.deepEqual(fs.readdirSync(appData), []);
+  const roaming = path.join(home, 'AppData', 'Roaming');
+  assert.ok(fs.existsSync(path.join(roaming, 'ponytail', 'config.json')));
+  assert.ok(fs.existsSync(path.join(roaming, 'Code', 'User', 'mcp.json')));
 });

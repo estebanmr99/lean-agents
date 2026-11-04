@@ -18,6 +18,11 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - CI: `real-proxy` (install through squid with direct traffic blocked, all-off preset, gh and agy behind the proxy), a pty test for the menus, no-TTY checks in PowerShell 5.1 and Git Bash, `gh` through winget.
 - `docs/compatibility.md` "Terminals": Warp and Orca install routes, the hooks Orca adds, its permission modes and how to keep approvals on. Research only; the installer does not offer either app yet.
 - Plan for session 10 (parallel agent sessions) in `docs/SPEC.md`, with the research in `docs/compatibility.md`.
+- `--agents vscode-copilot`: rules, subagents, user MCP servers, skills and strict privacy settings for VS Code Copilot. Shared `~/.copilot` files are written once when Copilot CLI is also selected.
+- `--agents cursor`: subagents, MCP servers, RTK hook and skills for Cursor and its `agent` CLI.
+- `--project <dir>` (`-Project` in PowerShell): writes the team setup into one repository (`AGENTS.md`, `.github/`, `.vscode/mcp.json`, `.cursor/`). State stays in the user's home.
+- `docs/claude-with-copilot.md`: the official route to Claude through GitHub Copilot (partner agent); token proxies are documented as not supported.
+- CI jobs `real-cursor` and `real-vscode`: real Cursor CLI and VS Code CLI in a throwaway HOME, Linux and macOS.
 
 ### Changed
 

@@ -67,6 +67,56 @@ Context Mode needs Node.js 22.5 or newer. Everything else works on Node.js 20.12
 
 ✅ supported · ⚠️ partial · ➖ not available for this agent. Details and verification dates: [docs/compatibility.md](docs/compatibility.md).
 
+| Feature | VS Code Copilot | Cursor (IDE and CLI) | Team repo (`--project`) |
+| --- | --- | --- | --- |
+| Rules | ⚠️ written, load unproven | ➖ settings UI only, use `--project` | ✅ `AGENTS.md` |
+| Subagents | ⚠️ written, load unproven | ⚠️ written, load unproven | ✅ `.github/agents`, `.cursor/agents` |
+| RTK | ⚠️ through Copilot CLI only | ✅ | ➖ per user |
+| Context Mode, Serena, Playwright | ✅ MCP | ✅ MCP | ✅ `.vscode/mcp.json`, `.cursor/mcp.json` |
+| Caveman, i-have-adhd skills | ⚠️ written, load unproven | ⚠️ written, load unproven | ➖ per user |
+
+## VS Code Copilot and Cursor
+
+lean-agents sets up the Copilot chat in VS Code and Cursor (the editor and its `agent` CLI) like the other agents:
+
+- **VS Code Copilot:** rules in `~/.copilot/copilot-instructions.md`, subagents in `~/.copilot/agents/`, MCP servers in your VS Code user `mcp.json`, and skills. Copilot CLI reads the same `~/.copilot` files, so with both they are written once.
+- **Cursor:** subagents in `~/.cursor/agents/`, MCP servers in `~/.cursor/mcp.json`, the RTK hook and skills. Cursor keeps user rules in its settings screen, not in a file, so lean-agents cannot write them. Use team mode below to give Cursor the rules through the repo's `AGENTS.md`.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --dry-run --agents vscode-copilot,cursor
+```
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -DryRun -Agents vscode-copilot,cursor
+```
+
+Drop `--dry-run` (`-DryRun`) to apply. `--uninstall` removes it all again.
+
+## Team mode (`--project`)
+
+Puts the shared setup into one repository, so everyone on the team gets it with `git pull`:
+
+| File | What it does |
+| --- | --- |
+| `AGENTS.md` | The rules, in a marked block; your own text stays |
+| `.github/copilot-instructions.md`, `.cursor/rules/lean-agents.mdc` | One line pointing to `AGENTS.md`, so rules load once |
+| `.github/agents/*.agent.md`, `.cursor/agents/*.md` | Tiered subagents for VS Code Copilot and Cursor |
+| `.vscode/mcp.json`, `.cursor/mcp.json` | Context Mode, plus Serena and Playwright if you pick them |
+
+Run it from the repository root, check the plan, apply, and commit:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --project . --dry-run --tools serena
+curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --project . --tools serena
+git add AGENTS.md .github .vscode .cursor && git commit -m "chore: add lean-agents team setup"
+```
+
+On Windows: `& ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -Project . -DryRun`. Later, `--project . --update` re-applies your saved choices, and `--project . --uninstall` removes only what lean-agents added. Team mode writes files only. Each teammate still runs the installer once for the tools the rules mention (RTK, Context Mode and the rest), and their state stays in their own home folder, never in the repo.
+
+## Claude through GitHub Copilot
+
+If your company pays for GitHub Copilot, the official way to use Claude as an agent is the **Claude coding agent**, a Copilot partner agent that an admin turns on. lean-agents installs nothing for it, because it is a policy switch, not a package. Tools that reuse a Copilot token to run the Claude Code CLI are not official and not supported. Steps and admin settings: [docs/claude-with-copilot.md](docs/claude-with-copilot.md).
+
 ## Install tiers
 
 | Tier | What | Default |
@@ -133,8 +183,9 @@ lean-agents is glue. The heavy lifting is done by these projects; please star th
 - [x] Installer for Claude Code and OpenCode 2.x (macOS, Linux)
 - [x] Windows installer and OpenCode 1.x
 - [x] Copilot CLI, Antigravity CLI, Codeburn, AutoSkills, GSD, original skills, model profiles
+- [x] VS Code Copilot, Cursor, team mode (`--project`), Claude through Copilot
 - [ ] `v1.0.0`
-- Later: Codex CLI, Gemini CLI, Cursor
+- Later: Codex CLI, Gemini CLI
 
 ## Contributing
 

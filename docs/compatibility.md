@@ -16,6 +16,20 @@ What lean-agents configures per agent, how, and when each command or key was las
 | Compaction | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=80` | `compaction.auto` + `compaction.buffer` | `compaction.auto` + `compaction.reserved`, optional DCP | planned | planned |
 | Strict privacy | env flags (below) | `share`, `update`, `policies` | `share`, `autoupdate`, `experimental.openTelemetry`, `disabled_providers` | `autoUpdate: false`; telemetry only through the `--disable-client-telemetry` flag | account setting only, printed as a reminder |
 
+### VS Code Copilot and Cursor
+
+| Feature | VS Code Copilot | Cursor (IDE and `agent` CLI) | `--project <dir>` (in the repo) |
+| --- | --- | --- | --- |
+| Rules | marked block in `~/.copilot/copilot-instructions.md` | ➖ user rules live in the settings UI | marked block in `AGENTS.md`; `.github/copilot-instructions.md` and `.cursor/rules/lean-agents.mdc` point to it |
+| Subagents | `~/.copilot/agents/*.agent.md` | `~/.cursor/agents/*.md` (`model: inherit`, `readonly`) | `.github/agents/*.agent.md`, `.cursor/agents/*.md` |
+| MCP | user `mcp.json` (`servers`, `type: stdio`) next to `settings.json` | `~/.cursor/mcp.json` (`mcpServers`) | `.vscode/mcp.json`, `.cursor/mcp.json` |
+| Context Mode | MCP | MCP | MCP |
+| RTK | shares the Copilot CLI hook (`rtk init -g --copilot`) only when copilot-cli is installed | `rtk init -g --agent cursor` | ➖ per user |
+| Skills | `npx skills add … -a github-copilot -g` | `npx skills add … -a cursor -g` | ➖ per user |
+| Strict privacy | `telemetry.telemetryLevel: off`, `update.mode: none` | Privacy Mode is an account setting, printed as a reminder | ➖ |
+
+With both `copilot-cli` and `vscode-copilot`, the shared `~/.copilot` files and skills are written once. Proxies: Cursor CLI has `network.useHttp1ForAgent` in `~/.cursor/cli-config.json`; lean-agents does not set it yet.
+
 ## Windows
 
 - `install.ps1` runs on PowerShell 5.1 and 7 and needs no admin rights.
@@ -121,6 +135,16 @@ Research only (session 8). lean-agents installs neither app yet. Checked 2026-11
 | Orca orchestration CLI (session 10): `worktree create --name --agent --prompt <text> --surface terminal --base-branch --json`, `agent launch --worktree --prompt`, `worktree ps --json`, `worktree list --json`, `worktree rm` (also deletes the branch), `terminal read --screen --limit`, `terminal send --text --enter`, `terminal wait --for exit\|tui-idle --timeout-ms`, `orchestration run-create`, `worker-start`, `worker-read`, `check`, `send`. `--prompt` takes text only: no prompt-file or stdin option | `orca agent-context --json` on Orca 1.4.243; [orchestration guide](https://github.com/stablyai/orca/blob/main/skill-guides/orchestration.md) | 2026-11-03 |
 | Claude Code parallel sessions: `-w/--worktree [name]` (`.claude/worktrees/<name>`, branch `worktree-<name>`), `--tmux` (needs `--worktree`), `--bg`, `claude agents`, `logs`, `attach`, `stop`, `rm`, `--permission-mode plan`, `-n <name>`, subagent `isolation: worktree`. No prompt-file flag: prompt is argv text, or piped with `cat f \| claude -p "<instr>"`; `--append-system-prompt-file` is in the docs but only named in a note in `--help` (**VERIFY**). `-p` worktrees are not cleaned up | `claude --help` on 2.1.309; [CLI reference](https://code.claude.com/docs/en/cli-reference), [worktrees](https://code.claude.com/docs/en/worktrees), [headless](https://code.claude.com/docs/en/headless), [subagents](https://code.claude.com/docs/en/sub-agents) | 2026-11-03 |
 | OpenCode parallel sessions: `opencode run "<msg>" -f <file> --agent plan --session --title --format json`, TUI `--prompt`, `serve`, `attach`, `run --attach`. No worktree command. The docs list `run --dir`, but 2.1.4 `--help` does not: set the working directory instead | `opencode run --help` on 2.1.4; [CLI docs](https://opencode.ai/docs/cli/), [agents docs](https://opencode.ai/docs/agents/) | 2026-11-03 |
+| VS Code user files: `~/.copilot/copilot-instructions.md`, `~/.copilot/instructions/`, `~/.copilot/agents/`, skills in `~/.copilot/skills` and `~/.agents/skills`; workspace `AGENTS.md` (`chat.useAgentsMdFile`), `.github/copilot-instructions.md`, `.github/agents/` | [instructions](https://code.visualstudio.com/docs/copilot/customization/custom-instructions), [agents](https://code.visualstudio.com/docs/copilot/customization/custom-agents), [skills](https://code.visualstudio.com/docs/copilot/customization/agent-skills) | 2026-11-03 |
+| VS Code `.agent.md` keys incl. `model` (an ID or a fallback list); `mcp.json` `servers` with `type`, `command`, `args`; `code --add-mcp` writes the user profile config | [agent file reference](https://code.visualstudio.com/docs/agents/reference/custom-agent-file-reference), [MCP reference](https://code.visualstudio.com/docs/agents/reference/mcp-configuration) | 2026-11-03 |
+| VS Code `telemetry.telemetryLevel` (`all`, `error`, `crash`, `off`), `update.mode` (`default`, `start`, `manual`, `none`); `settings.json` under `Code/User` per OS | [telemetry](https://code.visualstudio.com/docs/configure/telemetry), [updates](https://code.visualstudio.com/docs/enterprise/updates), [settings](https://code.visualstudio.com/docs/getstarted/settings) | 2026-11-03 |
+| Cursor CLI install `curl https://cursor.com/install -fsS \| bash` (Windows `irm 'https://cursor.com/install?win32=true' \| iex`); links `agent` and `cursor-agent` into `~/.local/bin`; `agent mcp list` | [install](https://cursor.com/docs/cli/installation), installer script, [CLI MCP](https://cursor.com/docs/cli/mcp) | 2026-11-03 |
+| Cursor rules `.cursor/rules/*.mdc` (`description`, `globs`, `alwaysApply`), `AGENTS.md`; the CLI reads both; user rules only in the UI | [rules](https://cursor.com/docs/context/rules), [CLI](https://cursor.com/docs/cli/using) | 2026-11-03 |
+| Cursor subagents `~/.cursor/agents`, `.cursor/agents` (`name`, `description`, `model`, `readonly`, `is_background`); skills `~/.cursor/skills`, `~/.agents/skills`; MCP `mcpServers`; CLI config `~/.cursor/cli-config.json` with `network.useHttp1ForAgent` | [subagents](https://cursor.com/docs/subagents), [skills](https://cursor.com/docs/skills), [MCP](https://cursor.com/docs/mcp), [CLI config](https://cursor.com/docs/cli/reference/configuration) | 2026-11-03 |
+| `rtk init -g --agent cursor`; Skills CLI ids `cursor`, `github-copilot`; Context Mode MCP for Cursor and VS Code (`servers`) | [rtk](https://github.com/rtk-ai/rtk), [skills agents](https://github.com/vercel-labs/skills/blob/main/docs/agents.md), [context-mode](https://github.com/mksglu/context-mode) | 2026-11-03 |
+| Claude through Copilot: Claude coding agent (partner agent), "Allow Claude coding agent", Copilot CLI only offers Claude models; see `docs/claude-with-copilot.md` | [Claude agent](https://docs.github.com/en/copilot/concepts/agents/anthropic-claude), [partner agents](https://docs.github.com/en/copilot/concepts/agents/about-third-party-agents) | 2026-11-03 |
+| Cursor CLI 2026.10.22: `agent mcp list` runs without a login and lists `~/.cursor/mcp.json` and the repo's `.cursor/mcp.json`; `rtk init -g --agent cursor` (rtk 1.1.0) writes a preToolUse hook to `~/.cursor/hooks.json` and `--uninstall` removes it; `skills add -a cursor -g` installs into `~/.agents/skills` | `tests/real-cursor.sh`, `real-cursor` on Ubuntu and macOS | 2026-11-04 |
+| VS Code: `code --add-mcp` writes the user `mcp.json` that lean-agents edits (`~/.config/Code/User` on Linux, `~/Library/Application Support/Code/User` on macOS); Copilot Chat ships built in (`--install-extension GitHub.copilot-chat` reports it as already installed, 0.71 to 0.72) | `tests/real-vscode.sh`, `real-vscode` on Ubuntu and macOS | 2026-11-04 |
 
 ## Proxy and corporate CA
 
@@ -189,3 +213,8 @@ The undocumented items below (Antigravity telemetry and auto-update, Serena conf
 - **VERIFY:** OpenCode stdin prompts, background runs and worktrees (feature request [anomalyco/opencode#12896](https://github.com/anomalyco/opencode/issues/12896)); `opencode run` flags on 1.x.
 - **VERIFY:** `copilot -p` and `agy -p` for workers; reports say `agy -p` hangs when stdout is not a TTY.
 - **VERIFY:** a parallel run with a real model (needs a login, out of CI).
+- **VERIFY:** the VS Code user `mcp.json` path on Windows (`%APPDATA%\Code\User`). Linux and macOS are proven by `real-vscode`.
+- **VERIFY:** the `model` value format in VS Code `.agent.md` (Copilot runtime IDs are assumed, as for Copilot CLI).
+- **VERIFY:** whether VS Code reads Copilot CLI hooks, so RTK for VS Code alone is not installed.
+- **VERIFY:** whether the Cursor CLI reads `~/.cursor/agents`, and the Context Mode hooks for Cursor and VS Code (MCP only for now).
+- **VERIFY:** the Claude agent plans, the organization and enterprise policy labels, and the minimum VS Code version (see `docs/claude-with-copilot.md`).

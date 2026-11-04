@@ -53,10 +53,13 @@ export function profileEdits(profile, agentsKey) {
   return edits;
 }
 
+// Read at import, before isolate() points HOME and USERPROFILE at --home.
+const REAL_HOME = os.homedir();
+
 function ponytailConfig(home) {
   if (process.platform !== 'win32') return path.join(configHome(home), 'ponytail', 'config.json');
   // Only the real home may use %APPDATA%: --home must keep every write inside the temp dir.
-  const appData = home === os.homedir() && process.env.APPDATA ? process.env.APPDATA : path.join(home, 'AppData', 'Roaming');
+  const appData = home === REAL_HOME && process.env.APPDATA ? process.env.APPDATA : path.join(home, 'AppData', 'Roaming');
   return path.join(appData, 'ponytail', 'config.json');
 }
 
