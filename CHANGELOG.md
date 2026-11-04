@@ -13,6 +13,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - Proxy support: `HTTP(S)_PROXY`, `ALL_PROXY` and `NO_PROXY` are passed to every command in both letter cases, and shown redacted in `--dry-run` and `--doctor` with any CA variables. Never written to disk.
 - `--gh`: installs GitHub CLI with brew or winget at user scope; `gh auth login` stays manual.
 - Interactive menus, a progress list and a summary on a real terminal, with `@clack/prompts` (the one new dependency). `--yes`, pipes and no-TTY runs keep the plain questions.
+- Settings upstream does not document (Antigravity telemetry and auto-update, Serena config, winget persistent proxy, download hosts, DCP, GSD and AutoSkills telemetry): the installer asks to paste docs or IT notes, saved to `~/.config/lean-agents/notes/` for an agent to apply after review, or keep the tool's default. Never guessed, never applied automatically, existing configs untouched.
 - `docs/SECURITY-REVIEW.md`: a prompt any agent runs on this repo before install.
 - CI: `real-proxy` (install through squid with direct traffic blocked, all-off preset, gh and agy behind the proxy), a pty test for the menus, no-TTY checks in PowerShell 5.1 and Git Bash, `gh` through winget.
 

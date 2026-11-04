@@ -117,6 +117,8 @@ The network question (`--network`, `--telemetry`, `--auto-update`, `--outbound`)
 
 ## Not yet verified
 
+The undocumented items below (Antigravity telemetry and auto-update, Serena config, winget persistent proxy, download hosts, DCP, GSD and AutoSkills telemetry) stay **VERIFY**. The installer does not configure them: it asks the user to paste their docs or IT notes (saved to `~/.config/lean-agents/notes/`, never applied) or keep the tool's default, and leaves an existing config untouched.
+
 - `reasoningEffort` as the pass-through option for Gemini on Vertex.
 - **VERIFY:** the `model` value format in Copilot `*.agent.md`. Without a login, Copilot cannot show which model it picked.
 - **VERIFY:** Antigravity loading `~/.gemini/config/rules` and `~/.agents/skills`. No list command shows them without a login, so README marks both as partial.
@@ -128,3 +130,4 @@ The network question (`--network`, `--telemetry`, `--auto-update`, `--outbound`)
 - **VERIFY:** Copilot CLI `NO_PROXY` and `--disable-client-telemetry` (seen in release notes, not in the docs).
 - **VERIFY:** Serena config path `~/.serena/serena_config.yml` and a usage-stats switch; GSD and Ponytail outbound calls.
 - **VERIFY:** pip `PIP_PROXY`, `PIP_CERT`; winget persistent proxy settings and CA handling.
+- **VERIFY:** DCP and AutoSkills telemetry; the exact winget and Playwright download hosts.

@@ -45,6 +45,7 @@ Every path is under your home folder. Existing files are backed up to `~/.config
 | `~/.gemini/config/rules/lean-agents.md`, `agents/*.md`, `mcp_config.json` | Antigravity CLI |
 | `~/.config/ponytail/config.json` (`%APPDATA%\ponytail` on Windows) | Ponytail |
 | `~/.gsd/defaults.json` | GSD (opt-in) |
+| `~/.config/lean-agents/notes/<item>.md` | only if you paste docs or IT notes for an undocumented setting; never applied automatically |
 | `~/.claude/skills/`, `~/.agents/skills/` | Caveman, i-have-adhd skills (written by the Skills CLI) |
 
 Third-party tools also write their own files when lean-agents runs them (for example `rtk init` adds a hook or plugin, `claude plugin install` fills `~/.claude/plugins/`).
