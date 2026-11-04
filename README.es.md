@@ -107,6 +107,16 @@ Las demos para Claude Desktop y Cursor vienen después.
 
 **Próximamente: soporte completo de Antigravity.** Hoy lean-agents configura Antigravity CLI (`agy`) en macOS y Linux. Lo siguiente es la app de escritorio de Antigravity y la CLI en Windows. Según la documentación oficial, la app y la CLI leen las mismas reglas, subagentes, skills y servidores MCP, así que una sola configuración serviría para ambas en macOS, Windows y Linux. Cada parte sale solo cuando CI la prueba con binarios reales. Plan: [Session 11](docs/SPEC.md#session-11--antigravity-full-setup) (en inglés).
 
+## Warp y Orca
+
+Si ya usas [Warp](https://www.warp.dev) u [Orca](https://github.com/stablyai/orca), lean-agents añade sus integraciones de agentes para los agentes que elegiste. Nunca instala las terminales. Busca la app (o `warp-terminal` / `orca` en el PATH), preselecciona lo que encuentra y no pregunta nada si no hay ninguna. `--terminal warp|orca|both|none` lo cambia; `none` lo desactiva.
+
+- **Warp:** el plugin de Claude Code `warp@claude-code-warp` (necesita `jq`) y el plugin de OpenCode `@warp-dot-dev/opencode-warp`.
+- **Orca:** la skill `orca-cli` para tus agentes. Orca gestiona sus propios hooks de estado (Settings > Agents, o `orca agent hooks on`); lean-agents no los toca.
+- `--uninstall` quita lo que añadió. Con el preset de red todo apagado imprime los interruptores de telemetría (Warp `telemetry_enabled = false`, Orca `DO_NOT_TRACK=1`) y nunca edita los ajustes de las apps.
+
+Fuentes y datos de GUI sin verificar: [docs/compatibility.md](docs/compatibility.md#terminals).
+
 ## Navegador con tu sesión (opcional)
 
 El MCP `playwright` por defecto abre un navegador nuevo sin ventana, que falla en páginas con inicio de sesión único (SSO). `--tools playwright-extension` agrega `@playwright/mcp --extension`. Se conecta a tu propio Chrome o Edge con la sesión iniciada, a través de la [extensión de Playwright](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm).
@@ -227,7 +237,8 @@ Ver la sección de créditos en el [README en inglés](README.md#credits).
 - [x] Copilot CLI, Antigravity CLI, Codeburn, AutoSkills, GSD, skills propias, perfiles de modelos
 - [x] VS Code Copilot, Cursor, modo equipo (`--project`), Claude a través de Copilot
 - [x] Sesiones de agentes en paralelo (`scripts/parallel.mjs`)
-- [ ] Planeado: terminales (Warp, Orca), configuración completa de Antigravity (app, y la CLI en Windows)
+- [x] Integraciones de Warp y Orca para quien ya las usa
+- [ ] Planeado: configuración completa de Antigravity (app, y la CLI en Windows)
 - [ ] `v1.0.0`
 - Más adelante: Codex CLI, Gemini CLI
 

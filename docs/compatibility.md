@@ -41,7 +41,20 @@ With both `copilot-cli` and `vscode-copilot`, the shared `~/.copilot` files and 
 
 ## Terminals
 
-Research only (session 8). lean-agents installs neither app yet. Checked 2026-11-03: Warp docs, Orca `v1.4.247` (released 2026-11-03).
+Session 8. lean-agents never installs the apps; for a user who already has Warp or Orca (`--terminal`, detected by default) it adds the integrations below. Checked 2026-11-03: Warp docs, Orca `v1.4.247` (released 2026-11-03).
+
+### What lean-agents does
+
+| Terminal | Added | Source (2026-11-03) | Undo |
+| --- | --- | --- | --- |
+| Warp, Claude Code | `claude plugin marketplace add warpdotdev/claude-code-warp`, `claude plugin install warp@claude-code-warp` (README shows the `/plugin` slash form; the shell form is the same command and is proven in CI `real-terminals`). Needs `jq` | [claude-code-warp](https://github.com/warpdotdev/claude-code-warp) | `claude plugin uninstall warp@claude-code-warp` |
+| Warp, OpenCode 2.x | `plugins` entry `@warp-dot-dev/opencode-warp` (OpenCode 2.0.18+) | [opencode-warp](https://github.com/warpdotdev/opencode-warp) | `--uninstall` reverts the json edit |
+| Warp, OpenCode 1.x | `plugin` entry `@warp-dot-dev/opencode-warp@0.1.7` (upstream asks for the pin) | same | same |
+| Orca | `npx skills add https://github.com/stablyai/orca --skill orca-cli -a <agents> -g -y` | [Orca CLI docs](https://www.onorca.dev/docs/cli/overview) | `npx skills remove orca-cli -g -y` (also removes an `orca-cli` you installed yourself) |
+
+Detection (a run with `--home` looks only inside it; `orca` on Linux is the GNOME screen reader, so Linux Orca is not detected, **VERIFY** its AppImage location): `/Applications/Warp.app` or `Orca.app` (also `~/Applications`), `%LOCALAPPDATA%\Programs\Warp` / `Orca` (**VERIFY** paths), or `warp-terminal` / `orca` on PATH. Warp has no other official agent plugins (checked); Orca's other agent hook installers are not used.
+
+**VERIFY:** `orca agent hooks on|off|status --json` (needs a running app? lean-agents does not run it, so `--uninstall` never turns off hooks you enabled yourself); Orca OpenCode plugin route; whether the Warp plugins are no-ops outside Warp; minimum Warp version; whether `TERM_PROGRAM=WarpTerminal` is set inside Warp; Orca `orchestration` and `computer-use` skills (only `orca-cli` is installed); Warp notifications and Orca status in the running GUI (not testable in CI).
 
 ### Warp
 

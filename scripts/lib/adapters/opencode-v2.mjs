@@ -1,5 +1,6 @@
 // OpenCode 2.x adapter. Uses the native 2.x keys (agents, plugins, update, policies,
 // mcp.servers), confirmed against `opencode debug config` on OpenCode 2.2 in CI.
+import { WARP_OPENCODE_PLUGIN } from '../terminals.mjs';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -122,6 +123,7 @@ export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
     if (tools.includes(name)) edits.push({ path: ['mcp', 'servers', name], value: localServer(core, name), mode: 'setIfAbsent' });
   }
   if (tools.includes('ponytail')) edits.push({ path: ['plugins'], value: '@dietrichgebert/ponytail', mode: 'arrayAdd' });
+  if (opts.terminals?.includes('warp')) edits.push({ path: ['plugins'], value: WARP_OPENCODE_PLUGIN, mode: 'arrayAdd' });
   if (opts.network.outbound === 'off') edits.push({ path: ['share'], value: 'disabled', mode: 'set' });
   if (opts.network.autoUpdate === 'off') edits.push({ path: ['update'], value: 'disable', mode: 'set' });
   if (opts.network.outbound === 'off') {

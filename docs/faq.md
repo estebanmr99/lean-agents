@@ -4,7 +4,7 @@
 
 - **Oh My OpenAgent (OMO):** powerful, but it adds many MCP servers and integrations, which costs context on every turn and widens what the agent can reach. lean-agents keeps the MCP list short and gets similar planning/building routing from tiered subagents.
 - **Graphify:** builds a code graph with AI calls, which costs a lot of tokens up front. Serena gives symbol-level navigation through a language server at no model cost.
-- **Terminal-specific plugins (for example Warp):** they only help users of one terminal. This covers Warp's Claude Code plugin ([`warpdotdev/claude-code-warp`](https://github.com/warpdotdev/claude-code-warp)) and its OpenCode plugin ([`warpdotdev/opencode-warp`](https://github.com/warpdotdev/opencode-warp)). Notification hooks may be documented later in a terminal-neutral way.
+- **Terminal plugins for everyone (for example Warp):** they only help users of one terminal, so lean-agents adds them only when it finds Warp or Orca on your machine (`--terminal none` opts out). It never installs the terminal. (Until 0.5.0 these were refused outright.)
 
 ## What does Orca change in my agents?
 

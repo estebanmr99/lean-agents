@@ -69,6 +69,7 @@ export function doctor({ home, state, exec }) {
   } else {
     const o = state.options;
     add('lean-agents', 'ok', `v${state.version}, agents: ${o.agents.join(', ')}, privacy: ${o.privacy}`);
+    if (o.terminals?.length) add('terminals', 'ok', `integrations for ${o.terminals.join(', ')} (commands listed below; app settings are yours)`);
     const latest = [...new Map(state.files.map((f) => [f.path, f])).values()];
     for (const f of latest) {
       const rel = f.path.startsWith(home) ? `~${f.path.slice(home.length)}` : f.path;
