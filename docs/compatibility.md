@@ -117,7 +117,7 @@ The network question (`--network`, `--telemetry`, `--auto-update`, `--outbound`)
 
 ## Not yet verified
 
-The undocumented items below (Antigravity telemetry and auto-update, Serena config, winget persistent proxy, download hosts, DCP, GSD and AutoSkills telemetry) stay **VERIFY**. The installer does not configure them: it asks the user to paste their docs or IT notes (saved to `~/.config/lean-agents/notes/`, never applied) or keep the tool's default, and leaves an existing config untouched.
+The undocumented items below (Antigravity telemetry and auto-update, Serena config, winget persistent proxy, download hosts, DCP, GSD and AutoSkills telemetry) stay **VERIFY**. The installer does not configure them: it asks the user to paste their docs or IT notes (saved to `~/.config/lean-agents/notes/`, never applied) or keep the tool's default. When another agent already set the tool up (Serena, DCP, GSD config found), it skips the question.
 
 - `reasoningEffort` as the pass-through option for Gemini on Vertex.
 - **VERIFY:** the `model` value format in Copilot `*.agent.md`. Without a login, Copilot cannot show which model it picked.

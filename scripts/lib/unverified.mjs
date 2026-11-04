@@ -1,7 +1,6 @@
 // Settings upstream does not document (VERIFY in docs/compatibility.md). lean-agents never guesses
 // them: the user pastes their docs or IT notes, saved as-is for an agent to apply after review.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { OWNED_MARK } from './fsops.mjs';
 import { configHome } from './system.mjs';
@@ -9,7 +8,7 @@ import { redactUrl } from './network.mjs';
 
 export const notesDir = (home) => path.join(home, '.config', 'lean-agents', 'notes');
 
-// "kept": another agent or the user already set the tool up, so its config stays untouched.
+// "kept": another agent or the user already set the tool up, so the question is skipped and no notes are added.
 export function unverifiedItems(o, home, { platform = process.platform, env = process.env, stateFiles = [] } = {}) {
   const ours = new Set(stateFiles.map((f) => f.path));
   const foreign = (p) => fs.existsSync(p) && !ours.has(p);
@@ -29,11 +28,16 @@ export function unverifiedItems(o, home, { platform = process.platform, env = pr
   return items;
 }
 
-// The answer is one line of text or a path to a file with the docs.
+// Pasted notes may hold credentials in forms other than a URL.
+export const redactNotes = (text) => redactUrl(text)
+  .replace(/(^|[\s=])[^\s:@/=]+:[^\s@/]+@/g, '$1***@')
+  .replace(/((?:password|passwd|pwd|token|secret)\s*[=:]\s*)\S+/gi, '$1***');
+
+// The answer is one line of text, or an absolute or ~ path to a file with the docs.
 export function notesFile(home, item, answer) {
-  const p = answer.replace(/^~(?=[/\\])/, os.homedir());
-  const fromFile = fs.existsSync(p) && fs.statSync(p).isFile();
-  const text = redactUrl(fromFile ? fs.readFileSync(p, 'utf8') : answer).trimEnd();
+  const p = answer.replace(/^~(?=[/\\])/, home);
+  const fromFile = path.isAbsolute(p) && fs.existsSync(p) && fs.statSync(p).isFile();
+  const text = redactNotes(fromFile ? fs.readFileSync(p, 'utf8') : answer).trimEnd();
   return {
     kind: 'file',
     path: path.join(notesDir(home), `${item.id}.md`),

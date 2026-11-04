@@ -230,8 +230,9 @@ async function chooseUnverified(o, saved, p) {
       ],
       def: 'default',
     });
-    if (a !== 'paste' && a !== 'default') throw new Error(`answer paste or default, not "${a}"`);
-    const answer = a === 'paste' ? (await p.ask('One line of notes, or a path to a file with them (no passwords)', '')).trim() : '';
+    const pick = { p: 'paste', d: 'default' }[a.trim().toLowerCase()[0]];
+    if (!pick) throw new Error(`answer paste or default, not "${a}"`);
+    const answer = pick === 'paste' ? (await p.ask('One line of notes, or a path to a file with them (no passwords)', '')).trim() : '';
     o.unverified[item.id] = answer ? 'notes' : 'default';
     if (answer) o.notes.push(notesFile(o.home, item, answer));
   }
@@ -275,8 +276,7 @@ function printPlan(o, planned, commands) {
   console.log(`  network: ${CATEGORIES.map((c) => `${c} ${o.network[c]}`).join(', ')}`);
   const net = proxyReport();
   if (net.length) console.log(`  proxy and CA (passed to every command): ${net.join(' ')}`);
-  const own = Object.entries(o.unverified).filter(([, v]) => v !== 'default');
-  if (own.length) console.log(`  not documented upstream: ${own.map(([k, v]) => `${k} ${v === 'kept' ? 'kept: existing config' : 'your notes'}`).join(', ')}`);
+  if (o.notes.length) console.log(`  your notes for undocumented settings (saved, never applied): ${o.notes.map((n) => path.basename(n.path, '.md')).join(', ')}`);
   console.log('');
   console.log('Files:');
   console.log(describe(planned, o.home));

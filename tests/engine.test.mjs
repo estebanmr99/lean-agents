@@ -502,9 +502,13 @@ test('undocumented settings: asked only when relevant, kept when another agent s
   const line = notesFile(home, item, 'proxy http://u:s3cret@127.0.0.1:8080');
   assert.equal(line.path, path.join(home, '.config', 'lean-agents', 'notes', 'serena.md'));
   assert.match(line.content, /managed by lean-agents[\s\S]*Source: pasted\n\nproxy http:\/\/\*\*\*@127\.0\.0\.1:8080\n$/);
+  assert.match(notesFile(home, item, 'HTTPS_PROXY=u:pw@10.0.0.1:8080 password: hunter2').content, /HTTPS_PROXY=\*\*\*@10\.0\.0\.1:8080 password: \*\*\*\n$/);
+  // A relative name is pasted text, even when such a file exists (npm test runs in the repo root).
+  assert.match(notesFile(home, item, 'package.json').content, /Source: pasted\n\npackage\.json\n$/);
   const src = path.join(home, 'it-notes.txt');
   fs.writeFileSync(src, 'line 1\nline 2 http://a:b@c\n');
   assert.match(notesFile(home, item, src).content, /Source: .*it-notes\.txt\n\nline 1\nline 2 http:\/\/\*\*\*@c\n$/);
+  assert.match(notesFile(home, item, '~/it-notes.txt').content, /Source: .*it-notes\.txt/);
 });
 
 test('--yes keeps every tool default for undocumented settings and writes no notes', () => {
