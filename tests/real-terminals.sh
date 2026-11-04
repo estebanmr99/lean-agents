@@ -43,8 +43,8 @@ case "$target" in
     refute test -e "$HOME/.claude/skills/orca-cli"
     ;;
   *)
-    opencode debug config > "$HOME/resolved-after.txt" 2>&1
-    refute grep -q '@warp-dot-dev/opencode-warp' "$HOME/resolved-after.txt"
+    # The file is the proof: OpenCode's own output can still mention a plugin it cached in HOME.
+    if test -e "$XDG_CONFIG_HOME/opencode/opencode.jsonc"; then refute grep -q '@warp-dot-dev/opencode-warp' "$XDG_CONFIG_HOME/opencode/opencode.jsonc"; fi
     refute test -e "$HOME/.agents/skills/orca-cli"
     ;;
 esac

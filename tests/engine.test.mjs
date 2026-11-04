@@ -748,7 +748,8 @@ test('terminals: nothing detected means no integration; --terminal adds Warp and
   fs.writeFileSync(path.join(bare, 'orca'), '#!/bin/sh\n', { mode: 0o755 });
   fs.writeFileSync(path.join(bare, 'warp-terminal'), '#!/bin/sh\n', { mode: 0o755 });
   process.env.PATH = bare;
-  try {
+  // `where` finds no extensionless stub on Windows.
+  if (process.platform !== 'win32') try {
     assert.deepEqual(detectTerminals(empty, { platform: 'darwin', system: true, env: {} }).sort(), ['orca', 'warp']);
     assert.deepEqual(detectTerminals(empty, { platform: 'linux', system: true, env: {} }), ['warp'], 'linux orca is a screen reader');
     assert.deepEqual(detectTerminals(empty, { platform: 'darwin', system: false, env: {} }).filter((t) => t === 'orca'), [], '--home ignores PATH');
