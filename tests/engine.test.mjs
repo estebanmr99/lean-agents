@@ -783,6 +783,7 @@ test('terminals: all-off network prints the Warp and Orca privacy switches', () 
   const out = lean(userHome(), ['--yes', '--no-exec', '--dry-run', '--agents', 'claude', '--network', 'off', '--terminal', 'both']);
   assert.match(out, /telemetry_enabled = false/);
   assert.match(out, /DO_NOT_TRACK=1/);
+});
 
 test('Antigravity app and CLI install only through verified ids, else print the vendor link', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-agy-'));
