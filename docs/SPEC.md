@@ -471,7 +471,7 @@ Mark each `[x]` when merged.
 - [x] **Session 12 — Release readiness.** OpenCode + GitHub Copilot demo path, signed-in browser through the Playwright Extension, issue #6, Bun benchmark, Gemini CLI research, 0.5.0 release notes. No tag.
 - [x] **Session 13 — Bun for Context Mode** (PR #14). Bun installed by default at user scope when Context Mode is selected (`--no-bun` opts out), faster `ctx_execute` and TypeScript. Fixes the Playwright rule line for Claude-only installs.
 - [x] **Session 14 — 0.5.0 final check.** README audit for the demo, proxy, menus, VS Code Copilot, Cursor, `--project`, Playwright extension and Bun; CHANGELOG 0.5.0 complete; release dry run in a scratch clone. No tag.
-- [ ] **Session 15 — README look and feel.** Hero, one badge row, table of contents, collapsible long sections, consistent tables in README EN and ES; a script checks links, anchors, EN/ES parity and that every shown installer command exits 0 in a dry run. 0.5.0 CHANGELOG housekeeping. No feature claims change.
+- [x] **Session 15 — README look and feel.** Hero, one badge row, table of contents, collapsible long sections, consistent tables in README EN and ES; a script checks links, anchors, EN/ES parity and that every shown installer command exits 0 in a dry run. 0.5.0 CHANGELOG housekeeping. No feature claims change.
 
 ### Session 3 — Windows + OpenCode 1.x + wider CI
 

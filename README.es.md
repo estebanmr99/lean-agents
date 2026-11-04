@@ -131,7 +131,7 @@ Empieza siempre con `--dry-run`: muestra cada archivo y comando antes de cambiar
 ## Warp y Orca
 
 <details>
-<summary>Ver detalles</summary>
+<summary>Qué añaden las integraciones de Warp y Orca</summary>
 
 Si ya usas [Warp](https://www.warp.dev) u [Orca](https://github.com/stablyai/orca), lean-agents añade sus integraciones de agentes para los agentes que elegiste. Nunca instala las terminales. Busca la app (o `warp-terminal` / `orca` en el PATH), preselecciona lo que encuentra y no pregunta nada si no hay ninguna. `--terminal warp|orca|both|none` lo cambia; `none` lo desactiva.
 
@@ -146,7 +146,7 @@ Fuentes y datos de GUI sin verificar: [docs/compatibility.md](docs/compatibility
 ## Navegador con tu sesión (opcional)
 
 <details>
-<summary>Ver detalles</summary>
+<summary>Cómo funciona el navegador con tu sesión</summary>
 
 El MCP `playwright` por defecto abre un navegador nuevo sin ventana, que falla en páginas con inicio de sesión único (SSO). `--tools playwright-extension` agrega `@playwright/mcp --extension`. Se conecta a tu propio Chrome o Edge con la sesión iniciada, a través de la [extensión de Playwright](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm).
 
@@ -159,7 +159,7 @@ El MCP `playwright` por defecto abre un navegador nuevo sin ventana, que falla e
 ## VS Code Copilot y Cursor
 
 <details>
-<summary>Ver detalles</summary>
+<summary>Qué se escribe en VS Code Copilot y Cursor</summary>
 
 lean-agents configura el chat de Copilot en VS Code y Cursor (el editor y su CLI `agent`) igual que los demás agentes:
 
@@ -181,7 +181,7 @@ Quita `--dry-run` (`-DryRun`) para aplicar. `--uninstall` lo quita todo otra vez
 ## Modo equipo (`--project`)
 
 <details>
-<summary>Ver detalles</summary>
+<summary>Archivos que escribe y comandos</summary>
 
 Pone la configuración compartida en un repositorio, así todo el equipo la recibe con `git pull`:
 
@@ -208,14 +208,14 @@ En Windows:
 
 - Después, `--project . --update` vuelve a aplicar tus opciones guardadas y `--project . --uninstall` quita solo lo que añadió lean-agents.
 - El modo equipo solo escribe archivos. Cada persona del equipo ejecuta el instalador una vez para las herramientas que mencionan las reglas (RTK, Context Mode y las demás).
-- Su estado se guarda en su propia carpeta de usuario, nunca en el repo.
+- El estado de cada persona se guarda en su propia carpeta de usuario, nunca en el repo.
 
 </details>
 
 ## Sesiones de agentes en paralelo
 
 <details>
-<summary>Ver detalles</summary>
+<summary>Comandos y niveles de modelo</summary>
 
 Un agente por tarea, cada uno en su propio git worktree, y las fusiones de una en una. Usa Orca si está instalado y `git worktree` si no. Cada tarea elige un nivel de modelo (`role: plan|build|explore|research` en su archivo de prompt: fuerte, equilibrado, barato), traducido con los perfiles de modelos.
 
@@ -255,7 +255,7 @@ Si tu empresa paga GitHub Copilot, la forma oficial de usar Claude como agente e
 ## En una PC de trabajo: proxy, red y revisión de seguridad
 
 <details>
-<summary>Ver detalles</summary>
+<summary>Proxy, presets de red y ajustes sin verificar</summary>
 
 1. **Revisa primero.** Pega el prompt de [docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md) en tu agente. Lista cada archivo, comando, host y herramienta, los compara con el código y te pide las páginas internas de TI o del proxy cuando no puede leerlas.
 2. **Define tu proxy en tu propia terminal** antes de instalar, en mayúsculas o minúsculas:

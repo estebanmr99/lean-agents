@@ -11,10 +11,10 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 export const READMES = ['README.md', 'README.es.md'];
 
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
-const stripFences = (md) => md.replace(/^```[\s\S]*?^```/gm, '');
+const stripFences = (md) => md.replace(/^\s*```[\s\S]*?^\s*```/gm, '');
 
 // GitHub heading slug: lowercase, drop punctuation, spaces to hyphens.
-export const slug = (h) => h.toLowerCase().replace(/[`*_]/g, '').replace(/[^\p{L}\p{N} -]/gu, '').replace(/ /g, '-');
+export const slug = (h) => h.toLowerCase().replace(/[`*]/g, '').replace(/[^\p{L}\p{N} _-]/gu, '').replace(/ /g, '-');
 
 export function headings(md) {
   return [...stripFences(md).matchAll(/^(#{1,6}) +(.+)$/gm)].map((m) => ({ level: m[1].length, text: m[2].trim() }));
@@ -50,8 +50,10 @@ export function shape(file) {
   return {
     headings: headings(md).map((h) => h.level).join(''),
     tables: tables.join(','),
-    fences: [...md.matchAll(/^```(\w*)/gm)].map((m) => m[1]).join(','),
+    fences: [...md.matchAll(/^\s*```(\w*)/gm)].map((m) => m[1]).join(','),
     details: (md.match(/<details>/g) || []).length,
+    links: (md.match(/\]\(/g) || []).length,
+    bullets: (md.match(/^\s*[-*] /gm) || []).length,
   };
 }
 
@@ -76,11 +78,11 @@ export function dryRun(args) {
   const home = path.join(tmp, 'home');
   fs.mkdirSync(home);
   const a = args.map((x) => (x === '.' ? tmp : x));
-  const lean = (...rest) => spawnSync(process.execPath, [path.join(ROOT, 'scripts/lean.mjs'), '--home', home, '--no-exec', '--yes', ...rest], { cwd: tmp, encoding: 'utf8' });
+  const lean = (...rest) => spawnSync(process.execPath, [path.join(ROOT, 'scripts/lean.mjs'), '--home', home, '--no-exec', '--yes', ...rest], { cwd: tmp, encoding: 'utf8', timeout: 60000 });
   // --doctor exits 1 on a HOME with nothing installed, so give it a no-exec install to check.
   if (a.includes('--doctor')) lean();
-  const r = lean('--dry-run', ...a);
-  fs.rmSync(tmp, { recursive: true, force: true });
+  let r;
+  try { r = lean('--dry-run', ...a); } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
   return { status: r.status, stderr: r.stderr.trim().split('\n').slice(-2).join(' ') };
 }
 

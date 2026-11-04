@@ -131,7 +131,7 @@ Always start with `--dry-run`: it shows every file and command before anything c
 ## Warp and Orca
 
 <details>
-<summary>Show details</summary>
+<summary>What the Warp and Orca integrations add</summary>
 
 If you already use [Warp](https://www.warp.dev) or [Orca](https://github.com/stablyai/orca), lean-agents adds their agent integrations for the agents you chose. It never installs the terminals. It looks for the app (or `warp-terminal` / `orca` on PATH), preselects what it finds, and asks nothing when neither is there. `--terminal warp|orca|both|none` overrides; `none` opts out.
 
@@ -146,7 +146,7 @@ Sources and unverified GUI facts: [docs/compatibility.md](docs/compatibility.md#
 ## Signed-in browser (opt-in)
 
 <details>
-<summary>Show details</summary>
+<summary>How the signed-in browser works</summary>
 
 The default `playwright` MCP opens a fresh headless browser, which fails on pages behind single sign-on. `--tools playwright-extension` adds `@playwright/mcp --extension` instead. It attaches to your own signed-in Chrome or Edge through the [Playwright Extension](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm).
 
@@ -159,7 +159,7 @@ The default `playwright` MCP opens a fresh headless browser, which fails on page
 ## VS Code Copilot and Cursor
 
 <details>
-<summary>Show details</summary>
+<summary>What lands in VS Code Copilot and Cursor</summary>
 
 lean-agents sets up the Copilot chat in VS Code and Cursor (the editor and its `agent` CLI) like the other agents:
 
@@ -181,7 +181,7 @@ Drop `--dry-run` (`-DryRun`) to apply. `--uninstall` removes it all again.
 ## Team mode (`--project`)
 
 <details>
-<summary>Show details</summary>
+<summary>Files written and commands</summary>
 
 Puts the shared setup into one repository, so everyone on the team gets it with `git pull`:
 
@@ -208,14 +208,14 @@ On Windows:
 
 - Later, `--project . --update` re-applies your saved choices, and `--project . --uninstall` removes only what lean-agents added.
 - Team mode writes files only. Each teammate still runs the installer once for the tools the rules mention (RTK, Context Mode and the rest).
-- Their state stays in their own home folder, never in the repo.
+- Each teammate's state stays in their own home folder, never in the repo.
 
 </details>
 
 ## Parallel agent sessions
 
 <details>
-<summary>Show details</summary>
+<summary>Commands and model tiers</summary>
 
 One agent per task, each in its own git worktree, merged one at a time. Orca is used when installed, plain `git worktree` otherwise. Each task picks a model tier (`role: plan|build|explore|research` in its prompt file: strong, balanced, cheap), mapped through the model profiles.
 
@@ -255,7 +255,7 @@ If your company pays for GitHub Copilot, the official way to use Claude as an ag
 ## On a work PC: proxy, network and security review
 
 <details>
-<summary>Show details</summary>
+<summary>Proxy, network presets and unverified settings</summary>
 
 1. **Review first.** Paste the prompt from [docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md) into your agent. It lists every file, command, host and tool, checks them against the code, and asks for your company's IT or proxy pages when it cannot read them itself.
 2. **Set your proxy in your own shell** before you run the installer, in either letter case:
