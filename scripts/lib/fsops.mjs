@@ -2,7 +2,8 @@
 // Three action kinds:
 //   file  - a whole file lean-agents owns (rules, agent definitions, loaders)
 //   json  - edits to a JSON/JSONC file the user owns; comments and formatting survive
-//   block - a marked block inside a text file the user owns (CLAUDE.md, AGENTS.md)
+//   block - a marked block inside a text file the user owns (CLAUDE.md, AGENTS.md);
+//           toml: true uses # markers and puts the block first, so its keys stay top-level
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -11,6 +12,8 @@ import { parse, modify, applyEdits, findNodeAtLocation, parseTree } from 'jsonc-
 export const OWNED_MARK = 'managed by lean-agents';
 const BLOCK_START = '<!-- lean-agents:start -->';
 const BLOCK_END = '<!-- lean-agents:end -->';
+const TOML_START = '# lean-agents:start';
+const TOML_END = '# lean-agents:end';
 const FORMAT = { formattingOptions: { insertSpaces: true, tabSize: 2, eol: '\n' } };
 
 export const sha = (text) => crypto.createHash('sha256').update(text).digest('hex');
@@ -76,23 +79,29 @@ export function revertJsonEdits(text, applied) {
   return text;
 }
 
-export function setBlock(original, body) {
-  const block = `${BLOCK_START}\n${body.trim()}\n${BLOCK_END}`;
+export function setBlock(original, body, toml = false) {
+  const [open, close] = toml ? [TOML_START, TOML_END] : [BLOCK_START, BLOCK_END];
+  const block = `${open}\n${body.trim()}\n${close}`;
   const text = original ?? '';
-  const start = text.indexOf(BLOCK_START);
-  const end = text.indexOf(BLOCK_END);
+  const start = text.indexOf(open);
+  const end = text.indexOf(close);
   if (start >= 0 && end > start) {
-    return text.slice(0, start) + block + text.slice(end + BLOCK_END.length);
+    return text.slice(0, start) + block + text.slice(end + close.length);
   }
+  if (toml) return text ? `${block}\n\n${text}` : `${block}\n`;
   const sep = text && !text.endsWith('\n\n') ? (text.endsWith('\n') ? '\n' : '\n\n') : '';
   return `${text}${sep}${block}\n`;
 }
 
 export function removeBlock(text) {
-  const start = text.indexOf(BLOCK_START);
-  const end = text.indexOf(BLOCK_END);
-  if (start < 0 || end < start) return text;
-  return (text.slice(0, start) + text.slice(end + BLOCK_END.length)).replace(/\n{3,}$/, '\n\n').replace(/^\n+$/, '');
+  for (const [open, close] of [[BLOCK_START, BLOCK_END], [TOML_START, TOML_END]]) {
+    const start = text.indexOf(open);
+    const end = text.indexOf(close);
+    if (start < 0 || end < start) continue;
+    const rest = text.slice(0, start) + text.slice(end + close.length);
+    return (start === 0 ? rest.replace(/^\n+/, '') : rest).replace(/\n{3,}$/, '\n\n').replace(/^\n+$/, '');
+  }
+  return text;
 }
 
 // Compute what each action would do. Pure apart from reading files.
@@ -123,7 +132,7 @@ export function plan(actions) {
       applied = r.applied;
       if (r.kept.length) note = `kept your values for: ${r.kept.map((k) => k.path.join('.')).join(', ')}`;
     } else if (a.kind === 'block') {
-      after = setBlock(before, a.body);
+      after = setBlock(before, a.body, a.toml);
     }
     const status = before === null ? 'create' : before === after ? 'unchanged' : 'modify';
     return { ...a, before, after, applied, status, note };

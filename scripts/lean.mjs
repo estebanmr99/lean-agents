@@ -19,7 +19,7 @@ import { cursorAdapter } from './lib/adapters/cursor.mjs';
 import { projectPlan, projectStateDir } from './lib/project.mjs';
 import { gsdPlan } from './lib/gsd.mjs';
 import { adhdCommand } from './lib/adhd.mjs';
-import { detectAgents, packageManager, prereqFor, which, run, quiet, exists, isolate } from './lib/system.mjs';
+import { detectAgents, packageManager, prereqFor, bunInstall, bunPresent, which, run, quiet, exists, isolate } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
 import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
@@ -54,7 +54,7 @@ function parseArgs(argv) {
   const o = {
     command: 'install', dryRun: false, yes: false, agents: null, tools: null, privacy: null, profile: null,
     lang: null, home: os.homedir(), exec: true, adhdAlways: null, ponytailMode: null,
-    networkPreset: null, networkFlags: {}, gh: null,
+    networkPreset: null, networkFlags: {}, gh: null, bun: null,
   };
   const list = (v) => v.split(',').map((s) => s.trim()).filter(Boolean);
   for (let i = 0; i < argv.length; i++) {
@@ -67,6 +67,8 @@ function parseArgs(argv) {
       case '--tools': o.tools = [...new Set([...MINIMAL_TOOLS, ...list(next())])]; break;
       case '--all-tools': o.tools = [...MINIMAL_TOOLS, ...OPTIONAL_TOOLS]; break;
       case '--no-tools': o.tools = []; break;
+      case '--bun': o.bun = true; break;
+      case '--no-bun': o.bun = false; break;
       case '--privacy': o.privacy = next(); fromPrivacy(o.privacy); break;
       case '--gh': o.gh = true; break;
       case '--network': o.networkPreset = onOff(a, next()); break;
@@ -108,6 +110,7 @@ const HELP = `Usage: lean-agents [options]
   --profile <name>       Model profile for OpenCode (see profiles/)
   --lang en|es           Language for rules and replies
   --gh                   Install GitHub CLI (gh) if it is missing
+  --bun / --no-bun       Install Bun for Context Mode (default: on; faster JS, TypeScript)
   --project <dir>        Write the shared team files into one repository
                          (AGENTS.md, .github/, .vscode/mcp.json, .cursor/)
   --adhd-always          Turn on i-have-adhd for every answer
@@ -194,6 +197,7 @@ async function choose(o, saved) {
   await chooseNetwork(o, saved, p);
   await chooseUnverified(o, saved, p);
   o.gh ??= saved?.gh ?? (!which('gh') && yesNo(await p.ask('Install GitHub CLI (gh)? You log in yourself afterwards', 'n')));
+  if (o.tools.includes('context-mode') && !o.project) o.bun ??= saved?.bun ?? (bunPresent(o.home) || yesNo(await p.ask('Install Bun so Context Mode runs faster?', 'y')));
   o.lang ??= saved?.lang ?? (await p.select({ ask: 'Language for rules and replies (en/es)?', message: 'Language for rules and replies', options: [{ value: 'en', label: 'English' }, { value: 'es', label: 'Español' }], def: 'en' }));
   if (o.agents.some((a) => a.startsWith('opencode')) && !o.profile) {
     const profiles = ['github-copilot', 'vertex-gemini', 'anthropic-api', 'opencode-go', 'openai-api', 'none'];
@@ -276,6 +280,9 @@ function buildPlan(o) {
     actions.push(...r.actions);
     commands.push(...r.commands);
   }
+  if (o.bun && o.network.telemetry === 'off') {
+    actions.push({ kind: 'block', toml: true, path: path.join(o.home, '.bunfig.toml'), body: 'telemetry = false' });
+  }
   return { planned: plan(actions), commands };
 }
 
@@ -288,6 +295,14 @@ function prereqCommands(o) {
     if (p.install) out.push({ tool: t, desc: `install ${p.bin}`, run: p.install, undo: [] });
     else out.push({ tool: t, desc: `${p.bin} is missing: install it from ${p.manual}`, run: [], undo: [], manual: true });
   }
+  if (o.bun && o.tools.includes('context-mode') && process.platform !== 'linux' && !which('bun') && bunPresent(o.home)) {
+    console.log('! Bun is in ~/.bun/bin but not on PATH; Context Mode needs it on PATH here. Add that folder to PATH.');
+  }
+  if (o.bun && o.tools.includes('context-mode') && !bunPresent(o.home)) {
+    const b = bunInstall(o.home, stateDir(o.home), process.platform, pm);
+    if (b) out.push(b);
+    else console.log('! Bun needs Homebrew here: install it from https://bun.com/docs/installation. Context Mode will run on Node.');
+  }
   return out;
 }
 
@@ -295,6 +310,7 @@ function printPlan(o, planned, commands) {
   console.log(`\nlean-agents plan for ${o.agents.join(', ') || 'no agents'}`);
   if (o.project) console.log(`  project: ${o.project}`);
   console.log(`  tools: ${o.tools.join(', ') || 'none'} | privacy: ${o.privacy} | lang: ${o.lang} | profile: ${o.profile ?? 'none'}`);
+  if (o.tools.includes('context-mode')) console.log(`  bun: ${o.bun ? `on${bunPresent(o.home) ? ' (already installed)' : ''}` : 'off'}`);
   console.log(`  network: ${CATEGORIES.map((c) => `${c} ${o.network[c]}`).join(', ')}`);
   const net = proxyReport();
   if (net.length) console.log(`  proxy and CA (passed to every command): ${net.join(' ')}`);
@@ -338,9 +354,11 @@ async function install(o) {
       if (c.skipIfOutput && quiet(c.skipIfOutput.cmd).ok) continue;
       if (ui) ui.step(i + 1, commands.length, c.desc);
       else console.log(`- ${c.desc}`);
-      const ok = c.run.every((argv) => run(argv, { dryRun: false, log: console.log }));
-      if (ui) ui.result(ok, c.desc);
-      else if (!ok) console.log(`  ! failed: ${c.desc}. Run the command above by hand, then --doctor.`);
+      const ok = c.run.every((argv) => run(argv, { dryRun: false, log: console.log, env: c.env }));
+      if (ui) ui.result(ok || c.optional, c.desc);
+      else if (!ok && !c.optional) console.log(`  ! failed: ${c.desc}. Run the command above by hand, then --doctor.`);
+      // An optional step (Bun) that fails only means Context Mode runs on Node; nothing to undo.
+      if (!ok && c.optional) { console.log('! Bun install failed; Context Mode will run on Node.'); continue; }
       if (!ok) failed++;
       ran.push({ desc: c.desc, ok, undo: c.undo });
     }
@@ -350,7 +368,7 @@ async function install(o) {
     version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version,
     installedAt: previous?.installedAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    options: { agents: o.agents, tools: o.tools, privacy: o.privacy, network: o.network, gh: o.gh, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode },
+    options: { agents: o.agents, tools: o.tools, privacy: o.privacy, network: o.network, gh: o.gh, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun },
     files: [...(previous?.files ?? []), ...files],
     commands: [...(previous?.commands ?? []), ...ran],
   };

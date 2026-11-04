@@ -93,10 +93,32 @@ export function prereqFor(tool, pm) {
   }
 }
 
-export function run(argv, { dryRun, log }) {
+// Bun for Context Mode (JS/TS in ctx_execute). One route per OS; the undo is recorded only when this install ran.
+// Linux: an unknown SHELL makes the upstream script skip the shell profile edit. Windows: the script adds ~\.bun\bin to the user PATH.
+export function bunInstall(home, dir, platform, pm) {
+  const bunDir = path.join(home, '.bun');
+  if (platform === 'darwin') {
+    return pm === 'brew' ? { tool: 'bun', desc: 'install bun', run: [['brew', 'install', 'oven-sh/bun/bun']], undo: [['brew', 'uninstall', 'bun']], optional: true } : null;
+  }
+  if (platform === 'win32') {
+    const file = path.join(dir, 'bun-install.ps1');
+    const ps = ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File'];
+    return { tool: 'bun', desc: 'install bun', run: [['curl.exe', '-fsSL', '-o', file, 'https://bun.com/install.ps1'], [...ps, file]], env: { BUN_INSTALL: bunDir }, undo: [[...ps, path.join(bunDir, 'uninstall.ps1')]], optional: true };
+  }
+  const file = path.join(dir, 'bun-install.sh');
+  return {
+    tool: 'bun', desc: 'install bun', optional: true,
+    run: [['curl', '-fsSL', '-o', file, 'https://bun.com/install'], ['env', 'SHELL=/bin/sh', `BUN_INSTALL=${bunDir}`, 'bash', file]],
+    undo: [[process.execPath, '-e', 'require("fs").rmSync(process.argv[1], { recursive: true, force: true })', bunDir]],
+  };
+}
+
+export const bunPresent = (home) => Boolean(which('bun')) || fs.existsSync(path.join(home, '.bun', 'bin', isWin ? 'bun.exe' : 'bun'));
+
+export function run(argv, { dryRun, log, env }) {
   log(`  $ ${argv.join(' ')}`);
   if (dryRun) return true;
-  const r = spawnSync(argv[0], argv.slice(1), { stdio: 'inherit', shell: useShell(argv[0]) });
+  const r = spawnSync(argv[0], argv.slice(1), { stdio: 'inherit', shell: useShell(argv[0]), env: env && { ...process.env, ...env } });
   return r.status === 0;
 }
 

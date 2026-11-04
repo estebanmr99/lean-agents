@@ -10,7 +10,7 @@ import { parse } from 'jsonc-parser';
 import { applyJsonEdits, revertJsonEdits } from '../scripts/lib/fsops.mjs';
 import { diffModels } from '../scripts/models-refresh.mjs';
 import { releaseNotes } from '../scripts/release.mjs';
-import { prereqFor } from '../scripts/lib/system.mjs';
+import { prereqFor, bunInstall } from '../scripts/lib/system.mjs';
 import { vscodeUserDir } from '../scripts/lib/adapters/vscode-copilot.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -390,7 +390,7 @@ test('release notes come from one CHANGELOG section, and a wrong version stops t
 
 test('without a TTY and without --yes: asks nothing, changes nothing, says why', { skip: process.platform === 'win32' }, () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
-  const args = ['--no-exec', '--agents', 'claude', '--tools', 'serena', '--privacy', 'standard', '--lang', 'en'];
+  const args = ['--no-exec', '--agents', 'claude', '--tools', 'serena', '--privacy', 'standard', '--lang', 'en', '--bun'];
   // detached starts a new session, which has no controlling terminal: /dev/tty cannot open.
   const noTty = (extra) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args, ...extra], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], detached: true, timeout: 20000 });
   const apply = noTty([]);
@@ -669,4 +669,66 @@ test('playwright-extension: opt-in, written for agents without a browser, never 
   lean(home, ['--uninstall', '--yes', '--no-exec']);
   const after = Object.fromEntries(Object.entries(snapshot(home)).filter(([f]) => !f.startsWith('.config/lean-agents/')));
   assert.deepEqual(after, before);
+});
+
+test('bunInstall: one argv route per OS, undo only for what it installs', () => {
+  const linux = bunInstall('/h', '/h/state', 'linux', null);
+  assert.deepEqual(linux.run[0], ['curl', '-fsSL', '-o', path.join('/h/state', 'bun-install.sh'), 'https://bun.com/install']);
+  assert.deepEqual(linux.run[1].slice(0, 4), ['env', 'SHELL=/bin/sh', `BUN_INSTALL=${path.join('/h', '.bun')}`, 'bash']);
+  assert.equal(linux.undo[0].at(-1), path.join('/h', '.bun'));
+  const mac = bunInstall('/h', '/h/state', 'darwin', 'brew');
+  assert.deepEqual([mac.run, mac.undo], [[['brew', 'install', 'oven-sh/bun/bun']], [['brew', 'uninstall', 'bun']]]);
+  assert.equal(bunInstall('/h', '/h/state', 'darwin', null), null);
+  const win = bunInstall('/h', '/h/state', 'win32', 'winget');
+  assert.equal(win.run[0][0], 'curl.exe');
+  assert.ok(win.run[1].includes('-File') && win.run[1].at(-1).endsWith('bun-install.ps1'));
+  assert.ok(win.undo[0].at(-1).endsWith('uninstall.ps1'));
+  assert.deepEqual(win.env, { BUN_INSTALL: path.join('/h', '.bun') });
+});
+
+test('Bun: on by default with Context Mode, --no-bun is saved and reused, --update keeps it', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const args = ['--yes', '--no-exec', '--agents', 'claude', '--lang', 'en', '--privacy', 'standard'];
+  assert.match(lean(home, [...args, '--dry-run']), /bun: on/);
+  assert.match(lean(home, [...args, '--dry-run', '--no-bun']), /bun: off/);
+  lean(home, [...args, '--no-bun']);
+  const state = () => JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'state.json'), 'utf8'));
+  assert.equal(state().options.bun, false);
+  lean(home, ['--update', '--yes', '--no-exec']);
+  assert.equal(state().options.bun, false);
+});
+
+test('~/.bunfig.toml: telemetry block at the top only with telemetry off, user content kept, undone', () => {
+  const args = ['--yes', '--no-exec', '--agents', 'claude', '--lang', 'en'];
+  const std = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  lean(std, [...args, '--privacy', 'standard']);
+  assert.ok(!fs.existsSync(path.join(std, '.bunfig.toml')));
+
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const file = path.join(home, '.bunfig.toml');
+  const mine = '[install]\nregistry = "https://example.test"\n';
+  fs.writeFileSync(file, mine);
+  lean(home, [...args, '--privacy', 'strict']);
+  const text = fs.readFileSync(file, 'utf8');
+  assert.ok(text.startsWith('# lean-agents:start\ntelemetry = false\n# lean-agents:end\n'));
+  assert.ok(text.endsWith(mine));
+  lean(home, ['--uninstall', '--yes', '--no-exec']);
+  assert.equal(fs.readFileSync(file, 'utf8'), mine);
+
+  const fresh = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  lean(fresh, [...args, '--privacy', 'strict']);
+  assert.ok(fs.existsSync(path.join(fresh, '.bunfig.toml')));
+  lean(fresh, ['--uninstall', '--yes', '--no-exec']);
+  assert.ok(!fs.existsSync(path.join(fresh, '.bunfig.toml')));
+});
+
+test('playwright-extension alone adds no Playwright rule lines for a Claude-only install', () => {
+  const args = ['--yes', '--no-exec', '--lang', 'en', '--privacy', 'standard', '--tools', 'playwright-extension'];
+  const rules = (agents) => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+    lean(home, [...args, '--agents', agents]);
+    return fs.readFileSync(path.join(home, '.config', 'lean-agents', 'AGENTS.md'), 'utf8');
+  };
+  assert.doesNotMatch(rules('claude'), /Playwright/);
+  assert.match(rules('opencode-v2'), /Playwright/);
 });
