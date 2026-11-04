@@ -73,7 +73,8 @@ function parseArgs(argv) {
       case '--profile': o.profile = next(); break;
       case '--lang': o.lang = next(); break;
       case '--home': o.home = path.resolve(next()); break;
-      case '--project': o.project = path.resolve(next()); break;
+      // realpath: the state dir is keyed by this path, and /var and /private/var are one folder on macOS.
+      case '--project': o.project = fs.realpathSync(path.resolve(next())); break;
       case '--no-exec': o.exec = false; break;
       case '--adhd-always': o.adhdAlways = true; break;
       case '--ponytail-mode': o.ponytailMode = next(); break;

@@ -580,7 +580,10 @@ test('--project writes the team files into the repo, keeps user content, and und
   assert.ok(!fs.existsSync(path.join(home, '.config', 'lean-agents', 'state.json')));
   assert.equal(fs.readdirSync(path.join(home, '.config', 'lean-agents', 'projects')).length, 1);
 
-  lean(home, ['--project', repo, '--doctor']);
+  // Another spelling of the same folder finds the same state.
+  const spelled = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, '--project', '.', '--doctor'], { encoding: 'utf8', cwd: repo });
+  assert.equal(spelled.status, 0, spelled.stdout);
+  assert.match(spelled.stdout, /AGENTS\.md/);
   lean(home, ['--project', repo, '--uninstall', '--yes']);
   assert.deepEqual(snapshot(repo), before);
 });
