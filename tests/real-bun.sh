@@ -64,7 +64,11 @@ grep -q '"bun": true' "$HOME/.config/lean-agents/state.json" || fail "state does
 node "$repo/tests/bench-context-mode.mjs" check | tee "$HOME/check.txt"
 grep -q 'Performance: FAST (Bun)' "$HOME/check.txt" || fail "ctx_doctor does not report Bun"
 grep -qx 'ts-ok 42' "$HOME/check.txt" || fail "TypeScript ctx_execute failed"
-if [ "$os" = linux ]; then grep -Eq 'PS: ([^ ]*/)?bun( |$)' "$HOME/check.txt" || fail "the MCP server does not run under Bun"; fi
+if [ "$os" = linux ]; then
+  # Only the plugin entry start.mjs re-execs the server under Bun; the npm bin above keeps it on Node.
+  CTX_SERVER="$HOME/npm/lib/node_modules/context-mode/start.mjs" node "$repo/tests/bench-context-mode.mjs" check > "$HOME/plugin.txt"
+  grep -Eq 'PS: ([^ ]*/)?bun( |$)' "$HOME/plugin.txt" || fail "start.mjs does not re-exec the server under Bun"
+fi
 
 echo "--- uninstall removes the Bun it installed"
 [ "$os" = windows ] && export PATH="${PATH%:"$bunbin"}"
@@ -90,7 +94,8 @@ if [ "$os" = mac ] && brew list bun >/dev/null 2>&1; then fail "brew installed b
 PATH="$other:$PATH" do_uninstall
 [ -e "$other/bun" ] || fail "uninstall removed a Bun it did not install"
 
-if [ "$os" != windows ]; then
+# Linux only: brew on macOS reinstalls from its download cache, even with no network.
+if [ "$os" = linux ]; then
   echo "--- a failed Bun install only warns and exits 0"
   HTTPS_PROXY=http://127.0.0.1:9 HTTP_PROXY=http://127.0.0.1:9 do_install | tee "$HOME/fallback.txt"
   grep -q '! Bun install failed; Context Mode will run on Node.' "$HOME/fallback.txt" || fail "no fallback line"

@@ -649,7 +649,7 @@ Done when: CI is green with the new real-binary checks (extension entry in each 
 Branch: `session-13-bun`. Goal: the `--bun` follow-up from the session 12 decision, ON by default (owner decision, 2026-11-03).
 
 1. **Install Bun when `context-mode` is selected**, one route per OS: Linux `curl -fsSL -o <file> https://bun.com/install` then `bash <file>` with `BUN_INSTALL=~/.bun` and an unknown `SHELL` (no profile edit); macOS `brew install oven-sh/bun/bun`; Windows `curl.exe` + upstream `install.ps1` (user PATH, no admin). `--no-bun` / `-NoBun` opts out. A Bun already on PATH or in `~/.bun/bin` is reused and never removed by `--uninstall`.
-2. **Where Context Mode finds Bun:** on Linux `start.mjs` re-execs the server under Bun from `~/.bun/bin`; on macOS and Windows the server stays on Node and takes Bun from PATH only for `ctx_execute` JS/TS (owner check, context-mode 1.0.169, Bun 1.4.4).
+2. **Where Context Mode finds Bun:** on Linux the plugin entry `start.mjs` re-execs the server under Bun from `~/.bun/bin` (the npm bin `context-mode` does not, but its `ctx_execute` still finds Bun there); on macOS and Windows the server stays on Node and takes Bun from PATH only for `ctx_execute` JS/TS (owner check, context-mode 1.0.169, Bun 1.4.4).
 3. **Fallback:** a failed Bun install prints one line and Context Mode runs on Node; it is not a failed step.
 4. **Telemetry:** with telemetry off, a marked block `telemetry = false` at the top of `~/.bunfig.toml`; `--uninstall` removes only the block.
 5. **Playwright rule fix:** `playwright-extension` alone adds no Playwright rule lines for a Claude-only install.

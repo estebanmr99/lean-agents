@@ -71,6 +71,9 @@ send(ENTER)  # keep the tool's default
 if b"GitHub CLI" in out or os.system("command -v gh >/dev/null") != 0:
     wait_for("GitHub CLI")
     send(ENTER)  # default no
+if os.system("command -v bun >/dev/null") != 0:
+    wait_for("Install Bun")
+    send(ENTER)  # preselected yes
 wait_for("Language")
 send(ENTER)
 wait_for("Dry run: nothing was changed")
@@ -80,6 +83,7 @@ print(text)
 assert code == 0, "installer exited with an error"
 assert "tools: rtk, context-mode, serena" in text, "serena was not picked from the menu"
 assert "network: telemetry off, autoUpdate off, outbound off" in text, "the all-off preset was not picked"
+assert "bun: on" in text, "Bun was not preselected on"
 assert os.listdir(home) == [], "the dry run wrote files"
 print("interactive menus: ok")
 
@@ -117,7 +121,7 @@ home = tempfile.mkdtemp(prefix="lean-tty-")
 notes_src = os.path.join(tempfile.mkdtemp(prefix="lean-notes-"), "it.txt")
 with open(notes_src, "w") as f:
     f.write("Serena: keep the dashboard off\nproxy http://u:s3cret@127.0.0.1:8080\n")
-argv = ["node", os.path.join(ROOT, "scripts", "lean.mjs"), "--home", home, "--no-exec", "--agents", "claude", "--tools", "serena", "--network", "on", "--lang", "en"]
+argv = ["node", os.path.join(ROOT, "scripts", "lean.mjs"), "--home", home, "--no-exec", "--agents", "claude", "--tools", "serena", "--network", "on", "--lang", "en", "--no-bun"]
 pid, fd = pty.fork()
 if pid == 0:
     os.execvp(argv[0], argv)
