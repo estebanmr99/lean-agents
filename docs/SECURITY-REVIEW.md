@@ -17,7 +17,7 @@ installer for real and do not change any file outside a temporary directory.
        --agents claude,opencode-v2,copilot-cli,antigravity --all-tools --network off
    (PowerShell: --home "$env:TEMP\lean-review").
 4. Find my company's rules for developer tools, proxies, telemetry and third-party software:
-   - If you have a wiki or documentation MCP server (for example Confluence, Notion or SharePoint),
+   - If you have a wiki or documentation MCP server,
      search it for: proxy, certificate, CA, allowed software, AI tools, telemetry, npm registry.
    - If you have a browser tool, open the internal IT pages I name.
    - If you have neither, STOP and ask me to paste the relevant internal IT or proxy wiki pages.
