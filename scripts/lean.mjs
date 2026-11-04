@@ -24,6 +24,7 @@ import { doctor } from './lib/doctor.mjs';
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
 import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
 import { unverifiedItems, notesFile } from './lib/unverified.mjs';
+import { detectTerminals, parseTerminal, terminalCommands, terminalPrivacyNotes } from './lib/terminals.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ADAPTERS = { claude: claudeAdapter, 'opencode-v1': opencodeV1Adapter, 'opencode-v2': opencodeV2Adapter, 'copilot-cli': copilotAdapter, antigravity: antigravityAdapter };
@@ -50,11 +51,14 @@ const TOOL_INFO = {
   autoskills: 'AutoSkills: picks skills per project, run with npx (CC BY-NC 4.0: non-commercial use only)',
 };
 
+// Read before isolate() points HOME at --home.
+const REAL_HOME = os.homedir();
+
 function parseArgs(argv) {
   const o = {
     command: 'install', dryRun: false, yes: false, agents: null, tools: null, privacy: null, profile: null,
     lang: null, home: os.homedir(), exec: true, adhdAlways: null, ponytailMode: null,
-    networkPreset: null, networkFlags: {}, gh: null, bun: null,
+    networkPreset: null, networkFlags: {}, gh: null, bun: null, terminals: null,
   };
   const list = (v) => v.split(',').map((s) => s.trim()).filter(Boolean);
   for (let i = 0; i < argv.length; i++) {
@@ -67,6 +71,7 @@ function parseArgs(argv) {
       case '--tools': o.tools = [...new Set([...MINIMAL_TOOLS, ...list(next())])]; break;
       case '--all-tools': o.tools = [...MINIMAL_TOOLS, ...OPTIONAL_TOOLS]; break;
       case '--no-tools': o.tools = []; break;
+      case '--terminal': o.terminals = parseTerminal(next()); break;
       case '--bun': o.bun = true; break;
       case '--no-bun': o.bun = false; break;
       case '--privacy': o.privacy = next(); fromPrivacy(o.privacy); break;
@@ -109,6 +114,8 @@ const HELP = `Usage: lean-agents [options]
                          One category; overrides the preset
   --profile <name>       Model profile for OpenCode (see profiles/)
   --lang en|es           Language for rules and replies
+  --terminal warp|orca|both|none
+                         Agent integrations for a terminal you already have (default: the detected ones)
   --gh                   Install GitHub CLI (gh) if it is missing
   --bun / --no-bun       Install Bun for Context Mode (default: on; faster JS, TypeScript)
   --project <dir>        Write the shared team files into one repository
@@ -194,6 +201,16 @@ async function choose(o, saved) {
   const unknown = o.tools.filter((t) => !known.includes(t));
   if (unknown.length) throw new Error(`unknown tools: ${unknown.join(', ')} (available: ${known.join(', ')})`);
   if (!o.agents.includes('opencode-v1')) o.tools = o.tools.filter((t) => t !== 'dcp');
+  if (o.project) o.terminals = [];
+  else if (!o.terminals) {
+    // Terminals are never installed, only detected; nothing found means no question.
+    const found = detectTerminals(o.home, { system: o.home === REAL_HOME });
+    o.terminals = saved?.terminals ?? found;
+    if (!saved && found.length) {
+      const items = found.map((t) => ({ value: t, label: t, ask: `Add the ${t} agent integration?` }));
+      o.terminals = await p.multi({ message: 'Terminals found: add their agent integrations', items, defaults: found });
+    }
+  }
   await chooseNetwork(o, saved, p);
   await chooseUnverified(o, saved, p);
   o.gh ??= saved?.gh ?? (!which('gh') && yesNo(await p.ask('Install GitHub CLI (gh)? You log in yourself afterwards', 'n')));
@@ -275,6 +292,7 @@ function buildPlan(o) {
     actions.push(...r.actions);
     commands.push(...r.commands.map((c) => ({ ...c, agent })));
   }
+  commands.push(...terminalCommands({ terminals: o.terminals, agents: o.agents }));
   if (o.tools.includes('gsd')) {
     const r = gsdPlan(ROOT, o.home, o);
     actions.push(...r.actions);
@@ -310,6 +328,8 @@ function printPlan(o, planned, commands) {
   console.log(`\nlean-agents plan for ${o.agents.join(', ') || 'no agents'}`);
   if (o.project) console.log(`  project: ${o.project}`);
   console.log(`  tools: ${o.tools.join(', ') || 'none'} | privacy: ${o.privacy} | lang: ${o.lang} | profile: ${o.profile ?? 'none'}`);
+  if (o.terminals.length) console.log(`  terminals: ${o.terminals.join(', ')}`);
+  if (o.network.telemetry === 'off') for (const n of terminalPrivacyNotes(o.terminals)) console.log(`  ${n}`);
   if (o.tools.includes('context-mode')) console.log(`  bun: ${o.bun ? `on${bunPresent(o.home) ? ' (already installed)' : ''}` : 'off'}`);
   console.log(`  network: ${CATEGORIES.map((c) => `${c} ${o.network[c]}`).join(', ')}`);
   const net = proxyReport();
@@ -368,7 +388,7 @@ async function install(o) {
     version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version,
     installedAt: previous?.installedAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    options: { agents: o.agents, tools: o.tools, privacy: o.privacy, network: o.network, gh: o.gh, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun },
+    options: { agents: o.agents, tools: o.tools, privacy: o.privacy, network: o.network, gh: o.gh, terminals: o.terminals, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun },
     files: [...(previous?.files ?? []), ...files],
     commands: [...(previous?.commands ?? []), ...ran],
   };

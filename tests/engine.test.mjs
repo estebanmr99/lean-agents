@@ -11,6 +11,7 @@ import { applyJsonEdits, revertJsonEdits } from '../scripts/lib/fsops.mjs';
 import { diffModels } from '../scripts/models-refresh.mjs';
 import { releaseNotes } from '../scripts/release.mjs';
 import { prereqFor, bunInstall } from '../scripts/lib/system.mjs';
+import { detectTerminals } from '../scripts/lib/terminals.mjs';
 import { vscodeUserDir } from '../scripts/lib/adapters/vscode-copilot.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -390,7 +391,7 @@ test('release notes come from one CHANGELOG section, and a wrong version stops t
 
 test('without a TTY and without --yes: asks nothing, changes nothing, says why', { skip: process.platform === 'win32' }, () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
-  const args = ['--no-exec', '--agents', 'claude', '--tools', 'serena', '--privacy', 'standard', '--lang', 'en', '--bun'];
+  const args = ['--no-exec', '--agents', 'claude', '--tools', 'serena', '--privacy', 'standard', '--lang', 'en', '--terminal', 'none', '--bun'];
   // detached starts a new session, which has no controlling terminal: /dev/tty cannot open.
   const noTty = (extra) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args, ...extra], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], detached: true, timeout: 20000 });
   const apply = noTty([]);
@@ -731,4 +732,43 @@ test('playwright-extension alone adds no Playwright rule lines for a Claude-only
   };
   assert.doesNotMatch(rules('claude'), /Playwright/);
   assert.match(rules('opencode-v2'), /Playwright/);
+});
+
+test('terminals: nothing detected means no integration; --terminal adds Warp and Orca and uninstall undoes it', () => {
+  const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-bin-'));
+  const env = { ...process.env, PATH: `${bare}${path.delimiter}${path.dirname(process.execPath)}`, LOCALAPPDATA: '' };
+  const base = ['--yes', '--no-exec', '--agents', 'claude,opencode-v2', '--tools', 'rtk'];
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-empty-'));
+  const oldPath = process.env.PATH;
+  process.env.PATH = bare;
+  try { assert.deepEqual(detectTerminals(empty, { platform: 'linux', env: {} }), [], 'nothing found: no prompt, no change'); } finally { process.env.PATH = oldPath; }
+  fs.mkdirSync(path.join(empty, 'Applications', 'Warp.app'), { recursive: true });
+  assert.deepEqual(detectTerminals(empty, { platform: 'darwin', env: {} }).filter((t) => t === 'warp'), ['warp']);
+
+  fs.writeFileSync(path.join(bare, 'orca'), '#!/bin/sh\n', { mode: 0o755 });
+  assert.match(lean(userHome(), [...base, '--dry-run'], env), /terminals: .*orca/, 'detected terminal is the default');
+  assert.doesNotMatch(lean(userHome(), [...base, '--dry-run', '--terminal', 'none'], env), /terminals:/);
+
+  const home = userHome();
+  const before = snapshot(home);
+  const plan = lean(home, [...base, '--dry-run', '--terminal', 'both'], env);
+  assert.match(plan, /claude plugin install warp@claude-code-warp/);
+  assert.match(plan, /skills add https:\/\/github.com\/stablyai\/orca --skill orca-cli -a claude-code opencode -g -y/);
+  lean(home, [...base, '--terminal', 'warp']);
+  const oc = parse(fs.readFileSync(path.join(home, '.config', 'opencode', 'opencode.jsonc'), 'utf8'), [], { allowTrailingComma: true });
+  assert.ok(oc.plugins.includes('@warp-dot-dev/opencode-warp'));
+  lean(home, ['--uninstall', '--yes']);
+  const after = snapshot(home);
+  for (const k of Object.keys(before)) assert.equal(after[k], before[k], `${k} restored`);
+
+  const v1 = userHome();
+  lean(v1, ['--yes', '--no-exec', '--agents', 'opencode-v1', '--tools', 'rtk', '--terminal', 'warp']);
+  const oc1 = parse(fs.readFileSync(path.join(v1, '.config', 'opencode', 'opencode.jsonc'), 'utf8'), [], { allowTrailingComma: true });
+  assert.ok(oc1.plugin.includes('@warp-dot-dev/opencode-warp@0.1.7'));
+});
+
+test('terminals: all-off network prints the Warp and Orca privacy switches', () => {
+  const out = lean(userHome(), ['--yes', '--no-exec', '--dry-run', '--agents', 'claude', '--network', 'off', '--terminal', 'both']);
+  assert.match(out, /telemetry_enabled = false/);
+  assert.match(out, /DO_NOT_TRACK=1/);
 });

@@ -30,7 +30,7 @@ Instructions for coding agents (Claude Code, OpenCode, Copilot CLI) that work **
 - **Verify, don't guess.** Every install command, config key and CLI flag comes from the tool's current upstream docs or from a real binary in CI. Record source and date in `docs/compatibility.md`. Mark anything unverified as **VERIFY**.
 - **Prove it in CI.** The owner does not test on their working machines. A feature is done when a CI job with real binaries and a throwaway HOME shows it works.
 - **Never overwrite user files.** Use the engine's action kinds in `scripts/lib/fsops.mjs`: `file` (owned files with the `managed by lean-agents` mark), `json` (JSONC edits that keep comments and user values), `block` (marked block in text files). Every change must be undone by `--uninstall`.
-- **Do not add tools the owner rejected:** Oh My OpenAgent, Graphify, Warp plugins (FAQ only).
+- **Do not add tools the owner rejected:** Oh My OpenAgent, Graphify. Warp and Orca agent integrations are allowed only when the user already uses that terminal (detected and preselected, `--terminal none` opts out); never install the terminal apps.
 - **Ask before pushing, opening PRs, or anything irreversible.**
 
 ## Code style

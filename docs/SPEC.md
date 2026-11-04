@@ -28,7 +28,7 @@ Repeat the same prompt for each session. Each session must leave the repository 
 - OpenCode 1 facts verified on 1.19.0: singular `agent` and `plugin`, flat `mcp`, `compaction.reserved`, `autoupdate`, `disabled_providers`. `opencode debug config` prints one object; `opencode agent list` lists agents. DCP now also installs on OpenCode 2, but lean-agents keeps it 1.x only; the notes in sections 6 and 14 saying it has no V2 release are out of date.
 - OpenCode 2 facts verified on 2.2.5: native keys are `agents` (not `agent`), top-level `policies`, `plugins`, `mcp.servers`, `compaction.buffer`, `update`, `share`. `opencode debug config` prints a JSON array of config sources (`{type, path, info}`); `opencode debug agents` lists agents.
 - The owner dropped the before/after savings claim (2026-11-03): the repo cannot show one, so the README "Why" has no numbers. `docs/launch.md`, `release.yml`, the banner, the demo GIF and the `assets` workflow exist. `1.0.0`, the tag and the release still need the owner's separate go.
-- Session 8 research is done (2026-11-03, Orca `v1.4.247`): `docs/compatibility.md` "Terminals". Orca's default permission mode adds no bypass flag; only Yolo adds one. No terminal installer code until session 6 merges.
+- Session 8 research is done (2026-11-03, Orca `v1.4.247`): `docs/compatibility.md` "Terminals". Orca's default permission mode adds no bypass flag; only Yolo adds one. Session 8 (2026-11-04): terminal integrations for users who already have Warp or Orca; the apps are never installed.
 - Testing policy: the owner does not test on their working machines. Every claim is proven in CI with throwaway HOME directories and real binaries (`tests/real-opencode.sh`).
 - Commits are authored by the owner (`git config user.name/user.email` set to their GitHub no-reply address) with a `Co-Authored-By` trailer for the agent.
 - Since session 6: Node.js 20.12+ and one more dependency, `@clack/prompts` (menus only on a real terminal). Network choices live in `scripts/lib/network.mjs` (`options.network` in `state.json`, `privacy` derived from it, so adapters can still read `opts.privacy`); undocumented settings in `scripts/lib/unverified.mjs` are never configured, only saved as user notes under `~/.config/lean-agents/notes/`.
@@ -57,7 +57,7 @@ Repeat the same prompt for each session. Each session must leave the repository 
 
 - **Privacy scrub.** This is a public repository. Never commit: personal usernames or home paths (use `~`, `$HOME`, `%USERPROFILE%`), employer names or employer-specific policies, internal/company MCP servers (issue trackers, wikis, test management tools of any company), cloud project IDs, regions tied to a person, emails, API keys, tokens, auth files. Write security rules generically ("your company's policy").
 - Run `scripts/check-private.sh` (section 12) before every commit. CI runs it too.
-- Do not install, recommend or configure these tools; mention them only in `docs/faq.md` under "Why not X": Oh My OpenAgent (OMO), Graphify (expensive graph generation; Serena replaces it), Warp-specific plugins (terminal-specific; optional notification hooks may be documented generically).
+- Do not install, recommend or configure these tools; mention them only in `docs/faq.md` under "Why not X": Oh My OpenAgent (OMO), Graphify (expensive graph generation; Serena replaces it). Warp and Orca agent integrations are allowed only for a user who already has that terminal (owner decision 2026-11-04, replaces the old FAQ-only rule): detected and preselected (`--terminal none` opts out), never installing the terminal app, fully undone by `--uninstall`.
 - Every third-party tool gets: upstream link, license note, what it does in one line, and how to remove it.
 - Verify every install command, config key and CLI flag against the tool's current upstream docs at build time. Where this spec says **VERIFY**, you must check upstream and record the date checked in `docs/compatibility.md`. Do not invent flags.
 - Keep comments and docs in English. Spanish lives only in `README.es.md` and in the optional `--lang es` rule translation.
@@ -567,13 +567,15 @@ Done when: CI renders and validates the project files, and real binaries (`curso
 
 Branch: `session-8-terminals`.
 
-1. Research: done 2026-11-03, see `docs/compatibility.md` "Terminals". Orca `v1.4.247` adds status hooks to Claude Code and Codex, an OpenCode TUI plugin and three skills in `~/.agents/skills`, no MCP server found so far (**VERIFY**), and starts new sessions in `own` mode (no bypass flag); Yolo adds the bypass flags listed in `docs/compatibility.md`. Open items are listed there as **VERIFY**. Build the rest only after session 6 merges.
-2. Installer asks: Warp, Orca, both or neither (default neither; PowerShell or Git Bash stay the default). Flag `--terminal warp|orca|both|none` for `--yes` runs. Routes: `brew install --cask warp`, `brew install --cask stablyai/orca/orca`, `winget install Warp.Warp --scope user`. Linux and Orca on Windows have no user-scope package route: print the download link only. Record what was installed in `state.json`.
-3. lean-agents never edits Warp or Orca settings and never installs their agent plugins (Warp's Claude Code and OpenCode plugins stay rejected, FAQ only). The all-off network preset from session 6 prints the switches: Warp `[privacy] telemetry_enabled = false`, Orca `DO_NOT_TRACK=1` and Settings > Privacy.
-4. `--doctor` lists Orca-managed hooks, `statusLine`, the OpenCode `tui.json` plugin entry and Orca skills in `~/.agents/skills` it finds, and warns when an agent's default arguments hold a bypass flag, with the Settings > Agents > Agent permissions path to turn it off.
-5. `--uninstall` removes only the apps recorded in `state.json`. It never touches Orca's hooks; it prints `orca agent hooks off` as a step to run before removing Orca.
+Owner decision (2026-11-04): a user who already uses Warp or Orca gets that terminal's agent integration for the agents they chose. Earlier plan (installing the apps, FAQ-only plugins) is dropped.
 
-Done when: CI installs each cask on macOS and Warp through winget on Windows in a throwaway HOME, and the Ubuntu job documents why it skips (GUI apps that need `sudo`).
+1. Research: `docs/compatibility.md` "Terminals" (Orca `v1.4.247`, Warp docs, 2026-11-03). Open items stay **VERIFY** there.
+2. Detection per OS (app folder or CLI on PATH) in `scripts/lib/terminals.mjs`. Menu appears only when a terminal is found and preselects what was detected; `--yes` uses the detected ones; `--terminal warp|orca|both|none` overrides (`none` opts out). PO decision 2026-11-04. Nothing detected: no prompt, no change. The terminal apps are never installed.
+3. Warp: Claude Code plugin `warp@claude-code-warp`; OpenCode plugin `@warp-dot-dev/opencode-warp` (2.x `plugins`, 1.x `plugin`, pinned). Orca: `orca-cli` skill through the Skills CLI and `orca agent hooks on` when the `orca` CLI is on PATH. Undo for each is in `--uninstall`.
+4. All-off network preset prints the switches (Warp `[privacy] telemetry_enabled = false`, Orca `DO_NOT_TRACK=1` and Settings > Privacy) and never edits app settings.
+5. `--doctor` lists detected terminals and the integrations installed.
+
+Done when: a CI job with real Claude Code and OpenCode in a throwaway HOME shows the Warp and Orca plans install and uninstall cleanly; GUI-only facts stay **VERIFY**.
 
 ### Session 9 — Showcase
 
