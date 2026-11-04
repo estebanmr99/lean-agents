@@ -8,7 +8,9 @@ import { fileURLToPath } from 'node:url';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const CATALOG = 'https://models.dev/api.json';
 
-const sameOutputs = (a, b) => JSON.stringify([...(a.modalities?.output ?? [])].sort()) === JSON.stringify([...(b.modalities?.output ?? [])].sort());
+// Unknown outputs on either side count as the same, so a catalog gap never hides an upgrade.
+const outputs = (m) => (m.modalities?.output ? JSON.stringify([...m.modalities.output].sort()) : null);
+const sameOutputs = (a, b) => !outputs(a) || !outputs(b) || outputs(a) === outputs(b);
 
 // profiles: [{ name, tiers }]. IDs without a provider prefix are aliases and are skipped.
 export function diffModels(profiles, catalog) {

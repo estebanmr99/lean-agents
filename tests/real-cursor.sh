@@ -35,7 +35,7 @@ grep -q '^disable-model-invocation: false$' "$HOME/.agents/skills/i-have-adhd/SK
 "$agent_bin" mcp list </dev/null > "$HOME/mcp.txt" 2>&1 || { cat "$HOME/mcp.txt"; exit 1; }
 cat "$HOME/mcp.txt"
 grep -q serena "$HOME/mcp.txt"
-grep -q playwright "$HOME/mcp.txt"
+grep -qE "(^|[^-[:alnum:]])playwright([^-]|$)" "$HOME/mcp.txt"
 grep -q playwright-extension "$HOME/mcp.txt"
 grep -q context-mode "$HOME/mcp.txt"
 

@@ -14,7 +14,7 @@ opencode --version
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 
 bash "$repo/install.sh" --yes --no-exec --agents opencode-v1 \
-  --tools serena,playwright,ponytail,dcp --privacy strict --lang en --profile anthropic-api
+  --tools serena,playwright,playwright-extension,ponytail,dcp --privacy strict --lang en --profile anthropic-api
 
 opencode debug config > "$HOME/resolved.txt" 2>"$HOME/stderr.txt" || { cat "$HOME/resolved.txt" "$HOME/stderr.txt"; exit 1; }
 
@@ -31,6 +31,7 @@ const checks = {
   'rules in instructions': (cfg.instructions ?? []).some((i) => String(i).includes('lean-agents')),
   'mcp serena': !!cfg.mcp?.serena,
   'mcp playwright': !!cfg.mcp?.playwright,
+  'mcp playwright-extension': (cfg.mcp?.['playwright-extension']?.command ?? []).includes('--extension'),
   'no context-mode mcp': !cfg.mcp?.['context-mode'],
   'plan model': JSON.stringify(cfg.agent?.plan?.model ?? null).includes('claude-opus-5-5'),
   'subagents loaded': ['explore', 'research', 'review', 'debug', 'planner'].every((a) => agentsOut.includes(a)),

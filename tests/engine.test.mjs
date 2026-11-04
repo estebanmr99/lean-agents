@@ -313,6 +313,8 @@ test('diffModels skips models the profile already uses and models with other out
   } } };
   const tiers = { balanced: { model: 'acme/k-3' }, strong: { model: 'acme/k-3.1-pro' }, fast: { model: 'acme/f-1' } };
   assert.deepEqual(diffModels([{ name: 'p', tiers }], catalog), { missing: [], newer: [] });
+  catalog.acme.models['f-2'] = { id: 'f-2', family: 'f', release_date: '2026-02-01' };
+  assert.deepEqual(diffModels([{ name: 'p', tiers }], catalog).newer, [{ profile: 'p', model: 'acme/f-1', latest: 'acme/f-2' }]);
 });
 
 test('diffModels reports missing IDs and newer family members, and skips aliases', () => {

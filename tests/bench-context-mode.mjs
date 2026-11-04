@@ -23,12 +23,16 @@ server.stdout.on('data', (d) => {
   while ((i = buf.indexOf('\n')) >= 0) {
     const line = buf.slice(0, i).trim();
     buf = buf.slice(i + 1);
-    if (!line.startsWith('{')) continue;
-    const msg = JSON.parse(line);
+    let msg;
+    try { msg = JSON.parse(line); } catch { continue; }
     pending.get(msg.id)?.(msg);
     pending.delete(msg.id);
   }
 });
+// A missing or crashed server fails every pending request at once instead of after the timeout.
+const failAll = (why) => { for (const done of pending.values()) done({ error: `${why}\n${stderr}` }); pending.clear(); };
+server.on('error', (e) => failAll(e.message));
+server.on('exit', (code) => failAll(`context-mode exited with ${code}`));
 let nextId = 1;
 function rpc(method, params, timeout = 120000) {
   const id = nextId++;
@@ -93,3 +97,5 @@ if (baseline) {
 lines.push('', 'Backend lines from ctx_doctor:', '', ...backend.map((l) => `- ${l}`), '');
 console.log(lines.join('\n'));
 if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
+// On Windows kill() stops only the cmd.exe shell; the server would keep the pipes and the script open.
+process.exit(0);
