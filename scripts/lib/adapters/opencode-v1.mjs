@@ -45,12 +45,11 @@ export function opencodeV1Adapter({ home, core, profile, opts, rulesPath }) {
       ],
     });
   }
-  if (opts.privacy === 'strict') {
-    edits.push({ path: ['share'], value: 'disabled', mode: 'set' });
-    edits.push({ path: ['autoupdate'], value: false, mode: 'set' });
-    edits.push({ path: ['experimental', 'openTelemetry'], value: false, mode: 'set' });
-    if (profile?.provider !== 'opencode') edits.push({ path: ['disabled_providers'], value: 'opencode', mode: 'arrayAdd' });
-  }
+  const net = opts.network;
+  if (net.outbound === 'off') edits.push({ path: ['share'], value: 'disabled', mode: 'set' });
+  if (net.autoUpdate === 'off') edits.push({ path: ['autoupdate'], value: false, mode: 'set' });
+  if (net.telemetry === 'off') edits.push({ path: ['experimental', 'openTelemetry'], value: false, mode: 'set' });
+  if (net.outbound === 'off' && profile?.provider !== 'opencode') edits.push({ path: ['disabled_providers'], value: 'opencode', mode: 'arrayAdd' });
   actions.push({ kind: 'json', path: configPath(dir), edits });
   return { actions, commands };
 }

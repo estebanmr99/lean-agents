@@ -387,3 +387,60 @@ test('without a TTY and without --yes: asks nothing, changes nothing, says why',
   assert.match(dry.stdout, /Dry run: nothing was changed/);
   assert.deepEqual(fs.readdirSync(home), []);
 });
+
+const NET_BASE = ['--yes', '--no-exec', '--no-tools', '--lang', 'en', '--profile', 'anthropic-api'];
+const SWITCHES = {
+  claude: (s) => Object.keys(parse(s['.claude/settings.json']).env).filter((k) => /^DISABLE_|NONESSENTIAL|DO_NOT_TRACK/.test(k)).sort(),
+  'opencode-v2': (s) => { const c = parse(s['.config/opencode/opencode.jsonc'] ?? '{}'); return { share: c.share, update: c.update, policies: c.policies }; },
+  'opencode-v1': (s) => { const c = parse(s['.config/opencode/opencode.jsonc'] ?? '{}'); return { share: c.share, autoupdate: c.autoupdate, otel: c.experimental?.openTelemetry, disabled: c.disabled_providers }; },
+  'copilot-cli': (s) => parse(s['.copilot/settings.json'] ?? '{}').autoUpdate,
+};
+const switchesFor = (agents, flags) => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-net-'));
+  lean(home, [...NET_BASE, '--agents', agents.join(','), ...flags]);
+  const s = snapshot(home);
+  return Object.fromEntries(agents.map((a) => [a, SWITCHES[a](s)]));
+};
+
+test('--network off turns every telemetry, update and outbound switch off and is recorded', () => {
+  const deny = [{ effect: 'deny', action: 'provider.use', resource: 'opencode' }];
+  assert.deepEqual(switchesFor(['claude', 'opencode-v2', 'copilot-cli'], ['--network', 'off']), {
+    claude: ['CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC', 'DISABLE_AUTOUPDATER', 'DISABLE_BUG_COMMAND', 'DISABLE_ERROR_REPORTING', 'DISABLE_TELEMETRY', 'DO_NOT_TRACK'],
+    'opencode-v2': { share: 'disabled', update: 'disable', policies: deny },
+    'copilot-cli': false,
+  });
+  assert.deepEqual(switchesFor(['opencode-v1'], ['--network', 'off'])['opencode-v1'], { share: 'disabled', autoupdate: false, otel: false, disabled: ['opencode'] });
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-net-'));
+  lean(home, [...NET_BASE, '--agents', 'claude', '--network', 'off']);
+  const { options } = JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'state.json'), 'utf8'));
+  assert.deepEqual(options.network, { telemetry: 'off', autoUpdate: 'off', outbound: 'off' });
+  assert.equal(options.privacy, 'strict');
+});
+
+test('--privacy strict equals --network off; --network on and the --yes default set no switch', () => {
+  const agents = ['claude', 'opencode-v2', 'copilot-cli'];
+  assert.deepEqual(switchesFor(agents, ['--privacy', 'strict']), switchesFor(agents, ['--network', 'off']));
+  const none = { claude: [], 'opencode-v2': { share: undefined, update: undefined, policies: undefined }, 'copilot-cli': undefined };
+  assert.deepEqual(switchesFor(agents, ['--network', 'on']), none);
+  assert.deepEqual(switchesFor(agents, []), none);
+});
+
+test('one category flag overrides the preset', () => {
+  const r = switchesFor(['claude', 'opencode-v2'], ['--network', 'off', '--auto-update', 'on']);
+  assert.deepEqual(r.claude, ['DISABLE_BUG_COMMAND', 'DISABLE_ERROR_REPORTING', 'DISABLE_TELEMETRY', 'DO_NOT_TRACK']);
+  assert.equal(r['opencode-v2'].update, undefined);
+  assert.deepEqual(switchesFor(['claude'], ['--telemetry', 'off']).claude, ['DISABLE_ERROR_REPORTING', 'DISABLE_TELEMETRY', 'DO_NOT_TRACK']);
+  const bad = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--outbound', 'maybe'], { encoding: 'utf8' });
+  assert.match(bad.stderr, /--outbound takes on or off/);
+});
+
+test('--update keeps the network choice of a state file that only has privacy', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-net-'));
+  lean(home, [...NET_BASE, '--agents', 'opencode-v2', '--privacy', 'strict']);
+  const f = path.join(home, '.config', 'lean-agents', 'state.json');
+  const state = JSON.parse(fs.readFileSync(f, 'utf8'));
+  delete state.options.network;
+  fs.writeFileSync(f, JSON.stringify(state));
+  lean(home, ['--update', '--yes', '--no-exec']);
+  assert.deepEqual(JSON.parse(fs.readFileSync(f, 'utf8')).options.network, { telemetry: 'off', autoUpdate: 'off', outbound: 'off' });
+});

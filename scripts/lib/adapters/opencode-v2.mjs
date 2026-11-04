@@ -119,9 +119,9 @@ export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
     if (tools.includes(name)) edits.push({ path: ['mcp', 'servers', name], value: localServer(core, name), mode: 'setIfAbsent' });
   }
   if (tools.includes('ponytail')) edits.push({ path: ['plugins'], value: '@dietrichgebert/ponytail', mode: 'arrayAdd' });
-  if (opts.privacy === 'strict') {
-    edits.push({ path: ['share'], value: 'disabled', mode: 'set' });
-    edits.push({ path: ['update'], value: 'disable', mode: 'set' });
+  if (opts.network.outbound === 'off') edits.push({ path: ['share'], value: 'disabled', mode: 'set' });
+  if (opts.network.autoUpdate === 'off') edits.push({ path: ['update'], value: 'disable', mode: 'set' });
+  if (opts.network.outbound === 'off') {
     if (profile?.provider !== 'opencode') {
       edits.push({ path: ['policies'], value: { effect: 'deny', action: 'provider.use', resource: 'opencode' }, mode: 'arrayAdd' });
     }

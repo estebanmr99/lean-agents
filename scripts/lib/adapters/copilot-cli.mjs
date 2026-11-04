@@ -46,7 +46,7 @@ export function copilotAdapter({ home, core, profile, opts, rules, adhdCommand }
     edits.push({ path: ['mcpServers', name], value: { type: 'local', command, args, tools: ['*'] }, mode: 'setIfAbsent' });
   }
   if (edits.length) actions.push({ kind: 'json', path: path.join(dir, 'mcp-config.json'), edits });
-  if (opts.privacy === 'strict') {
+  if (opts.network.autoUpdate === 'off') {
     actions.push({ kind: 'json', path: path.join(dir, 'settings.json'), edits: [{ path: ['autoUpdate'], value: false, mode: 'set' }] });
   }
 

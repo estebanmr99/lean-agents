@@ -18,6 +18,7 @@ import { gsdPlan } from './lib/gsd.mjs';
 import { adhdCommand } from './lib/adhd.mjs';
 import { detectAgents, packageManager, prereqFor, which, run, quiet, exists, isolate } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
+import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv } from './lib/network.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ADAPTERS = { claude: claudeAdapter, 'opencode-v1': opencodeV1Adapter, 'opencode-v2': opencodeV2Adapter, 'copilot-cli': copilotAdapter, antigravity: antigravityAdapter };
@@ -43,6 +44,7 @@ function parseArgs(argv) {
   const o = {
     command: 'install', dryRun: false, yes: false, agents: null, tools: null, privacy: null, profile: null,
     lang: null, home: os.homedir(), exec: true, adhdAlways: null, ponytailMode: null,
+    networkPreset: null, networkFlags: {},
   };
   const list = (v) => v.split(',').map((s) => s.trim()).filter(Boolean);
   for (let i = 0; i < argv.length; i++) {
@@ -55,7 +57,11 @@ function parseArgs(argv) {
       case '--tools': o.tools = [...new Set([...MINIMAL_TOOLS, ...list(next())])]; break;
       case '--all-tools': o.tools = [...MINIMAL_TOOLS, ...OPTIONAL_TOOLS]; break;
       case '--no-tools': o.tools = []; break;
-      case '--privacy': o.privacy = next(); break;
+      case '--privacy': o.privacy = next(); fromPrivacy(o.privacy); break;
+      case '--network': o.networkPreset = onOff(a, next()); break;
+      case '--telemetry': o.networkFlags.telemetry = onOff(a, next()); break;
+      case '--auto-update': o.networkFlags.autoUpdate = onOff(a, next()); break;
+      case '--outbound': o.networkFlags.outbound = onOff(a, next()); break;
       case '--profile': o.profile = next(); break;
       case '--lang': o.lang = next(); break;
       case '--home': o.home = path.resolve(next()); break;
@@ -82,7 +88,10 @@ const HELP = `Usage: lean-agents [options]
   --tools a,b            Optional tools on top of rtk and context-mode:
                          ${[...OPTIONAL_TOOLS, ...OPT_IN_TOOLS].join(', ')}
   --all-tools / --no-tools  (--all-tools leaves out ${OPT_IN_TOOLS.join(', ')})
-  --privacy standard|strict
+  --privacy standard|strict  Same as --network on / --network off
+  --network on|off       Preset for telemetry, auto-updates and other outbound calls
+  --telemetry on|off, --auto-update on|off, --outbound on|off
+                         One category; overrides the preset
   --profile <name>       Model profile for OpenCode (see profiles/)
   --lang en|es           Language for rules and replies
   --adhd-always          Turn on i-have-adhd for every answer
@@ -153,7 +162,7 @@ async function choose(o, saved) {
   const unknown = o.tools.filter((t) => !known.includes(t));
   if (unknown.length) throw new Error(`unknown tools: ${unknown.join(', ')} (available: ${known.join(', ')})`);
   if (!o.agents.includes('opencode-v1')) o.tools = o.tools.filter((t) => t !== 'dcp');
-  o.privacy ??= saved?.privacy ?? (yesNo(await p.ask('Strict privacy (no telemetry, no auto-updates, no session sharing)?', 'n')) ? 'strict' : 'standard');
+  await chooseNetwork(o, saved, p);
   o.lang ??= saved?.lang ?? (await p.ask('Language for rules and replies (en/es)?', 'en'));
   if (o.agents.some((a) => a.startsWith('opencode')) && !o.profile) {
     o.profile = saved?.profile ?? (await p.ask('OpenCode model profile (github-copilot, vertex-gemini, anthropic-api, opencode-go, openai-api, none)?', 'none'));
@@ -162,6 +171,22 @@ async function choose(o, saved) {
   if (o.tools.includes('i-have-adhd')) o.adhdAlways ??= saved?.adhdAlways ?? yesNo(await p.ask('Use i-have-adhd on every answer?', 'y'));
   if (o.tools.includes('ponytail')) o.ponytailMode ??= saved?.ponytailMode ?? (await p.ask('Ponytail default mode (lite/full/ultra/off)?', 'lite'));
   return p;
+}
+
+const NETWORK_INFO = { telemetry: 'telemetry and error reports', autoUpdate: 'auto-updates', outbound: 'other outbound calls (session sharing, feedback, built-in providers)' };
+
+async function chooseNetwork(o, saved, p) {
+  let base = o.networkPreset ? preset(o.networkPreset) : fromPrivacy(o.privacy) ?? saved?.network ?? fromPrivacy(saved?.privacy);
+  if (!base && !Object.keys(o.networkFlags).length) {
+    const a = await p.ask('Network: off (enterprise PC: no telemetry, auto-updates or sharing), on (personal PC), or choose per category?', 'on');
+    if (a === 'off' || a === 'on') base = preset(a);
+    else if (a === 'choose') {
+      base = {};
+      for (const c of CATEGORIES) base[c] = yesNo(await p.ask(`Keep ${NETWORK_INFO[c]} on?`, 'y')) ? 'on' : 'off';
+    } else throw new Error(`network takes off, on or choose, not "${a}"`);
+  }
+  o.network = { ...(base ?? preset('on')), ...o.networkFlags };
+  o.privacy = privacyOf(o.network);
 }
 
 function buildPlan(o) {
@@ -198,7 +223,8 @@ function prereqCommands(o) {
 
 function printPlan(o, planned, commands) {
   console.log(`\nlean-agents plan for ${o.agents.join(', ') || 'no agents'}`);
-  console.log(`  tools: ${o.tools.join(', ') || 'none'} | privacy: ${o.privacy} | lang: ${o.lang} | profile: ${o.profile ?? 'none'}\n`);
+  console.log(`  tools: ${o.tools.join(', ') || 'none'} | privacy: ${o.privacy} | lang: ${o.lang} | profile: ${o.profile ?? 'none'}`);
+  console.log(`  network: ${CATEGORIES.map((c) => `${c} ${o.network[c]}`).join(', ')}\n`);
   console.log('Files:');
   console.log(describe(planned, o.home));
   if (commands.length) {
@@ -221,6 +247,7 @@ async function install(o) {
   if (o.dryRun) { p.close(); console.log('Dry run: nothing was changed.'); return; }
   if (!yesNo(await p.ask('Apply these changes?', 'y'))) { p.close(); console.log('Cancelled.'); return; }
   p.close();
+  Object.assign(process.env, childEnv(o.network));
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupDir = path.join(stateDir(o.home), 'backups', stamp);
@@ -243,7 +270,7 @@ async function install(o) {
     version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version,
     installedAt: previous?.installedAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    options: { agents: o.agents, tools: o.tools, privacy: o.privacy, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode },
+    options: { agents: o.agents, tools: o.tools, privacy: o.privacy, network: o.network, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode },
     files: [...(previous?.files ?? []), ...files],
     commands: [...(previous?.commands ?? []), ...ran],
   };
@@ -256,14 +283,17 @@ async function install(o) {
   }
   console.log(`\nDone. Backups: ${backupDir}`);
   console.log('Next: restart your agents, log in to your providers, then run --doctor.');
-  if (o.privacy === 'strict' && o.agents.includes('claude')) {
+  if (o.network.telemetry === 'off' && o.agents.includes('claude')) {
     console.log('Strict privacy: also turn off "Help improve Claude" in your claude.ai privacy settings.');
   }
-  if (o.privacy === 'strict' && o.agents.includes('copilot-cli')) {
+  if (o.network.telemetry === 'off' && o.agents.includes('copilot-cli')) {
     console.log('Strict privacy: Copilot CLI has no telemetry setting. Start it with --disable-client-telemetry.');
   }
-  if (o.privacy === 'strict' && o.agents.includes('antigravity')) {
+  if (o.network.telemetry === 'off' && o.agents.includes('antigravity')) {
     console.log('Strict privacy: turn off "Enable Telemetry" in Antigravity settings. It is stored on your account.');
+  }
+  if (o.network.autoUpdate === 'off' && o.agents.includes('antigravity')) {
+    console.log('Auto-updates off: Antigravity CLI updates itself and has no documented switch for it.');
   }
 }
 
