@@ -42,6 +42,10 @@ grep -q 'HTTPS_PROXY=http://\*\*\*@127.0.0.1:3128' "$HOME/install.txt"
 grep -q 'network env.*HTTPS_PROXY=http://\*\*\*@127.0.0.1:3128' "$HOME/doctor.txt"
 if grep -rq "$pw" "$HOME/install.txt" "$HOME/doctor.txt" "$HOME/.config"; then echo "proxy password leaked" >&2; exit 1; fi
 test -f "$HOME/.agents/skills/caveman/SKILL.md"
+# Bun came through the proxy, the all-off preset wrote its telemetry block, and Bun's own fetch honors the proxy.
+test -x "$HOME/.bun/bin/bun"
+grep -q '^telemetry = false' "$HOME/.bunfig.toml"
+HTTPS_PROXY="$https_proxy" "$HOME/.bun/bin/bun" -e 'fetch("https://github.com").then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))'
 command -v rtk >/dev/null
 command -v uvx >/dev/null
 
@@ -78,4 +82,5 @@ echo "gh and agy through the proxy: ok"
 grep -Eo 'CONNECT [^ ]+' "$HOME/squid.txt" | sort -u
 grep -q 'registry.npmjs.org' "$HOME/squid.txt"
 grep -q 'github.com' "$HOME/squid.txt"
+grep -q 'bun.com' "$HOME/squid.txt"
 echo "install through the proxy: ok"
