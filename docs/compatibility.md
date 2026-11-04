@@ -71,6 +71,50 @@ What lean-agents configures per agent, how, and when each command or key was las
 | Installer with no TTY and no `--yes`: stops with a message, changes nothing; `--dry-run` with every choice as a flag exits 0. With `/dev/tty` and stdin from `/dev/null`, it asks and exits. Windows `CONIN$` is not tested | `tests/engine.test.mjs`, pty run in the `test` job | 2026-10-31 |
 | Awesome lists: `hesreallyhim/awesome-claude-code` (web issue form), `awesome-opencode/awesome-opencode` (YAML PR), `punkpeye/awesome-mcp-servers` (MCP servers only). Show HN rules. Social preview 1280x640, under 1 MB. Up to six pinned repos | each project's CONTRIBUTING, [Show HN](https://news.ycombinator.com/showhn.html), GitHub docs; all links in `docs/launch.md` fetched | 2026-10-31 |
 
+## Proxy and corporate CA
+
+lean-agents copies each proxy variable it finds (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY`) to the other letter case for the commands it runs, because tools disagree on the case. It reports CA variables but never copies them: each one replaces a tool's whole bundle.
+
+| Item | Proxy | Corporate CA | Source | Checked |
+| --- | --- | --- | --- | --- |
+| Node.js | `NODE_USE_ENV_PROXY=1` or `--use-env-proxy` (22.21+, 24+) makes `fetch` read `HTTP(S)_PROXY`, `NO_PROXY` | `NODE_EXTRA_CA_CERTS=<file>`; `NODE_USE_SYSTEM_CA=1` (22.19+, 24.6+) | [Node CLI](https://nodejs.org/api/cli.html) | 2026-11-03 |
+| npm, npx | `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, or `proxy`, `https-proxy`, `noproxy` (`npm_config_*` env) | `cafile`; keep `strict-ssl` on | [npm config](https://docs.npmjs.com/cli/v10/using-npm/config) | 2026-11-03 |
+| git | `http_proxy`, `https_proxy`, `all_proxy` (lowercase); `http.proxy` wins | `http.sslCAInfo`, `GIT_SSL_CAINFO` | [git-config](https://git-scm.com/docs/git-config) | 2026-11-03 |
+| uv, uvx (Serena) | `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` (uppercase) | `SSL_CERT_FILE`, `SSL_CERT_DIR`, `UV_SYSTEM_CERTS=true` (`UV_NATIVE_TLS` is deprecated) | [uv env vars](https://docs.astral.sh/uv/reference/environment/) | 2026-11-03 |
+| Homebrew | `http_proxy`, `https_proxy`, `all_proxy`, `no_proxy` (lowercase, through curl and git) | no variable documented | [brew manpage](https://docs.brew.sh/Manpage) | 2026-11-03 |
+| winget | `--proxy <url>`, `--no-proxy` per run; not used by lean-agents | not documented | [winget settings](https://learn.microsoft.com/en-us/windows/package-manager/winget/settings) | 2026-11-03 |
+| Claude Code | `https_proxy`, `HTTPS_PROXY`, `http_proxy`, `HTTP_PROXY` (first set wins), `NO_PROXY`; no SOCKS | `NODE_EXTRA_CA_CERTS`; bundled CAs plus the OS store; mTLS `CLAUDE_CODE_CLIENT_CERT` / `CLAUDE_CODE_CLIENT_KEY` | [network config](https://code.claude.com/docs/en/network-config) | 2026-11-03 |
+| OpenCode | standard proxy variables (docs show uppercase); add `localhost` to `NO_PROXY` | `NODE_EXTRA_CA_CERTS` | [network](https://opencode.ai/docs/network/) | 2026-11-03 |
+| Copilot CLI | `HTTPS_PROXY` > `https_proxy` > `HTTP_PROXY` > `http_proxy`; restart after a change | `NODE_EXTRA_CA_CERTS` plus the OS store | [network settings](https://docs.github.com/en/copilot/concepts/network-settings) | 2026-11-03 |
+| Antigravity CLI | **VERIFY** | `AGY_LLM_GATEWAY_CA_CERT` (enterprise gateway, agy 1.2.15+), falls back to `SSL_CERT_FILE` | [gateway docs](https://docs.cloud.google.com/gemini/enterprise/docs/ai-developer-tools/connect-enterprise-gateway) | 2026-11-03 |
+| Playwright MCP | **VERIFY** | browser download: `NODE_EXTRA_CA_CERTS`; mirror with `PLAYWRIGHT_DOWNLOAD_HOST` | [Playwright browsers](https://playwright.dev/docs/browsers) | 2026-11-03 |
+
+## Outbound switches
+
+The network question (`--network`, `--telemetry`, `--auto-update`, `--outbound`) sets these; see [privacy.md](privacy.md).
+
+| Agent or tool | Category | Switch | Source | Checked |
+| --- | --- | --- | --- | --- |
+| Claude Code | telemetry | env `DISABLE_TELEMETRY=1`, `DISABLE_ERROR_REPORTING=1`, `DO_NOT_TRACK=1` | [data usage](https://code.claude.com/docs/en/data-usage), [env vars](https://code.claude.com/docs/en/env-vars) | 2026-11-03 |
+| Claude Code | auto-update | env `DISABLE_AUTOUPDATER=1` (`claude update` still works) | [env vars](https://code.claude.com/docs/en/env-vars) | 2026-11-03 |
+| Claude Code | other | env `DISABLE_BUG_COMMAND=1` (now also `DISABLE_FEEDBACK_COMMAND`); `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` turns off updates, telemetry, error reports, feedback and surveys together, so lean-agents sets it only when all three are off | [env vars](https://code.claude.com/docs/en/env-vars) | 2026-11-03 |
+| OpenCode 2 | auto-update | `update: "disable"` | [v2 config](https://opencode.ai/v2/docs/config), real binary 2.2.5 | 2026-11-03 |
+| OpenCode 2 | other | `share: "disabled"`; `policies` deny `provider.use` `opencode` | real binary 2.2.5 (`tests/real-opencode.sh`) | 2026-10-31 |
+| OpenCode 1 | telemetry, auto-update, other | `experimental.openTelemetry: false`; `autoupdate: false`; `share: "disabled"`, `disabled_providers` | [1.x config](https://opencode.ai/docs/config/), real binary 1.19.0 | 2026-11-03 |
+| Copilot CLI | auto-update | `autoUpdate: false` in `~/.copilot/settings.json` | [change settings](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/change-settings) | 2026-11-03 |
+| Copilot CLI | telemetry | `COPILOT_OFFLINE=true` disables all telemetry (and more); printed as a reminder only | [responsible use](https://docs.github.com/en/copilot/responsible-use/copilot-cli) | 2026-11-03 |
+| gh | telemetry | `GH_TELEMETRY=false`, `DO_NOT_TRACK=true`, or `gh config set telemetry disabled` | [gh telemetry](https://docs.github.com/en/github-cli/github-cli/github-cli-telemetry) | 2026-11-03 |
+| gh | auto-update | `GH_NO_UPDATE_NOTIFIER`, `GH_NO_EXTENSION_UPDATE_NOTIFIER` (any value) | [gh environment](https://cli.github.com/manual/gh_help_environment) | 2026-11-03 |
+| Caveman | telemetry | on by default; `DO_NOT_TRACK=1` or `caveman telemetry off` | [SECURITY.md](https://github.com/JuliusBrussee/caveman/blob/main/SECURITY.md) | 2026-11-03 |
+| Skills CLI | telemetry | `DISABLE_TELEMETRY=1` or `DO_NOT_TRACK=1` | [vercel-labs/skills](https://github.com/vercel-labs/skills) | 2026-11-03 |
+| RTK | telemetry | off until `rtk telemetry enable` | [README](https://github.com/rtk-ai/rtk) | 2026-11-03 |
+| Context Mode | telemetry | none, per README; `ctx-insight` opens a hosted dashboard only when run | [README](https://github.com/mksglu/context-mode) | 2026-11-03 |
+| Serena | other | `web_dashboard: False` in Serena's config (default on); not set by lean-agents | [config template](https://github.com/oraios/serena/blob/main/src/serena/resources/serena_config.template.yml) | 2026-11-03 |
+| Codeburn | other | CLI sends nothing; `CODEBURN_CURSOR_SYNC=0` | [README](https://github.com/getagentseal/codeburn) | 2026-11-03 |
+| Homebrew | telemetry, auto-update | `HOMEBREW_NO_ANALYTICS`, `HOMEBREW_NO_AUTO_UPDATE` | [brew manpage](https://docs.brew.sh/Manpage) | 2026-11-03 |
+| npm | auto-update | `update-notifier=false` | [npm config](https://docs.npmjs.com/cli/v10/using-npm/config) | 2026-11-03 |
+| uv | — | no telemetry or update-check switch documented | [uv env vars](https://docs.astral.sh/uv/reference/environment/) | 2026-11-03 |
+
 ## Not yet verified
 
 - `reasoningEffort` as the pass-through option for Gemini on Vertex.
@@ -78,3 +122,8 @@ What lean-agents configures per agent, how, and when each command or key was las
 - **VERIFY:** Antigravity loading `~/.gemini/config/rules` and `~/.agents/skills`. No list command shows them without a login, so README marks both as partial.
 - **VERIFY:** subreddit rules, whether r/opencode exists, and X handles in `docs/launch.md`. Reddit blocked the fetch.
 - **VERIFY:** `brew install copilot-cli` (README) against `brew install --cask copilot-cli` (docs). lean-agents does not use either.
+- **VERIFY:** Antigravity proxy variables and any telemetry or auto-update switch.
+- **VERIFY:** proxy and CA handling in gh, RTK, Context Mode, Serena, Playwright MCP and the Skills CLI beyond the variables their runtimes (Node, uv, git) read.
+- **VERIFY:** Copilot CLI `NO_PROXY` and `--disable-client-telemetry` (seen in release notes, not in the docs).
+- **VERIFY:** Serena config path `~/.serena/serena_config.yml` and a usage-stats switch; GSD and Ponytail outbound calls.
+- **VERIFY:** pip `PIP_PROXY`, `PIP_CERT`; winget persistent proxy settings and CA handling.
