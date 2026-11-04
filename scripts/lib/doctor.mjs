@@ -39,6 +39,13 @@ function checkCopilot(o, add) {
   }
 }
 
+function checkCursor(o, add) {
+  const mcp = quiet(['agent', 'mcp', 'list']);
+  for (const s of ['serena', 'playwright', 'context-mode'].filter((t) => o.tools.includes(t))) {
+    add(`cursor mcp ${s}`, mcp.ok && mcp.out.includes(s) ? 'ok' : 'error', mcp.ok ? '' : 'agent mcp list failed');
+  }
+}
+
 function checkAntigravity(o, core, add) {
   const agents = quiet(['agy', 'agents']).out;
   add('agy subagents loaded', core.every((a) => agents.includes(a)) ? 'ok' : 'error');
@@ -79,6 +86,12 @@ export function doctor({ home, state, exec }) {
         const v = version(bin);
         add(`${bin} on PATH`, v ? 'ok' : 'error', v ?? 'not found');
       }
+      for (const [bin, agent] of [['code', 'vscode-copilot'], ['agent', 'cursor']]) {
+        if (!o.agents.includes(agent)) continue;
+        const v = version(bin);
+        add(`${bin} on PATH`, v ? 'ok' : 'error', v ?? 'not found');
+      }
+      if (o.agents.includes('cursor')) checkCursor(o, add);
       if (o.agents.includes('claude')) {
         const mcp = quiet(['claude', 'mcp', 'list']);
         for (const s of ['serena', 'playwright'].filter((t) => o.tools.includes(t))) {

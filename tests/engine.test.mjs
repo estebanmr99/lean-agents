@@ -11,6 +11,7 @@ import { applyJsonEdits, revertJsonEdits } from '../scripts/lib/fsops.mjs';
 import { diffModels } from '../scripts/models-refresh.mjs';
 import { releaseNotes } from '../scripts/release.mjs';
 import { prereqFor } from '../scripts/lib/system.mjs';
+import { vscodeUserDir } from '../scripts/lib/adapters/vscode-copilot.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ALL = ['--yes', '--no-exec', '--agents', 'claude,opencode-v2', '--all-tools', '--privacy', 'strict', '--lang', 'en', '--profile', 'vertex-gemini', '--adhd-always', '--ponytail-mode', 'lite'];
@@ -517,4 +518,60 @@ test('--yes keeps every tool default for undocumented settings and writes no not
   const state = JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'state.json'), 'utf8'));
   assert.deepEqual(state.options.unverified, { antigravity: 'default', serena: 'default', 'download-hosts': 'default' });
   assert.ok(!fs.existsSync(path.join(home, '.config', 'lean-agents', 'notes')));
+});
+
+test('VS Code Copilot: user MCP and strict settings, shared ~/.copilot files written once, full uninstall', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const user = vscodeUserDir(home);
+  fs.mkdirSync(user, { recursive: true });
+  fs.writeFileSync(path.join(user, 'settings.json'), '{\n  // mine\n  "editor.fontSize": 14\n}\n');
+  fs.writeFileSync(path.join(user, 'mcp.json'), '{\n  "servers": { "playwright": { "type": "http", "url": "https://mine" } }\n}\n');
+  const before = snapshot(home);
+  const out = lean(home, ['--yes', '--no-exec', '--agents', 'vscode-copilot', '--all-tools', '--privacy', 'strict', '--lang', 'en', '--adhd-always', '--ponytail-mode', 'off']);
+  assert.match(out, /Caveman skills for VS Code Copilot/);
+
+  const mcp = parse(fs.readFileSync(path.join(user, 'mcp.json'), 'utf8')).servers;
+  assert.equal(mcp.playwright.url, 'https://mine');
+  assert.equal(mcp.serena.type, 'stdio');
+  assert.equal(mcp['context-mode'].command, 'npx');
+  const settings = parse(fs.readFileSync(path.join(user, 'settings.json'), 'utf8'));
+  assert.equal(settings['editor.fontSize'], 14);
+  assert.equal(settings['telemetry.telemetryLevel'], 'off');
+  assert.equal(settings['update.mode'], 'none');
+  assert.match(fs.readFileSync(path.join(home, '.copilot', 'copilot-instructions.md'), 'utf8'), /lean-agents:start/);
+  assert.match(fs.readFileSync(path.join(home, '.copilot', 'agents', 'explore.agent.md'), 'utf8'), /^model: claude-haiku-5\.5$/m);
+
+  lean(home, ['--uninstall', '--yes', '--no-exec']);
+  const after = Object.fromEntries(Object.entries(snapshot(home)).filter(([f]) => !f.startsWith('.config/lean-agents/')));
+  assert.deepEqual(after, before);
+
+  // With Copilot CLI too, the shared ~/.copilot files and skills come from one adapter only.
+  const both = lean(fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-')), ['--yes', '--no-exec', '--dry-run', '--agents', 'copilot-cli,vscode-copilot', '--all-tools', '--privacy', 'standard', '--lang', 'en', '--adhd-always', '--ponytail-mode', 'off']);
+  assert.equal(both.match(/copilot-instructions\.md/g).length, 1);
+  assert.doesNotMatch(both, /for VS Code Copilot/);
+});
+
+test('Cursor: subagents, MCP, kept user values, no global rules, full uninstall', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const dir = path.join(home, '.cursor');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'mcp.json'), '{\n  "mcpServers": { "serena": { "command": "mine" } }\n}\n');
+  const before = snapshot(home);
+  const out = lean(home, ['--yes', '--no-exec', '--agents', 'cursor', '--all-tools', '--privacy', 'strict', '--lang', 'en', '--adhd-always', '--ponytail-mode', 'off']);
+  assert.match(out, /rtk init -g --agent cursor/);
+  assert.match(out, /skills add JuliusBrussee\/caveman .* -a cursor -g/);
+  assert.match(out, /Privacy Mode in Cursor/);
+
+  const mcp = JSON.parse(fs.readFileSync(path.join(dir, 'mcp.json'), 'utf8')).mcpServers;
+  assert.equal(mcp.serena.command, 'mine');
+  assert.equal(mcp.playwright.command, 'npx');
+  assert.equal(mcp['context-mode'].command, 'npx');
+  const agent = fs.readFileSync(path.join(dir, 'agents', 'debug.md'), 'utf8');
+  assert.match(agent, /^model: inherit$/m);
+  assert.match(agent, /^readonly: false$/m);
+  assert.ok(!fs.existsSync(path.join(dir, 'rules')), 'Cursor user rules live in its settings UI');
+
+  lean(home, ['--uninstall', '--yes', '--no-exec']);
+  const after = Object.fromEntries(Object.entries(snapshot(home)).filter(([f]) => !f.startsWith('.config/lean-agents/')));
+  assert.deepEqual(after, before);
 });

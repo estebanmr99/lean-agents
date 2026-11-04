@@ -23,7 +23,7 @@ export function renderCopilotAgent(agent, profile) {
   return lines.join('\n');
 }
 
-const skills = (tool, desc, repo, names) => ({
+export const skills = (tool, desc, repo, names) => ({
   tool,
   desc,
   run: [['npx', '-y', 'skills', 'add', repo, '--skill', ...names, '-a', 'github-copilot', '-g', '-y']],

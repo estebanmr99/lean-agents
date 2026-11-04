@@ -14,6 +14,8 @@ import { opencodeV1Adapter } from './lib/adapters/opencode-v1.mjs';
 import { opencodeV2Adapter } from './lib/adapters/opencode-v2.mjs';
 import { copilotAdapter } from './lib/adapters/copilot-cli.mjs';
 import { antigravityAdapter } from './lib/adapters/antigravity.mjs';
+import { vscodeCopilotAdapter } from './lib/adapters/vscode-copilot.mjs';
+import { cursorAdapter } from './lib/adapters/cursor.mjs';
 import { gsdPlan } from './lib/gsd.mjs';
 import { adhdCommand } from './lib/adhd.mjs';
 import { detectAgents, packageManager, prereqFor, which, run, quiet, exists, isolate } from './lib/system.mjs';
@@ -26,6 +28,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ADAPTERS = { claude: claudeAdapter, 'opencode-v1': opencodeV1Adapter, 'opencode-v2': opencodeV2Adapter, 'copilot-cli': copilotAdapter, antigravity: antigravityAdapter };
 // Agents whose models do not depend on --profile.
 const FIXED_PROFILE = { claude: 'claude-subscription', 'copilot-cli': 'github-copilot', antigravity: 'antigravity' };
+Object.assign(ADAPTERS, { 'vscode-copilot': vscodeCopilotAdapter, cursor: cursorAdapter });
+FIXED_PROFILE['vscode-copilot'] = 'github-copilot';
 const MINIMAL_TOOLS = ['rtk', 'context-mode'];
 const OPTIONAL_TOOLS = ['serena', 'playwright', 'ponytail', 'caveman', 'i-have-adhd', 'dcp', 'codeburn'];
 // Asked for one by one and never part of --all-tools.
@@ -348,6 +352,9 @@ async function install(o) {
   }
   if (o.network.telemetry === 'off' && o.agents.includes('copilot-cli')) {
     console.log('Strict privacy: Copilot CLI has no telemetry setting. Start it with --disable-client-telemetry.');
+  }
+  if (o.network.telemetry === 'off' && o.agents.includes('cursor')) {
+    console.log('Strict privacy: turn on Privacy Mode in Cursor settings. It is stored on your account.');
   }
   if (o.network.telemetry === 'off' && o.agents.includes('antigravity')) {
     console.log('Strict privacy: turn off "Enable Telemetry" in Antigravity settings. It is stored on your account.');
