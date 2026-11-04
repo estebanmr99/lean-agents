@@ -10,7 +10,7 @@ import { parse } from 'jsonc-parser';
 import { applyJsonEdits, revertJsonEdits } from '../scripts/lib/fsops.mjs';
 import { diffModels } from '../scripts/models-refresh.mjs';
 import { releaseNotes } from '../scripts/release.mjs';
-import { prereqFor, bunInstall } from '../scripts/lib/system.mjs';
+import { prereqFor, antigravityPrereqs, bunInstall } from '../scripts/lib/system.mjs';
 import { detectTerminals } from '../scripts/lib/terminals.mjs';
 import { vscodeUserDir } from '../scripts/lib/adapters/vscode-copilot.mjs';
 
@@ -783,4 +783,15 @@ test('terminals: all-off network prints the Warp and Orca privacy switches', () 
   const out = lean(userHome(), ['--yes', '--no-exec', '--dry-run', '--agents', 'claude', '--network', 'off', '--terminal', 'both']);
   assert.match(out, /telemetry_enabled = false/);
   assert.match(out, /DO_NOT_TRACK=1/);
+
+test('Antigravity app and CLI install only through verified ids, else print the vendor link', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-agy-'));
+  const runs = (pm, platform) => antigravityPrereqs(pm, platform, home).map((c) => c.run[0]?.join(' ') ?? 'manual');
+  assert.ok(runs('brew', 'darwin').includes('brew install --cask antigravity'));
+  assert.ok(runs('brew', 'darwin').every((r) => !r.startsWith('winget')));
+  const linux = antigravityPrereqs('brew', 'linux', home);
+  assert.ok(linux.every((c) => c.manual && !c.run.length));
+  // The Windows CLI id has no documented scope, so it is never run; only the app (scope user) is.
+  assert.ok(antigravityPrereqs(null, 'win32', home).every((c) => c.manual));
+  assert.ok(!runs('winget', 'win32').some((r) => r.includes('AntigravityCLI')));
 });

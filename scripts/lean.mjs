@@ -19,7 +19,7 @@ import { cursorAdapter } from './lib/adapters/cursor.mjs';
 import { projectPlan, projectStateDir } from './lib/project.mjs';
 import { gsdPlan } from './lib/gsd.mjs';
 import { adhdCommand } from './lib/adhd.mjs';
-import { detectAgents, packageManager, prereqFor, bunInstall, bunPresent, which, run, quiet, exists, isolate } from './lib/system.mjs';
+import { detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPresent, which, run, quiet, exists, isolate } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
 import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
@@ -313,6 +313,9 @@ function prereqCommands(o) {
     if (!p || which(p.bin)) continue;
     if (p.install) out.push({ tool: t, desc: `install ${p.bin}`, run: p.install, undo: [] });
     else out.push({ tool: t, desc: `${p.bin} is missing: install it from ${p.manual}`, run: [], undo: [], manual: true });
+  }
+  if (o.agents.includes('antigravity')) {
+    out.push(...antigravityPrereqs(pm, process.platform, os.homedir()).map((c) => ({ tool: 'antigravity', undo: [], ...c })));
   }
   if (o.bun && o.tools.includes('context-mode') && process.platform !== 'linux' && !which('bun') && bunPresent(o.home)) {
     console.log('! Bun is in ~/.bun/bin but not on PATH; Context Mode needs it on PATH here. Add that folder to PATH.');
