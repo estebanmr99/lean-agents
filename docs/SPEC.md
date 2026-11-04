@@ -626,6 +626,8 @@ Branch: `session-11-antigravity`. Code starts after sessions 6 and 7 merge: reus
 
 Done when: CI jobs with real binaries and a throwaway HOME (`USERPROFILE` on Windows) install `agy`, run the installer, `agy agents`, `agy mcp list`, `--doctor` and `--uninstall` on Ubuntu, macOS and Windows; the app installs in CI where the OS allows it, or the job documents why it cannot, and the files lean-agents writes for it are validated. Anything that needs a login to prove stays ⚠️ with a **VERIFY** note.
 
+**Bun decision (2026-11-04, session 12):** the median Bun JS run is at least 1.5x faster than Node on all three OSes (1.53x, 2.00x, 1.56x) and Bun installs at user scope without a TTY on each, so the rule in item 9 says offer `--bun` (off by default). The flag is not built yet: it is a follow-up session. Numbers: `docs/compatibility.md`.
+
 Done when (Bun): `bench-context-mode` is green on Ubuntu, macOS and Windows, its numbers are in `docs/compatibility.md`, and the `--bun` or docs-only decision is recorded.
 
 ### Session 12 — Release readiness
