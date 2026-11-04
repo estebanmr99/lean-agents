@@ -341,6 +341,36 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - run: bash tests/real-skills-undo.sh '${{ matrix.agents }}'
 
+  real-terminals:
+    # Warp and Orca agent integrations with real Claude Code and OpenCode, throwaway HOME. The apps are GUI-only: not installed.
+    strategy:
+      fail-fast: false
+      matrix:
+        agent: [claude, opencode-v1, opencode-v2]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Install Claude Code
+        if: matrix.agent == 'claude'
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Install OpenCode 1.19
+        if: matrix.agent == 'opencode-v1'
+        run: |
+          curl -fsSL https://opencode.ai/install | bash -s -- --version 1.19.0
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+      - name: Install OpenCode 2
+        if: matrix.agent == 'opencode-v2'
+        run: |
+          curl -fsSL https://opencode.ai/v2/install | bash
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+      - run: bash tests/real-terminals.sh '${{ matrix.agent }}'
+
   real-copilot:
     # Real Copilot CLI and real tools, throwaway HOME, no login and no TTY.
     strategy:
