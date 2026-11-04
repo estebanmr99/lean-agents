@@ -6,11 +6,14 @@ import { configHome, envDir } from '../system.mjs';
 import { localServer } from './opencode-v2.mjs';
 import { renderCopilotAgent, skills } from './copilot-cli.mjs';
 
+// Read at import, before isolate() points HOME and USERPROFILE at --home.
+const REAL_HOME = os.homedir();
+
 export function vscodeUserDir(home) {
   if (process.platform === 'darwin') return path.join(home, 'Library', 'Application Support', 'Code', 'User');
   if (process.platform !== 'win32') return path.join(configHome(home), 'Code', 'User');
   // Only the real home may use %APPDATA%: --home must keep every write inside the temp dir.
-  const appData = home === os.homedir() && process.env.APPDATA ? process.env.APPDATA : path.join(home, 'AppData', 'Roaming');
+  const appData = home === REAL_HOME && process.env.APPDATA ? process.env.APPDATA : path.join(home, 'AppData', 'Roaming');
   return path.join(appData, 'Code', 'User');
 }
 

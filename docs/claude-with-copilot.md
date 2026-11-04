@@ -18,7 +18,7 @@ How to use Claude when your company pays for GitHub Copilot, which routes GitHub
    - On github.com: the **Agents** tab, or assign an issue or pull request to the Claude agent.
    - In VS Code: start a new session in the chat view and pick Claude. **VERIFY:** the minimum VS Code version. `docs/SPEC.md` assumes 1.109 or later; GitHub states none.
 
-Policies for partner agents do not cover local agents in VS Code. Those follow the normal Copilot model policies.
+Policies for partner agents do not cover local agents in VS Code. Those follow the normal Copilot model policies. **VERIFY:** GitHub's Claude agent page says so, but no policy page confirms it.
 
 ## Copilot CLI
 
@@ -35,4 +35,4 @@ lean-agents never installs, configures or recommends these. GitHub's [Generative
 
 ## What lean-agents does
 
-Nothing for the partner agent: it is a policy switch, not a file or package. With `--agents vscode-copilot` or `--project`, your rules, subagents and MCP servers are already in place when the Claude agent works in the same repository, because it reads `AGENTS.md`. **VERIFY:** whether the Claude agent reads `AGENTS.md`.
+Nothing for the partner agent: it is a policy switch, not a file or package. With `--project`, your rules, subagents and MCP servers are already in place when the Claude agent works in the same repository, because it reads `AGENTS.md`. **VERIFY:** whether the Claude agent reads `AGENTS.md`.

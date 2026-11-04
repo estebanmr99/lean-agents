@@ -185,7 +185,7 @@ lean-agents is glue. The heavy lifting is done by these projects; please star th
 - [x] Copilot CLI, Antigravity CLI, Codeburn, AutoSkills, GSD, original skills, model profiles
 - [x] VS Code Copilot, Cursor, team mode (`--project`), Claude through Copilot
 - [ ] `v1.0.0`
-- Later: Codex CLI, Gemini CLI, Cursor
+- Later: Codex CLI, Gemini CLI
 
 ## Contributing
 

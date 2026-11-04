@@ -553,7 +553,8 @@ test('VS Code Copilot: user MCP and strict settings, shared ~/.copilot files wri
 
 test('--project writes the team files into the repo, keeps user content, and undoes cleanly', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
-  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-repo-'));
+  const repo = path.join(home, 'repo');
+  fs.mkdirSync(repo);
   fs.writeFileSync(path.join(repo, 'AGENTS.md'), '# Team rules\n');
   fs.mkdirSync(path.join(repo, '.vscode'));
   fs.writeFileSync(path.join(repo, '.vscode', 'mcp.json'), '{\n  // ours\n  "servers": { "docs": { "type": "http", "url": "https://docs" } }\n}\n');
@@ -589,7 +590,8 @@ test('--project writes the team files into the repo, keeps user content, and und
 });
 
 test('--project refuses --agents', () => {
-  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', os.tmpdir(), '--project', os.tmpdir(), '--agents', 'claude', '--dry-run', '--yes'], { encoding: 'utf8' });
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, '--project', home, '--agents', 'claude', '--dry-run', '--yes'], { encoding: 'utf8' });
   assert.equal(r.status, 1);
   assert.match(r.stderr, /--project writes repository files only/);
 });

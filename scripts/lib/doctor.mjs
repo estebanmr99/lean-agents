@@ -40,9 +40,9 @@ function checkCopilot(o, add) {
 }
 
 function checkCursor(o, add) {
-  const mcp = quiet(['agent', 'mcp', 'list']);
+  const mcp = quiet(['cursor-agent', 'mcp', 'list']);
   for (const s of ['serena', 'playwright', 'context-mode'].filter((t) => o.tools.includes(t))) {
-    add(`cursor mcp ${s}`, mcp.ok && mcp.out.includes(s) ? 'ok' : 'error', mcp.ok ? '' : 'agent mcp list failed');
+    add(`cursor mcp ${s}`, mcp.ok && mcp.out.includes(s) ? 'ok' : 'error', mcp.ok ? '' : 'cursor-agent mcp list failed');
   }
 }
 
@@ -86,7 +86,7 @@ export function doctor({ home, state, exec }) {
         const v = version(bin);
         add(`${bin} on PATH`, v ? 'ok' : 'error', v ?? 'not found');
       }
-      for (const [bin, agent] of [['code', 'vscode-copilot'], ['agent', 'cursor']]) {
+      for (const [bin, agent] of [['code', 'vscode-copilot'], ['cursor-agent', 'cursor']]) {
         if (!o.agents.includes(agent)) continue;
         const v = version(bin);
         add(`${bin} on PATH`, v ? 'ok' : 'error', v ?? 'not found');

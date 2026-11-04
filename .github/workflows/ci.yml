@@ -429,6 +429,7 @@ jobs:
       - name: Install, let code write the same files, project mode, doctor, uninstall
         run: bash tests/real-vscode.sh
 
+  real-winget:
     # The winget commands from prereqFor, with the runner's image missing winget.
     runs-on: windows-latest
     steps:
