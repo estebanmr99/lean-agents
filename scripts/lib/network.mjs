@@ -24,7 +24,7 @@ export function childEnv(network) {
 const PROXY_VARS = ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY'];
 const CA_VARS = ['NODE_EXTRA_CA_CERTS', 'NODE_USE_SYSTEM_CA', 'SSL_CERT_FILE', 'SSL_CERT_DIR', 'GIT_SSL_CAINFO', 'UV_SYSTEM_CERTS', 'REQUESTS_CA_BUNDLE', 'npm_config_cafile'];
 
-export const redactUrl = (v) => v.replace(/\/\/[^/@\s]+@/g, '//***@');
+export const redactUrl = (v) => v.replace(/\/\/[^/\s]*@/g, '//***@');
 
 // Tools disagree on case (brew and git read lowercase, uv uppercase), so both cases get the value.
 // Only process.env changes: proxy values are never written to disk.

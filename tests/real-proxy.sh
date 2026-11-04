@@ -12,9 +12,16 @@ docker run -d --name lean-squid -p 3128:3128 ubuntu/squid >/dev/null
 for _ in $(seq 30); do curl -s -o /dev/null -x http://127.0.0.1:3128 https://github.com && break; sleep 2; done
 
 # Docker rewrites 127.0.0.1:3128 to the container address before the filter table sees it.
-sudo iptables -A OUTPUT -m owner --uid-owner "$(id -u)" -d 127.0.0.0/8 -j ACCEPT
-sudo iptables -A OUTPUT -m owner --uid-owner "$(id -u)" -d 172.16.0.0/12 -j ACCEPT
-sudo iptables -A OUTPUT -m owner --uid-owner "$(id -u)" -j REJECT
+uid="$(id -u)"
+unblock() {
+  sudo iptables -D OUTPUT -m owner --uid-owner "$uid" -j REJECT || true
+  sudo iptables -D OUTPUT -m owner --uid-owner "$uid" -d 172.16.0.0/12 -j ACCEPT || true
+  sudo iptables -D OUTPUT -m owner --uid-owner "$uid" -d 127.0.0.0/8 -j ACCEPT || true
+}
+trap unblock EXIT
+sudo iptables -A OUTPUT -m owner --uid-owner "$uid" -d 127.0.0.0/8 -j ACCEPT
+sudo iptables -A OUTPUT -m owner --uid-owner "$uid" -d 172.16.0.0/12 -j ACCEPT
+sudo iptables -A OUTPUT -m owner --uid-owner "$uid" -j REJECT
 if curl -s -m 10 -o /dev/null https://github.com; then echo "direct traffic is not blocked" >&2; exit 1; fi
 
 HOME="$(mktemp -d)"
@@ -22,7 +29,9 @@ export HOME
 export XDG_CONFIG_HOME="$HOME/.config"
 unset XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME HTTP_PROXY HTTPS_PROXY NO_PROXY
 # Lowercase only, with credentials: the engine must share them in both cases and never print or write them.
-export http_proxy=http://ci:ci-proxy-pass@127.0.0.1:3128 https_proxy=http://ci:ci-proxy-pass@127.0.0.1:3128 no_proxy=localhost,127.0.0.1
+# Random per run, so no fixed credential lives in the repo; squid ignores it.
+pw="$(openssl rand -hex 12)"
+export http_proxy="http://ci:$pw@127.0.0.1:3128" https_proxy="http://ci:$pw@127.0.0.1:3128" no_proxy=localhost,127.0.0.1
 export HOMEBREW_NO_AUTO_UPDATE=1
 
 bash "$repo/install.sh" --yes --agents opencode-v2 --tools serena,caveman --network off \
@@ -31,7 +40,7 @@ node "$repo/scripts/lean.mjs" --doctor | tee "$HOME/doctor.txt"
 
 grep -q 'HTTPS_PROXY=http://\*\*\*@127.0.0.1:3128' "$HOME/install.txt"
 grep -q 'network env.*HTTPS_PROXY=http://\*\*\*@127.0.0.1:3128' "$HOME/doctor.txt"
-if grep -rq ci-proxy-pass "$HOME/install.txt" "$HOME/doctor.txt" "$HOME/.config"; then echo "proxy password leaked" >&2; exit 1; fi
+if grep -rq "$pw" "$HOME/install.txt" "$HOME/doctor.txt" "$HOME/.config"; then echo "proxy password leaked" >&2; exit 1; fi
 test -f "$HOME/.agents/skills/caveman/SKILL.md"
 command -v rtk >/dev/null
 command -v uvx >/dev/null

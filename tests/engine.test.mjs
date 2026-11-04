@@ -456,7 +456,8 @@ test('proxy variables are shown redacted, shared in both cases, and never writte
   const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, '--doctor', '--no-exec'], { encoding: 'utf8', env });
   assert.match(r.stdout, /network env\s+HTTPS_PROXY=http:\/\/\*\*\*@127\.0\.0\.1:3128/);
   assert.ok(!r.stdout.includes('s3cret'));
-  const { shareProxy } = await import('../scripts/lib/network.mjs');
+  const { shareProxy, redactUrl } = await import('../scripts/lib/network.mjs');
+  assert.equal(redactUrl('http://ci:p@ss@host:3128'), 'http://***@host:3128');
   const e = { https_proxy: 'http://p:1', NO_PROXY: 'x', NODE_USE_ENV_PROXY: '0' };
   shareProxy(e);
   assert.deepEqual(e, { https_proxy: 'http://p:1', HTTPS_PROXY: 'http://p:1', NO_PROXY: 'x', no_proxy: 'x', NODE_USE_ENV_PROXY: '0' });

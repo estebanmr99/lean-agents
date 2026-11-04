@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # lean-agents bootstrap for macOS, Linux and Git Bash on Windows.
-# Makes sure git and Node.js 20+ exist, fetches lean-agents, then hands over to the
+# Makes sure git and Node.js 20.12+ exist, fetches lean-agents, then hands over to the
 # Node engine (scripts/lean.mjs), which shows the full plan before changing anything.
 #
 #   curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --dry-run

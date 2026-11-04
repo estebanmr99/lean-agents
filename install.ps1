@@ -1,5 +1,5 @@
 # lean-agents bootstrap for Windows (PowerShell 5.1 and 7).
-# Makes sure git and Node.js 20+ exist, fetches lean-agents, then hands over to the
+# Makes sure git and Node.js 20.12+ exist, fetches lean-agents, then hands over to the
 # Node engine (scripts/lean.mjs), which shows the full plan before changing anything.
 #
 #   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -DryRun
