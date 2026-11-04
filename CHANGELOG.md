@@ -4,15 +4,6 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
-### Added
-
-- Bun for Context Mode, on by default when `context-mode` is selected (`--no-bun`, `-NoBun` to opt out): faster `ctx_execute` and TypeScript. User scope on every OS (Linux upstream script into `~/.bun` with no profile edit, macOS `brew install oven-sh/bun/bun`, Windows upstream `install.ps1`); an existing Bun is reused and never removed; a failed install falls back to Node with one line. With telemetry off, a marked `telemetry = false` block at the top of `~/.bunfig.toml`, removed by `--uninstall`.
-- CI job `real-bun` (Ubuntu, macOS, Windows): Bun found by Context Mode through the MCP client, reuse, `--no-bun`, fallback and uninstall; `real-proxy` also checks Bun through the proxy.
-
-### Fixed
-
-- A Claude-only install with `--tools playwright-extension` no longer gets the Playwright and `ToolSearch` rule lines.
-
 ## [0.5.0] - 2026-11-04
 
 ### Added
@@ -37,6 +28,8 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - Plan and research for full Antigravity support (app and CLI on macOS, Windows and Linux): `docs/SPEC.md` session 11, `docs/compatibility.md`, both READMEs.
 - Opt-in `--tools playwright-extension`: Playwright MCP in extension mode (`--extension`) for OpenCode, Copilot CLI, VS Code Copilot and Cursor, so agents use your own signed-in Chrome on pages behind single sign-on. The installer prints the Chrome Web Store link; `docs/browser-extension.md` covers the optional auto-approve token, which lean-agents never asks for, stores or prints.
 - CI job `bench-context-mode`: Context Mode `ctx_execute` with Node only and with Bun on Ubuntu, macOS and Windows, numbers in the job summary.
+- Bun for Context Mode, on by default when `context-mode` is selected (`--no-bun`, `-NoBun` to opt out): faster `ctx_execute` and TypeScript. User scope on every OS (Linux upstream script into `~/.bun` with no profile edit, macOS `brew install oven-sh/bun/bun`, Windows upstream `install.ps1`); an existing Bun is reused and never removed; a failed install falls back to Node with one line. With telemetry off, a marked `telemetry = false` block at the top of `~/.bunfig.toml`, removed by `--uninstall`.
+- CI job `real-bun` (Ubuntu, macOS, Windows): Bun found by Context Mode through the MCP client, reuse, `--no-bun`, fallback and uninstall; `real-proxy` also checks Bun through the proxy.
 
 ### Changed
 
@@ -50,6 +43,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - The OpenCode undo no longer leaves `~/.agents/skills` when another agent is detected.
 - Real-binary test scripts run agent CLIs only after HOME is a throwaway.
 - With `--home`, `XDG_CACHE_HOME`, `XDG_DATA_HOME` and `XDG_STATE_HOME` outside it are dropped.
+- A Claude-only install with `--tools playwright-extension` no longer gets the Playwright and `ToolSearch` rule lines.
 
 ## [0.4.0] - 2026-10-31
 

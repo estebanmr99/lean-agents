@@ -469,7 +469,8 @@ Mark each `[x]` when merged.
 - [ ] **Session 10 — Parallel agent sessions.** Coordinator plus one worker per task in its own git worktree, prompt files, status, one-at-a-time merges; Orca when installed, plain git worktree otherwise. Starts after sessions 6 and 8 merge.
 - [ ] **Session 11 — Antigravity full setup.** Antigravity app and CLI on macOS, Windows and Linux.
 - [x] **Session 12 — Release readiness.** OpenCode + GitHub Copilot demo path, signed-in browser through the Playwright Extension, issue #6, Bun benchmark, Gemini CLI research, 0.5.0 release notes. No tag.
-- [ ] **Session 13 — Bun for Context Mode.** Bun installed by default at user scope when Context Mode is selected (`--no-bun` opts out), faster `ctx_execute` and TypeScript. Fixes the Playwright rule line for Claude-only installs.
+- [x] **Session 13 — Bun for Context Mode** (PR #14). Bun installed by default at user scope when Context Mode is selected (`--no-bun` opts out), faster `ctx_execute` and TypeScript. Fixes the Playwright rule line for Claude-only installs.
+- [ ] **Session 14 — 0.5.0 final check.** README audit for the demo, proxy, menus, VS Code Copilot, Cursor, `--project`, Playwright extension and Bun; CHANGELOG 0.5.0 complete; release dry run in a scratch clone. No tag.
 
 ### Session 3 — Windows + OpenCode 1.x + wider CI
 
@@ -655,6 +656,17 @@ Branch: `session-13-bun`. Goal: the `--bun` follow-up from the session 12 decisi
 5. **Playwright rule fix:** `playwright-extension` alone adds no Playwright rule lines for a Claude-only install.
 
 Done when: the `real-bun` CI job proves install, PATH or `~/.bun/bin` detection through the MCP client (`ctx_doctor`, TypeScript `ctx_execute`), reuse, `--no-bun`, fallback and `--uninstall` on Ubuntu, macOS and Windows, and `real-proxy` shows Bun installed through the proxy.
+
+### Session 14 — 0.5.0 final check
+
+Branch: `session-14-final-check`. Goal: 0.5.0 is ready for the owner to tag; the owner presents it with OpenCode + GitHub Copilot.
+
+1. **READMEs (EN and ES):** every feature from sessions 6, 7, 12 and 13 is explained for a new user, the OpenCode + GitHub Copilot demo path is first and works end to end, the tables match `docs/compatibility.md`, EN and ES say the same. Every installer command shown exits 0 with `--home "$(mktemp -d)" --no-exec --dry-run`. Gaps only, no rewrites.
+2. **CHANGELOG:** the `0.5.0` section includes session 13; nothing that belongs to 0.5.0 stays under Unreleased. Version is 0.5.0 everywhere.
+3. **Release dry run:** `node scripts/release.mjs 0.5.0` in a scratch clone builds the notes and both archives. No tag, no publish, no GitHub release.
+4. **Owner commands:** the exact tag and release commands go in the PR body, not in the repo.
+
+Done when: `npm test` and `scripts/check-private.sh` pass, CI is green and the owner has the PR summary.
 
 ## 15. Definition of done (every session)
 
