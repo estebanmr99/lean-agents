@@ -463,6 +463,7 @@ Mark each `[x]` when merged.
 - [ ] **Session 7 — VS Code Copilot, Cursor, team repos, Claude through Copilot.**
 - [ ] **Session 8 — Terminals: Warp, Orca, or neither.**
 - [ ] **Session 9 — Showcase.** Logo, GIF per use case, who it is for.
+- [ ] **Session 10 — Parallel agent sessions.** Coordinator plus one worker per task in its own git worktree, prompt files, status, one-at-a-time merges; Orca when installed, plain git worktree otherwise. Starts after sessions 6 and 8 merge.
 
 ### Session 3 — Windows + OpenCode 1.x + wider CI
 
@@ -577,6 +578,28 @@ Branch: `session-9-showcase`.
 4. Update `docs/launch.md` and the social preview.
 
 Done when: the `assets` workflow renders every image and GIF, and the owner has checked the frames.
+
+### Session 10 — Parallel agent sessions
+
+Branch: `session-10-parallel-sessions`. Starts after sessions 6 and 8 merge; reuse session 8's Orca install, hook and bypass-mode findings instead of researching them again.
+
+1. **Research** (done 2026-11-03, see `docs/compatibility.md`): Orca orchestration CLI, Claude Code worktrees, background sessions and plan mode, OpenCode `run`, plan agent and server. No agent takes a prompt file; Orca and Claude take the prompt as argv text.
+2. **Skill** `skills/parallel-sessions/SKILL.md` (Agent Skills format, installed like the other skills): the coordinator playbook.
+   - Split the work into tasks that touch different files; shared files only get new lines.
+   - Write one prompt file per task: goal, allowed files, checks to run, "do not push", and how to report (a status file with `running`, `blocked: <question>` or `done`).
+   - Start each worker in plan mode where the agent has one; the coordinator reads only status files and bounded output tails, never full transcripts.
+   - Merge one worker at a time, in the planned order: checks pass, merge into the base branch, rebase the rest, rerun their checks, then the next.
+3. **Helper** `scripts/parallel.mjs` (Node, no new dependencies, commands built as argv arrays, never shell strings): `start <task.md>…`, `status`, `merge <task>`, `clean`.
+   - Prompt files live in the worker's git dir (`git rev-parse --git-path lean-agents/task.md`), so they are never committed and go away with the worktree.
+   - Every agent gets only `Read <path> and follow it.` as its prompt; OpenCode also gets `-f <path>`.
+   - **Orca found** (`orca` that answers `agent-context`): `orca worktree create --name <task> --agent <id> --prompt <instr> --surface terminal --json`; status from `orca worktree ps --json`; bounded output from `orca terminal read --screen --limit`; answers through `orca terminal send --enter`.
+   - **No Orca:** `git worktree add -b <branch> <dir> <base>`, then Claude Code `claude --bg -n <task> --permission-mode plan <instr>` (status: `claude agents`, `claude logs`) or OpenCode `opencode run --dir <dir> --title <task> --agent plan -f <file> <instr>` with output to a log file; when the agent needs a TTY, print the exact command for the user to paste into a new terminal.
+   - Copilot CLI and Antigravity: print-the-command only, until their `-p` mode is verified (**VERIFY**).
+   - `clean` removes only worktrees and branches the helper created and only when merged; never `--force`.
+4. **Uninstall**: `--uninstall` removes the skill; the helper writes nothing outside the repo's git dir.
+5. Docs: `docs/parallel-sessions.md` (EN), README and README.es sections, compatibility rows per agent, CHANGELOG.
+
+Done when: a CI job on Ubuntu and macOS (`tests/real-parallel.sh`), in a throwaway HOME with real git, Claude Code and OpenCode binaries, starts two workers from prompt files with a stub agent that commits and writes `done`, shows both in `status`, merges them one at a time with the second rebased, and `clean` leaves no worktree or branch behind. The same job checks every flag the helper builds against `claude --help`, `opencode run --help` and, where Orca installs per session 8, `orca agent-context --json`. Unit tests in `tests/engine.test.mjs` cover argv building, prompt paths and merge order. A run with a real model stays **VERIFY** (needs a login).
 
 ## 15. Definition of done (every session)
 
