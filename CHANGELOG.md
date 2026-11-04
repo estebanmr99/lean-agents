@@ -17,6 +17,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - `docs/SECURITY-REVIEW.md`: a prompt any agent runs on this repo before install.
 - CI: `real-proxy` (install through squid with direct traffic blocked, all-off preset, gh and agy behind the proxy), a pty test for the menus, no-TTY checks in PowerShell 5.1 and Git Bash, `gh` through winget.
 - `docs/compatibility.md` "Terminals": Warp and Orca install routes, the hooks Orca adds, its permission modes and how to keep approvals on. Research only; the installer does not offer either app yet.
+- Plan for session 10 (parallel agent sessions) in `docs/SPEC.md`, with the research in `docs/compatibility.md`.
 
 ### Changed
 
