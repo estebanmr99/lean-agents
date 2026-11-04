@@ -4,6 +4,11 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Added
+
+- `scripts/parallel.mjs` (`start`, `status`, `merge`, `clean`) and the `parallel-sessions` skill: one worker per task in its own git worktree (Orca when installed, plain `git worktree` otherwise), prompt and status files, one-at-a-time merges with a rebase of the rest. Each worker gets a model tier (`cheap`, `balanced`, `strong`; default by role: plan strong, build balanced, explore and research cheap) mapped through the model profiles. `--doctor` lists workers left in the repo.
+- CI job `real-parallel`: real git worktrees and a stub agent on Ubuntu and macOS; flags checked against real Claude Code and OpenCode.
+
 ## [0.5.0] - 2026-11-04
 
 ### Added

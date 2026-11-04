@@ -153,6 +153,19 @@ git add AGENTS.md .github .vscode .cursor && git commit -m "chore: add lean-agen
 
 On Windows: `& ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -Project . -DryRun -Tools serena -Yes`. Later, `--project . --update` re-applies your saved choices, and `--project . --uninstall` removes only what lean-agents added. Team mode writes files only. Each teammate still runs the installer once for the tools the rules mention (RTK, Context Mode and the rest), and their state stays in their own home folder, never in the repo.
 
+## Parallel agent sessions
+
+One agent per task, each in its own git worktree, merged one at a time. Orca is used when installed, plain `git worktree` otherwise. Each task picks a model tier (`role: plan|build|explore|research` in its prompt file: strong, balanced, cheap), mapped through the model profiles.
+
+```bash
+node scripts/parallel.mjs start api.md ui.md   # from inside your repo
+node scripts/parallel.mjs status
+node scripts/parallel.mjs merge api --yes      # in start order
+node scripts/parallel.mjs clean
+```
+
+Playbook: `skills/parallel-sessions`. Details: [docs/parallel-sessions.md](docs/parallel-sessions.md).
+
 ## Claude through GitHub Copilot
 
 If your company pays for GitHub Copilot, the official way to use Claude as an agent is the **Claude coding agent**, a Copilot partner agent that an admin turns on. lean-agents installs nothing for it, because it is a policy switch, not a package. Tools that reuse a Copilot token to run the Claude Code CLI are not official and not supported. Steps and admin settings: [docs/claude-with-copilot.md](docs/claude-with-copilot.md).
@@ -225,7 +238,8 @@ lean-agents is glue. The heavy lifting is done by these projects; please star th
 - [x] Windows installer and OpenCode 1.x
 - [x] Copilot CLI, Antigravity CLI, Codeburn, AutoSkills, GSD, original skills, model profiles
 - [x] VS Code Copilot, Cursor, team mode (`--project`), Claude through Copilot
-- [ ] Planned: terminals (Warp, Orca), parallel agent sessions, full Antigravity setup (app, and the CLI on Windows)
+- [x] Parallel agent sessions (`scripts/parallel.mjs`)
+- [ ] Planned: terminals (Warp, Orca), full Antigravity setup (app, and the CLI on Windows)
 - [ ] `v1.0.0`
 - Later: Codex CLI, Gemini CLI
 

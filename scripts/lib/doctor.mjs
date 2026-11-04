@@ -5,6 +5,7 @@ import { sha } from './fsops.mjs';
 import { version, quiet } from './system.mjs';
 import { adhdSkillFiles } from './adhd.mjs';
 import { proxyReport } from './network.mjs';
+import { leftovers } from './parallel.mjs';
 
 const CORE_AGENTS = ['debug', 'explore', 'planner', 'research', 'review'];
 const SECRET_KEY = /(key|token|secret|password|auth)/i;
@@ -107,6 +108,8 @@ export function doctor({ home, state, exec }) {
       if (o.tools.includes('autoskills')) add('autoskills runs', quiet(['npx', '-y', 'autoskills', '--help'], 120000).ok ? 'ok' : 'error');
     }
   }
+  const left = leftovers(process.cwd());
+  if (left.length) add('parallel workers', 'changed', `left in this repo: ${left.join(', ')} (merge them, then run scripts/parallel.mjs clean)`);
   for (const line of proxyReport()) add('network env', 'ok', line);
   print(rows);
   return !rows.some((r) => r.status === 'error' || r.status === 'missing');

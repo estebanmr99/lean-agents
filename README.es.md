@@ -153,6 +153,19 @@ git add AGENTS.md .github .vscode .cursor && git commit -m "chore: add lean-agen
 
 En Windows: `& ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -Project . -DryRun -Tools serena -Yes`. Después, `--project . --update` vuelve a aplicar tus opciones guardadas y `--project . --uninstall` quita solo lo que añadió lean-agents. El modo equipo solo escribe archivos. Cada persona del equipo ejecuta el instalador una vez para las herramientas que mencionan las reglas (RTK, Context Mode y las demás), y su estado se guarda en su propia carpeta de usuario, nunca en el repo.
 
+## Sesiones de agentes en paralelo
+
+Un agente por tarea, cada uno en su propio git worktree, y las fusiones de una en una. Usa Orca si está instalado y `git worktree` si no. Cada tarea elige un nivel de modelo (`role: plan|build|explore|research` en su archivo de prompt: fuerte, equilibrado, barato), traducido con los perfiles de modelos.
+
+```bash
+node scripts/parallel.mjs start api.md ui.md   # desde dentro de tu repo
+node scripts/parallel.mjs status
+node scripts/parallel.mjs merge api --yes      # en el orden de inicio
+node scripts/parallel.mjs clean
+```
+
+Guía: `skills/parallel-sessions`. Detalles (en inglés): [docs/parallel-sessions.md](docs/parallel-sessions.md).
+
 ## Claude a través de GitHub Copilot
 
 Si tu empresa paga GitHub Copilot, la forma oficial de usar Claude como agente es el **agente de código Claude**, un agente asociado de Copilot que activa un administrador. lean-agents no instala nada para esto, porque es un ajuste de políticas, no un paquete. Las herramientas que reutilizan un token de Copilot para ejecutar la CLI de Claude Code no son oficiales y no están soportadas. Pasos y ajustes de administración (en inglés): [docs/claude-with-copilot.md](docs/claude-with-copilot.md).
@@ -213,7 +226,8 @@ Ver la sección de créditos en el [README en inglés](README.md#credits).
 - [x] Instalador para Windows y OpenCode 1.x
 - [x] Copilot CLI, Antigravity CLI, Codeburn, AutoSkills, GSD, skills propias, perfiles de modelos
 - [x] VS Code Copilot, Cursor, modo equipo (`--project`), Claude a través de Copilot
-- [ ] Planeado: terminales (Warp, Orca), sesiones de agentes en paralelo, configuración completa de Antigravity (app, y la CLI en Windows)
+- [x] Sesiones de agentes en paralelo (`scripts/parallel.mjs`)
+- [ ] Planeado: terminales (Warp, Orca), configuración completa de Antigravity (app, y la CLI en Windows)
 - [ ] `v1.0.0`
 - Más adelante: Codex CLI, Gemini CLI
 
