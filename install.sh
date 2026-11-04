@@ -38,7 +38,8 @@ ensure_tool git git https://git-scm.com/downloads || true
 ensure_tool node node https://nodejs.org/ || true
 if have node; then
   major="$(node -p 'process.versions.node.split(".")[0]')"
-  (( major >= 20 )) || die "Node.js 20 or newer is required (found $(node --version)). Update from https://nodejs.org/"
+  minor="$(node -p 'process.versions.node.split(".")[1]')"
+  (( major > 20 || (major == 20 && minor >= 12) )) || die "Node.js 20.12 or newer is required (found $(node --version)). Update from https://nodejs.org/"
 else
   die "Node.js is required for the engine. Install it and run this again."
 fi
@@ -57,7 +58,7 @@ else
   git clone --quiet --depth 1 --branch "$REF" "$REPO_URL" "$SRC"
 fi
 
-if [[ ! -d "$SRC/node_modules/jsonc-parser" ]]; then
+if [[ ! -d "$SRC/node_modules/jsonc-parser" || ! -d "$SRC/node_modules/@clack/prompts" ]]; then
   (cd "$SRC" && npm ci --omit=dev --silent --no-audit --no-fund) || die "npm install failed in $SRC"
 fi
 

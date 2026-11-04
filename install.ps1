@@ -49,8 +49,8 @@ Install-Prerequisite 'git' 'Git.Git' 'https://git-scm.com/downloads'
 Install-Prerequisite 'node' 'OpenJS.NodeJS.LTS' 'https://nodejs.org/'
 if (-not (Test-Command 'node')) { throw 'lean-agents: Node.js is required for the engine. Install it and run this again.' }
 $nodeVersion = & node --version
-if ([int]$nodeVersion.TrimStart('v').Split('.')[0] -lt 20) {
-  throw "lean-agents: Node.js 20 or newer is required (found $nodeVersion). Update from https://nodejs.org/"
+if ([version]$nodeVersion.TrimStart('v') -lt [version]'20.12.0') {
+  throw "lean-agents: Node.js 20.12 or newer is required (found $nodeVersion). Update from https://nodejs.org/"
 }
 
 # Use the checkout this script lives in, if any; otherwise clone or update the source folder.
@@ -67,7 +67,7 @@ if ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot 'scripts\lean.mjs')))
   Assert-Success 'git clone'
 }
 
-if (-not (Test-Path (Join-Path $Src 'node_modules\jsonc-parser'))) {
+if (-not (Test-Path (Join-Path $Src 'node_modules\jsonc-parser')) -or -not (Test-Path (Join-Path $Src 'node_modules\@clack\prompts'))) {
   npm ci --prefix $Src --omit=dev --silent --no-audit --no-fund
   Assert-Success "npm install in $Src"
 }

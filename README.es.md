@@ -34,7 +34,7 @@ Windows PowerShell:
 
 Empieza siempre con `--dry-run`: muestra cada archivo y comando antes de cambiar nada. En PowerShell las mismas opciones van en PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`.
 
-Context Mode necesita Node.js 22.5 o superior. Todo lo demás funciona con Node.js 20.
+Context Mode necesita Node.js 22.5 o superior. Todo lo demás funciona con Node.js 20.12.
 
 ## Por qué
 
