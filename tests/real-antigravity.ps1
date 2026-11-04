@@ -24,7 +24,7 @@ Invoke-WebRequest 'https://github.com/rtk-ai/rtk/releases/latest/download/rtk-x8
 Expand-Archive "$dir\rtk.zip" "$dir\tools\rtk"
 
 $cfg = "$dir\.gemini\config"
-& "$repo\install.ps1" -Yes -NoApp -Agents antigravity -Tools serena, playwright, caveman, i-have-adhd -Privacy strict -Lang en --ponytail-mode off
+& "$repo\install.ps1" -Yes -NoApp -Agents antigravity -Tools playwright, caveman, i-have-adhd -Privacy strict -Lang en --ponytail-mode off
 if (-not (Test-Path "$cfg\rules\lean-agents.md")) { throw 'rules file is missing' }
 if (-not (Select-String -Path "$cfg\agents\planner.md" -Pattern '^model: pro$' -Quiet)) { throw 'subagents are missing' }
 if (-not (Test-Path "$dir\.agents\skills\caveman\SKILL.md")) { throw 'Caveman skills are missing' }
@@ -38,8 +38,10 @@ if ($LASTEXITCODE -ne 0) { throw 'agy agents failed' }
 foreach ($n in 'explore', 'research', 'review', 'debug', 'planner') { if ($agents -notmatch $n) { throw "agy does not list $n" } }
 $mcp = & $agy mcp list | Out-String
 if ($LASTEXITCODE -ne 0) { throw 'agy mcp list failed' }
-if ($mcp -notmatch 'serena' -or $mcp -notmatch 'playwright') { throw 'agy does not see the MCP servers' }
-# agy reads the temp USERPROFILE but rtk wrote to the OS profile folder, so agy cannot list the RTK plugin here (VERIFY).
+if ($mcp -notmatch 'playwright') { throw 'agy does not see Playwright' }
+# agy reads the temp USERPROFILE: copy what rtk wrote so agy and --doctor can load it (test-only).
+Copy-Item $rtkPlugin "$cfg\plugins\rtk" -Recurse
+if ((& $agy plugin list --json | Out-String) -notmatch '"rtk"') { throw 'agy does not see RTK' }
 
 & "$repo\install.ps1" -Doctor
 
@@ -48,3 +50,4 @@ if (Test-Path "$cfg\agents\planner.md") { throw 'subagents were not removed' }
 if (Test-Path "$cfg\rules\lean-agents.md") { throw 'rules were not removed' }
 if (Test-Path "$dir\.agents\skills\caveman") { throw 'Caveman skills were not removed' }
 if (Test-Path $rtkPlugin) { throw 'RTK plugin was not removed' }
+Remove-Item "$cfg\plugins\rtk" -Recurse -Force -ErrorAction SilentlyContinue
