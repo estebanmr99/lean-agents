@@ -93,6 +93,28 @@ export function prereqFor(tool, pm) {
   }
 }
 
+// Antigravity CLI and app, only when the user picked Antigravity. Only ids checked upstream (2026-11-03) run;
+// the rest print the vendor link. Windows CLI: `Google.AntigravityCLI` has no documented scope, so install.ps1 stays manual.
+export function antigravityPrereqs(pm, platform, home, app = true) {
+  const out = [];
+  const winApp = pm === 'winget' && platform === 'win32';
+  if (!which('agy')) {
+    out.push(platform === 'darwin' && pm === 'brew'
+      ? { desc: 'install agy', run: [['brew', 'install', '--cask', 'antigravity-cli']] }
+      : { desc: `agy is missing: install it from https://antigravity.google/docs/getting-started`, run: [], manual: true });
+  }
+  if (!app) return out;
+  const appInstalled = platform === 'darwin'
+    ? exists('/Applications/Antigravity.app') || exists(path.join(home, 'Applications', 'Antigravity.app'))
+    : winApp && quiet(['winget', 'list', '--id', 'Google.Antigravity', '-e']).ok;
+  if (!appInstalled) {
+    if (platform === 'darwin' && pm === 'brew') out.push({ desc: 'install the Antigravity app', run: [['brew', 'install', '--cask', 'antigravity']] });
+    else if (winApp) out.push({ desc: 'install the Antigravity app', run: [['winget', 'install', '--id', 'Google.Antigravity', '-e', '--scope', 'user', '--accept-source-agreements', '--accept-package-agreements']] });
+    else out.push({ desc: 'The Antigravity app is optional: download it from https://antigravity.google/download', note: true });
+  }
+  return out;
+}
+
 // Bun for Context Mode (JS/TS in ctx_execute). One route per OS; the undo is recorded only when this install ran.
 // Linux: an unknown SHELL makes the upstream script skip the shell profile edit. Windows: the script adds ~\.bun\bin to the user PATH.
 export function bunInstall(home, dir, platform, pm) {

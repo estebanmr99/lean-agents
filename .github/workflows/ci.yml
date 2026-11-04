@@ -431,6 +431,19 @@ jobs:
       - name: Install, ask agy what loaded, doctor, uninstall
         run: bash tests/real-antigravity.sh
 
+  real-antigravity-windows:
+    # Real Antigravity CLI on Windows through install.ps1, throwaway USERPROFILE.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Install, ask agy what loaded, doctor, uninstall
+        shell: pwsh
+        run: ./tests/real-antigravity.ps1
+
   bench-context-mode:
     # Context Mode ctx_execute with Node only, then with Bun (session 11, items 8 and 9). Numbers go to the job summary.
     strategy:

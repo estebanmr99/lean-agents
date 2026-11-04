@@ -17,7 +17,7 @@ unset XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 dir="$HOME/.gemini/config"
 
-bash "$repo/install.sh" --yes --agents antigravity --tools serena,playwright,caveman,i-have-adhd,gsd \
+bash "$repo/install.sh" --yes --no-app --agents antigravity --tools serena,playwright,caveman,i-have-adhd,gsd \
   --privacy strict --lang en --ponytail-mode off </dev/null 2>&1 | tee "$HOME/install.txt"
 refute grep -qE '^ *! ' "$HOME/install.txt"
 

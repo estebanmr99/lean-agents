@@ -19,7 +19,7 @@ The same rules, cheap-by-default subagents, context-saving tools and MCP servers
 
 </div>
 
-> **Status: v0.5 preview.** The installer works for **Claude Code**, **OpenCode 1.x and 2.x**, **GitHub Copilot CLI**, **Antigravity CLI**, **VS Code Copilot** and **Cursor** on macOS, Linux and Windows (Antigravity: macOS and Linux). Star the repo to get notified when `v1.0.0` ships.
+> **Status: v0.5 preview.** The installer works for **Claude Code**, **OpenCode 1.x and 2.x**, **GitHub Copilot CLI**, **Antigravity CLI**, **VS Code Copilot** and **Cursor** on macOS, Linux and Windows. Star the repo to get notified when `v1.0.0` ships.
 
 <img src="docs/assets/demo.gif" alt="install.sh --dry-run listing every file and command it would change" width="720">
 
@@ -41,7 +41,7 @@ Prefer your agent to do it? Paste a prompt from [INSTALL_WITH_AGENT.md](INSTALL_
 
 Always start with `--dry-run`: it shows every file and command before anything changes. Then run it again without `--dry-run`; it asks which agents, tools, privacy level, language and model profile you want. Useful flags: `--all-tools`, `--privacy strict`, `--lang es`, `--profile vertex-gemini`, `--update`, `--uninstall`, `--doctor` (`--help` lists them all). In PowerShell the common flags are PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`. Any other flag is passed as it is, for example `-DryRun --network off`.
 
-Context Mode needs Node.js 22.5 or newer. Everything else works on Node.js 20.12. With Context Mode, the installer also sets up Bun by default (faster `ctx_execute`); add `--no-bun` (`-NoBun` in PowerShell) to skip it. See the Bun row in [Install tiers](#install-tiers).
+Context Mode needs Node.js 22.5 or newer. Everything else works on Node.js 20.12. With Context Mode, the installer also sets up Bun by default (faster `ctx_execute`); add `--no-bun` (`-NoBun` in PowerShell) to skip it. With Antigravity, `--no-app` (`-NoApp`) skips installing the app. See the Bun row in [Install tiers](#install-tiers).
 
 ## Demo: OpenCode with GitHub Copilot models
 
@@ -105,7 +105,7 @@ Claude Desktop and Cursor demo paths come later.
 | Signed-in browser (opt-in) | ✅ opt-in | ✅ opt-in | ➖ per user |
 | Caveman, i-have-adhd skills | ⚠️ written, load unproven | ⚠️ written, load unproven | ➖ per user |
 
-**Planned: full Antigravity support.** Today lean-agents sets up the Antigravity CLI (`agy`) on macOS and Linux. Next it adds the Antigravity desktop app and the CLI on Windows. The upstream docs say the app and the CLI read the same rules, subagents, skills and MCP servers, so one setup would serve both on macOS, Windows and Linux. Each part ships only once CI proves it with real binaries. Plan: [Session 11](docs/SPEC.md#session-11--antigravity-full-setup).
+**Antigravity app and CLI.** The app and the CLI read the same `~/.gemini/config` files, so one setup serves both on macOS, Linux and Windows (the CLI on Windows is proven in CI with real `agy`). With Antigravity selected, lean-agents installs the CLI and the app with Homebrew (macOS) or the app with winget (Windows); otherwise it prints the vendor link. **VERIFY:** that the app loads the rules, subagents, skills and MCP servers, where its MCP file is, and its settings keys: CI cannot run the app or log in, so these are unproven.
 
 ## Warp and Orca
 
@@ -250,7 +250,7 @@ lean-agents is glue. The heavy lifting is done by these projects; please star th
 - [x] VS Code Copilot, Cursor, team mode (`--project`), Claude through Copilot
 - [x] Parallel agent sessions (`scripts/parallel.mjs`)
 - [x] Warp and Orca agent integrations for users who already have them
-- [ ] Planned: full Antigravity setup (app, and the CLI on Windows)
+- [x] Antigravity app and CLI on macOS, Linux and Windows (app loading stays VERIFY)
 - [ ] `v1.0.0`
 - Later: Codex CLI, Gemini CLI
 
