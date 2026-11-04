@@ -4,6 +4,8 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-04
+
 ### Added
 
 - `docs/launch.md`, a README banner, and an `assets` workflow that renders the demo GIF and social preview in CI.
