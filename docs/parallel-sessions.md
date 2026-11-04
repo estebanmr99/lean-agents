@@ -46,4 +46,6 @@ Run inside the repository (or pass `--repo <dir>`).
 - **OpenCode**: `opencode run --title <task> --agent plan -m <model> -f <file>`, started with the worktree as working directory.
 - **Anything else, or no binary**: the helper prints the command to paste into a new terminal. Copilot CLI and Antigravity stay print-only (VERIFY).
 
+Workers start in plan mode (Claude Code `--permission-mode plan`, OpenCode `--agent plan`): approve a worker's plan in its session before it edits and commits.
+
 Prompt, status and log files live in `<git dir>/lean-agents/<task>/`, so they are never committed. `clean` removes them; `--doctor` lists workers left in the current repo. Facts and sources: `docs/compatibility.md`.

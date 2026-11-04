@@ -169,7 +169,10 @@ export function start(cwd, files, opts = {}) {
       worker.dir = adoptOrcaBranch(top, task.name, branch);
     } else {
       worker.dir = path.join(`${top}.lean`, task.name);
+      if (agent === 'custom' && !opts.cmd) throw new Error('--agent custom needs --cmd <program>');
       gitOrThrow(top, ['worktree', 'add', '-b', branch, worker.dir, base]);
+      data.workers.push(worker);
+      saveWorkers(stateDir, data);
       if (agent === 'custom') {
         argv = [opts.cmd, promptFile];
       } else if (agent !== 'print') {
@@ -185,7 +188,7 @@ export function start(cwd, files, opts = {}) {
         spawn(argv[0], argv.slice(1), { cwd: worker.dir, detached: true, stdio: ['ignore', fd, fd] }).unref();
       }
     }
-    data.workers.push(worker);
+    if (!data.workers.includes(worker)) data.workers.push(worker);
     saveWorkers(stateDir, data);
     out.push(worker);
   }
@@ -197,7 +200,7 @@ export function status(cwd) {
   return loadWorkers(stateDir).workers.map((w) => ({
     ...w,
     status: statusOf(stateDir, w.name),
-        tail: logTail(stateDir, w.name),
+    tail: logTail(stateDir, w.name),
   }));
 }
 
@@ -220,16 +223,20 @@ export function merge(cwd, name) {
     const r = spawnSync(bin, args, { cwd: w.dir, encoding: 'utf8' });
     if (r.status !== 0) throw new Error(`check "${w.check}" failed:\n${(r.stdout ?? '').slice(-LOG_TAIL_BYTES)}${(r.stderr ?? '').slice(-LOG_TAIL_BYTES)}`);
   }
-  gitOrThrow(top, ['merge', '--no-ff', '--no-edit', w.branch]);
+  const m = git(top, ['merge', '--no-ff', '--no-edit', w.branch]);
+  if (!m.ok) { git(top, ['merge', '--abort']); throw new Error(`merge of "${name}" conflicts; resolve it in ${w.dir} (rebase on ${data.base}) and retry`); }
   w.merged = true;
   saveWorkers(stateDir, data);
   const rebased = [];
+  const skipped = [];
   for (const o of data.workers) {
     if (o.merged) continue;
-    const r = git(o.dir, ['rebase', data.base]);
-    if (!r.ok) { git(o.dir, ['rebase', '--abort']); throw new Error(`rebase of "${o.name}" conflicts; resolve it in ${o.dir}`); }
-    rebased.push(o.name);
+    // A running worker has a dirty tree and would be disturbed; it rebases itself or at its own merge.
+    if (statusOf(stateDir, o.name) !== 'done' || git(o.dir, ['status', '--porcelain']).out) { skipped.push(o.name); continue; }
+    if (git(o.dir, ['rebase', data.base]).ok) rebased.push(o.name);
+    else { git(o.dir, ['rebase', '--abort']); skipped.push(o.name); }
   }
+  if (skipped.length) console.error(`not rebased (running, dirty or conflicting): ${skipped.join(', ')}; rebase them in their worktree before their merge`);
   return rebased;
 }
 
@@ -241,8 +248,8 @@ export function clean(cwd) {
   const removed = [];
   for (const w of data.workers) {
     if (!w.merged) { kept.push(w); continue; }
-    gitOrThrow(top, ['worktree', 'remove', w.dir]);
-    gitOrThrow(top, ['branch', '-d', w.branch]);
+    if (fs.existsSync(w.dir)) gitOrThrow(top, ['worktree', 'remove', w.dir]);
+    if (git(top, ['rev-parse', '--verify', '-q', w.branch]).ok) gitOrThrow(top, ['branch', '-d', w.branch]);
     fs.rmSync(path.join(stateDir, w.name), { recursive: true, force: true });
     removed.push(w.name);
   }

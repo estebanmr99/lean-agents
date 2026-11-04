@@ -48,7 +48,8 @@ done
 [ "$n" = 2 ] || fail "workers did not finish"
 
 refute "${PAR[@]}" merge two --yes
-"${PAR[@]}" merge one --yes | grep -q 'rebased two' || fail "second worker was not rebased"
+out="$("${PAR[@]}" merge one --yes)"
+grep -q 'rebased two' <<< "$out" || fail "second worker was not rebased"
 "${PAR[@]}" merge two --yes
 if [ ! -f "$WORK/proj/one.txt" ] || [ ! -f "$WORK/proj/two.txt" ]; then fail "merged files missing"; fi
 
