@@ -470,7 +470,8 @@ Mark each `[x]` when merged.
 - [x] **Session 11 — Antigravity full setup.** CLI on Windows (real `agy` in CI), CLI and app installed through verified brew and winget ids, vendor link otherwise. One adapter serves app and CLI; no `config.json` keys written (none documented). Bun (item 8) skipped: session 13 shipped it. Open: app loading, app MCP path, settings keys, CLI winget scope stay VERIFY.
 - [x] **Session 12 — Release readiness.** OpenCode + GitHub Copilot demo path, signed-in browser through the Playwright Extension, issue #6, Bun benchmark, Gemini CLI research, 0.5.0 release notes. No tag.
 - [x] **Session 13 — Bun for Context Mode** (PR #14). Bun installed by default at user scope when Context Mode is selected (`--no-bun` opts out), faster `ctx_execute` and TypeScript. Fixes the Playwright rule line for Claude-only installs.
-- [ ] **Session 14 — 0.5.0 final check.** README audit for the demo, proxy, menus, VS Code Copilot, Cursor, `--project`, Playwright extension and Bun; CHANGELOG 0.5.0 complete; release dry run in a scratch clone. No tag.
+- [x] **Session 14 — 0.5.0 final check.** README audit for the demo, proxy, menus, VS Code Copilot, Cursor, `--project`, Playwright extension and Bun; CHANGELOG 0.5.0 complete; release dry run in a scratch clone. No tag.
+- [ ] **Session 15 — README look and feel.** Hero, one badge row, table of contents, collapsible long sections, consistent tables in README EN and ES; a script checks links, anchors, EN/ES parity and that every shown installer command exits 0 in a dry run. 0.5.0 CHANGELOG housekeeping. No feature claims change.
 
 ### Session 3 — Windows + OpenCode 1.x + wider CI
 
@@ -669,6 +670,17 @@ Branch: `session-14-final-check`. Goal: 0.5.0 is ready for the owner to tag; the
 4. **Owner commands:** the exact tag and release commands go in the PR body, not in the repo.
 
 Done when: `npm test` and `scripts/check-private.sh` pass, CI is green and the owner has the PR summary.
+
+### Session 15 — README look and feel
+
+Branch: `session-15-readme`. Goal: both READMEs look professional on the GitHub page and are easy to skim for a team demo. Content stays true; no feature claim changes.
+
+1. **Audit** both READMEs (structure, scannability, links and anchors, table widths, heading levels, image alt text), list findings, then plan.
+2. **Improve:** short hero (one-line value, one badge row, the demo path as the first call to action), table of contents, `<details>` for long per-agent sections, consistent tables, no walls of text. EN and ES keep the same structure.
+3. **Check by script** (`scripts/check-readme.mjs`, run by `npm test`): relative links and `#anchors` resolve, EN and ES have the same headings and table rows, every installer command shown exits 0 with `--home <temp dir> --no-exec --dry-run --yes`.
+4. **Housekeeping:** 0.5.0 is untagged, so the CHANGELOG `Unreleased` items move into `[0.5.0]`; `node scripts/release.mjs 0.5.0` in a scratch clone lists Warp/Orca, parallel sessions and Antigravity. No tag.
+
+Done when: `npm test` and `scripts/check-private.sh` pass and CI is green.
 
 ## 15. Definition of done (every session)
 
