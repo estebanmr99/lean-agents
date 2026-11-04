@@ -17,7 +17,7 @@ export function opencodeV1Adapter({ home, core, profile, opts, rulesPath }) {
     ...profileEdits(profile, 'agent'),
   ];
 
-  for (const name of ['serena', 'playwright']) {
+  for (const name of ['serena', 'playwright', 'playwright-extension']) {
     if (tools.includes(name)) edits.push({ path: ['mcp', name], value: localServer(core, name), mode: 'setIfAbsent' });
   }
   // Context Mode is plugin-only here: plugin plus MCP breaks OpenCode tool registration.

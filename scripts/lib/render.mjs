@@ -47,8 +47,8 @@ export function renderRules(root, { lang, tools }) {
   const hasTool = (...names) => names.some((name) => tools.includes(name));
   const toolRules =
     (hasTool('context-mode') ? t.contextMode : '') +
-    (hasTool('playwright') ? t.playwright : '') +
-    (hasTool('context-mode', 'playwright', 'serena') ? t.load : '');
+    (hasTool('playwright', 'playwright-extension') ? t.playwright : '') +
+    (hasTool('context-mode', 'playwright', 'playwright-extension', 'serena') ? t.load : '');
   const header = `<!-- ${'managed by lean-agents'}: edit core/AGENTS.md upstream or add your own rules in a separate file -->\n`;
   return (
     header +

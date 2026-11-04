@@ -41,7 +41,7 @@ export function copilotAdapter({ home, core, profile, opts, rules, adhdCommand }
     actions.push({ kind: 'file', path: path.join(dir, 'agents', `${agent.name}.agent.md`), content: renderCopilotAgent(agent, profile) });
   }
   const edits = [];
-  for (const name of ['serena', 'playwright'].filter((t) => tools.includes(t))) {
+  for (const name of ['serena', 'playwright', 'playwright-extension'].filter((t) => tools.includes(t))) {
     const [command, ...args] = localServer(core, name).command;
     edits.push({ path: ['mcpServers', name], value: { type: 'local', command, args, tools: ['*'] }, mode: 'setIfAbsent' });
   }

@@ -118,7 +118,7 @@ export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
     ...profileEdits(profile, 'agents'),
   ];
 
-  for (const name of ['context-mode', 'serena', 'playwright']) {
+  for (const name of ['context-mode', 'serena', 'playwright', 'playwright-extension']) {
     if (tools.includes(name)) edits.push({ path: ['mcp', 'servers', name], value: localServer(core, name), mode: 'setIfAbsent' });
   }
   if (tools.includes('ponytail')) edits.push({ path: ['plugins'], value: '@dietrichgebert/ponytail', mode: 'arrayAdd' });

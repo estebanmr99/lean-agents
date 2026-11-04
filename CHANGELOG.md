@@ -24,6 +24,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - `docs/claude-with-copilot.md`: the official route to Claude through GitHub Copilot (partner agent); token proxies are documented as not supported.
 - CI jobs `real-cursor` and `real-vscode`: real Cursor CLI and VS Code CLI in a throwaway HOME, Linux and macOS.
 - Plan and research for full Antigravity support (app and CLI on macOS, Windows and Linux): `docs/SPEC.md` session 11, `docs/compatibility.md`, both READMEs.
+- Opt-in `--tools playwright-extension`: Playwright MCP in extension mode (`--extension`) for OpenCode, Copilot CLI, VS Code Copilot and Cursor, so agents use your own signed-in Chrome on pages behind single sign-on. The installer prints the Chrome Web Store link; `docs/browser-extension.md` covers the optional auto-approve token, which lean-agents never asks for, stores or prints.
 
 ### Changed
 

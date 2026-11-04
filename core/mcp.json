@@ -13,6 +13,12 @@
       "command": ["npx", "-y", "@playwright/mcp@latest"],
       "optional": true
     },
+    "playwright-extension": {
+      "description": "Playwright MCP attached to the user's own signed-in Chrome or Edge through the Playwright Extension.",
+      "upstream": "https://github.com/microsoft/playwright-mcp",
+      "command": ["npx", "-y", "@playwright/mcp@latest", "--extension"],
+      "optional": true
+    },
     "context-mode": {
       "description": "Keeps large tool outputs out of the context window. Used as MCP only where its plugin is unavailable.",
       "upstream": "https://github.com/mksglu/context-mode",

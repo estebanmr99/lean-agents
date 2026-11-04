@@ -22,7 +22,7 @@ export function renderCursorAgent(agent) {
 
 // `mcpServers` entries for a Cursor mcp.json, user or project.
 export function cursorServers(core, tools) {
-  return ['serena', 'playwright', 'context-mode'].filter((t) => tools.includes(t)).map((name) => {
+  return ['serena', 'playwright', 'playwright-extension', 'context-mode'].filter((t) => tools.includes(t)).map((name) => {
     const [command, ...args] = localServer(core, name).command;
     return { path: ['mcpServers', name], value: { command, args }, mode: 'setIfAbsent' };
   });

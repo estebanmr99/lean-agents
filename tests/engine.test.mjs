@@ -630,3 +630,29 @@ test('with --home, %APPDATA% outside it is never written (Ponytail, VS Code)', {
   assert.ok(fs.existsSync(path.join(roaming, 'ponytail', 'config.json')));
   assert.ok(fs.existsSync(path.join(roaming, 'Code', 'User', 'mcp.json')));
 });
+
+test('playwright-extension: opt-in, written for agents without a browser, never for Claude Code, and undone', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const args = ['--yes', '--no-exec', '--lang', 'en', '--privacy', 'standard', '--profile', 'github-copilot', '--adhd-always', '--ponytail-mode', 'off'];
+  const all = lean(home, [...args, '--agents', 'opencode-v2', '--all-tools', '--dry-run']);
+  assert.ok(!/tools: .*playwright-extension/.test(all));
+  assert.ok(!all.includes('Playwright Extension'));
+
+  const before = snapshot(home);
+  const out = lean(home, [...args, '--agents', 'opencode-v2,copilot-cli,cursor,vscode-copilot,claude', '--tools', 'playwright-extension']);
+  assert.match(out, /chromewebstore\.google\.com\/detail\/playwright-extension\/mmlmfjhmonkocbjadbfplnigmagldckm/);
+  assert.match(out, /docs\/browser-extension\.md/);
+  assert.ok(!/claude mcp add .*playwright-extension/.test(out));
+  assert.ok(!out.includes('PLAYWRIGHT_MCP_EXTENSION_TOKEN'));
+  const read = (...p) => parse(fs.readFileSync(path.join(...p), 'utf8'));
+  const ext = ['-y', '@playwright/mcp@latest', '--extension'];
+  assert.deepEqual(read(home, '.config', 'opencode', 'opencode.jsonc').mcp.servers['playwright-extension'].command, ['npx', ...ext]);
+  assert.deepEqual(read(home, '.copilot', 'mcp-config.json').mcpServers['playwright-extension'].args, ext);
+  assert.deepEqual(read(home, '.cursor', 'mcp.json').mcpServers['playwright-extension'].args, ext);
+  assert.deepEqual(read(vscodeUserDir(home), 'mcp.json').servers['playwright-extension'].args, ext);
+  for (const f of ['.copilot/mcp-config.json', '.cursor/mcp.json']) assert.ok(!read(home, f).mcpServers.playwright, f);
+
+  lean(home, ['--uninstall', '--yes', '--no-exec']);
+  const after = Object.fromEntries(Object.entries(snapshot(home)).filter(([f]) => !f.startsWith('.config/lean-agents/')));
+  assert.deepEqual(after, before);
+});
