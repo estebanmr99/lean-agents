@@ -469,6 +469,7 @@ Mark each `[x]` when merged.
 - [ ] **Session 10 — Parallel agent sessions.** Coordinator plus one worker per task in its own git worktree, prompt files, status, one-at-a-time merges; Orca when installed, plain git worktree otherwise. Starts after sessions 6 and 8 merge.
 - [ ] **Session 11 — Antigravity full setup.** Antigravity app and CLI on macOS, Windows and Linux.
 - [x] **Session 12 — Release readiness.** OpenCode + GitHub Copilot demo path, signed-in browser through the Playwright Extension, issue #6, Bun benchmark, Gemini CLI research, 0.5.0 release notes. No tag.
+- [ ] **Session 13 — Bun for Context Mode.** Bun installed by default at user scope when Context Mode is selected (`--no-bun` opts out), faster `ctx_execute` and TypeScript. Fixes the Playwright rule line for Claude-only installs.
 
 ### Session 3 — Windows + OpenCode 1.x + wider CI
 
@@ -642,6 +643,18 @@ Branch: `session-12-release`. Goal: 0.5.0 ready to publish on the GitHub page; t
 6. **Release:** `package.json` and CHANGELOG `0.5.0`, release notes from `releaseNotes()`, `release-build` green. No tag.
 
 Done when: CI is green with the new real-binary checks (extension entry in each agent's MCP list, `@playwright/mcp --help` lists `--extension`, `bench-context-mode` on three OSes), and the owner has the release notes.
+
+### Session 13 — Bun for Context Mode
+
+Branch: `session-13-bun`. Goal: the `--bun` follow-up from the session 12 decision, ON by default (owner decision, 2026-11-03).
+
+1. **Install Bun when `context-mode` is selected**, one route per OS: Linux `curl -fsSL -o <file> https://bun.com/install` then `bash <file>` with `BUN_INSTALL=~/.bun` and an unknown `SHELL` (no profile edit); macOS `brew install oven-sh/bun/bun`; Windows `curl.exe` + upstream `install.ps1` (user PATH, no admin). `--no-bun` / `-NoBun` opts out. A Bun already on PATH or in `~/.bun/bin` is reused and never removed by `--uninstall`.
+2. **Where Context Mode finds Bun:** on Linux `start.mjs` re-execs the server under Bun from `~/.bun/bin`; on macOS and Windows the server stays on Node and takes Bun from PATH only for `ctx_execute` JS/TS (owner check, context-mode 1.0.169, Bun 1.4.4).
+3. **Fallback:** a failed Bun install prints one line and Context Mode runs on Node; it is not a failed step.
+4. **Telemetry:** with telemetry off, a marked block `telemetry = false` at the top of `~/.bunfig.toml`; `--uninstall` removes only the block.
+5. **Playwright rule fix:** `playwright-extension` alone adds no Playwright rule lines for a Claude-only install.
+
+Done when: the `real-bun` CI job proves install, PATH or `~/.bun/bin` detection through the MCP client (`ctx_doctor`, TypeScript `ctx_execute`), reuse, `--no-bun`, fallback and `--uninstall` on Ubuntu, macOS and Windows, and `real-proxy` shows Bun installed through the proxy.
 
 ## 15. Definition of done (every session)
 
