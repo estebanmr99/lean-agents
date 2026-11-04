@@ -41,10 +41,12 @@ const TEXT = {
   },
 };
 
-export function renderRules(root, { lang, tools }) {
+export function renderRules(root, { lang, tools, agents = [] }) {
   const file = lang === 'es' ? 'AGENTS.es.md' : 'AGENTS.md';
   const t = TEXT[lang] ?? TEXT.en;
-  const hasTool = (...names) => names.some((name) => tools.includes(name));
+  // Claude Code has Claude in Chrome, so playwright-extension alone adds nothing for a Claude-only install.
+  const effective = agents.length === 1 && agents[0] === 'claude' ? tools.filter((n) => n !== 'playwright-extension') : tools;
+  const hasTool = (...names) => names.some((name) => effective.includes(name));
   const toolRules =
     (hasTool('context-mode') ? t.contextMode : '') +
     (hasTool('playwright', 'playwright-extension') ? t.playwright : '') +

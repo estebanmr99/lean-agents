@@ -720,3 +720,14 @@ test('~/.bunfig.toml: telemetry block at the top only with telemetry off, user c
   lean(fresh, ['--uninstall', '--yes', '--no-exec']);
   assert.ok(!fs.existsSync(path.join(fresh, '.bunfig.toml')));
 });
+
+test('playwright-extension alone adds no Playwright rule lines for a Claude-only install', () => {
+  const args = ['--yes', '--no-exec', '--lang', 'en', '--privacy', 'standard', '--tools', 'playwright-extension'];
+  const rules = (agents) => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+    lean(home, [...args, '--agents', agents]);
+    return fs.readFileSync(path.join(home, '.config', 'lean-agents', 'AGENTS.md'), 'utf8');
+  };
+  assert.doesNotMatch(rules('claude'), /Playwright/);
+  assert.match(rules('opencode-v2'), /Playwright/);
+});
