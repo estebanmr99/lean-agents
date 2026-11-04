@@ -23,6 +23,11 @@ $found = @(Get-ChildItem -Force "$dir\.config\lean-agents").Name
 if (($found -join ',') -ne 'src') { throw "piped dry run wrote: $found" }
 if (@(Get-ChildItem -Force $dir).Count -ne 1) { throw 'piped dry run wrote outside .config' }
 
+Write-Output '--- -NoBun turns Bun off in the plan'
+$dir = New-TempProfile
+$plan = & "$repo\install.ps1" -DryRun -Yes -Agents claude -NoBun -Privacy standard -Lang en --no-exec | Out-String
+if ($plan -notmatch 'bun: off') { throw "-NoBun did not reach the engine: $plan" }
+
 Write-Output '--- install, doctor and uninstall'
 $dir = New-TempProfile
 & "$repo\install.ps1" -Yes -Agents claude, opencode-v1 -AllTools -Privacy strict -Profile anthropic-api -Lang en --no-exec
