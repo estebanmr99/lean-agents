@@ -30,6 +30,7 @@ Repeat the same prompt for each session. Each session must leave the repository 
 - The owner dropped the before/after savings claim (2026-11-03): the repo cannot show one, so the README "Why" has no numbers. `docs/launch.md`, `release.yml`, the banner, the demo GIF and the `assets` workflow exist. `1.0.0`, the tag and the release still need the owner's separate go.
 - Testing policy: the owner does not test on their working machines. Every claim is proven in CI with throwaway HOME directories and real binaries (`tests/real-opencode.sh`).
 - Commits are authored by the owner (`git config user.name/user.email` set to their GitHub no-reply address) with a `Co-Authored-By` trailer for the agent.
+- Since session 6: Node.js 20.12+ and one more dependency, `@clack/prompts` (menus only on a real terminal). Network choices live in `scripts/lib/network.mjs` (`options.network` in `state.json`, `privacy` derived from it, so adapters can still read `opts.privacy`); undocumented settings in `scripts/lib/unverified.mjs` are never configured, only saved as user notes under `~/.config/lean-agents/notes/`.
 - Private terms are blocked by `scripts/check-private.sh` using the `PRIVATE_DENYLIST` repository secret in CI and a gitignored `.private-denylist` locally.
 
 ## 1. Product
@@ -457,7 +458,7 @@ Mark each `[x]` when merged.
 - [x] **Session 3 — Windows + OpenCode 1.x + wider CI** (PR #4). `install.ps1`, OpenCode 1.x adapter, optional DCP, tool rules, CI with real binaries on Windows, OpenCode 1.19, Claude Code and real tool installs.
 - [x] **Session 4 — Copilot CLI, Antigravity CLI, tools, skills, models** (PR #5). Both adapters, Codeburn, opt-in GSD and AutoSkills, three skills, three profiles, `models-refresh`, `XDG_CONFIG_HOME`, `--home` passed to child tools, real Copilot, Antigravity and winget jobs. Open: Copilot `model` format and Antigravity rule and skill loading need a logged-in check.
 - [x] **Session 5 — Launch** (PR #7). Banner, demo GIF, social preview, launch kit, release workflow, skills undo and HOME fixes.
-- [ ] **Session 6 — Enterprise and team basics.** Proxy, network presets, `gh`, interactive CLI, security review prompt.
+- [x] **Session 6 — Enterprise and team basics** (PR #11). Proxy passed to every command and shown redacted, network presets (`--network`, per-category flags, saved in `state.json`), `gh` prerequisite, interactive menus with `@clack/prompts`, notes or default for undocumented settings, `docs/SECURITY-REVIEW.md`, real proxy and pty CI jobs. Open: Antigravity telemetry and auto-update, Serena config path, winget persistent proxy, download hosts, DCP/GSD/AutoSkills telemetry and Windows arrow-key menus stay VERIFY.
 - [ ] **Session 7 — VS Code Copilot, Cursor, team repos, Claude through Copilot.**
 - [ ] **Session 8 — Terminals: Warp, Orca, or neither.**
 - [ ] **Session 9 — Showcase.** Logo, GIF per use case, who it is for.
