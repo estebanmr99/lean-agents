@@ -478,3 +478,39 @@ test('gh installs at user scope with brew or winget, only when asked for', () =>
   assert.match(out, /gh auth login/);
   assert.equal(JSON.parse(fs.readFileSync(f, 'utf8')).options.gh, true);
 });
+
+test('undocumented settings: asked only when relevant, kept when another agent set them up, never guessed', async () => {
+  const { unverifiedItems, notesFile } = await import('../scripts/lib/unverified.mjs');
+  const { preset } = await import('../scripts/lib/network.mjs');
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const o = (agents, tools, net) => ({ agents, tools, network: preset(net) });
+  const ids = (items) => items.map((i) => `${i.id}${i.kept ? ':kept' : ''}`);
+  assert.deepEqual(ids(unverifiedItems(o(['claude'], ['rtk'], 'on'), home, { platform: 'darwin', env: {} })), []);
+  assert.deepEqual(ids(unverifiedItems(o(['antigravity'], ['serena', 'playwright', 'gsd', 'autoskills', 'dcp'], 'off'), home, { platform: 'darwin', env: {} })),
+    ['antigravity', 'serena', 'download-hosts', 'dcp', 'gsd', 'autoskills']);
+  assert.deepEqual(ids(unverifiedItems(o(['claude'], ['gsd'], 'on'), home, { platform: 'win32', env: { https_proxy: 'http://p:1' } })), ['winget-proxy', 'download-hosts']);
+  fs.mkdirSync(path.join(home, '.serena'));
+  fs.writeFileSync(path.join(home, '.serena', 'serena_config.yml'), 'x: 1\n');
+  fs.mkdirSync(path.join(home, '.gsd'));
+  const gsd = path.join(home, '.gsd', 'defaults.json');
+  fs.writeFileSync(gsd, '{}\n');
+  const both = o(['claude'], ['serena', 'gsd'], 'off');
+  assert.deepEqual(ids(unverifiedItems(both, home, { platform: 'darwin', env: {} })), ['serena:kept', 'gsd:kept']);
+  assert.deepEqual(ids(unverifiedItems(both, home, { platform: 'darwin', env: {}, stateFiles: [{ path: gsd }] })), ['serena:kept', 'gsd']);
+
+  const item = { id: 'serena', label: 'Serena config' };
+  const line = notesFile(home, item, 'proxy http://u:s3cret@127.0.0.1:8080');
+  assert.equal(line.path, path.join(home, '.config', 'lean-agents', 'notes', 'serena.md'));
+  assert.match(line.content, /managed by lean-agents[\s\S]*Source: pasted\n\nproxy http:\/\/\*\*\*@127\.0\.0\.1:8080\n$/);
+  const src = path.join(home, 'it-notes.txt');
+  fs.writeFileSync(src, 'line 1\nline 2 http://a:b@c\n');
+  assert.match(notesFile(home, item, src).content, /Source: .*it-notes\.txt\n\nline 1\nline 2 http:\/\/\*\*\*@c\n$/);
+});
+
+test('--yes keeps every tool default for undocumented settings and writes no notes', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  lean(home, ['--yes', '--no-exec', '--agents', 'antigravity', '--tools', 'serena,playwright', '--network', 'off', '--lang', 'en']);
+  const state = JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'state.json'), 'utf8'));
+  assert.deepEqual(state.options.unverified, { antigravity: 'default', serena: 'default', 'download-hosts': 'default' });
+  assert.ok(!fs.existsSync(path.join(home, '.config', 'lean-agents', 'notes')));
+});

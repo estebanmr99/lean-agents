@@ -61,11 +61,13 @@ def finish(pid, timeout=30):
     sys.exit("the installer did not exit")
 
 
-SPACE, ENTER, UP = b" ", b"\r", b"\x1b[A"
+SPACE, ENTER, UP, DOWN = b" ", b"\r", b"\x1b[A", b"\x1b[B"
 wait_for("Optional tools")
 send(SPACE + ENTER)  # first option: serena
 wait_for("Telemetry, auto-updates")
 send(UP + ENTER)  # from "All on" up to "All off"
+wait_for("Serena config")
+send(ENTER)  # keep the tool's default
 if b"GitHub CLI" in out or os.system("command -v gh >/dev/null") != 0:
     wait_for("GitHub CLI")
     send(ENTER)  # default no
@@ -109,3 +111,33 @@ wait_for("Done")
 assert finish(pid) == 0, "apply exited with an error"
 assert os.path.exists(os.path.join(home, ".config", "lean-agents", "state.json")), "state.json missing"
 print("apply with summary: ok")
+
+# Pasting notes for an undocumented setting: saved as-is (password redacted), removed by --uninstall.
+home = tempfile.mkdtemp(prefix="lean-tty-")
+notes_src = os.path.join(tempfile.mkdtemp(prefix="lean-notes-"), "it.txt")
+with open(notes_src, "w") as f:
+    f.write("Serena: keep the dashboard off\nproxy http://u:s3cret@127.0.0.1:8080\n")
+argv = ["node", os.path.join(ROOT, "scripts", "lean.mjs"), "--home", home, "--no-exec", "--agents", "claude", "--tools", "serena", "--network", "on", "--lang", "en"]
+pid, fd = pty.fork()
+if pid == 0:
+    os.execvp(argv[0], argv)
+fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 100, 0, 0))
+out = b""
+wait_for("Serena config")
+send(DOWN + ENTER)  # paste docs or IT notes
+wait_for("One line of notes")
+send(notes_src.encode() + ENTER)
+if os.system("command -v gh >/dev/null") != 0:
+    wait_for("GitHub CLI")
+    send(ENTER)
+wait_for("Apply these changes")
+send(ENTER)
+wait_for("Notes saved")
+assert finish(pid) == 0, "apply with notes exited with an error"
+notes = os.path.join(home, ".config", "lean-agents", "notes", "serena.md")
+text = open(notes).read()
+assert "Serena: keep the dashboard off" in text and "http://***@127.0.0.1:8080" in text, text
+assert "s3cret" not in text, "the proxy password was written"
+assert os.system(" ".join(["node", os.path.join(ROOT, "scripts", "lean.mjs"), "--home", home, "--no-exec", "--uninstall", "--yes", ">/dev/null"])) == 0
+assert not os.path.exists(notes), "--uninstall left the notes file"
+print("notes for undocumented settings: ok")

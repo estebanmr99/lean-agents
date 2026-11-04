@@ -20,6 +20,7 @@ import { detectAgents, packageManager, prereqFor, which, run, quiet, exists, iso
 import { doctor } from './lib/doctor.mjs';
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
 import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
+import { unverifiedItems, notesFile } from './lib/unverified.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ADAPTERS = { claude: claudeAdapter, 'opencode-v1': opencodeV1Adapter, 'opencode-v2': opencodeV2Adapter, 'copilot-cli': copilotAdapter, antigravity: antigravityAdapter };
@@ -125,6 +126,7 @@ async function prompter(yes) {
     rl.question(`${q} [${def}] `, (a) => res(a.trim() || def));
   });
   return {
+    tty: Boolean(input.isTTY),
     ask,
     // Menus fall back to the same text questions as before.
     select: ({ ask: q, def }) => ask(q, def),
@@ -173,6 +175,7 @@ async function choose(o, saved) {
   if (unknown.length) throw new Error(`unknown tools: ${unknown.join(', ')} (available: ${known.join(', ')})`);
   if (!o.agents.includes('opencode-v1')) o.tools = o.tools.filter((t) => t !== 'dcp');
   await chooseNetwork(o, saved, p);
+  await chooseUnverified(o, saved, p);
   o.gh ??= saved?.gh ?? (!which('gh') && yesNo(await p.ask('Install GitHub CLI (gh)? You log in yourself afterwards', 'n')));
   o.lang ??= saved?.lang ?? (await p.select({ ask: 'Language for rules and replies (en/es)?', message: 'Language for rules and replies', options: [{ value: 'en', label: 'English' }, { value: 'es', label: 'Español' }], def: 'en' }));
   if (o.agents.some((a) => a.startsWith('opencode')) && !o.profile) {
@@ -210,11 +213,35 @@ async function chooseNetwork(o, saved, p) {
   o.privacy = privacyOf(o.network);
 }
 
+async function chooseUnverified(o, saved, p) {
+  o.unverified = { ...saved?.unverified };
+  o.notes = [];
+  for (const item of unverifiedItems(o, o.home, { stateFiles: readState(o.home)?.files ?? [] })) {
+    if (item.kept) { o.unverified[item.id] = 'kept'; continue; }
+    if (o.unverified[item.id] && o.unverified[item.id] !== 'kept') continue;
+    // --yes, pipes and no terminal keep the default: pasting is interactive only.
+    if (!p.menus && !p.tty) { o.unverified[item.id] = 'default'; continue; }
+    const a = await p.select({
+      ask: `${item.label} is not documented upstream. Paste your docs or IT notes (paste), or keep the tool's default (default)?`,
+      message: `${item.label}: not documented upstream`,
+      options: [
+        { value: 'default', label: "Keep the tool's default" },
+        { value: 'paste', label: 'Paste docs or IT notes', hint: 'saved for your agent to apply after review' },
+      ],
+      def: 'default',
+    });
+    if (a !== 'paste' && a !== 'default') throw new Error(`answer paste or default, not "${a}"`);
+    const answer = a === 'paste' ? (await p.ask('One line of notes, or a path to a file with them (no passwords)', '')).trim() : '';
+    o.unverified[item.id] = answer ? 'notes' : 'default';
+    if (answer) o.notes.push(notesFile(o.home, item, answer));
+  }
+}
+
 function buildPlan(o) {
   const core = loadCore(ROOT);
   const rulesPath = path.join(stateDir(o.home), 'AGENTS.md');
   const rules = renderRules(ROOT, o);
-  const actions = [{ kind: 'file', path: rulesPath, content: rules }];
+  const actions = [{ kind: 'file', path: rulesPath, content: rules }, ...o.notes];
   const commands = [];
   for (const agent of o.agents) {
     const profile = loadProfile(ROOT, FIXED_PROFILE[agent] ?? o.profile);
@@ -248,6 +275,8 @@ function printPlan(o, planned, commands) {
   console.log(`  network: ${CATEGORIES.map((c) => `${c} ${o.network[c]}`).join(', ')}`);
   const net = proxyReport();
   if (net.length) console.log(`  proxy and CA (passed to every command): ${net.join(' ')}`);
+  const own = Object.entries(o.unverified).filter(([, v]) => v !== 'default');
+  if (own.length) console.log(`  not documented upstream: ${own.map(([k, v]) => `${k} ${v === 'kept' ? 'kept: existing config' : 'your notes'}`).join(', ')}`);
   console.log('');
   console.log('Files:');
   console.log(describe(planned, o.home));
@@ -298,7 +327,7 @@ async function install(o) {
     version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version,
     installedAt: previous?.installedAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    options: { agents: o.agents, tools: o.tools, privacy: o.privacy, network: o.network, gh: o.gh, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode },
+    options: { agents: o.agents, tools: o.tools, privacy: o.privacy, network: o.network, gh: o.gh, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode },
     files: [...(previous?.files ?? []), ...files],
     commands: [...(previous?.commands ?? []), ...ran],
   };
@@ -313,6 +342,7 @@ async function install(o) {
   console.log(`\nDone. Backups: ${backupDir}`);
   console.log('Next: restart your agents, log in to your providers, then run --doctor.');
   if (o.gh) console.log('GitHub CLI: run `gh auth login` yourself; lean-agents never handles tokens.');
+  for (const n of o.notes) console.log(`Notes saved: ${n.path}. Ask your agent to apply them, showing you each change first.`);
   if (o.network.telemetry === 'off' && o.agents.includes('claude')) {
     console.log('Strict privacy: also turn off "Help improve Claude" in your claude.ai privacy settings.');
   }
