@@ -156,6 +156,27 @@ Research only (session 8). lean-agents installs neither app yet. Checked 2026-11
 | Context Mode and Bun, per the README: "Bun is auto-detected for 3-5x faster JS/TS execution"; on Bun it uses `bun:sqlite` and skips `better-sqlite3`; storage is `bun:sqlite` on Bun, `node:sqlite` on Node.js 22.5+, `better-sqlite3` otherwise. The README makes no Windows-specific Bun claim. No benchmark backs the 3-5x figure | [README](https://github.com/mksglu/context-mode), [BENCHMARK.md](https://github.com/mksglu/context-mode/blob/main/BENCHMARK.md) | 2026-11-03 |
 | **VERIFY** against the raw files: Context Mode source: Bun found on PATH or in `~/.bun/bin` (Windows also `%LOCALAPPDATA%\bun\bin`); no variable forces or turns off Bun; `node:sqlite` is used only when an FTS5 probe passes; `better-sqlite3` is a regular dependency (`^12.6.2`), so `npm i -g context-mode` installs it even with Bun | [runtime.ts](https://github.com/mksglu/context-mode/blob/main/src/runtime.ts), [db-base.ts](https://github.com/mksglu/context-mode/blob/main/src/db-base.ts), [package.json](https://github.com/mksglu/context-mode/blob/main/package.json) (read through a summary) | 2026-11-03 |
 | Bun 1.4.4: `curl -fsSL https://bun.com/install \| bash` and `irm bun.sh/install.ps1 \| iex` to `~/.bun/bin`; `brew install oven-sh/bun/bun`; `npm install -g bun`; winget `Oven-sh.Bun` exists | [Bun install docs](https://bun.com/docs/installation), [releases](https://github.com/oven-sh/bun/releases/latest), [winget-pkgs](https://github.com/microsoft/winget-pkgs/tree/master/manifests/o/Oven-sh/Bun) | 2026-11-03 |
+| `bench-context-mode` (run 2026-11-04, Node 22, Bun 1.4.4, throwaway HOME, 2 warm-up + 10 timed runs of `tests/fixtures/bench/`). **JavaScript `ctx_execute` median, Node only / Bun:** Ubuntu 46 / 30 ms (1.53x), macOS 54 / 27 ms (2.00x), Windows 109 / 70 ms (1.56x). **TypeScript:** Node only has no TS runtime (`ctx_execute` errors, asks for bun, tsx or ts-node); with Bun 29, 26 and 69 ms. **Install:** `npm i -g context-mode` about 4 s on Ubuntu and macOS, 55 s on Windows (step time); Bun 2 s, 1 s, 8 s, with the upstream script at user scope and no TTY on all three. **SQLite:** `ctx_doctor` reports FTS5 / SQLite PASS with the native module on both passes; it does not name the backend (**VERIFY**), and prebuilt vs compiled `better-sqlite3` is in the job summary. Context Mode's "3-5x" is not reproduced: 1.5-2x on this workload | `bench-context-mode` job, PR #13 | 2026-11-04 |
+| Playwright MCP `--extension` connects to a running Chrome or Edge through the "Playwright Extension" (Chrome Web Store id `mmlmfjhmonkocbjadbfplnigmagldckm`); each connection is approved in the browser unless `PLAYWRIGHT_MCP_EXTENSION_TOKEN` is set in the server's environment; the token is per browser profile, shown by the extension. lean-agents adds the `playwright-extension` entry only with `--tools playwright-extension`, never for Claude Code or Antigravity | [playwright-mcp](https://github.com/microsoft/playwright-mcp), [extension README](https://github.com/microsoft/playwright/tree/main/packages/extension) | 2026-11-03 |
+
+## Gemini CLI (not supported)
+
+Checked 2026-11-03. lean-agents does not add a Gemini CLI adapter: upstream says free individual access and Google AI Pro and Ultra moved to Antigravity CLI on 2026-06-18, and Gemini CLI now serves Gemini Code Assist Standard and Enterprise. Antigravity CLI is supported instead.
+
+| Item | Source | Checked |
+| --- | --- | --- |
+| Access moved to Antigravity CLI on 2026-06-18; Gemini CLI targets Code Assist Standard and Enterprise | [README](https://github.com/google-gemini/gemini-cli), [MCP docs](https://geminicli.com/docs/tools/mcp-server) | 2026-11-03 |
+| Install: `npm install -g @google/gemini-cli`, `npx @google/gemini-cli`, `brew install gemini-cli`, MacPorts, conda | [README](https://github.com/google-gemini/gemini-cli) | 2026-11-03 |
+| MCP: `~/.gemini/settings.json` `mcpServers` (`command`, `url` or `httpUrl`; `args`, `env`, `cwd`, `timeout`, `trust`, `includeTools`, `excludeTools`); `gemini mcp add [-s user\|project] [-t stdio\|sse\|http]`, `gemini mcp list`, `gemini mcp remove`; stdio servers connect only in trusted folders | [MCP docs](https://geminicli.com/docs/tools/mcp-server) | 2026-11-03 |
+| Auto-update: `general.enableAutoUpdate` (default true); `skills.enabled` (default true) | [settings](https://geminicli.com/docs/cli/settings) | 2026-11-03 |
+| RTK: `rtk init -g --gemini` (BeforeTool hook) | [rtk](https://github.com/rtk-ai/rtk) | 2026-11-03 |
+
+- **VERIFY:** Gemini CLI rules file (`~/.gemini/GEMINI.md`, `context.fileName` for `AGENTS.md`), skills and subagent folders, proxy, telemetry and usage statistics settings, the Node minimum, and whether `gemini mcp list` runs without a login.
+
+### Cursor: what CI proves today
+
+- Proven by `real-cursor` (Ubuntu, macOS): `agent mcp list` reads `~/.cursor/mcp.json` and the repo's `.cursor/mcp.json`; the RTK hook in `~/.cursor/hooks.json`; skills in `~/.agents/skills`; `--uninstall` removes them.
+- **VERIFY:** whether the Cursor CLI loads `~/.cursor/agents/*.md` and `.cursor/agents/*.md` (CI checks the files only); whether it applies `.cursor/rules/lean-agents.mdc`; Context Mode hooks for Cursor (MCP only for now); `network.useHttp1ForAgent` for proxies (not set yet); the Cursor IDE app itself (not in CI).
 
 ## Proxy and corporate CA
 
@@ -227,6 +248,7 @@ The undocumented items below (Antigravity telemetry and auto-update, Serena conf
 - **VERIFY:** the VS Code user `mcp.json` path on Windows (`%APPDATA%\Code\User`). Linux and macOS are proven by `real-vscode`.
 - **VERIFY:** the `model` value format in VS Code `.agent.md` (Copilot runtime IDs are assumed, as for Copilot CLI).
 - **VERIFY:** whether VS Code reads Copilot CLI hooks, so RTK for VS Code alone is not installed.
+- **VERIFY:** Playwright extension mode with a real Chrome (needs the extension and a click to approve, out of CI); whether the token appears in the connect page URL; the extension's button to regenerate the token; whether VS Code and Cursor started outside a terminal see a token set in the shell profile.
 - **VERIFY:** whether the Cursor CLI reads `~/.cursor/agents`, and the Context Mode hooks for Cursor and VS Code (MCP only for now).
 - **VERIFY:** the Claude agent plans, the organization and enterprise policy labels, and the minimum VS Code version (see `docs/claude-with-copilot.md`).
 - **VERIFY (session 11):** the next Antigravity release; only part of the changelog was read.

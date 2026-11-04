@@ -6,11 +6,11 @@
 
 **One command. Every coding agent. Fewer tokens, clearer answers.**
 
-The same rules, cheap-by-default subagents, context-saving tools and MCP servers for Claude Code, OpenCode, GitHub Copilot CLI and Antigravity CLI, on macOS and Windows.
+The same rules, cheap-by-default subagents, context-saving tools and MCP servers for Claude Code, OpenCode 1.x and 2.x, GitHub Copilot CLI, Antigravity CLI, VS Code Copilot and Cursor, on macOS, Linux and Windows.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-lightgrey)
-![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%7C%20OpenCode%20%7C%20Copilot%20CLI%20%7C%20Antigravity-8A2BE2)
+![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%7C%20OpenCode%20%7C%20Copilot%20CLI%20%7C%20Antigravity%20%7C%20VS%20Code%20Copilot%20%7C%20Cursor-8A2BE2)
 [![CI](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml)
 [![Secret scan](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml)
 ![GitHub stars](https://img.shields.io/github/stars/estebanmr99/lean-agents?style=social)
@@ -19,7 +19,7 @@ The same rules, cheap-by-default subagents, context-saving tools and MCP servers
 
 </div>
 
-> **Status: v0.4 preview.** The installer works for **Claude Code**, **OpenCode 1.x and 2.x**, **GitHub Copilot CLI** and **Antigravity CLI** on macOS, Linux and Windows (Antigravity: macOS and Linux). Star the repo to get notified when `v1.0.0` ships.
+> **Status: v0.5 preview.** The installer works for **Claude Code**, **OpenCode 1.x and 2.x**, **GitHub Copilot CLI**, **Antigravity CLI**, **VS Code Copilot** and **Cursor** on macOS, Linux and Windows (Antigravity: macOS and Linux). Star the repo to get notified when `v1.0.0` ships.
 
 <img src="docs/assets/demo.gif" alt="install.sh --dry-run listing every file and command it would change" width="720">
 
@@ -37,11 +37,39 @@ Windows PowerShell:
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -DryRun
 ```
 
-Prefer your agent to do it? Paste a prompt from [INSTALL_WITH_AGENT.md](INSTALL_WITH_AGENT.md) into Claude Code, OpenCode or Copilot CLI.
+Prefer your agent to do it? Paste a prompt from [INSTALL_WITH_AGENT.md](INSTALL_WITH_AGENT.md) into Claude Code, OpenCode or Copilot CLI. Use `--lang es` to get the rules and replies in Spanish.
 
-Always start with `--dry-run`: it shows every file and command before anything changes. Then run it again without `--dry-run`; it asks which agents, tools, privacy level, language and model profile you want. Useful flags: `--all-tools`, `--privacy strict`, `--lang es`, `--profile vertex-gemini`, `--update`, `--uninstall`, `--doctor` (`--help` lists them all). In PowerShell the same flags are PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`.
+Always start with `--dry-run`: it shows every file and command before anything changes. Then run it again without `--dry-run`; it asks which agents, tools, privacy level, language and model profile you want. Useful flags: `--all-tools`, `--privacy strict`, `--lang es`, `--profile vertex-gemini`, `--update`, `--uninstall`, `--doctor` (`--help` lists them all). In PowerShell the common flags are PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`. Any other flag is passed as it is, for example `-DryRun --network off`.
 
 Context Mode needs Node.js 22.5 or newer. Everything else works on Node.js 20.12.
+
+## Demo: OpenCode with GitHub Copilot models
+
+1. Install OpenCode (macOS, Linux or Git Bash). On Windows, see the [OpenCode docs](https://opencode.ai/docs):
+   ```bash
+   curl -fsSL https://opencode.ai/v2/install | bash
+   ```
+2. Preview what lean-agents would change:
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --agents opencode-v2 --profile github-copilot --dry-run
+   ```
+   ```powershell
+   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -Agents opencode-v2 -Profile github-copilot -DryRun
+   ```
+3. Run the same without the dry run:
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --agents opencode-v2 --profile github-copilot
+   ```
+   ```powershell
+   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -Agents opencode-v2 -Profile github-copilot
+   ```
+4. Start `opencode`, run `/connect`, pick GitHub Copilot and sign in with your GitHub account (it needs a Copilot plan). lean-agents never handles the login. Subagents use the `github-copilot` profile: `fast` = claude-haiku-5.5, `balanced` = claude-sonnet-5.5, `strong` = claude-opus-5.5. No free OpenCode models are used.
+5. Check the result:
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --doctor
+   ```
+
+Claude Desktop and Cursor demo paths come later.
 
 ## Why
 
@@ -58,6 +86,7 @@ Context Mode needs Node.js 22.5 or newer. Everything else works on Node.js 20.12
 | RTK (shell output compression) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Context Mode | ✅ plugin | ✅ MCP | ✅ plugin | ✅ plugin | ✅ plugin |
 | Serena + Playwright MCP | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Signed-in browser (opt-in) | ➖ Claude in Chrome | ✅ opt-in | ✅ opt-in | ✅ opt-in | ➖ |
 | Ponytail | ✅ | ✅ | ✅ | ➖ | ➖ |
 | i-have-adhd | ✅ | ✅ | ✅ | ✅ | ⚠️ written, load unproven |
 | Caveman and other skills | ✅ | ✅ | ✅ | ✅ | ⚠️ written, load unproven |
@@ -70,12 +99,21 @@ Context Mode needs Node.js 22.5 or newer. Everything else works on Node.js 20.12
 | Feature | VS Code Copilot | Cursor (IDE and CLI) | Team repo (`--project`) |
 | --- | --- | --- | --- |
 | Rules | ⚠️ written, load unproven | ➖ settings UI only, use `--project` | ✅ `AGENTS.md` |
-| Subagents | ⚠️ written, load unproven | ⚠️ written, load unproven | ✅ `.github/agents`, `.cursor/agents` |
+| Subagents | ⚠️ written, load unproven | ⚠️ written, load unproven | ✅ `.github/agents`; ⚠️ `.cursor/agents` (Cursor CLI loading unverified) |
 | RTK | ⚠️ through Copilot CLI only | ✅ | ➖ per user |
 | Context Mode, Serena, Playwright | ✅ MCP | ✅ MCP | ✅ `.vscode/mcp.json`, `.cursor/mcp.json` |
+| Signed-in browser (opt-in) | ✅ opt-in | ✅ opt-in | ➖ per user |
 | Caveman, i-have-adhd skills | ⚠️ written, load unproven | ⚠️ written, load unproven | ➖ per user |
 
 **Planned: full Antigravity support.** Today lean-agents sets up the Antigravity CLI (`agy`) on macOS and Linux. Next it adds the Antigravity desktop app and the CLI on Windows. The upstream docs say the app and the CLI read the same rules, subagents, skills and MCP servers, so one setup would serve both on macOS, Windows and Linux. Each part ships only once CI proves it with real binaries. Plan: [Session 11](docs/SPEC.md#session-11--antigravity-full-setup).
+
+## Signed-in browser (opt-in)
+
+The default `playwright` MCP opens a fresh headless browser, which fails on pages behind single sign-on. `--tools playwright-extension` adds `@playwright/mcp --extension` instead. It attaches to your own signed-in Chrome or Edge through the [Playwright Extension](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm).
+
+- Install the extension yourself. Extensions cannot be installed silently without an admin policy.
+- Each session asks you to approve the connection. Auto-approve with a token is optional: see [docs/browser-extension.md](docs/browser-extension.md). The installer never asks for, stores or prints the token.
+- Works with OpenCode, Copilot CLI, VS Code Copilot and Cursor. Claude Code and Claude Desktop use Claude in Chrome instead.
 
 ## VS Code Copilot and Cursor
 
@@ -127,7 +165,7 @@ If your company pays for GitHub Copilot, the official way to use Claude as an ag
 | Optional tools | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0), Codeburn | Asked one by one |
 | Opt-in tools | GSD Core, AutoSkills (CC BY-NC 4.0: non-commercial use only) | Asked one by one, never in `--all-tools` |
 | Strict privacy | No telemetry, no auto-updates, no session sharing, no providers that train on your prompts | Off, opt in with `--privacy strict` |
-| Network preset | All off (work PC), all on, or per category: telemetry, auto-updates, other outbound calls | All on; `--network off` or one flag per category |
+| Network preset | All off (work PC), all on, or per category: telemetry, auto-updates, other outbound calls | All on; `--network off` (same as `--privacy strict`) or `--telemetry`, `--auto-update`, `--outbound` |
 | GitHub CLI (`gh`) | Installed with brew or winget at user scope; you run `gh auth login` | Asked when missing; `--gh` |
 
 ## On a work PC: proxy, network and security review
@@ -141,10 +179,10 @@ If your company pays for GitHub Copilot, the official way to use Claude as an ag
    The installer passes both cases to every command it runs (brew and git read lowercase, uv uppercase) and shows them in `--dry-run` and `--doctor` with any password replaced by `***`. It never writes them to disk. Which CA variable each tool reads: [docs/compatibility.md](docs/compatibility.md#proxy-and-corporate-ca).
 3. **Pick a network preset.** The installer asks: **all off** (enterprise PC), **all on** (personal PC) or **per category**. For scripted runs:
    ```bash
-   bash install.sh --dry-run --network off                    # everything off
-   bash install.sh --yes --network off --auto-update on       # off, but keep auto-updates
+   curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --dry-run --network off                # everything off
+   curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --yes --network off --auto-update on   # off, but keep auto-updates
    ```
-   What each category turns off per agent: [docs/privacy.md](docs/privacy.md). The choice is saved and reused by `--update`.
+   The per-category flags are `--telemetry on|off`, `--auto-update on|off` and `--outbound on|off`. `--network off` is the same as `--privacy strict`. In PowerShell they pass as they are, for example `-DryRun --network off`. What each category turns off per agent: [docs/privacy.md](docs/privacy.md). The choice is saved and reused by `--update`.
 4. **`gh`**: add `--gh` (or answer yes) to install GitHub CLI without admin rights, then run `gh auth login` yourself.
 
 In a real terminal the installer shows menus (arrow keys, space to toggle), a progress list and a summary. With `--yes`, a pipe or no terminal, it asks plain questions or none, as before.
@@ -186,7 +224,7 @@ lean-agents is glue. The heavy lifting is done by these projects; please star th
 - [x] Windows installer and OpenCode 1.x
 - [x] Copilot CLI, Antigravity CLI, Codeburn, AutoSkills, GSD, original skills, model profiles
 - [x] VS Code Copilot, Cursor, team mode (`--project`), Claude through Copilot
-- [ ] Antigravity app, and the Antigravity CLI on Windows
+- [ ] Planned: terminals (Warp, Orca), parallel agent sessions, full Antigravity setup (app, and the CLI on Windows)
 - [ ] `v1.0.0`
 - Later: Codex CLI, Gemini CLI
 

@@ -303,6 +303,20 @@ test('adhd-skill flips the flag in every installed copy and back', () => {
   assert.equal(script('on', fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'))), 1, 'a missing skill must fail the install');
 });
 
+test('diffModels skips models the profile already uses and models with other outputs (issue #6)', () => {
+  const text = { output: ['text'] };
+  const catalog = { acme: { models: {
+    'k-3': { id: 'k-3', family: 'k', release_date: '2026-01-01', modalities: text },
+    'k-3.1-pro': { id: 'k-3.1-pro', family: 'k', release_date: '2026-02-01', modalities: text },
+    'f-1': { id: 'f-1', family: 'f', release_date: '2026-01-01', modalities: text },
+    'f-image': { id: 'f-image', family: 'f', release_date: '2026-03-01', modalities: { output: ['text', 'image'] } },
+  } } };
+  const tiers = { balanced: { model: 'acme/k-3' }, strong: { model: 'acme/k-3.1-pro' }, fast: { model: 'acme/f-1' } };
+  assert.deepEqual(diffModels([{ name: 'p', tiers }], catalog), { missing: [], newer: [] });
+  catalog.acme.models['f-2'] = { id: 'f-2', family: 'f', release_date: '2026-02-01' };
+  assert.deepEqual(diffModels([{ name: 'p', tiers }], catalog).newer, [{ profile: 'p', model: 'acme/f-1', latest: 'acme/f-2' }]);
+});
+
 test('diffModels reports missing IDs and newer family members, and skips aliases', () => {
   const catalog = { acme: { models: {
     'a-1': { id: 'a-1', family: 'a', release_date: '2026-01-01' },
@@ -629,4 +643,30 @@ test('with --home, %APPDATA% outside it is never written (Ponytail, VS Code)', {
   const roaming = path.join(home, 'AppData', 'Roaming');
   assert.ok(fs.existsSync(path.join(roaming, 'ponytail', 'config.json')));
   assert.ok(fs.existsSync(path.join(roaming, 'Code', 'User', 'mcp.json')));
+});
+
+test('playwright-extension: opt-in, written for agents without a browser, never for Claude Code, and undone', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const args = ['--yes', '--no-exec', '--lang', 'en', '--privacy', 'standard', '--profile', 'github-copilot', '--adhd-always', '--ponytail-mode', 'off'];
+  const all = lean(home, [...args, '--agents', 'opencode-v2', '--all-tools', '--dry-run']);
+  assert.ok(!/tools: .*playwright-extension/.test(all));
+  assert.ok(!all.includes('Playwright Extension'));
+
+  const before = snapshot(home);
+  const out = lean(home, [...args, '--agents', 'opencode-v2,copilot-cli,cursor,vscode-copilot,claude', '--tools', 'playwright-extension']);
+  assert.match(out, /chromewebstore\.google\.com\/detail\/playwright-extension\/mmlmfjhmonkocbjadbfplnigmagldckm/);
+  assert.match(out, /docs\/browser-extension\.md/);
+  assert.ok(!/claude mcp add .*playwright-extension/.test(out));
+  assert.ok(!out.includes('PLAYWRIGHT_MCP_EXTENSION_TOKEN'));
+  const read = (...p) => parse(fs.readFileSync(path.join(...p), 'utf8'));
+  const ext = ['-y', '@playwright/mcp@latest', '--extension'];
+  assert.deepEqual(read(home, '.config', 'opencode', 'opencode.jsonc').mcp.servers['playwright-extension'].command, ['npx', ...ext]);
+  assert.deepEqual(read(home, '.copilot', 'mcp-config.json').mcpServers['playwright-extension'].args, ext);
+  assert.deepEqual(read(home, '.cursor', 'mcp.json').mcpServers['playwright-extension'].args, ext);
+  assert.deepEqual(read(vscodeUserDir(home), 'mcp.json').servers['playwright-extension'].args, ext);
+  for (const f of ['.copilot/mcp-config.json', '.cursor/mcp.json']) assert.ok(!read(home, f).mcpServers.playwright, f);
+
+  lean(home, ['--uninstall', '--yes', '--no-exec']);
+  const after = Object.fromEntries(Object.entries(snapshot(home)).filter(([f]) => !f.startsWith('.config/lean-agents/')));
+  assert.deepEqual(after, before);
 });

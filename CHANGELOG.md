@@ -4,6 +4,8 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-04
+
 ### Added
 
 - `docs/launch.md`, a README banner, and an `assets` workflow that renders the demo GIF and social preview in CI.
@@ -24,6 +26,8 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - `docs/claude-with-copilot.md`: the official route to Claude through GitHub Copilot (partner agent); token proxies are documented as not supported.
 - CI jobs `real-cursor` and `real-vscode`: real Cursor CLI and VS Code CLI in a throwaway HOME, Linux and macOS.
 - Plan and research for full Antigravity support (app and CLI on macOS, Windows and Linux): `docs/SPEC.md` session 11, `docs/compatibility.md`, both READMEs.
+- Opt-in `--tools playwright-extension`: Playwright MCP in extension mode (`--extension`) for OpenCode, Copilot CLI, VS Code Copilot and Cursor, so agents use your own signed-in Chrome on pages behind single sign-on. The installer prints the Chrome Web Store link; `docs/browser-extension.md` covers the optional auto-approve token, which lean-agents never asks for, stores or prints.
+- CI job `bench-context-mode`: Context Mode `ctx_execute` with Node only and with Bun on Ubuntu, macOS and Windows, numbers in the job summary.
 
 ### Changed
 
@@ -31,6 +35,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- `models-refresh` no longer reports a model the same profile already uses, or one with different outputs such as an image model (issue #6). Profiles unchanged; reasons in `profiles/README.md`.
 - After the last prompt on `/dev/tty`, as in `curl | bash`, the installer exits instead of hanging.
 - Without a TTY and without `--yes`, the installer stops with a clear message instead of a crash, and `--dry-run` with every choice passed as a flag exits 0.
 - The OpenCode undo no longer leaves `~/.agents/skills` when another agent is detected.

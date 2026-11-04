@@ -19,7 +19,7 @@ unset XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 if [[ "$(uname)" == Darwin ]]; then user="$HOME/Library/Application Support/Code/User"; else user="$HOME/.config/Code/User"; fi
 
-bash "$repo/install.sh" --yes --agents vscode-copilot --tools serena,playwright,caveman \
+bash "$repo/install.sh" --yes --agents vscode-copilot --tools serena,playwright,playwright-extension,caveman \
   --privacy strict --lang en --ponytail-mode off </dev/null 2>&1 | tee "$HOME/install.txt"
 refute grep -qE '^ *! ' "$HOME/install.txt"
 
@@ -32,7 +32,7 @@ grep -q '"telemetry.telemetryLevel": "off"' "$user/settings.json"
 "$code_bin" --add-mcp '{"name":"probe","command":"node","args":["--version"]}' </dev/null
 node -e '
   const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).servers;
-  for (const k of ["probe", "serena", "playwright", "context-mode"]) if (!s[k]) throw new Error("no " + k + " in user mcp.json");
+  for (const k of ["probe", "serena", "playwright", "playwright-extension", "context-mode"]) if (!s[k]) throw new Error("no " + k + " in user mcp.json");
   if (s.serena.type !== "stdio") throw new Error("serena is not stdio");
 ' "$user/mcp.json"
 

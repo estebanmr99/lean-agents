@@ -31,13 +31,16 @@ const ADAPTERS = { claude: claudeAdapter, 'opencode-v1': opencodeV1Adapter, 'ope
 const FIXED_PROFILE = { claude: 'claude-subscription', 'copilot-cli': 'github-copilot', antigravity: 'antigravity' };
 Object.assign(ADAPTERS, { 'vscode-copilot': vscodeCopilotAdapter, cursor: cursorAdapter });
 FIXED_PROFILE['vscode-copilot'] = 'github-copilot';
+// Extensions cannot be installed silently without admin policy, so the user installs it.
+const EXTENSION_NOTE = 'install the Playwright Extension yourself from https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm . Each session asks you to approve the connection; optional auto-approve: docs/browser-extension.md';
 const MINIMAL_TOOLS = ['rtk', 'context-mode'];
 const OPTIONAL_TOOLS = ['serena', 'playwright', 'ponytail', 'caveman', 'i-have-adhd', 'dcp', 'codeburn'];
 // Asked for one by one and never part of --all-tools.
-const OPT_IN_TOOLS = ['gsd', 'autoskills'];
+const OPT_IN_TOOLS = ['gsd', 'autoskills', 'playwright-extension'];
 const TOOL_INFO = {
   serena: 'Serena MCP: symbol-level code navigation, so agents read less code',
   playwright: 'Playwright MCP: lets agents drive a browser to check web UIs',
+  'playwright-extension': 'Playwright MCP extension mode: attaches to your own signed-in Chrome (pages behind single sign-on); not for Claude Code, which has Claude in Chrome',
   ponytail: 'Ponytail: code-quality guidance injected each turn (lite mode recommended)',
   caveman: 'Caveman skills: extra-compressed answers when you ask for them',
   'i-have-adhd': 'i-have-adhd: skimmable, action-first formatting for every answer',
@@ -295,6 +298,7 @@ function printPlan(o, planned, commands) {
   console.log(`  network: ${CATEGORIES.map((c) => `${c} ${o.network[c]}`).join(', ')}`);
   const net = proxyReport();
   if (net.length) console.log(`  proxy and CA (passed to every command): ${net.join(' ')}`);
+  if (o.tools.includes('playwright-extension')) console.log(`  signed-in browser: ${EXTENSION_NOTE}`);
   if (o.notes.length) console.log(`  your notes for undocumented settings (saved, never applied): ${o.notes.map((n) => path.basename(n.path, '.md')).join(', ')}`);
   console.log('');
   console.log('Files:');
@@ -361,6 +365,7 @@ async function install(o) {
   console.log(`\nDone. Backups: ${backupDir}`);
   if (o.project) return console.log('Next: review and commit these files. Each teammate runs the installer once for the tools (rtk, context-mode, ...).');
   console.log('Next: restart your agents, log in to your providers, then run --doctor.');
+  if (o.tools.includes('playwright-extension')) console.log(`Signed-in browser: ${EXTENSION_NOTE}`);
   if (o.gh) console.log('GitHub CLI: run `gh auth login` yourself; lean-agents never handles tokens.');
   for (const n of o.notes) console.log(`Notes saved: ${n.path}. Ask your agent to apply them, showing you each change first.`);
   if (o.network.telemetry === 'off' && o.agents.includes('claude')) {

@@ -14,7 +14,7 @@ opencode --version
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 
 bash "$repo/install.sh" --yes --no-exec --agents opencode-v2 \
-  --tools serena,playwright,ponytail --privacy strict --profile anthropic-api
+  --tools serena,playwright,playwright-extension,ponytail --privacy strict --profile anthropic-api
 
 # Proves the file name the migration guide gives for the old tui.json.
 LC_ALL=C grep -aq 'opencode/cli.json' "$(command -v opencode)"
@@ -34,6 +34,7 @@ const checks = {
   'rules in instructions': (cfg.instructions ?? []).some((i) => String(i).includes('lean-agents')),
   'mcp serena': !!servers.serena,
   'mcp playwright': !!servers.playwright,
+  'mcp playwright-extension': (servers['playwright-extension']?.command ?? []).includes('--extension'),
   'mcp context-mode': !!servers['context-mode'],
   'plan model': JSON.stringify(cfg.agents?.plan?.model ?? null).includes('claude-opus-5-5'),
   'subagents loaded': ['explore', 'research', 'review', 'debug', 'planner'].every((a) => agentsOut.includes(a)),

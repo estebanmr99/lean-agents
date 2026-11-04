@@ -78,6 +78,7 @@ export function prereqFor(tool, pm) {
     case 'serena':
       return { bin: 'uvx', install: brew('uv') ?? winget('astral-sh.uv'), manual: 'https://docs.astral.sh/uv/getting-started/installation/' };
     case 'playwright':
+    case 'playwright-extension':
     case 'caveman':
     case 'codeburn':
     case 'autoskills':

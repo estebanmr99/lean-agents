@@ -29,7 +29,7 @@ export function resolvedOpenCodeConfig(text) {
 
 function checkCopilot(o, add) {
   const mcp = quiet(['copilot', 'mcp', 'list', '--json']);
-  for (const s of ['serena', 'playwright'].filter((t) => o.tools.includes(t))) {
+  for (const s of ['serena', 'playwright', 'playwright-extension'].filter((t) => o.tools.includes(t))) {
     add(`copilot mcp ${s}`, mcp.ok && mcp.out.includes(`"${s}"`) ? 'ok' : 'error', mcp.ok ? '' : 'copilot mcp list failed');
   }
   const rules = quiet(['copilot', 'instruction', 'list']);
@@ -42,7 +42,7 @@ function checkCopilot(o, add) {
 function checkCursor(o, add) {
   // `mcp list` starts every server, and Serena through uvx can take longer than 30s.
   const mcp = quiet(['cursor-agent', 'mcp', 'list'], 120000);
-  for (const s of ['serena', 'playwright', 'context-mode'].filter((t) => o.tools.includes(t))) {
+  for (const s of ['serena', 'playwright', 'playwright-extension', 'context-mode'].filter((t) => o.tools.includes(t))) {
     add(`cursor mcp ${s}`, mcp.ok && mcp.out.includes(s) ? 'ok' : 'error', mcp.ok ? '' : 'cursor-agent mcp list failed');
   }
 }
@@ -120,7 +120,7 @@ function checkOpenCode(o, add) {
   cfg = redact(cfg);
   const servers = cfg.mcp?.servers ?? cfg.mcp ?? {};
   const v1 = o.agents.includes('opencode-v1');
-  for (const s of ['context-mode', 'serena', 'playwright'].filter((t) => o.tools.includes(t) && !(v1 && t === 'context-mode'))) {
+  for (const s of ['context-mode', 'serena', 'playwright', 'playwright-extension'].filter((t) => o.tools.includes(t) && !(v1 && t === 'context-mode'))) {
     add(`opencode mcp ${s}`, servers[s] ? 'ok' : 'error', servers[s] ? '' : 'not in resolved config');
   }
   const plugins = [...(cfg.plugins ?? []), ...(cfg.plugin ?? [])].map(String);
