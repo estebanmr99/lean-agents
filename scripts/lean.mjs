@@ -44,7 +44,7 @@ function parseArgs(argv) {
   const o = {
     command: 'install', dryRun: false, yes: false, agents: null, tools: null, privacy: null, profile: null,
     lang: null, home: os.homedir(), exec: true, adhdAlways: null, ponytailMode: null,
-    networkPreset: null, networkFlags: {},
+    networkPreset: null, networkFlags: {}, gh: null,
   };
   const list = (v) => v.split(',').map((s) => s.trim()).filter(Boolean);
   for (let i = 0; i < argv.length; i++) {
@@ -58,6 +58,7 @@ function parseArgs(argv) {
       case '--all-tools': o.tools = [...MINIMAL_TOOLS, ...OPTIONAL_TOOLS]; break;
       case '--no-tools': o.tools = []; break;
       case '--privacy': o.privacy = next(); fromPrivacy(o.privacy); break;
+      case '--gh': o.gh = true; break;
       case '--network': o.networkPreset = onOff(a, next()); break;
       case '--telemetry': o.networkFlags.telemetry = onOff(a, next()); break;
       case '--auto-update': o.networkFlags.autoUpdate = onOff(a, next()); break;
@@ -94,6 +95,7 @@ const HELP = `Usage: lean-agents [options]
                          One category; overrides the preset
   --profile <name>       Model profile for OpenCode (see profiles/)
   --lang en|es           Language for rules and replies
+  --gh                   Install GitHub CLI (gh) if it is missing
   --adhd-always          Turn on i-have-adhd for every answer
   --ponytail-mode lite|full|ultra|off
   --update               Re-apply with your saved choices
@@ -163,6 +165,7 @@ async function choose(o, saved) {
   if (unknown.length) throw new Error(`unknown tools: ${unknown.join(', ')} (available: ${known.join(', ')})`);
   if (!o.agents.includes('opencode-v1')) o.tools = o.tools.filter((t) => t !== 'dcp');
   await chooseNetwork(o, saved, p);
+  o.gh ??= saved?.gh ?? (!which('gh') && yesNo(await p.ask('Install GitHub CLI (gh)? You log in yourself afterwards', 'n')));
   o.lang ??= saved?.lang ?? (await p.ask('Language for rules and replies (en/es)?', 'en'));
   if (o.agents.some((a) => a.startsWith('opencode')) && !o.profile) {
     o.profile = saved?.profile ?? (await p.ask('OpenCode model profile (github-copilot, vertex-gemini, anthropic-api, opencode-go, openai-api, none)?', 'none'));
@@ -212,7 +215,7 @@ function buildPlan(o) {
 function prereqCommands(o) {
   const pm = packageManager();
   const out = [];
-  for (const t of o.tools) {
+  for (const t of [...o.tools, ...(o.gh ? ['gh'] : [])]) {
     const p = prereqFor(t, pm);
     if (!p || which(p.bin)) continue;
     if (p.install) out.push({ tool: t, desc: `install ${p.bin}`, run: p.install, undo: [] });
@@ -273,7 +276,7 @@ async function install(o) {
     version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version,
     installedAt: previous?.installedAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    options: { agents: o.agents, tools: o.tools, privacy: o.privacy, network: o.network, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode },
+    options: { agents: o.agents, tools: o.tools, privacy: o.privacy, network: o.network, gh: o.gh, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode },
     files: [...(previous?.files ?? []), ...files],
     commands: [...(previous?.commands ?? []), ...ran],
   };
@@ -286,6 +289,7 @@ async function install(o) {
   }
   console.log(`\nDone. Backups: ${backupDir}`);
   console.log('Next: restart your agents, log in to your providers, then run --doctor.');
+  if (o.gh) console.log('GitHub CLI: run `gh auth login` yourself; lean-agents never handles tokens.');
   if (o.network.telemetry === 'off' && o.agents.includes('claude')) {
     console.log('Strict privacy: also turn off "Help improve Claude" in your claude.ai privacy settings.');
   }

@@ -464,3 +464,16 @@ test('proxy variables are shown redacted, shared in both cases, and never writte
   shareProxy(e2);
   assert.equal(e2.NODE_USE_ENV_PROXY, '1');
 });
+
+test('gh installs at user scope with brew or winget, only when asked for', () => {
+  assert.deepEqual(prereqFor('gh', 'brew').install, [['brew', 'install', 'gh']]);
+  assert.deepEqual(prereqFor('gh', 'winget').install[0].slice(0, 6), ['winget', 'install', '--id', 'GitHub.cli', '-e', '--scope']);
+  assert.equal(prereqFor('gh', null).install, null);
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-gh-'));
+  const f = path.join(home, '.config', 'lean-agents', 'state.json');
+  lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--no-tools', '--lang', 'en']);
+  assert.equal(JSON.parse(fs.readFileSync(f, 'utf8')).options.gh, false);
+  const out = lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--no-tools', '--lang', 'en', '--gh']);
+  assert.match(out, /gh auth login/);
+  assert.equal(JSON.parse(fs.readFileSync(f, 'utf8')).options.gh, true);
+});
