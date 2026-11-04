@@ -32,6 +32,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- `models-refresh` no longer reports a model the same profile already uses, or one with different outputs such as an image model (issue #6). Profiles unchanged; reasons in `profiles/README.md`.
 - After the last prompt on `/dev/tty`, as in `curl | bash`, the installer exits instead of hanging.
 - Without a TTY and without `--yes`, the installer stops with a clear message instead of a crash, and `--dry-run` with every choice passed as a flag exits 0.
 - The OpenCode undo no longer leaves `~/.agents/skills` when another agent is detected.

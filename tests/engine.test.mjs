@@ -303,6 +303,18 @@ test('adhd-skill flips the flag in every installed copy and back', () => {
   assert.equal(script('on', fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'))), 1, 'a missing skill must fail the install');
 });
 
+test('diffModels skips models the profile already uses and models with other outputs (issue #6)', () => {
+  const text = { output: ['text'] };
+  const catalog = { acme: { models: {
+    'k-3': { id: 'k-3', family: 'k', release_date: '2026-01-01', modalities: text },
+    'k-3.1-pro': { id: 'k-3.1-pro', family: 'k', release_date: '2026-02-01', modalities: text },
+    'f-1': { id: 'f-1', family: 'f', release_date: '2026-01-01', modalities: text },
+    'f-image': { id: 'f-image', family: 'f', release_date: '2026-03-01', modalities: { output: ['text', 'image'] } },
+  } } };
+  const tiers = { balanced: { model: 'acme/k-3' }, strong: { model: 'acme/k-3.1-pro' }, fast: { model: 'acme/f-1' } };
+  assert.deepEqual(diffModels([{ name: 'p', tiers }], catalog), { missing: [], newer: [] });
+});
+
 test('diffModels reports missing IDs and newer family members, and skips aliases', () => {
   const catalog = { acme: { models: {
     'a-1': { id: 'a-1', family: 'a', release_date: '2026-01-01' },

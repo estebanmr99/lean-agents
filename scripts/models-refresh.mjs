@@ -8,11 +8,14 @@ import { fileURLToPath } from 'node:url';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const CATALOG = 'https://models.dev/api.json';
 
+const sameOutputs = (a, b) => JSON.stringify([...(a.modalities?.output ?? [])].sort()) === JSON.stringify([...(b.modalities?.output ?? [])].sort());
+
 // profiles: [{ name, tiers }]. IDs without a provider prefix are aliases and are skipped.
 export function diffModels(profiles, catalog) {
   const missing = [];
   const newer = [];
   for (const { name, tiers } of profiles) {
+    const used = new Set(Object.values(tiers).map((t) => t.model));
     for (const { model } of Object.values(tiers)) {
       if (!model.includes('/')) continue;
       const [provider, id] = model.split(/\/(.*)/);
@@ -23,7 +26,9 @@ export function diffModels(profiles, catalog) {
         continue;
       }
       const latest = Object.values(models)
+        // A model the profile already uses, or one with other outputs (an image model in a text family), is not an upgrade.
         .filter((m) => m.family === current.family && m.release_date > current.release_date)
+        .filter((m) => !used.has(`${provider}/${m.id}`) && sameOutputs(m, current))
         .sort((a, b) => b.release_date.localeCompare(a.release_date))[0];
       if (latest) newer.push({ profile: name, model, latest: `${provider}/${latest.id}` });
     }
