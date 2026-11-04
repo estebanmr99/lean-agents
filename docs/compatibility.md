@@ -159,6 +159,25 @@ Research only (session 8). lean-agents installs neither app yet. Checked 2026-11
 | **Pending CI numbers:** `bench-context-mode` (Ubuntu, macOS, Windows, throwaway HOME) times `ctx_execute` on `tests/fixtures/bench/` (2 warm-up, 10 timed runs, JS and TS) with Node only, then with Bun, plus the install times and the backend lines from `ctx_doctor`. Results and the `--bun` decision go here after the first green run | `tests/bench-context-mode.mjs`, `.github/workflows/ci.yml` | 2026-11-03 |
 | Playwright MCP `--extension` connects to a running Chrome or Edge through the "Playwright Extension" (Chrome Web Store id `mmlmfjhmonkocbjadbfplnigmagldckm`); each connection is approved in the browser unless `PLAYWRIGHT_MCP_EXTENSION_TOKEN` is set in the server's environment; the token is per browser profile, shown by the extension. lean-agents adds the `playwright-extension` entry only with `--tools playwright-extension`, never for Claude Code or Antigravity | [playwright-mcp](https://github.com/microsoft/playwright-mcp), [extension README](https://github.com/microsoft/playwright/tree/main/packages/extension) | 2026-11-03 |
 
+## Gemini CLI (not supported)
+
+Checked 2026-11-03. lean-agents does not add a Gemini CLI adapter: upstream says free individual access and Google AI Pro and Ultra moved to Antigravity CLI on 2026-06-18, and Gemini CLI now serves Gemini Code Assist Standard and Enterprise. Antigravity CLI is supported instead.
+
+| Item | Source | Checked |
+| --- | --- | --- |
+| Access moved to Antigravity CLI on 2026-06-18; Gemini CLI targets Code Assist Standard and Enterprise | [README](https://github.com/google-gemini/gemini-cli), [MCP docs](https://geminicli.com/docs/tools/mcp-server) | 2026-11-03 |
+| Install: `npm install -g @google/gemini-cli`, `npx @google/gemini-cli`, `brew install gemini-cli`, MacPorts, conda | [README](https://github.com/google-gemini/gemini-cli) | 2026-11-03 |
+| MCP: `~/.gemini/settings.json` `mcpServers` (`command`, `url` or `httpUrl`; `args`, `env`, `cwd`, `timeout`, `trust`, `includeTools`, `excludeTools`); `gemini mcp add [-s user\|project] [-t stdio\|sse\|http]`, `gemini mcp list`, `gemini mcp remove`; stdio servers connect only in trusted folders | [MCP docs](https://geminicli.com/docs/tools/mcp-server) | 2026-11-03 |
+| Auto-update: `general.enableAutoUpdate` (default true); `skills.enabled` (default true) | [settings](https://geminicli.com/docs/cli/settings) | 2026-11-03 |
+| RTK: `rtk init -g --gemini` (BeforeTool hook) | [rtk](https://github.com/rtk-ai/rtk) | 2026-11-03 |
+
+- **VERIFY:** Gemini CLI rules file (`~/.gemini/GEMINI.md`, `context.fileName` for `AGENTS.md`), skills and subagent folders, proxy, telemetry and usage statistics settings, the Node minimum, and whether `gemini mcp list` runs without a login.
+
+### Cursor: what CI proves today
+
+- Proven by `real-cursor` (Ubuntu, macOS): `agent mcp list` reads `~/.cursor/mcp.json` and the repo's `.cursor/mcp.json`; the RTK hook in `~/.cursor/hooks.json`; skills in `~/.agents/skills`; `--uninstall` removes them.
+- **VERIFY:** whether the Cursor CLI loads `~/.cursor/agents/*.md` and `.cursor/agents/*.md` (CI checks the files only); whether it applies `.cursor/rules/lean-agents.mdc`; Context Mode hooks for Cursor (MCP only for now); `network.useHttp1ForAgent` for proxies (not set yet); the Cursor IDE app itself (not in CI).
+
 ## Proxy and corporate CA
 
 lean-agents copies each proxy variable it finds (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY`) to the other letter case for the commands it runs, because tools disagree on the case. It reports CA variables but never copies them: each one replaces a tool's whole bundle.
