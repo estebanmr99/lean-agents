@@ -284,6 +284,9 @@ jobs:
           test -f "$HOME/.agents/skills/caveman/SKILL.md"
           grep -q '"gsd-debugger": "anthropic/claude-opus-5-5"' "$HOME/.gsd/defaults.json"
           uvx -p 3.13 --from git+https://github.com/oraios/serena serena --help
+          # The flag the playwright-extension entry passes exists in the real package.
+          npx -y @playwright/mcp@latest --help > "$HOME/pw-help.txt"
+          grep -q -- '--extension' "$HOME/pw-help.txt"
           node scripts/lean.mjs --uninstall --yes > "$HOME/uninstall.txt"
           cat "$HOME/uninstall.txt"
           if grep -qE '^ *! ' "$HOME/uninstall.txt"; then exit 1; fi

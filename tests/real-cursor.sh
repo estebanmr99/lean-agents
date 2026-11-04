@@ -19,7 +19,7 @@ unset XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 dir="$HOME/.cursor"
 
-bash "$repo/install.sh" --yes --agents cursor --tools serena,playwright,caveman,i-have-adhd \
+bash "$repo/install.sh" --yes --agents cursor --tools serena,playwright,playwright-extension,caveman,i-have-adhd \
   --privacy strict --lang en --ponytail-mode off </dev/null 2>&1 | tee "$HOME/install.txt"
 refute grep -qE '^ *! ' "$HOME/install.txt"
 
@@ -36,6 +36,7 @@ grep -q '^disable-model-invocation: false$' "$HOME/.agents/skills/i-have-adhd/SK
 cat "$HOME/mcp.txt"
 grep -q serena "$HOME/mcp.txt"
 grep -q playwright "$HOME/mcp.txt"
+grep -q playwright-extension "$HOME/mcp.txt"
 grep -q context-mode "$HOME/mcp.txt"
 
 node "$repo/scripts/lean.mjs" --doctor </dev/null
@@ -46,6 +47,7 @@ refute test -e "$dir/agents/explore.md"
 refute grep -qs rtk "$dir/hooks.json"
 refute test -e "$HOME/.agents/skills/caveman"
 refute grep -qs serena "$dir/mcp.json"
+refute grep -qs playwright-extension "$dir/mcp.json"
 
 # Team mode: with the user config gone, Cursor can only find serena in the repo's .cursor/mcp.json.
 proj="$HOME/team-repo"
