@@ -6,7 +6,7 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=20.12"
   },
   "bin": {
     "lean-agents": "scripts/lean.mjs"
@@ -16,6 +16,7 @@
     "check-private": "bash scripts/check-private.sh"
   },
   "dependencies": {
+    "@clack/prompts": "1.8.1",
     "jsonc-parser": "^3.3.1"
   }
 }

@@ -78,6 +78,8 @@ export function prereqFor(tool, pm) {
     case 'autoskills':
     case 'gsd':
       return { bin: 'npx', install: null, manual: 'https://nodejs.org/' };
+    case 'gh':
+      return { bin: 'gh', install: brew('gh') ?? winget('GitHub.cli'), manual: 'https://cli.github.com/' };
     case 'i-have-adhd':
       return { bin: 'git', install: brew('git') ?? winget('Git.Git'), manual: 'https://git-scm.com/downloads' };
     default:

@@ -9,6 +9,17 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - `docs/launch.md`, a README banner, and an `assets` workflow that renders the demo GIF and social preview in CI.
 - `release.yml`: a tag `v*` publishes the CHANGELOG notes and source archives. `scripts/release.mjs` builds them.
 - CI job `real-skills-undo`: real Skills CLI, throwaway HOME, Claude Code and OpenCode 1.x and 2.x.
+- Network presets: one question (all off, all on, per category) and `--network on|off`, `--telemetry`, `--auto-update`, `--outbound` for `--yes` runs. Saved in `state.json`; `--privacy strict|standard` map to the presets. Telemetry off also sets `DO_NOT_TRACK=1` for Claude Code and for install commands.
+- Proxy support: `HTTP(S)_PROXY`, `ALL_PROXY` and `NO_PROXY` are passed to every command in both letter cases, and shown redacted in `--dry-run` and `--doctor` with any CA variables. Never written to disk.
+- `--gh`: installs GitHub CLI with brew or winget at user scope; `gh auth login` stays manual.
+- Interactive menus, a progress list and a summary on a real terminal, with `@clack/prompts` (the one new dependency). `--yes`, pipes and no-TTY runs keep the plain questions.
+- Settings upstream does not document (Antigravity telemetry and auto-update, Serena config, winget persistent proxy, download hosts, DCP, GSD and AutoSkills telemetry): the installer asks to paste docs or IT notes, saved to `~/.config/lean-agents/notes/` for an agent to apply after review, or keep the tool's default. Never guessed and never applied automatically; skipped when another agent already set the tool up.
+- `docs/SECURITY-REVIEW.md`: a prompt any agent runs on this repo before install.
+- CI: `real-proxy` (install through squid with direct traffic blocked, all-off preset, gh and agy behind the proxy), a pty test for the menus, no-TTY checks in PowerShell 5.1 and Git Bash, `gh` through winget.
+
+### Changed
+
+- Node.js 20.12 or newer is required (`@clack/prompts` needs `util.styleText`).
 
 ### Fixed
 

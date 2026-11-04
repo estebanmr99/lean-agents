@@ -3,6 +3,7 @@
 import path from 'node:path';
 import { OWNED_MARK } from '../fsops.mjs';
 import { tierFor, modelFor } from '../render.mjs';
+import { privacyOf } from '../network.mjs';
 
 const TOOLS = {
   'read-only': 'Read, Grep, Glob',
@@ -46,11 +47,16 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
   const env = { BASH_MAX_OUTPUT_LENGTH: '15000', CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '80' };
   const edits = Object.entries(env).map(([k, v]) => ({ path: ['env', k], value: v, mode: 'setIfAbsent' }));
   edits.unshift({ path: ['model'], value: profile?.main_model ?? 'sonnet', mode: 'setIfAbsent' });
-  if (opts.privacy === 'strict') {
-    for (const k of ['DISABLE_AUTOUPDATER', 'DISABLE_TELEMETRY', 'DISABLE_ERROR_REPORTING', 'DISABLE_BUG_COMMAND', 'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC']) {
-      edits.push({ path: ['env', k], value: '1', mode: 'set' });
-    }
-  }
+  const net = opts.network;
+  const off = [
+    ...(net.autoUpdate === 'off' ? ['DISABLE_AUTOUPDATER'] : []),
+    ...(net.telemetry === 'off' ? ['DISABLE_TELEMETRY', 'DISABLE_ERROR_REPORTING'] : []),
+    ...(net.outbound === 'off' ? ['DISABLE_BUG_COMMAND'] : []),
+    // Also stops updates and telemetry, so only when every category is off.
+    ...(privacyOf(net) === 'strict' ? ['CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC'] : []),
+    ...(net.telemetry === 'off' ? ['DO_NOT_TRACK'] : []),
+  ];
+  for (const k of off) edits.push({ path: ['env', k], value: '1', mode: 'set' });
   actions.push({ kind: 'json', path: path.join(dir, 'settings.json'), edits });
 
   if (tools.includes('rtk')) {

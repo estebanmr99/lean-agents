@@ -21,6 +21,7 @@ Instructions for coding agents (Claude Code, OpenCode, Copilot CLI) that work **
 | Real Skills CLI undo check (safe locally, throwaway HOME) | `bash tests/real-skills-undo.sh claude,opencode-v2` |
 | Real Copilot CLI check (needs `copilot`, `rtk` and `uvx` on PATH) | `bash tests/real-copilot.sh` |
 | Real Antigravity check (needs `agy`, `rtk` and `uvx` on PATH) | `bash tests/real-antigravity.sh` |
+| Interactive menus in a pseudo-terminal (macOS, Linux; temp HOME, dry run) | `python3 tests/real-interactive.py` |
 
 ## Hard rules
 
@@ -34,7 +35,7 @@ Instructions for coding agents (Claude Code, OpenCode, Copilot CLI) that work **
 
 ## Code style
 
-- Node 20+, ES modules, no dependencies beyond `jsonc-parser`. Small pure functions; adapters return `{ actions, commands }`.
+- Node 20.12+, ES modules, no dependencies beyond `jsonc-parser` and `@clack/prompts` (pinned; menus only, loaded only on a real terminal). Ask the owner before adding any other. Small pure functions; adapters return `{ actions, commands }`.
 - Bash 3.2 compatible (macOS default) and shellcheck clean. PowerShell 5.1 compatible and PSScriptAnalyzer clean.
 - Match the comment density of the surrounding code: a short header per file, comments only where the why is not obvious.
 - Tests in `tests/*.test.mjs` with `node:test`, always against a temp HOME.

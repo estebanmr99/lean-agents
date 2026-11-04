@@ -18,6 +18,9 @@ import { gsdPlan } from './lib/gsd.mjs';
 import { adhdCommand } from './lib/adhd.mjs';
 import { detectAgents, packageManager, prereqFor, which, run, quiet, exists, isolate } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
+import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
+import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
+import { unverifiedItems, notesFile } from './lib/unverified.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ADAPTERS = { claude: claudeAdapter, 'opencode-v1': opencodeV1Adapter, 'opencode-v2': opencodeV2Adapter, 'copilot-cli': copilotAdapter, antigravity: antigravityAdapter };
@@ -43,6 +46,7 @@ function parseArgs(argv) {
   const o = {
     command: 'install', dryRun: false, yes: false, agents: null, tools: null, privacy: null, profile: null,
     lang: null, home: os.homedir(), exec: true, adhdAlways: null, ponytailMode: null,
+    networkPreset: null, networkFlags: {}, gh: null,
   };
   const list = (v) => v.split(',').map((s) => s.trim()).filter(Boolean);
   for (let i = 0; i < argv.length; i++) {
@@ -55,7 +59,12 @@ function parseArgs(argv) {
       case '--tools': o.tools = [...new Set([...MINIMAL_TOOLS, ...list(next())])]; break;
       case '--all-tools': o.tools = [...MINIMAL_TOOLS, ...OPTIONAL_TOOLS]; break;
       case '--no-tools': o.tools = []; break;
-      case '--privacy': o.privacy = next(); break;
+      case '--privacy': o.privacy = next(); fromPrivacy(o.privacy); break;
+      case '--gh': o.gh = true; break;
+      case '--network': o.networkPreset = onOff(a, next()); break;
+      case '--telemetry': o.networkFlags.telemetry = onOff(a, next()); break;
+      case '--auto-update': o.networkFlags.autoUpdate = onOff(a, next()); break;
+      case '--outbound': o.networkFlags.outbound = onOff(a, next()); break;
       case '--profile': o.profile = next(); break;
       case '--lang': o.lang = next(); break;
       case '--home': o.home = path.resolve(next()); break;
@@ -82,9 +91,13 @@ const HELP = `Usage: lean-agents [options]
   --tools a,b            Optional tools on top of rtk and context-mode:
                          ${[...OPTIONAL_TOOLS, ...OPT_IN_TOOLS].join(', ')}
   --all-tools / --no-tools  (--all-tools leaves out ${OPT_IN_TOOLS.join(', ')})
-  --privacy standard|strict
+  --privacy standard|strict  Same as --network on / --network off
+  --network on|off       Preset for telemetry, auto-updates and other outbound calls
+  --telemetry on|off, --auto-update on|off, --outbound on|off
+                         One category; overrides the preset
   --profile <name>       Model profile for OpenCode (see profiles/)
   --lang en|es           Language for rules and replies
+  --gh                   Install GitHub CLI (gh) if it is missing
   --adhd-always          Turn on i-have-adhd for every answer
   --ponytail-mode lite|full|ultra|off
   --update               Re-apply with your saved choices
@@ -92,26 +105,36 @@ const HELP = `Usage: lean-agents [options]
   --doctor               Check the install
 `;
 
-function prompter(yes) {
-  if (yes) return { ask: async (_q, def) => def, close() {} };
+async function prompter(yes) {
+  if (yes) return { ask: async (_q, def) => def, select: async ({ def }) => def, multi: async ({ defaults }) => defaults, close() {} };
   let input = process.stdin;
   if (!process.stdin.isTTY) {
     // openSync reports a missing /dev/tty here, not later as a crash. A tty.ReadStream, unlike
     // an fs stream, can close while a read is pending, so the process can exit.
     try { input = new tty.ReadStream(fs.openSync(process.platform === 'win32' ? 'CONIN$' : '/dev/tty', 'r')); } catch { /* keep stdin */ }
   }
+  if (canUseMenus(input)) return menuPrompter(input);
   const rl = readline.createInterface({ input, output: process.stdout });
   // Never fall back to the default answer here: nobody approved these changes.
   const noInput = () => new Error('no terminal to ask on: pass --yes to accept the defaults, or --dry-run with --agents and --tools to preview');
   let closed = false;
   let fail = null;
   rl.once('close', () => { closed = true; fail?.(noInput()); });
+  const ask = (q, def) => new Promise((res, rej) => {
+    if (closed) return rej(noInput());
+    fail = rej;
+    rl.question(`${q} [${def}] `, (a) => res(a.trim() || def));
+  });
   return {
-    ask: (q, def) => new Promise((res, rej) => {
-      if (closed) return rej(noInput());
-      fail = rej;
-      rl.question(`${q} [${def}] `, (a) => res(a.trim() || def));
-    }),
+    tty: Boolean(input.isTTY),
+    ask,
+    // Menus fall back to the same text questions as before.
+    select: ({ ask: q, def }) => ask(q, def),
+    multi: async ({ items, defaults }) => {
+      const picked = [];
+      for (const it of items) if (yesNo(await ask(it.ask, defaults.includes(it.value) ? 'y' : 'n'))) picked.push(it.value);
+      return picked;
+    },
     close: () => { fail = null; rl.close(); if (input !== process.stdin) input.destroy(); },
   };
 }
@@ -124,16 +147,15 @@ function readState(home) {
 }
 
 async function choose(o, saved) {
-  const p = prompter(o.yes);
+  const p = await prompter(o.yes);
   if (!o.agents) {
     o.agents = saved?.agents ?? [];
     if (!saved) {
       const detected = detectAgents();
       const supported = Object.keys(detected).filter((a) => ADAPTERS[a]);
       if (!supported.length) console.log('No supported agent found on PATH (claude, opencode, copilot, agy). Use --agents to configure anyway.');
-      for (const a of supported) {
-        if (yesNo(await p.ask(`Configure ${a} ${detected[a]}?`, 'y'))) o.agents.push(a);
-      }
+      const items = supported.map((a) => ({ value: a, label: `${a} ${detected[a]}`, ask: `Configure ${a} ${detected[a]}?` }));
+      if (items.length) o.agents.push(...await p.multi({ message: 'Agents to configure (space to toggle, enter to confirm)', items, defaults: supported }));
     }
   }
   for (const a of o.agents) if (!ADAPTERS[a]) throw new Error(`agent "${a}" is not supported yet (available: ${Object.keys(ADAPTERS).join(', ')})`);
@@ -143,32 +165,84 @@ async function choose(o, saved) {
   if (!o.tools) {
     o.tools = saved?.tools ?? [...MINIMAL_TOOLS];
     if (!saved) {
-      for (const t of [...OPTIONAL_TOOLS, ...OPT_IN_TOOLS]) {
-        if (t === 'dcp' && !o.agents.includes('opencode-v1')) continue;
-        if (yesNo(await p.ask(`Add ${TOOL_INFO[t]}?`, 'n'))) o.tools.push(t);
-      }
+      const offered = [...OPTIONAL_TOOLS, ...OPT_IN_TOOLS].filter((t) => t !== 'dcp' || o.agents.includes('opencode-v1'));
+      const items = offered.map((t) => ({ value: t, label: t, hint: TOOL_INFO[t].replace(/^[^:]+: /, ''), ask: `Add ${TOOL_INFO[t]}?` }));
+      o.tools.push(...await p.multi({ message: `Optional tools (${MINIMAL_TOOLS.join(' and ')} are always included)`, items, defaults: [] }));
     }
   }
   const known = [...MINIMAL_TOOLS, ...OPTIONAL_TOOLS, ...OPT_IN_TOOLS];
   const unknown = o.tools.filter((t) => !known.includes(t));
   if (unknown.length) throw new Error(`unknown tools: ${unknown.join(', ')} (available: ${known.join(', ')})`);
   if (!o.agents.includes('opencode-v1')) o.tools = o.tools.filter((t) => t !== 'dcp');
-  o.privacy ??= saved?.privacy ?? (yesNo(await p.ask('Strict privacy (no telemetry, no auto-updates, no session sharing)?', 'n')) ? 'strict' : 'standard');
-  o.lang ??= saved?.lang ?? (await p.ask('Language for rules and replies (en/es)?', 'en'));
+  await chooseNetwork(o, saved, p);
+  await chooseUnverified(o, saved, p);
+  o.gh ??= saved?.gh ?? (!which('gh') && yesNo(await p.ask('Install GitHub CLI (gh)? You log in yourself afterwards', 'n')));
+  o.lang ??= saved?.lang ?? (await p.select({ ask: 'Language for rules and replies (en/es)?', message: 'Language for rules and replies', options: [{ value: 'en', label: 'English' }, { value: 'es', label: 'Español' }], def: 'en' }));
   if (o.agents.some((a) => a.startsWith('opencode')) && !o.profile) {
-    o.profile = saved?.profile ?? (await p.ask('OpenCode model profile (github-copilot, vertex-gemini, anthropic-api, opencode-go, openai-api, none)?', 'none'));
+    const profiles = ['github-copilot', 'vertex-gemini', 'anthropic-api', 'opencode-go', 'openai-api', 'none'];
+    o.profile = saved?.profile ?? (await p.select({ ask: `OpenCode model profile (${profiles.join(', ')})?`, message: 'OpenCode model profile', options: profiles.map((v) => ({ value: v })), def: 'none' }));
   }
   if (o.profile === 'none') o.profile = null;
   if (o.tools.includes('i-have-adhd')) o.adhdAlways ??= saved?.adhdAlways ?? yesNo(await p.ask('Use i-have-adhd on every answer?', 'y'));
-  if (o.tools.includes('ponytail')) o.ponytailMode ??= saved?.ponytailMode ?? (await p.ask('Ponytail default mode (lite/full/ultra/off)?', 'lite'));
+  if (o.tools.includes('ponytail')) o.ponytailMode ??= saved?.ponytailMode ?? (await p.select({ ask: 'Ponytail default mode (lite/full/ultra/off)?', message: 'Ponytail default mode', options: ['lite', 'full', 'ultra', 'off'].map((v) => ({ value: v })), def: 'lite' }));
   return p;
+}
+
+const NETWORK_INFO = { telemetry: 'telemetry and error reports', autoUpdate: 'auto-updates', outbound: 'other outbound calls (session sharing, feedback, built-in providers)' };
+
+async function chooseNetwork(o, saved, p) {
+  let base = o.networkPreset ? preset(o.networkPreset) : fromPrivacy(o.privacy) ?? saved?.network ?? fromPrivacy(saved?.privacy);
+  if (!base && !Object.keys(o.networkFlags).length) {
+    const a = await p.select({
+      ask: 'Network: off (enterprise PC: no telemetry, auto-updates or sharing), on (personal PC), or choose per category?',
+      message: 'Telemetry, auto-updates and other outbound calls',
+      options: [
+        { value: 'off', label: 'All off', hint: 'enterprise PC' },
+        { value: 'on', label: 'All on', hint: 'personal PC, nothing changes' },
+        { value: 'choose', label: 'Choose per category' },
+      ],
+      def: 'on',
+    });
+    if (a === 'off' || a === 'on') base = preset(a);
+    else if (a === 'choose') {
+      base = {};
+      for (const c of CATEGORIES) base[c] = yesNo(await p.ask(`Keep ${NETWORK_INFO[c]} on?`, 'y')) ? 'on' : 'off';
+    } else throw new Error(`network takes off, on or choose, not "${a}"`);
+  }
+  o.network = { ...(base ?? preset('on')), ...o.networkFlags };
+  o.privacy = privacyOf(o.network);
+}
+
+async function chooseUnverified(o, saved, p) {
+  o.unverified = { ...saved?.unverified };
+  o.notes = [];
+  for (const item of unverifiedItems(o, o.home, { stateFiles: readState(o.home)?.files ?? [] })) {
+    if (item.kept) { o.unverified[item.id] = 'kept'; continue; }
+    if (o.unverified[item.id] && o.unverified[item.id] !== 'kept') continue;
+    // --yes, pipes and no terminal keep the default: pasting is interactive only.
+    if (!p.menus && !p.tty) { o.unverified[item.id] = 'default'; continue; }
+    const a = await p.select({
+      ask: `${item.label} is not documented upstream. Paste your docs or IT notes (paste), or keep the tool's default (default)?`,
+      message: `${item.label}: not documented upstream`,
+      options: [
+        { value: 'default', label: "Keep the tool's default" },
+        { value: 'paste', label: 'Paste docs or IT notes', hint: 'saved for your agent to apply after review' },
+      ],
+      def: 'default',
+    });
+    const pick = { p: 'paste', d: 'default' }[a.trim().toLowerCase()[0]];
+    if (!pick) throw new Error(`answer paste or default, not "${a}"`);
+    const answer = pick === 'paste' ? (await p.ask('One line of notes, or a path to a file with them (no passwords)', '')).trim() : '';
+    o.unverified[item.id] = answer ? 'notes' : 'default';
+    if (answer) o.notes.push(notesFile(o.home, item, answer));
+  }
 }
 
 function buildPlan(o) {
   const core = loadCore(ROOT);
   const rulesPath = path.join(stateDir(o.home), 'AGENTS.md');
   const rules = renderRules(ROOT, o);
-  const actions = [{ kind: 'file', path: rulesPath, content: rules }];
+  const actions = [{ kind: 'file', path: rulesPath, content: rules }, ...o.notes];
   const commands = [];
   for (const agent of o.agents) {
     const profile = loadProfile(ROOT, FIXED_PROFILE[agent] ?? o.profile);
@@ -187,7 +261,7 @@ function buildPlan(o) {
 function prereqCommands(o) {
   const pm = packageManager();
   const out = [];
-  for (const t of o.tools) {
+  for (const t of [...o.tools, ...(o.gh ? ['gh'] : [])]) {
     const p = prereqFor(t, pm);
     if (!p || which(p.bin)) continue;
     if (p.install) out.push({ tool: t, desc: `install ${p.bin}`, run: p.install, undo: [] });
@@ -198,7 +272,12 @@ function prereqCommands(o) {
 
 function printPlan(o, planned, commands) {
   console.log(`\nlean-agents plan for ${o.agents.join(', ') || 'no agents'}`);
-  console.log(`  tools: ${o.tools.join(', ') || 'none'} | privacy: ${o.privacy} | lang: ${o.lang} | profile: ${o.profile ?? 'none'}\n`);
+  console.log(`  tools: ${o.tools.join(', ') || 'none'} | privacy: ${o.privacy} | lang: ${o.lang} | profile: ${o.profile ?? 'none'}`);
+  console.log(`  network: ${CATEGORIES.map((c) => `${c} ${o.network[c]}`).join(', ')}`);
+  const net = proxyReport();
+  if (net.length) console.log(`  proxy and CA (passed to every command): ${net.join(' ')}`);
+  if (o.notes.length) console.log(`  your notes for undocumented settings (saved, never applied): ${o.notes.map((n) => path.basename(n.path, '.md')).join(', ')}`);
+  console.log('');
   console.log('Files:');
   console.log(describe(planned, o.home));
   if (commands.length) {
@@ -221,6 +300,8 @@ async function install(o) {
   if (o.dryRun) { p.close(); console.log('Dry run: nothing was changed.'); return; }
   if (!yesNo(await p.ask('Apply these changes?', 'y'))) { p.close(); console.log('Cancelled.'); return; }
   p.close();
+  const ui = p.menus ? await menuProgress() : null;
+  Object.assign(process.env, childEnv(o.network));
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupDir = path.join(stateDir(o.home), 'backups', stamp);
@@ -228,13 +309,16 @@ async function install(o) {
   const ran = [];
   let failed = 0;
   if (o.exec) {
-    for (const c of commands) {
+    for (const [i, c] of commands.entries()) {
       if (c.manual) { console.log(`! ${c.desc}`); failed++; continue; }
       if (c.skipIfExists && exists(c.skipIfExists)) continue;
       if (c.skipIfOutput && quiet(c.skipIfOutput.cmd).ok) continue;
-      console.log(`- ${c.desc}`);
+      if (ui) ui.step(i + 1, commands.length, c.desc);
+      else console.log(`- ${c.desc}`);
       const ok = c.run.every((argv) => run(argv, { dryRun: false, log: console.log }));
-      if (!ok) { console.log(`  ! failed: ${c.desc}. Run the command above by hand, then --doctor.`); failed++; }
+      if (ui) ui.result(ok, c.desc);
+      else if (!ok) console.log(`  ! failed: ${c.desc}. Run the command above by hand, then --doctor.`);
+      if (!ok) failed++;
       ran.push({ desc: c.desc, ok, undo: c.undo });
     }
   }
@@ -243,7 +327,7 @@ async function install(o) {
     version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version,
     installedAt: previous?.installedAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    options: { agents: o.agents, tools: o.tools, privacy: o.privacy, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode },
+    options: { agents: o.agents, tools: o.tools, privacy: o.privacy, network: o.network, gh: o.gh, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode },
     files: [...(previous?.files ?? []), ...files],
     commands: [...(previous?.commands ?? []), ...ran],
   };
@@ -251,26 +335,33 @@ async function install(o) {
   fs.writeFileSync(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(state, null, 2)}\n`);
   if (failed) {
     console.log(`\n${failed} step(s) failed; see the lines marked ! above. Backups: ${backupDir}`);
+    ui?.summary('Summary', [`${failed} of ${commands.length} commands failed`, `Backups: ${backupDir}`], false);
     process.exitCode = 1;
     return;
   }
   console.log(`\nDone. Backups: ${backupDir}`);
   console.log('Next: restart your agents, log in to your providers, then run --doctor.');
-  if (o.privacy === 'strict' && o.agents.includes('claude')) {
+  if (o.gh) console.log('GitHub CLI: run `gh auth login` yourself; lean-agents never handles tokens.');
+  for (const n of o.notes) console.log(`Notes saved: ${n.path}. Ask your agent to apply them, showing you each change first.`);
+  if (o.network.telemetry === 'off' && o.agents.includes('claude')) {
     console.log('Strict privacy: also turn off "Help improve Claude" in your claude.ai privacy settings.');
   }
-  if (o.privacy === 'strict' && o.agents.includes('copilot-cli')) {
+  if (o.network.telemetry === 'off' && o.agents.includes('copilot-cli')) {
     console.log('Strict privacy: Copilot CLI has no telemetry setting. Start it with --disable-client-telemetry.');
   }
-  if (o.privacy === 'strict' && o.agents.includes('antigravity')) {
+  if (o.network.telemetry === 'off' && o.agents.includes('antigravity')) {
     console.log('Strict privacy: turn off "Enable Telemetry" in Antigravity settings. It is stored on your account.');
   }
+  if (o.network.autoUpdate === 'off' && o.agents.includes('antigravity')) {
+    console.log('Auto-updates off: Antigravity CLI updates itself and has no documented switch for it.');
+  }
+  ui?.summary('Summary', [`${files.length} files written, ${ran.length} commands run`, `Backups: ${backupDir}`], true);
 }
 
 async function uninstall(o) {
   const state = readState(o.home);
   if (!state) { console.log('lean-agents is not installed.'); return; }
-  const p = prompter(o.yes);
+  const p = await prompter(o.yes);
   console.log(`This restores ${state.files.length} files and undoes ${state.commands.length} commands.`);
   if (o.dryRun || !yesNo(await p.ask('Uninstall?', o.yes ? 'y' : 'n'))) { p.close(); console.log('Nothing changed.'); return; }
   p.close();
@@ -293,6 +384,7 @@ async function uninstall(o) {
 async function main() {
   const o = parseArgs(process.argv.slice(2));
   isolate(o.home);
+  shareProxy();
   if (o.command === 'help') return console.log(HELP);
   if (o.command === 'doctor') return process.exit(doctor({ home: o.home, state: readState(o.home), exec: o.exec }) ? 0 : 1);
   if (o.command === 'uninstall') return uninstall(o);

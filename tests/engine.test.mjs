@@ -387,3 +387,134 @@ test('without a TTY and without --yes: asks nothing, changes nothing, says why',
   assert.match(dry.stdout, /Dry run: nothing was changed/);
   assert.deepEqual(fs.readdirSync(home), []);
 });
+
+const NET_BASE = ['--yes', '--no-exec', '--no-tools', '--lang', 'en', '--profile', 'anthropic-api'];
+const SWITCHES = {
+  claude: (s) => Object.keys(parse(s['.claude/settings.json']).env).filter((k) => /^DISABLE_|NONESSENTIAL|DO_NOT_TRACK/.test(k)).sort(),
+  'opencode-v2': (s) => { const c = parse(s['.config/opencode/opencode.jsonc'] ?? '{}'); return { share: c.share, update: c.update, policies: c.policies }; },
+  'opencode-v1': (s) => { const c = parse(s['.config/opencode/opencode.jsonc'] ?? '{}'); return { share: c.share, autoupdate: c.autoupdate, otel: c.experimental?.openTelemetry, disabled: c.disabled_providers }; },
+  'copilot-cli': (s) => parse(s['.copilot/settings.json'] ?? '{}').autoUpdate,
+};
+const switchesFor = (agents, flags) => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-net-'));
+  lean(home, [...NET_BASE, '--agents', agents.join(','), ...flags]);
+  const s = snapshot(home);
+  return Object.fromEntries(agents.map((a) => [a, SWITCHES[a](s)]));
+};
+
+test('--network off turns every telemetry, update and outbound switch off and is recorded', () => {
+  const deny = [{ effect: 'deny', action: 'provider.use', resource: 'opencode' }];
+  assert.deepEqual(switchesFor(['claude', 'opencode-v2', 'copilot-cli'], ['--network', 'off']), {
+    claude: ['CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC', 'DISABLE_AUTOUPDATER', 'DISABLE_BUG_COMMAND', 'DISABLE_ERROR_REPORTING', 'DISABLE_TELEMETRY', 'DO_NOT_TRACK'],
+    'opencode-v2': { share: 'disabled', update: 'disable', policies: deny },
+    'copilot-cli': false,
+  });
+  assert.deepEqual(switchesFor(['opencode-v1'], ['--network', 'off'])['opencode-v1'], { share: 'disabled', autoupdate: false, otel: false, disabled: ['opencode'] });
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-net-'));
+  lean(home, [...NET_BASE, '--agents', 'claude', '--network', 'off']);
+  const { options } = JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'state.json'), 'utf8'));
+  assert.deepEqual(options.network, { telemetry: 'off', autoUpdate: 'off', outbound: 'off' });
+  assert.equal(options.privacy, 'strict');
+});
+
+test('--privacy strict equals --network off; --network on and the --yes default set no switch', () => {
+  const agents = ['claude', 'opencode-v2', 'copilot-cli'];
+  assert.deepEqual(switchesFor(agents, ['--privacy', 'strict']), switchesFor(agents, ['--network', 'off']));
+  const none = { claude: [], 'opencode-v2': { share: undefined, update: undefined, policies: undefined }, 'copilot-cli': undefined };
+  assert.deepEqual(switchesFor(agents, ['--network', 'on']), none);
+  assert.deepEqual(switchesFor(agents, []), none);
+});
+
+test('one category flag overrides the preset', () => {
+  const r = switchesFor(['claude', 'opencode-v2'], ['--network', 'off', '--auto-update', 'on']);
+  assert.deepEqual(r.claude, ['DISABLE_BUG_COMMAND', 'DISABLE_ERROR_REPORTING', 'DISABLE_TELEMETRY', 'DO_NOT_TRACK']);
+  assert.equal(r['opencode-v2'].update, undefined);
+  assert.deepEqual(switchesFor(['claude'], ['--telemetry', 'off']).claude, ['DISABLE_ERROR_REPORTING', 'DISABLE_TELEMETRY', 'DO_NOT_TRACK']);
+  const bad = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--outbound', 'maybe'], { encoding: 'utf8' });
+  assert.match(bad.stderr, /--outbound takes on or off/);
+});
+
+test('--update keeps the network choice of a state file that only has privacy', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-net-'));
+  lean(home, [...NET_BASE, '--agents', 'opencode-v2', '--privacy', 'strict']);
+  const f = path.join(home, '.config', 'lean-agents', 'state.json');
+  const state = JSON.parse(fs.readFileSync(f, 'utf8'));
+  delete state.options.network;
+  fs.writeFileSync(f, JSON.stringify(state));
+  lean(home, ['--update', '--yes', '--no-exec']);
+  assert.deepEqual(JSON.parse(fs.readFileSync(f, 'utf8')).options.network, { telemetry: 'off', autoUpdate: 'off', outbound: 'off' });
+});
+
+test('proxy variables are shown redacted, shared in both cases, and never written to disk', async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-proxy-'));
+  const env = { ...process.env, https_proxy: 'http://alice:s3cret@127.0.0.1:3128', NO_PROXY: 'localhost', NODE_EXTRA_CA_CERTS: '/etc/corp-ca.pem' };
+  delete env.HTTPS_PROXY; delete env.no_proxy;
+  const out = lean(home, ['--yes', '--no-exec', '--agents', 'claude,opencode-v2', '--all-tools', '--network', 'off', '--lang', 'en', '--profile', 'none'], env);
+  assert.match(out, /HTTPS_PROXY=http:\/\/\*\*\*@127\.0\.0\.1:3128 NO_PROXY=localhost NODE_EXTRA_CA_CERTS=\/etc\/corp-ca\.pem/);
+  assert.ok(!out.includes('s3cret'));
+  for (const [f, text] of Object.entries(snapshot(home))) assert.ok(!text.includes('s3cret') && !text.includes('3128'), f);
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, '--doctor', '--no-exec'], { encoding: 'utf8', env });
+  assert.match(r.stdout, /network env\s+HTTPS_PROXY=http:\/\/\*\*\*@127\.0\.0\.1:3128/);
+  assert.ok(!r.stdout.includes('s3cret'));
+  const { shareProxy, redactUrl } = await import('../scripts/lib/network.mjs');
+  assert.equal(redactUrl('http://ci:p@ss@host:3128'), 'http://***@host:3128');
+  const e = { https_proxy: 'http://p:1', NO_PROXY: 'x', NODE_USE_ENV_PROXY: '0' };
+  shareProxy(e);
+  assert.deepEqual(e, { https_proxy: 'http://p:1', HTTPS_PROXY: 'http://p:1', NO_PROXY: 'x', no_proxy: 'x', NODE_USE_ENV_PROXY: '0' });
+  const e2 = { HTTP_PROXY: 'http://p:1' };
+  shareProxy(e2);
+  assert.equal(e2.NODE_USE_ENV_PROXY, '1');
+});
+
+test('gh installs at user scope with brew or winget, only when asked for', () => {
+  assert.deepEqual(prereqFor('gh', 'brew').install, [['brew', 'install', 'gh']]);
+  assert.deepEqual(prereqFor('gh', 'winget').install[0].slice(0, 6), ['winget', 'install', '--id', 'GitHub.cli', '-e', '--scope']);
+  assert.equal(prereqFor('gh', null).install, null);
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-gh-'));
+  const f = path.join(home, '.config', 'lean-agents', 'state.json');
+  lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--no-tools', '--lang', 'en']);
+  assert.equal(JSON.parse(fs.readFileSync(f, 'utf8')).options.gh, false);
+  const out = lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--no-tools', '--lang', 'en', '--gh']);
+  assert.match(out, /gh auth login/);
+  assert.equal(JSON.parse(fs.readFileSync(f, 'utf8')).options.gh, true);
+});
+
+test('undocumented settings: asked only when relevant, kept when another agent set them up, never guessed', async () => {
+  const { unverifiedItems, notesFile } = await import('../scripts/lib/unverified.mjs');
+  const { preset } = await import('../scripts/lib/network.mjs');
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const o = (agents, tools, net) => ({ agents, tools, network: preset(net) });
+  const ids = (items) => items.map((i) => `${i.id}${i.kept ? ':kept' : ''}`);
+  assert.deepEqual(ids(unverifiedItems(o(['claude'], ['rtk'], 'on'), home, { platform: 'darwin', env: {} })), []);
+  assert.deepEqual(ids(unverifiedItems(o(['antigravity'], ['serena', 'playwright', 'gsd', 'autoskills', 'dcp'], 'off'), home, { platform: 'darwin', env: {} })),
+    ['antigravity', 'serena', 'download-hosts', 'dcp', 'gsd', 'autoskills']);
+  assert.deepEqual(ids(unverifiedItems(o(['claude'], ['gsd'], 'on'), home, { platform: 'win32', env: { https_proxy: 'http://p:1' } })), ['winget-proxy', 'download-hosts']);
+  fs.mkdirSync(path.join(home, '.serena'));
+  fs.writeFileSync(path.join(home, '.serena', 'serena_config.yml'), 'x: 1\n');
+  fs.mkdirSync(path.join(home, '.gsd'));
+  const gsd = path.join(home, '.gsd', 'defaults.json');
+  fs.writeFileSync(gsd, '{}\n');
+  const both = o(['claude'], ['serena', 'gsd'], 'off');
+  assert.deepEqual(ids(unverifiedItems(both, home, { platform: 'darwin', env: {} })), ['serena:kept', 'gsd:kept']);
+  assert.deepEqual(ids(unverifiedItems(both, home, { platform: 'darwin', env: {}, stateFiles: [{ path: gsd }] })), ['serena:kept', 'gsd']);
+
+  const item = { id: 'serena', label: 'Serena config' };
+  const line = notesFile(home, item, 'proxy http://u:s3cret@127.0.0.1:8080');
+  assert.equal(line.path, path.join(home, '.config', 'lean-agents', 'notes', 'serena.md'));
+  assert.match(line.content, /managed by lean-agents[\s\S]*Source: pasted\n\nproxy http:\/\/\*\*\*@127\.0\.0\.1:8080\n$/);
+  assert.match(notesFile(home, item, 'HTTPS_PROXY=u:pw@10.0.0.1:8080 password: hunter2').content, /HTTPS_PROXY=\*\*\*@10\.0\.0\.1:8080 password: \*\*\*\n$/);
+  // A relative name is pasted text, even when such a file exists (npm test runs in the repo root).
+  assert.match(notesFile(home, item, 'package.json').content, /Source: pasted\n\npackage\.json\n$/);
+  const src = path.join(home, 'it-notes.txt');
+  fs.writeFileSync(src, 'line 1\nline 2 http://a:b@c\n');
+  assert.match(notesFile(home, item, src).content, /Source: .*it-notes\.txt\n\nline 1\nline 2 http:\/\/\*\*\*@c\n$/);
+  assert.match(notesFile(home, item, '~/it-notes.txt').content, /Source: .*it-notes\.txt/);
+});
+
+test('--yes keeps every tool default for undocumented settings and writes no notes', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  lean(home, ['--yes', '--no-exec', '--agents', 'antigravity', '--tools', 'serena,playwright', '--network', 'off', '--lang', 'en']);
+  const state = JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'state.json'), 'utf8'));
+  assert.deepEqual(state.options.unverified, { antigravity: 'default', serena: 'default', 'download-hosts': 'default' });
+  assert.ok(!fs.existsSync(path.join(home, '.config', 'lean-agents', 'notes')));
+});
