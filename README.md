@@ -54,7 +54,7 @@ Context Mode needs Node.js 22.5 or newer. Everything else works on Node.js 20.12
    curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --agents opencode-v2 --profile github-copilot --dry-run --yes
    ```
    ```powershell
-   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -Agents opencode-v2 -Profile github-copilot -DryRun --yes
+   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -Agents opencode-v2 -Profile github-copilot -DryRun -Yes
    ```
 3. Run the same without the dry run; in a terminal it asks you the questions you skipped with `--yes`:
    ```bash
@@ -151,7 +151,7 @@ curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/instal
 git add AGENTS.md .github .vscode .cursor && git commit -m "chore: add lean-agents team setup"
 ```
 
-On Windows: `& ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -Project . -DryRun --tools serena --yes`. Later, `--project . --update` re-applies your saved choices, and `--project . --uninstall` removes only what lean-agents added. Team mode writes files only. Each teammate still runs the installer once for the tools the rules mention (RTK, Context Mode and the rest), and their state stays in their own home folder, never in the repo.
+On Windows: `& ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -Project . -DryRun -Tools serena -Yes`. Later, `--project . --update` re-applies your saved choices, and `--project . --uninstall` removes only what lean-agents added. Team mode writes files only. Each teammate still runs the installer once for the tools the rules mention (RTK, Context Mode and the rest), and their state stays in their own home folder, never in the repo.
 
 ## Claude through GitHub Copilot
 

@@ -54,7 +54,7 @@ Context Mode necesita Node.js 22.5 o superior. Todo lo demás funciona con Node.
    curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --agents opencode-v2 --profile github-copilot --dry-run --yes
    ```
    ```powershell
-   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -Agents opencode-v2 -Profile github-copilot -DryRun --yes
+   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -Agents opencode-v2 -Profile github-copilot -DryRun -Yes
    ```
 3. Corre lo mismo sin el dry run; en una terminal te hace las preguntas que saltaste con `--yes`:
    ```bash
@@ -151,7 +151,7 @@ curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/instal
 git add AGENTS.md .github .vscode .cursor && git commit -m "chore: add lean-agents team setup"
 ```
 
-En Windows: `& ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -Project . -DryRun --tools serena --yes`. Después, `--project . --update` vuelve a aplicar tus opciones guardadas y `--project . --uninstall` quita solo lo que añadió lean-agents. El modo equipo solo escribe archivos. Cada persona del equipo ejecuta el instalador una vez para las herramientas que mencionan las reglas (RTK, Context Mode y las demás), y su estado se guarda en su propia carpeta de usuario, nunca en el repo.
+En Windows: `& ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -Project . -DryRun -Tools serena -Yes`. Después, `--project . --update` vuelve a aplicar tus opciones guardadas y `--project . --uninstall` quita solo lo que añadió lean-agents. El modo equipo solo escribe archivos. Cada persona del equipo ejecuta el instalador una vez para las herramientas que mencionan las reglas (RTK, Context Mode y las demás), y su estado se guarda en su propia carpeta de usuario, nunca en el repo.
 
 ## Claude a través de GitHub Copilot
 
