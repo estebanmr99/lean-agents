@@ -465,6 +465,7 @@ Mark each `[x]` when merged.
 - [ ] **Session 8 — Terminals: Warp, Orca, or neither.**
 - [ ] **Session 9 — Showcase.** Logo, GIF per use case, who it is for.
 - [ ] **Session 10 — Parallel agent sessions.** Coordinator plus one worker per task in its own git worktree, prompt files, status, one-at-a-time merges; Orca when installed, plain git worktree otherwise. Starts after sessions 6 and 8 merge.
+- [ ] **Session 11 — Antigravity full setup.** Antigravity app and CLI on macOS, Windows and Linux.
 
 ### Session 3 — Windows + OpenCode 1.x + wider CI
 
@@ -601,6 +602,20 @@ Branch: `session-10-parallel-sessions`.
 5. Docs: `docs/parallel-sessions.md` (EN), README and README.es sections, compatibility rows per agent, CHANGELOG.
 
 Done when: a CI job on Ubuntu and macOS (`tests/real-parallel.sh`), in a throwaway HOME with real git, starts two workers from prompt files with a stub agent that commits and writes `done`, shows both in `status`, merges them one at a time with the second rebased, and `clean` leaves no worktree or branch behind. Real Claude Code and OpenCode binaries in the same job check every flag the helper builds (`claude --help`, `opencode run --help`). The Orca path is checked against `orca agent-context --json` in the CI step session 8 adds to install Orca; until that step exists, the Orca path stays **VERIFY**. Unit tests in `tests/engine.test.mjs` cover argv building, prompt paths and merge order. A run with a real model stays **VERIFY** (needs a login).
+
+### Session 11 — Antigravity full setup
+
+Branch: `session-11-antigravity`. Code starts after sessions 6 and 7 merge: reuse the session 6 proxy and network presets and the session 7 IDE adapter pattern. Target the Antigravity app; the standalone Antigravity IDE is out of scope.
+
+1. **Research first** (done 2026-11-03, see `docs/compatibility.md`). Before coding, check the latest app and `agy` versions again, because a new release is due, and re-run the research if paths changed.
+2. **Install per OS**, at user scope and asked like other prerequisites. CLI: `install.sh`, `install.ps1`, `brew install --cask antigravity-cli`, winget `Google.AntigravityCLI` (**VERIFY** scope). App: `.dmg` or a brew cask, `.exe` or winget, Linux `.tar.gz` (**VERIFY** cask and winget ids). Never require admin.
+3. **Shared config:** the app and the CLI read the same `~/.gemini/config/{rules,agents,plugins}` and `mcp_config.json`, so one set of files serves both. Check the app's MCP file (`~/.gemini/config` or `~/.gemini/antigravity`, **VERIFY**). If Antigravity does not read `~/.agents/skills`, install skills into `~/.gemini/config/skills` (**VERIFY**).
+4. **App adapter** in the session 7 IDE pattern: detect the app, write only what the CLI files do not cover (app settings in `~/.gemini/config/config.json`, **VERIFY** per OS), and `--uninstall` removes only lean-agents keys.
+5. **Windows CLI:** `tests/real-antigravity.ps1` like `tests/real-copilot.ps1`; `%LOCALAPPDATA%\agy\bin` on PATH; RTK and Context Mode plugins under a temp `USERPROFILE` (`rtk init` writes to the OS profile folder); Skills CLI detection.
+6. **Network:** pass the session 6 proxy variables to `agy` and every child command. Antigravity documents no proxy, CA or auto-update setting (only `sandboxProxy` for sandboxed commands) and keeps telemetry on the account: the all-off preset prints the account step; recheck each (**VERIFY**).
+7. Docs: an Antigravity app column in the README tables (EN and ES), `docs/compatibility.md`, `docs/privacy.md`, CHANGELOG.
+
+Done when: CI jobs with real binaries and a throwaway HOME (`USERPROFILE` on Windows) install `agy`, run the installer, `agy agents`, `agy mcp list`, `--doctor` and `--uninstall` on Ubuntu, macOS and Windows; the app installs in CI where the OS allows it, or the job documents why it cannot, and the files lean-agents writes for it are validated. Anything that needs a login to prove stays ⚠️ with a **VERIFY** note.
 
 ## 15. Definition of done (every session)
 
