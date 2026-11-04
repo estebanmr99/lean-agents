@@ -468,7 +468,7 @@ Mark each `[x]` when merged.
 - [ ] **Session 9 — Showcase.** Logo, GIF per use case, who it is for.
 - [ ] **Session 10 — Parallel agent sessions.** Coordinator plus one worker per task in its own git worktree, prompt files, status, one-at-a-time merges; Orca when installed, plain git worktree otherwise. Starts after sessions 6 and 8 merge.
 - [ ] **Session 11 — Antigravity full setup.** Antigravity app and CLI on macOS, Windows and Linux.
-- [ ] **Session 12 — Release readiness.** OpenCode + GitHub Copilot demo path, signed-in browser through the Playwright Extension, issue #6, Bun benchmark, Gemini CLI research, 0.5.0 release notes. No tag.
+- [x] **Session 12 — Release readiness.** OpenCode + GitHub Copilot demo path, signed-in browser through the Playwright Extension, issue #6, Bun benchmark, Gemini CLI research, 0.5.0 release notes. No tag.
 
 ### Session 3 — Windows + OpenCode 1.x + wider CI
 
