@@ -6,13 +6,20 @@
 
 **Un comando. Todos tus agentes de código. Menos tokens, respuestas más claras.**
 
-Las mismas reglas, subagentes baratos por defecto, herramientas que ahorran contexto y servidores MCP para Claude Code, OpenCode, GitHub Copilot CLI y Antigravity CLI, en macOS y Windows.
+Las mismas reglas, subagentes baratos por defecto, herramientas que ahorran contexto y servidores MCP para Claude Code, OpenCode 1.x y 2.x, GitHub Copilot CLI, Antigravity CLI, VS Code Copilot y Cursor, en macOS, Linux y Windows.
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-lightgrey)
+![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%7C%20OpenCode%20%7C%20Copilot%20CLI%20%7C%20Antigravity%20%7C%20VS%20Code%20Copilot%20%7C%20Cursor-8A2BE2)
+[![CI](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml)
+[![Secret scan](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml)
+![GitHub stars](https://img.shields.io/github/stars/estebanmr99/lean-agents?style=social)
 
 [Read in English](README.md)
 
 </div>
 
-> **Estado: versión preliminar v0.4.** El instalador funciona para **Claude Code**, **OpenCode 1.x y 2.x**, **GitHub Copilot CLI** y **Antigravity CLI** en macOS, Linux y Windows (Antigravity: macOS y Linux). Dale una estrella al repo para enterarte cuando salga `v1.0.0`.
+> **Estado: versión preliminar v0.4.** El instalador funciona para **Claude Code**, **OpenCode 1.x y 2.x**, **GitHub Copilot CLI**, **Antigravity CLI**, **VS Code Copilot** y **Cursor** en macOS, Linux y Windows (Antigravity: macOS y Linux). Dale una estrella al repo para enterarte cuando salga `v1.0.0`.
 
 <img src="docs/assets/demo.gif" alt="install.sh --dry-run lista cada archivo y comando que cambiaría" width="720">
 
@@ -32,9 +39,37 @@ Windows PowerShell:
 
 ¿Prefieres que lo haga tu agente? Pega un prompt de [INSTALL_WITH_AGENT.md](INSTALL_WITH_AGENT.md) en Claude Code, OpenCode o Copilot CLI. Usa `--lang es` para que las reglas y las respuestas queden en español.
 
-Empieza siempre con `--dry-run`: muestra cada archivo y comando antes de cambiar nada. En PowerShell las mismas opciones van en PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`.
+Empieza siempre con `--dry-run`: muestra cada archivo y comando antes de cambiar nada. Luego córrelo otra vez sin `--dry-run`; te pregunta qué agentes, herramientas, nivel de privacidad, idioma y perfil de modelos quieres. Opciones útiles: `--all-tools`, `--privacy strict`, `--lang es`, `--profile vertex-gemini`, `--update`, `--uninstall`, `--doctor` (`--help` las lista todas). En PowerShell las opciones comunes van en PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`. Cualquier otra opción se pasa tal cual, por ejemplo `-DryRun --network off`.
 
 Context Mode necesita Node.js 22.5 o superior. Todo lo demás funciona con Node.js 20.12.
+
+## Demo: OpenCode con modelos de GitHub Copilot
+
+1. Instala OpenCode (macOS, Linux o Git Bash). En Windows, mira la [documentación de OpenCode](https://opencode.ai/docs):
+   ```bash
+   curl -fsSL https://opencode.ai/v2/install | bash
+   ```
+2. Mira qué cambiaría lean-agents:
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --agents opencode-v2 --profile github-copilot --dry-run
+   ```
+   ```powershell
+   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -Agents opencode-v2 -Profile github-copilot -DryRun
+   ```
+3. Corre lo mismo sin el dry run:
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --agents opencode-v2 --profile github-copilot
+   ```
+   ```powershell
+   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -Agents opencode-v2 -Profile github-copilot
+   ```
+4. Abre `opencode`, ejecuta `/connect`, elige GitHub Copilot e inicia sesión con tu cuenta de GitHub (necesita un plan de Copilot). lean-agents nunca maneja el inicio de sesión. Los subagentes usan el perfil `github-copilot`: `fast` = claude-haiku-5.5, `balanced` = claude-sonnet-5.5, `strong` = claude-opus-5.5. No se usan modelos gratuitos de OpenCode.
+5. Revisa el resultado:
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --doctor
+   ```
+
+Las demos para Claude Desktop y Cursor vienen después.
 
 ## Por qué
 
@@ -51,6 +86,7 @@ Context Mode necesita Node.js 22.5 o superior. Todo lo demás funciona con Node.
 | RTK (comprime la salida del shell) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Context Mode | ✅ plugin | ✅ MCP | ✅ plugin | ✅ plugin | ✅ plugin |
 | Serena + Playwright MCP | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Navegador con tu sesión (opcional) | ➖ Claude in Chrome | ✅ opcional | ✅ opcional | ✅ opcional | ➖ |
 | Ponytail | ✅ | ✅ | ✅ | ➖ | ➖ |
 | i-have-adhd | ✅ | ✅ | ✅ | ✅ | ⚠️ se escribe, carga sin probar |
 | Caveman y otras skills | ✅ | ✅ | ✅ | ✅ | ⚠️ se escriben, carga sin probar |
@@ -63,12 +99,21 @@ Context Mode necesita Node.js 22.5 o superior. Todo lo demás funciona con Node.
 | Función | VS Code Copilot | Cursor (IDE y CLI) | Repo del equipo (`--project`) |
 | --- | --- | --- | --- |
 | Reglas | ⚠️ se escriben, carga sin probar | ➖ solo en ajustes, usa `--project` | ✅ `AGENTS.md` |
-| Subagentes | ⚠️ se escriben, carga sin probar | ⚠️ se escriben, carga sin probar | ✅ `.github/agents`, `.cursor/agents` |
+| Subagentes | ⚠️ se escriben, carga sin probar | ⚠️ se escriben, carga sin probar | ✅ `.github/agents`; ⚠️ `.cursor/agents` (carga en Cursor CLI sin verificar) |
 | RTK | ⚠️ solo a través de Copilot CLI | ✅ | ➖ por usuario |
 | Context Mode, Serena, Playwright | ✅ MCP | ✅ MCP | ✅ `.vscode/mcp.json`, `.cursor/mcp.json` |
+| Navegador con tu sesión (opcional) | ✅ opcional | ✅ opcional | ➖ por usuario |
 | Skills Caveman, i-have-adhd | ⚠️ se escriben, carga sin probar | ⚠️ se escriben, carga sin probar | ➖ por usuario |
 
 **Próximamente: soporte completo de Antigravity.** Hoy lean-agents configura Antigravity CLI (`agy`) en macOS y Linux. Lo siguiente es la app de escritorio de Antigravity y la CLI en Windows. Según la documentación oficial, la app y la CLI leen las mismas reglas, subagentes, skills y servidores MCP, así que una sola configuración serviría para ambas en macOS, Windows y Linux. Cada parte sale solo cuando CI la prueba con binarios reales. Plan: [Session 11](docs/SPEC.md#session-11--antigravity-full-setup) (en inglés).
+
+## Navegador con tu sesión (opcional)
+
+El MCP `playwright` por defecto abre un navegador nuevo sin ventana, que falla en páginas con inicio de sesión único (SSO). `--tools playwright-extension` agrega `@playwright/mcp --extension`. Se conecta a tu propio Chrome o Edge con la sesión iniciada, a través de la [extensión de Playwright](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm).
+
+- Instala la extensión tú mismo. Las extensiones no se pueden instalar en silencio sin una política de administrador.
+- Cada sesión te pide aprobar la conexión. Aprobar solo con un token es opcional: mira [docs/browser-extension.md](docs/browser-extension.md). El instalador nunca pide, guarda ni muestra el token.
+- Funciona con OpenCode, Copilot CLI, VS Code Copilot y Cursor. Claude Code y Claude Desktop usan Claude in Chrome.
 
 ## VS Code Copilot y Cursor
 
@@ -120,7 +165,7 @@ Si tu empresa paga GitHub Copilot, la forma oficial de usar Claude como agente e
 | Herramientas opcionales | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0), Codeburn | Se pregunta una por una |
 | Herramientas por elección | GSD Core, AutoSkills (CC BY-NC 4.0: solo uso no comercial) | Se pregunta una por una, nunca en `--all-tools` |
 | Privacidad estricta | Sin telemetría, sin auto updates, sin compartir sesiones, sin proveedores que entrenan con tus prompts | Apagado, se activa con `--privacy strict` |
-| Preset de red | Todo apagado (PC de trabajo), todo encendido, o por categoría: telemetría, auto updates, otras salidas | Todo encendido; `--network off` o una opción por categoría |
+| Preset de red | Todo apagado (PC de trabajo), todo encendido, o por categoría: telemetría, auto updates, otras salidas | Todo encendido; `--network off` (igual que `--privacy strict`) o `--telemetry`, `--auto-update`, `--outbound` |
 | GitHub CLI (`gh`) | Se instala con brew o winget sin admin; tú corres `gh auth login` | Se pregunta si falta; `--gh` |
 
 ## En una PC de trabajo: proxy, red y revisión de seguridad
@@ -134,10 +179,10 @@ Si tu empresa paga GitHub Copilot, la forma oficial de usar Claude como agente e
    El instalador pasa ambas formas a cada comando (brew y git leen minúsculas, uv mayúsculas) y las muestra en `--dry-run` y `--doctor` con la contraseña cambiada por `***`. Nunca las escribe en disco. Qué variable de CA lee cada herramienta: [docs/compatibility.md](docs/compatibility.md#proxy-and-corporate-ca).
 3. **Elige un preset de red.** El instalador pregunta: **todo apagado** (PC de empresa), **todo encendido** (PC personal) o **por categoría**. Para correrlo sin preguntas:
    ```bash
-   bash install.sh --dry-run --network off                    # todo apagado
-   bash install.sh --yes --network off --auto-update on       # apagado, pero con auto updates
+   curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --dry-run --network off                # todo apagado
+   curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --yes --network off --auto-update on   # apagado, pero con auto updates
    ```
-   Qué apaga cada categoría por agente: [docs/privacy.md](docs/privacy.md). La elección se guarda y `--update` la reutiliza.
+   Las opciones por categoría son `--telemetry on|off`, `--auto-update on|off` y `--outbound on|off`. `--network off` es igual que `--privacy strict`. En PowerShell se pasan tal cual, por ejemplo `-DryRun --network off`. Qué apaga cada categoría por agente: [docs/privacy.md](docs/privacy.md). La elección se guarda y `--update` la reutiliza.
 4. **`gh`**: agrega `--gh` (o responde que sí) para instalar GitHub CLI sin admin; luego corre `gh auth login` tú mismo.
 
 En una terminal real el instalador muestra menús (flechas, espacio para marcar), una lista de progreso y un resumen. Con `--yes`, con un pipe o sin terminal, hace preguntas simples o ninguna, como antes.
@@ -146,16 +191,35 @@ En una terminal real el instalador muestra menús (flechas, espacio para marcar)
 
 ## Modelos siempre al día
 
-Los subagentes piden un nivel (`fast`, `balanced`, `strong`), no un modelo. En Claude Code eso son los alias `haiku`, `sonnet` y `opus`. Los demás agentes usan [perfiles](profiles/) fechados por suscripción, y la skill `update-models` los actualiza con tu aprobación.
+Los subagentes piden un nivel (`fast`, `balanced`, `strong`), no un modelo. En Claude Code eso son los alias `haiku`, `sonnet` y `opus`, que siempre apuntan a los modelos más nuevos. Los demás agentes usan [perfiles](profiles/) fechados por suscripción, y la skill `update-models` los actualiza con tu aprobación.
 
 ## Seguridad
 
 - Respalda cada archivo antes de tocarlo. `--uninstall` lo restaura.
 - Nunca sobrescribe tu `AGENTS.md` ni tu `CLAUDE.md`: los importa o agrega un bloque marcado.
-- Nunca pide, guarda ni muestra API keys.
-- No necesita permisos de administrador (`--no-admin`).
+- Nunca pide, guarda ni muestra API keys. Tú inicias sesión en los proveedores.
+- No necesita permisos de administrador (`--no-admin`), así que funciona en laptops de trabajo restringidas.
 - Se puede revisar antes de instalar: [docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md) es un prompt que tu agente corre sobre este repo.
 
-## Créditos y licencia
+## Créditos
 
-Ver la sección de créditos en el [README en inglés](README.md#credits). Licencia [MIT](LICENSE).
+Ver la sección de créditos en el [README en inglés](README.md#credits).
+
+## Hoja de ruta
+
+- [x] Especificación, reglas y definiciones de subagentes
+- [x] Instalador para Claude Code y OpenCode 2.x (macOS, Linux)
+- [x] Instalador para Windows y OpenCode 1.x
+- [x] Copilot CLI, Antigravity CLI, Codeburn, AutoSkills, GSD, skills propias, perfiles de modelos
+- [x] VS Code Copilot, Cursor, modo equipo (`--project`), Claude a través de Copilot
+- [ ] Planeado: terminales (Warp, Orca), sesiones de agentes en paralelo, configuración completa de Antigravity (app, y la CLI en Windows)
+- [ ] `v1.0.0`
+- Más adelante: Codex CLI, Gemini CLI
+
+## Contribuir
+
+Los issues y PRs son bienvenidos. Lee primero [CONTRIBUTING.md](CONTRIBUTING.md); cada PR pasa un escaneo de secretos y privacidad.
+
+## Licencia
+
+[MIT](LICENSE)
