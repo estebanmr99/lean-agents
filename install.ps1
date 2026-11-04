@@ -12,6 +12,7 @@ param(
   [switch]$AllTools,
   [switch]$NoTools,
   [switch]$NoBun,
+  [switch]$NoApp,
   [string]$Privacy,
   # $Profile is a PowerShell automatic variable, so -Profile binds through an alias.
   [Alias('Profile')][string]$ModelProfile,
