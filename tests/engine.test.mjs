@@ -620,3 +620,13 @@ test('Cursor: subagents, MCP, kept user values, no global rules, full uninstall'
   const after = Object.fromEntries(Object.entries(snapshot(home)).filter(([f]) => !f.startsWith('.config/lean-agents/')));
   assert.deepEqual(after, before);
 });
+
+test('with --home, %APPDATA% outside it is never written (Ponytail, VS Code)', { skip: process.platform !== 'win32' }, () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const appData = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-appdata-'));
+  lean(home, ['--yes', '--no-exec', '--agents', 'opencode-v2,vscode-copilot', '--tools', 'ponytail,serena', '--privacy', 'strict', '--lang', 'en', '--profile', 'none', '--ponytail-mode', 'lite'], { ...process.env, APPDATA: appData });
+  assert.deepEqual(fs.readdirSync(appData), []);
+  const roaming = path.join(home, 'AppData', 'Roaming');
+  assert.ok(fs.existsSync(path.join(roaming, 'ponytail', 'config.json')));
+  assert.ok(fs.existsSync(path.join(roaming, 'Code', 'User', 'mcp.json')));
+});
