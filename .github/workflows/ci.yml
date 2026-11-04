@@ -52,6 +52,32 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./tests/windows-install.ps1
+      - name: Without a TTY or --yes, the engine stops instead of hanging (PowerShell 5.1)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $base = Join-Path $env:RUNNER_TEMP 'notty'
+          New-Item -ItemType Directory -Force "$base-home" | Out-Null
+          Set-Content "$base.in" ''
+          $p = Start-Process node -ArgumentList 'scripts/lean.mjs', '--home', "$base-home", '--no-exec', '--agents', 'claude', '--no-tools' -NoNewWindow -PassThru -RedirectStandardInput "$base.in" -RedirectStandardOutput "$base.out" -RedirectStandardError "$base.err"
+          if (-not $p.WaitForExit(60000)) { $p.Kill(); throw 'the installer hung waiting for input' }
+          Get-Content "$base.out", "$base.err"
+          if ((Get-Content "$base.err" -Raw) -notmatch 'no terminal to ask on') { throw 'expected the no-terminal error' }
+      - name: Git Bash without a TTY stops instead of hanging; dry run with --yes
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          h="$(mktemp -d)"
+          code=0
+          timeout 60 node scripts/lean.mjs --home "$h" --no-exec --agents claude --no-tools </dev/null > "$RUNNER_TEMP/gitbash.txt" 2>&1 || code=$?
+          cat "$RUNNER_TEMP/gitbash.txt"
+          test "$code" = 1
+          grep -q 'no terminal to ask on' "$RUNNER_TEMP/gitbash.txt"
+          node scripts/lean.mjs --home "$h" --dry-run --yes --no-exec --agents claude,opencode-v2 --all-tools --network off --profile vertex-gemini
+          test -z "$(ls -A "$h")"
+      - name: Interactive menus in a pseudo-terminal
+        if: runner.os != 'Windows'
+        run: python3 tests/real-interactive.py
       - name: Installer dry run in a temporary HOME changes nothing
         if: runner.os != 'Windows'
         run: |
@@ -118,6 +144,24 @@ jobs:
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - name: Install lean-agents and check what OpenCode resolved
         run: bash tests/real-opencode.sh
+
+  real-proxy:
+    # Real install through a squid proxy with direct traffic blocked, network preset all off.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Install OpenCode 2
+        run: |
+          curl -fsSL https://opencode.ai/v2/install | bash
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+      - name: Use the runner's Linuxbrew
+        run: echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
+      - name: Install through the proxy only
+        run: bash tests/real-proxy.sh
 
   real-opencode-xdg:
     # Its own job: OpenCode's background service holds a fixed port and keeps the first HOME.
@@ -344,6 +388,12 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "winget install $id failed" }
             if ((winget list --id $id | Out-String) -notmatch [regex]::Escape($id)) { throw "$id is not installed" }
           }
+      - name: Install gh at user scope without a TTY
+        shell: pwsh
+        run: |
+          winget install --id GitHub.cli -e --scope user --accept-source-agreements --accept-package-agreements
+          if ($LASTEXITCODE -ne 0) { throw 'winget install GitHub.cli failed' }
+          if ((winget list --id GitHub.cli | Out-String) -notmatch 'GitHub.cli') { throw 'GitHub.cli is not installed' }
 
   real-windows:
     # Real OpenCode 1.x and real tools through install.ps1, throwaway USERPROFILE.
