@@ -551,6 +551,46 @@ test('VS Code Copilot: user MCP and strict settings, shared ~/.copilot files wri
   assert.doesNotMatch(both, /for VS Code Copilot/);
 });
 
+test('--project writes the team files into the repo, keeps user content, and undoes cleanly', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-repo-'));
+  fs.writeFileSync(path.join(repo, 'AGENTS.md'), '# Team rules\n');
+  fs.mkdirSync(path.join(repo, '.vscode'));
+  fs.writeFileSync(path.join(repo, '.vscode', 'mcp.json'), '{\n  // ours\n  "servers": { "docs": { "type": "http", "url": "https://docs" } }\n}\n');
+  const before = snapshot(repo);
+  const out = lean(home, ['--yes', '--project', repo, '--tools', 'serena,playwright', '--privacy', 'standard', '--lang', 'en']);
+  assert.match(out, /commit these files/);
+  assert.doesNotMatch(out, /Commands:/);
+
+  const files = snapshot(repo);
+  assert.match(files['AGENTS.md'], /^# Team rules[\s\S]*lean-agents:start/);
+  assert.match(files['.github/copilot-instructions.md'], /AGENTS\.md/);
+  assert.match(files['.cursor/rules/lean-agents.mdc'], /^---\ndescription: .+\nalwaysApply: true\n---\n/);
+  assert.match(files['.github/agents/planner.agent.md'], /^model: claude-opus-5\.5$/m);
+  const vscode = parse(files['.vscode/mcp.json']).servers;
+  assert.equal(vscode.docs.url, 'https://docs');
+  assert.deepEqual(Object.keys(vscode).sort(), ['context-mode', 'docs', 'playwright', 'serena']);
+  assert.match(files['.cursor/agents/review.md'], /^readonly: true$/m);
+  const cursor = JSON.parse(files['.cursor/mcp.json']).mcpServers;
+  assert.equal(cursor.serena.command, 'uvx');
+  for (const [f, text] of Object.entries(files)) {
+    assert.ok(!text.includes(home) && !text.includes(repo) && !text.includes(os.homedir()), `${f} holds a local path`);
+  }
+  // State stays in the user's home, never in the repo; a user install is not touched.
+  assert.ok(!fs.existsSync(path.join(home, '.config', 'lean-agents', 'state.json')));
+  assert.equal(fs.readdirSync(path.join(home, '.config', 'lean-agents', 'projects')).length, 1);
+
+  lean(home, ['--project', repo, '--doctor']);
+  lean(home, ['--project', repo, '--uninstall', '--yes']);
+  assert.deepEqual(snapshot(repo), before);
+});
+
+test('--project refuses --agents', () => {
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', os.tmpdir(), '--project', os.tmpdir(), '--agents', 'claude', '--dry-run', '--yes'], { encoding: 'utf8' });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /--project writes repository files only/);
+});
+
 test('Cursor: subagents, MCP, kept user values, no global rules, full uninstall', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
   const dir = path.join(home, '.cursor');

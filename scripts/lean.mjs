@@ -16,6 +16,7 @@ import { copilotAdapter } from './lib/adapters/copilot-cli.mjs';
 import { antigravityAdapter } from './lib/adapters/antigravity.mjs';
 import { vscodeCopilotAdapter } from './lib/adapters/vscode-copilot.mjs';
 import { cursorAdapter } from './lib/adapters/cursor.mjs';
+import { projectPlan, projectStateDir } from './lib/project.mjs';
 import { gsdPlan } from './lib/gsd.mjs';
 import { adhdCommand } from './lib/adhd.mjs';
 import { detectAgents, packageManager, prereqFor, which, run, quiet, exists, isolate } from './lib/system.mjs';
@@ -72,6 +73,7 @@ function parseArgs(argv) {
       case '--profile': o.profile = next(); break;
       case '--lang': o.lang = next(); break;
       case '--home': o.home = path.resolve(next()); break;
+      case '--project': o.project = path.resolve(next()); break;
       case '--no-exec': o.exec = false; break;
       case '--adhd-always': o.adhdAlways = true; break;
       case '--ponytail-mode': o.ponytailMode = next(); break;
@@ -102,6 +104,8 @@ const HELP = `Usage: lean-agents [options]
   --profile <name>       Model profile for OpenCode (see profiles/)
   --lang en|es           Language for rules and replies
   --gh                   Install GitHub CLI (gh) if it is missing
+  --project <dir>        Write the shared team files into one repository
+                         (AGENTS.md, .github/, .vscode/mcp.json, .cursor/)
   --adhd-always          Turn on i-have-adhd for every answer
   --ponytail-mode lite|full|ultra|off
   --update               Re-apply with your saved choices
@@ -144,7 +148,12 @@ async function prompter(yes) {
 }
 const yesNo = (a) => /^(y|yes|s|si|sí)$/i.test(a);
 
-function stateDir(home) { return path.join(home, '.config', 'lean-agents'); }
+// --project keeps its own state, so a repo install and a user install never mix.
+let project = null;
+function stateDir(home) {
+  if (project) return projectStateDir(home, project);
+  return path.join(home, '.config', 'lean-agents');
+}
 function readState(home) {
   const f = path.join(stateDir(home), 'state.json');
   return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null;
@@ -243,6 +252,10 @@ async function chooseUnverified(o, saved, p) {
 }
 
 function buildPlan(o) {
+  if (o.project) {
+    const r = projectPlan(ROOT, o.project, o);
+    return { planned: plan(r.actions), commands: r.commands };
+  }
   const core = loadCore(ROOT);
   const rulesPath = path.join(stateDir(o.home), 'AGENTS.md');
   const rules = renderRules(ROOT, o);
@@ -276,6 +289,7 @@ function prereqCommands(o) {
 
 function printPlan(o, planned, commands) {
   console.log(`\nlean-agents plan for ${o.agents.join(', ') || 'no agents'}`);
+  if (o.project) console.log(`  project: ${o.project}`);
   console.log(`  tools: ${o.tools.join(', ') || 'none'} | privacy: ${o.privacy} | lang: ${o.lang} | profile: ${o.profile ?? 'none'}`);
   console.log(`  network: ${CATEGORIES.map((c) => `${c} ${o.network[c]}`).join(', ')}`);
   const net = proxyReport();
@@ -344,6 +358,7 @@ async function install(o) {
     return;
   }
   console.log(`\nDone. Backups: ${backupDir}`);
+  if (o.project) return console.log('Next: review and commit these files. Each teammate runs the installer once for the tools (rtk, context-mode, ...).');
   console.log('Next: restart your agents, log in to your providers, then run --doctor.');
   if (o.gh) console.log('GitHub CLI: run `gh auth login` yourself; lean-agents never handles tokens.');
   for (const n of o.notes) console.log(`Notes saved: ${n.path}. Ask your agent to apply them, showing you each change first.`);
@@ -390,6 +405,9 @@ async function uninstall(o) {
 
 async function main() {
   const o = parseArgs(process.argv.slice(2));
+  // A repository gets files only: tools and agents stay per user.
+  if (o.project && o.agents?.length) throw new Error('--project writes repository files only: run --agents in a separate install');
+  if (o.project) { project = o.project; o.agents = []; o.exec = false; }
   isolate(o.home);
   shareProxy();
   if (o.command === 'help') return console.log(HELP);
