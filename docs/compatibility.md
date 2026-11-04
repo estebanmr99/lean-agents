@@ -109,7 +109,7 @@ The network question (`--network`, `--telemetry`, `--auto-update`, `--outbound`)
 | Skills CLI | telemetry | `DISABLE_TELEMETRY=1` or `DO_NOT_TRACK=1` | [vercel-labs/skills](https://github.com/vercel-labs/skills) | 2026-11-03 |
 | RTK | telemetry | off until `rtk telemetry enable` | [README](https://github.com/rtk-ai/rtk) | 2026-11-03 |
 | Context Mode | telemetry | none, per README; `ctx-insight` opens a hosted dashboard only when run | [README](https://github.com/mksglu/context-mode) | 2026-11-03 |
-| Serena | other | `web_dashboard: False` in Serena's config (default on); not set by lean-agents | [config template](https://github.com/oraios/serena/blob/main/src/serena/resources/serena_config.template.yml) | 2026-11-03 |
+| Serena | other | `web_dashboard: False` in Serena's config (default on; dashboard on `localhost:24282`); not set by lean-agents | [config template](https://github.com/oraios/serena/blob/main/src/serena/resources/serena_config.template.yml) | 2026-11-03 |
 | Codeburn | other | CLI sends nothing; `CODEBURN_CURSOR_SYNC=0` | [README](https://github.com/getagentseal/codeburn) | 2026-11-03 |
 | Homebrew | telemetry, auto-update | `HOMEBREW_NO_ANALYTICS`, `HOMEBREW_NO_AUTO_UPDATE` | [brew manpage](https://docs.brew.sh/Manpage) | 2026-11-03 |
 | npm | auto-update | `update-notifier=false` | [npm config](https://docs.npmjs.com/cli/v10/using-npm/config) | 2026-11-03 |
@@ -122,8 +122,9 @@ The network question (`--network`, `--telemetry`, `--auto-update`, `--outbound`)
 - **VERIFY:** Antigravity loading `~/.gemini/config/rules` and `~/.agents/skills`. No list command shows them without a login, so README marks both as partial.
 - **VERIFY:** subreddit rules, whether r/opencode exists, and X handles in `docs/launch.md`. Reddit blocked the fetch.
 - **VERIFY:** `brew install copilot-cli` (README) against `brew install --cask copilot-cli` (docs). lean-agents does not use either.
-- **VERIFY:** Antigravity proxy variables and any telemetry or auto-update switch.
-- **VERIFY:** proxy and CA handling in gh, RTK, Context Mode, Serena, Playwright MCP and the Skills CLI beyond the variables their runtimes (Node, uv, git) read.
+- **VERIFY:** Antigravity proxy variables (no docs; `tests/real-proxy.sh` runs `agy plugin install` through squid with direct traffic blocked) and any telemetry or auto-update switch (none documented; the CLI updates itself in the background, per [antigravity.google/cli](https://antigravity.google/cli), checked 2026-11-03).
+- **VERIFY:** gh has no documented proxy or CA variable ([gh environment](https://cli.github.com/manual/gh_help_environment), 2026-11-03); `tests/real-proxy.sh` checks that it uses `https_proxy` and that `SSL_CERT_FILE` replaces its trust store.
+- **VERIFY:** proxy and CA handling in RTK, Context Mode, Serena, Playwright MCP and the Skills CLI beyond the variables their runtimes (Node, uv, git) read.
 - **VERIFY:** Copilot CLI `NO_PROXY` and `--disable-client-telemetry` (seen in release notes, not in the docs).
 - **VERIFY:** Serena config path `~/.serena/serena_config.yml` and a usage-stats switch; GSD and Ponytail outbound calls.
 - **VERIFY:** pip `PIP_PROXY`, `PIP_CERT`; winget persistent proxy settings and CA handling.

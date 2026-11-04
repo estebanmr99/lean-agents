@@ -14,4 +14,6 @@ Install lean-agents for me from https://github.com/estebanmr99/lean-agents.
 Never read, print or store my API keys or tokens.
 ```
 
+On a work PC, run the review prompt in [docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md) first. It checks every file, command and network host against your company's rules.
+
 > The installer configures Claude Code, OpenCode 1.x and 2.x, and Copilot CLI on macOS, Linux and Windows, and Antigravity CLI on macOS and Linux. On Windows, use `install.ps1` instead of `bash install.sh`.
