@@ -349,6 +349,8 @@ Same approach: research the current CLI (binary name, global rules location, wor
 
 Codex CLI, Gemini CLI, Cursor: they read AGENTS.md; add adapters only after v1 ships. Note them in the README roadmap.
 
+Gemini CLI (checked 2026-11-03): individual access moved to Antigravity CLI on 2026-06-18, so Gemini CLI now serves Gemini Code Assist Standard and Enterprise. Not supported; facts in `docs/compatibility.md`.
+
 ## 7. Third-party tools (`tools/<tool>/`)
 
 Each recipe: `README.md` (what, why, upstream, license, per-agent wiring, remove), `install.sh`, `install.ps1`, `uninstall.*`, and a `check` function used by the doctor.
@@ -466,6 +468,7 @@ Mark each `[x]` when merged.
 - [ ] **Session 9 — Showcase.** Logo, GIF per use case, who it is for.
 - [ ] **Session 10 — Parallel agent sessions.** Coordinator plus one worker per task in its own git worktree, prompt files, status, one-at-a-time merges; Orca when installed, plain git worktree otherwise. Starts after sessions 6 and 8 merge.
 - [ ] **Session 11 — Antigravity full setup.** Antigravity app and CLI on macOS, Windows and Linux.
+- [ ] **Session 12 — Release readiness.** OpenCode + GitHub Copilot demo path, signed-in browser through the Playwright Extension, issue #6, Bun benchmark, Gemini CLI research, 0.5.0 release notes. No tag.
 
 ### Session 3 — Windows + OpenCode 1.x + wider CI
 
@@ -624,6 +627,19 @@ Branch: `session-11-antigravity`. Code starts after sessions 6 and 7 merge: reus
 Done when: CI jobs with real binaries and a throwaway HOME (`USERPROFILE` on Windows) install `agy`, run the installer, `agy agents`, `agy mcp list`, `--doctor` and `--uninstall` on Ubuntu, macOS and Windows; the app installs in CI where the OS allows it, or the job documents why it cannot, and the files lean-agents writes for it are validated. Anything that needs a login to prove stays ⚠️ with a **VERIFY** note.
 
 Done when (Bun): `bench-context-mode` is green on Ubuntu, macOS and Windows, its numbers are in `docs/compatibility.md`, and the `--bun` or docs-only decision is recorded.
+
+### Session 12 — Release readiness
+
+Branch: `session-12-release`. Goal: 0.5.0 ready to publish on the GitHub page; the owner tags and publishes. Ships what sessions 6 and 7 merged; sessions 8, 10 and 11 stay "planned" in the READMEs (owner decision, 2026-11-03).
+
+1. **Demo path first:** README and README.es show OpenCode with GitHub Copilot models end to end (install OpenCode, `--agents opencode-v2 --profile github-copilot`, `/connect`, `--doctor`). No free OpenCode models. Claude Desktop and Cursor follow later. Every installer command in both READMEs passes `--dry-run` with `--home "$(mktemp -d)"`; EN and ES say the same thing; the tables match `docs/compatibility.md`.
+2. **Signed-in browser:** opt-in tool `playwright-extension` (`@playwright/mcp --extension`, attaches to the user's own signed-in Chrome) next to the headless `playwright` entry, for OpenCode, Copilot CLI, VS Code Copilot and Cursor. The installer prints the Chrome Web Store link for the Playwright Extension (no silent install without admin policy). `docs/browser-extension.md` explains the optional `PLAYWRIGHT_MCP_EXTENSION_TOKEN` (`setx` on Windows, shell profile on macOS and Linux), the leak warning and rotation. The installer never asks for, stores or prints the token; per-session approval stays the default. Claude Code and Claude Desktop keep Claude in Chrome.
+3. **Issue #6:** `models-refresh` no longer reports a model the same profile already uses or one with different output modalities (image models). Profiles unchanged; reasons in `profiles/README.md`.
+4. **Bun benchmark:** build `bench-context-mode` from session 11 items 8 and 9 and record the decision. A `--bun` flag, if the numbers qualify, is a later session.
+5. **Gemini CLI:** documented in `docs/compatibility.md`, not supported (individual access moved to Antigravity CLI). **Cursor:** open VERIFY items listed, not fixed.
+6. **Release:** `package.json` and CHANGELOG `0.5.0`, release notes from `releaseNotes()`, `release-build` green. No tag.
+
+Done when: CI is green with the new real-binary checks (extension entry in each agent's MCP list, `@playwright/mcp --help` lists `--extension`, `bench-context-mode` on three OSes), and the owner has the release notes.
 
 ## 15. Definition of done (every session)
 
