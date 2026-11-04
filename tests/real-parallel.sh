@@ -4,9 +4,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WORK="$(mktemp -d)"
-export HOME="$WORK/home"
-mkdir -p "$HOME"
+HOME="$(mktemp -d)"
+export HOME
+WORK="$HOME"
 trap 'rm -rf "$WORK"' EXIT
 PAR=(node "$ROOT/scripts/parallel.mjs" --repo "$WORK/proj")
 
