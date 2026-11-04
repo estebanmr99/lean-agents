@@ -19,7 +19,7 @@ Las mismas reglas, subagentes baratos por defecto, herramientas que ahorran cont
 
 </div>
 
-> **Estado: versión preliminar v0.5.** El instalador funciona para **Claude Code**, **OpenCode 1.x y 2.x**, **GitHub Copilot CLI**, **Antigravity CLI**, **VS Code Copilot** y **Cursor** en macOS, Linux y Windows (Antigravity: macOS y Linux). Dale una estrella al repo para enterarte cuando salga `v1.0.0`.
+> **Estado: versión preliminar v0.5.** El instalador funciona para **Claude Code**, **OpenCode 1.x y 2.x**, **GitHub Copilot CLI**, **Antigravity CLI**, **VS Code Copilot** y **Cursor** en macOS, Linux y Windows . Dale una estrella al repo para enterarte cuando salga `v1.0.0`.
 
 <img src="docs/assets/demo.gif" alt="install.sh --dry-run lista cada archivo y comando que cambiaría" width="720">
 
@@ -105,7 +105,7 @@ Las demos para Claude Desktop y Cursor vienen después.
 | Navegador con tu sesión (opcional) | ✅ opcional | ✅ opcional | ➖ por usuario |
 | Skills Caveman, i-have-adhd | ⚠️ se escriben, carga sin probar | ⚠️ se escriben, carga sin probar | ➖ por usuario |
 
-**Próximamente: soporte completo de Antigravity.** Hoy lean-agents configura Antigravity CLI (`agy`) en macOS y Linux. Lo siguiente es la app de escritorio de Antigravity y la CLI en Windows. Según la documentación oficial, la app y la CLI leen las mismas reglas, subagentes, skills y servidores MCP, así que una sola configuración serviría para ambas en macOS, Windows y Linux. Cada parte sale solo cuando CI la prueba con binarios reales. Plan: [Session 11](docs/SPEC.md#session-11--antigravity-full-setup) (en inglés).
+**App y CLI de Antigravity.** La app y la CLI leen los mismos archivos de `~/.gemini/config`, así que una sola configuración sirve a ambas en macOS, Linux y Windows (la CLI en Windows se prueba en CI con `agy` real). Con Antigravity elegido, lean-agents instala la CLI y la app con Homebrew (macOS) o la app con winget (Windows); si no, muestra el enlace oficial. **VERIFY:** que la app cargue reglas, subagentes, skills y servidores MCP, dónde está su archivo MCP y sus claves de ajustes: CI no puede ejecutar la app ni iniciar sesión, así que no están probados.
 
 ## Warp y Orca
 
@@ -238,7 +238,7 @@ Ver la sección de créditos en el [README en inglés](README.md#credits).
 - [x] VS Code Copilot, Cursor, modo equipo (`--project`), Claude a través de Copilot
 - [x] Sesiones de agentes en paralelo (`scripts/parallel.mjs`)
 - [x] Integraciones de Warp y Orca para quien ya las usa
-- [ ] Planeado: configuración completa de Antigravity (app, y la CLI en Windows)
+- [x] App y CLI de Antigravity en macOS, Linux y Windows (la carga en la app sigue en VERIFY)
 - [ ] `v1.0.0`
 - Más adelante: Codex CLI, Gemini CLI
 

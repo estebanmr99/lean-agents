@@ -8,6 +8,8 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 - `scripts/parallel.mjs` (`start`, `status`, `merge`, `clean`) and the `parallel-sessions` skill: one worker per task in its own git worktree (Orca when installed, plain `git worktree` otherwise), prompt and status files, one-at-a-time merges with a rebase of the rest. Each worker gets a model tier (`cheap`, `balanced`, `strong`; default by role: plan strong, build balanced, explore and research cheap) mapped through the model profiles. `--doctor` lists workers left in the repo.
 - CI job `real-parallel`: real git worktrees and a stub agent on Ubuntu and macOS; flags checked against real Claude Code and OpenCode.
+- Antigravity CLI on Windows: CI job `real-antigravity-windows` runs real `agy` with `install.ps1` in a throwaway `USERPROFILE`.
+- With Antigravity selected, the CLI and the app are installed through Homebrew (macOS) or winget (app only, Windows); other cases print the vendor link. App-side loading, its MCP path and settings stay VERIFY.
 - `--terminal warp|orca|both|none`: agent integrations for a terminal you already have. Warp: Claude Code plugin `warp@claude-code-warp` and the OpenCode plugin `@warp-dot-dev/opencode-warp`. Orca: the `orca-cli` skill. The apps are detected (never installed) and preselected; nothing found means no question. The all-off network preset prints the Warp and Orca telemetry switches. CI job `real-terminals` (real Claude Code, OpenCode 1.x and 2.x, throwaway HOME).
 
 ### Changed
