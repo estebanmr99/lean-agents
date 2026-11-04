@@ -88,7 +88,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           export HOME="$(mktemp -d)"
-          { sleep 3; echo n; } | timeout 30 script -qec 'node scripts/lean.mjs --home "$HOME" --no-exec --agents claude --tools caveman --privacy standard --lang en </dev/null; echo "exit=$?"' /dev/null > "$HOME/tty.txt"
+          { sleep 3; echo n; } | timeout 30 script -qec 'node scripts/lean.mjs --home "$HOME" --no-exec --agents claude --tools caveman --privacy standard --lang en --bun </dev/null; echo "exit=$?"' /dev/null > "$HOME/tty.txt"
           cat "$HOME/tty.txt"
           grep -q Cancelled "$HOME/tty.txt"
           grep -q 'exit=0' "$HOME/tty.txt"
