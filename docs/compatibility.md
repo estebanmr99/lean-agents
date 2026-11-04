@@ -25,6 +25,44 @@ What lean-agents configures per agent, how, and when each command or key was las
 - `rtk init` writes to the OS profile folder, not `USERPROFILE`. It only matters when testing with a temp `USERPROFILE`.
 - The runner image has no winget; `real-winget` adds it with `Repair-WinGetPackageManager`.
 
+## Terminals
+
+Research only (session 8). lean-agents installs neither app yet. Checked 2026-11-03: Warp docs, Orca `v1.4.247` (released 2026-11-03).
+
+### Warp
+
+| Item | Value |
+| --- | --- |
+| Install | macOS `brew install --cask warp`; Windows `winget install Warp.Warp --scope user` (Inno installer, user and machine scopes); Linux `.deb`, `.rpm`, AppImage or the `releases.warp.dev` repo (needs `sudo`) |
+| Name clash | Cloudflare WARP is the `cloudflare-warp` cask, not Warp |
+| Settings | `settings.toml`: macOS `~/.warp/` (current docs; older docs say `~/.config/warp-terminal`, **VERIFY**), Linux `~/.config/warp-terminal/`, Windows `%LOCALAPPDATA%\warp\Warp\config\` |
+| Outbound | `[privacy] telemetry_enabled` (default `true`; the free plan needs it on for AI, **VERIFY**), `crash_reporting_enabled`; `[general] login_item` (starts at login, default `true`) |
+| Agent features | Reads `AGENTS.md` and `WARP.md` (`WARP.md` wins in the same folder); user MCP in `~/.warp/.mcp.json`, file-based MCP off by default (`file_based_mcp_enabled`) |
+| Hooks into other agents | None by itself. The optional Claude Code plugin `warp@claude-code-warp` adds SessionStart, Stop, Notification, PermissionRequest, UserPromptSubmit and PostToolUse hooks; `warpdotdev/opencode-warp` is the OpenCode plugin. Both are rejected (FAQ only) |
+| Remove | `brew uninstall --cask warp` (**VERIFY**) or delete the app; leftovers `~/.warp`, `~/.config/warp-terminal`, the `dev.warp.Warp-Stable` defaults domain and its Group Containers folder, `~/Library/Logs/warp.log*` |
+
+### Orca
+
+| Item | Value |
+| --- | --- |
+| Project | [`stablyai/orca`](https://github.com/stablyai/orca), MIT, desktop app that runs several agents in git worktrees |
+| Install | macOS `brew install --cask stablyai/orca/orca` (bare `orca` is an unrelated cask); Windows `orca-windows-setup.exe`; Linux `orca-linux.AppImage`; no winget package found |
+| CLI | `orca`, ships with the app and is put on PATH from Settings > General > Orca CLI |
+| Claude Code hooks | Status hooks in the Claude `settings.json` (`CLAUDE_CONFIG_DIR` or `~/.claude`): SessionStart, UserPromptSubmit, Stop, StopFailure, SubagentStart, SubagentStop, TeammateIdle, PreToolUse, PostToolUse, PostToolUseFailure, PermissionRequest, PostCompact, Elicitation, ElicitationResult, SessionEnd (each gated by Claude version), plus a `statusLine` for the default config dir |
+| Codex hooks | `hooks.json` and `config.toml` in an Orca-managed Codex home: SessionStart, UserPromptSubmit, PreToolUse, PermissionRequest, PostToolUse, SubagentStart, SubagentStop, Stop, Interrupt, each running `/bin/sh <script>` |
+| Hook endpoint | `agent-hooks/endpoint.env` (`endpoint.cmd` on Windows) in the app data folder; `~/.orca/agent-hooks/` on remote hosts |
+| Other agents | Orca also has hook installers and removers for Copilot CLI, Antigravity, Gemini, Cursor and other agents (`src/main/agent-hooks/managed-agent-hook-registry.ts`); their files and events: **VERIFY** |
+| OpenCode TUI plugin | Copies a status plugin into `plugins/` (TUI copy in a `<name>-tui` folder) and adds its `file://` URL to the `plugin` list in `tui.jsonc` or `tui.json`, in `$XDG_CONFIG_HOME/opencode` or `~/.config/opencode`. Not in the hook remover list, so `orca agent hooks off` leaves it |
+| Skills | Agent setup installs `orca-cli`, `orchestration` and `computer-use` into the shared `~/.agents/skills` (plus folders of detected agents, such as `~/.claude/skills`). Orca updates only its own untouched copies and never deletes a folder it did not create |
+| Hooks on or off | Settings > Agents > Agent status hooks, or `orca agent hooks on\|off\|status --json`. Off removes the managed hooks and the `statusLine` |
+| MCP servers | None written on its own: servers come only from what the user registers in Settings > Integrations > MCP (docs; no full source grep, **VERIFY**). The repo-root `.mcp.json` (`orca-component-fixtures`) is a test fixture, not installed |
+| Permission modes | `own` (default for new sessions, adds no flag), `ask`, `accept-edits`, `auto`, `full-access` (Yolo). Settings keys `agentPermissionDefault`, `nativeChatPermissionMode`, `agentDefaultArgs` |
+| Bypass flags (Yolo) | Claude Code and Antigravity `--dangerously-skip-permissions`; Codex `--dangerously-bypass-approvals-and-sandbox`; Copilot CLI, Gemini, Cursor and others `--yolo`. Auto mode: Claude `--permission-mode auto`, Codex `--approve-for-me` |
+| Turn bypass off | Settings > Agents > Agent permissions: pick Manual (`ask`) or keep the default `own` (UI path and runtime default: **VERIFY** in a running app); check that no bypass flag sits in the per-agent default arguments |
+| Folder trust | "Trust the folder when Orca starts an agent" is on by default and skips each agent's trust prompt; turn it off in Settings > Agents |
+| Telemetry | Settings > Privacy "Share anonymous usage data", or `DO_NOT_TRACK=1` / `ORCA_TELEMETRY_DISABLED=1`. Sends version, OS, app opens, agent type, coarse errors; not prompts |
+| Remove | 1. `orca agent hooks off`. 2. Skills: Orca Skills page > Delete (**VERIFY**), or `npx skills remove orca-cli orchestration computer-use -g -y` (whether it also clears the copies in agent folders such as `~/.claude/skills`: **VERIFY**). 3. OpenCode: delete Orca's `file://…/plugins/…` entry from `plugin` in `tui.json` / `tui.jsonc` and its files in `plugins/` (file name: **VERIFY**). 4. Remove the app (`brew uninstall --cask stablyai/orca/orca`, **VERIFY**). No uninstall page found upstream |
+
 ## Verification log
 
 | Item | Source | Checked |
@@ -68,6 +106,16 @@ What lean-agents configures per agent, how, and when each command or key was las
 | i-have-adhd ships `disable-model-invocation: true`: a prompt cannot load it, only `/i-have-adhd` or the always-on flag. lean-agents sets it to `false` in the installed copies | plugin 0.4.1 | 2026-10-30 |
 | vhs: needs `ttyd` and `ffmpeg`; tape commands `Output`, `Set`, `Hide`, `Show`, `Type`, `Enter`, `Sleep`. `charmbracelet/vhs-action` latest is v2.1.1, input `path`; the tag `v2` is used in `assets.yml` | [vhs README](https://github.com/charmbracelet/vhs), [action](https://github.com/charmbracelet/vhs-action), `assets` job | 2026-10-31 |
 | `gh release create` flags `--notes-file`, `--verify-tag` | `gh release create --help` on 2.103.0 | 2026-10-31 |
+| Warp install per OS, settings file paths, `telemetry_enabled`, `crash_reporting_enabled`, `login_item`, `file_based_mcp_enabled`, `~/.warp/.mcp.json`, `AGENTS.md` / `WARP.md` rules (`WARP.md` wins), `cloudflare-warp` is a different cask, leftovers after uninstall | [installation](https://docs.warp.dev/getting-started/installation), [all settings](https://docs.warp.dev/terminal/settings/all-settings/), [file locations](https://docs.warp.dev/terminal/settings/file-locations/), [MCP](https://docs.warp.dev/guides/external-tools/using-mcp-servers-with-warp.md), [rules](https://docs.warp.dev/agent-platform/capabilities/rules/), [uninstall](https://docs.warp.dev/support-and-community/troubleshooting-and-support/logging-out-and-uninstalling/) | 2026-11-03 |
+| winget `Warp.Warp`: Inno installer with `user` (`/CURRENTUSER`) and `machine` (`/ALLUSERS`) scopes | [winget-pkgs manifest](https://github.com/microsoft/winget-pkgs/tree/master/manifests/w/Warp/Warp) | 2026-11-03 |
+| Warp plugins `warpdotdev/claude-code-warp` (`warp@claude-code-warp`, six hooks, needs `jq`) and `warpdotdev/opencode-warp` (OpenCode 2.0.18+); rejected | [claude-code-warp](https://github.com/warpdotdev/claude-code-warp), [opencode-warp](https://github.com/warpdotdev/opencode-warp) | 2026-11-03 |
+| Orca install routes (cask `stablyai/orca/orca`, bare `orca` is another cask, dmg, exe, AppImage, no winget), CLI on PATH from Settings > General, `agent-hooks/endpoint.env` / `endpoint.cmd`, hook toggle `orca agent hooks on\|off\|status --json`, folder trust default, telemetry opt-out `DO_NOT_TRACK` / `ORCA_TELEMETRY_DISABLED` and the data it sends | [README](https://github.com/stablyai/orca), [settings](https://www.onorca.dev/docs/settings), [hooks](https://www.onorca.dev/docs/agents/hooks-memory), [CLI](https://www.onorca.dev/docs/cli/overview), [telemetry](https://onorca.dev/docs/telemetry) | 2026-11-03 |
+| Orca Claude hook events, `CLAUDE_CONFIG_DIR` honored, `statusLine` only for the default dir, hooks off removes them | `src/main/claude/{claude-managed-hook-events,claude-hook-event-versions,claude-config-dir-pin,hook-service}.ts` at [v1.4.247](https://github.com/stablyai/orca/tree/v1.4.247) | 2026-11-03 |
+| Orca `v1.4.247` published 2026-11-03; repo-root `.mcp.json` holds only the `orca-component-fixtures` test server | [release](https://github.com/stablyai/orca/releases/tag/v1.4.247), `.mcp.json` at v1.4.247 | 2026-11-03 |
+| Orca skills `orca-cli`, `orchestration`, `computer-use` installed into `~/.agents/skills` and agent folders, `orca skills install`, only untouched copies updated; MCP only from Settings > Integrations > MCP | [skills docs](https://github.com/stablyai/orca/blob/v1.4.247/docs/site/content/docs/cli/skills.mdx), `src/main/skills/bundled-skill-install/targets.ts` at v1.4.247 | 2026-11-03 |
+| Orca OpenCode TUI plugin: `file://` entry in the `plugin` list of `tui.jsonc` / `tui.json`, config dir from `XDG_CONFIG_HOME`; OpenCode absent from `MANAGED_AGENT_HOOK_REMOVERS` | `src/shared/{opencode-tui-config-registration,opencode-tui-plugin-install,opencode-config-directory}.ts`, `src/main/agent-hooks/managed-agent-hook-registry.ts` at v1.4.247 | 2026-11-03 |
+| Orca Codex hooks in its managed Codex home (`hooks.json`, `config.toml`) | `src/main/codex/codex-hook-definition.ts` at v1.4.247 | 2026-11-03 |
+| Orca permission modes, default `own` with no flag, Yolo and auto flags per agent | `src/shared/{tui-agent-permissions,tui-agent-permission-choice,agent-chat-permission-mode,agent-permission-args}.ts` at v1.4.247 | 2026-11-03 |
 | Installer with no TTY and no `--yes`: stops with a message, changes nothing; `--dry-run` with every choice as a flag exits 0. With `/dev/tty` and stdin from `/dev/null`, it asks and exits. Windows `CONIN$` is not tested | `tests/engine.test.mjs`, pty run in the `test` job | 2026-10-31 |
 | Awesome lists: `hesreallyhim/awesome-claude-code` (web issue form), `awesome-opencode/awesome-opencode` (YAML PR), `punkpeye/awesome-mcp-servers` (MCP servers only). Show HN rules. Social preview 1280x640, under 1 MB. Up to six pinned repos | each project's CONTRIBUTING, [Show HN](https://news.ycombinator.com/showhn.html), GitHub docs; all links in `docs/launch.md` fetched | 2026-10-31 |
 
@@ -131,3 +179,5 @@ The undocumented items below (Antigravity telemetry and auto-update, Serena conf
 - **VERIFY:** Serena config path `~/.serena/serena_config.yml` and a usage-stats switch; GSD and Ponytail outbound calls.
 - **VERIFY:** pip `PIP_PROXY`, `PIP_CERT`; winget persistent proxy settings and CA handling.
 - **VERIFY:** DCP and AutoSkills telemetry; the exact winget and Playwright download hosts.
+- **VERIFY:** Warp first run: whether the desktop app needs a login, writes shell integration into `~/.zshrc` / `~/.bashrc`, and has a desktop auto-update switch (only the Agent CLI documents `general.autoupdate_enabled` and `WARP_TUI_DISABLE_AUTOUPDATE`). Older docs give `~/.config/warp-terminal` as the macOS settings path.
+- **VERIFY:** Orca: the hook command strings, the local hook script path and the app data folder name; the OpenCode plugin file name; whether Codex hooks go into `~/.codex` (docs say so, v1.4.247 source uses a managed home); that no MCP server is written (source grep needs a GitHub login); whether `orca agent hooks status` works without the app running; whether the app installs and starts headless in CI.

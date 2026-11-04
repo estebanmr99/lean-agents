@@ -16,6 +16,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - Settings upstream does not document (Antigravity telemetry and auto-update, Serena config, winget persistent proxy, download hosts, DCP, GSD and AutoSkills telemetry): the installer asks to paste docs or IT notes, saved to `~/.config/lean-agents/notes/` for an agent to apply after review, or keep the tool's default. Never guessed and never applied automatically; skipped when another agent already set the tool up.
 - `docs/SECURITY-REVIEW.md`: a prompt any agent runs on this repo before install.
 - CI: `real-proxy` (install through squid with direct traffic blocked, all-off preset, gh and agy behind the proxy), a pty test for the menus, no-TTY checks in PowerShell 5.1 and Git Bash, `gh` through winget.
+- `docs/compatibility.md` "Terminals": Warp and Orca install routes, the hooks Orca adds, its permission modes and how to keep approvals on. Research only; the installer does not offer either app yet.
 
 ### Changed
 
