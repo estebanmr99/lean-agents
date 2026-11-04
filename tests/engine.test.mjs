@@ -444,3 +444,23 @@ test('--update keeps the network choice of a state file that only has privacy', 
   lean(home, ['--update', '--yes', '--no-exec']);
   assert.deepEqual(JSON.parse(fs.readFileSync(f, 'utf8')).options.network, { telemetry: 'off', autoUpdate: 'off', outbound: 'off' });
 });
+
+test('proxy variables are shown redacted, shared in both cases, and never written to disk', async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-proxy-'));
+  const env = { ...process.env, https_proxy: 'http://alice:s3cret@127.0.0.1:3128', NO_PROXY: 'localhost', NODE_EXTRA_CA_CERTS: '/etc/corp-ca.pem' };
+  delete env.HTTPS_PROXY; delete env.no_proxy;
+  const out = lean(home, ['--yes', '--no-exec', '--agents', 'claude,opencode-v2', '--all-tools', '--network', 'off', '--lang', 'en', '--profile', 'none'], env);
+  assert.match(out, /HTTPS_PROXY=http:\/\/\*\*\*@127\.0\.0\.1:3128 NO_PROXY=localhost NODE_EXTRA_CA_CERTS=\/etc\/corp-ca\.pem/);
+  assert.ok(!out.includes('s3cret'));
+  for (const [f, text] of Object.entries(snapshot(home))) assert.ok(!text.includes('s3cret') && !text.includes('3128'), f);
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, '--doctor', '--no-exec'], { encoding: 'utf8', env });
+  assert.match(r.stdout, /network env\s+HTTPS_PROXY=http:\/\/\*\*\*@127\.0\.0\.1:3128/);
+  assert.ok(!r.stdout.includes('s3cret'));
+  const { shareProxy } = await import('../scripts/lib/network.mjs');
+  const e = { https_proxy: 'http://p:1', NO_PROXY: 'x', NODE_USE_ENV_PROXY: '0' };
+  shareProxy(e);
+  assert.deepEqual(e, { https_proxy: 'http://p:1', HTTPS_PROXY: 'http://p:1', NO_PROXY: 'x', no_proxy: 'x', NODE_USE_ENV_PROXY: '0' });
+  const e2 = { HTTP_PROXY: 'http://p:1' };
+  shareProxy(e2);
+  assert.equal(e2.NODE_USE_ENV_PROXY, '1');
+});

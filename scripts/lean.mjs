@@ -18,7 +18,7 @@ import { gsdPlan } from './lib/gsd.mjs';
 import { adhdCommand } from './lib/adhd.mjs';
 import { detectAgents, packageManager, prereqFor, which, run, quiet, exists, isolate } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
-import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv } from './lib/network.mjs';
+import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ADAPTERS = { claude: claudeAdapter, 'opencode-v1': opencodeV1Adapter, 'opencode-v2': opencodeV2Adapter, 'copilot-cli': copilotAdapter, antigravity: antigravityAdapter };
@@ -224,7 +224,10 @@ function prereqCommands(o) {
 function printPlan(o, planned, commands) {
   console.log(`\nlean-agents plan for ${o.agents.join(', ') || 'no agents'}`);
   console.log(`  tools: ${o.tools.join(', ') || 'none'} | privacy: ${o.privacy} | lang: ${o.lang} | profile: ${o.profile ?? 'none'}`);
-  console.log(`  network: ${CATEGORIES.map((c) => `${c} ${o.network[c]}`).join(', ')}\n`);
+  console.log(`  network: ${CATEGORIES.map((c) => `${c} ${o.network[c]}`).join(', ')}`);
+  const net = proxyReport();
+  if (net.length) console.log(`  proxy and CA (passed to every command): ${net.join(' ')}`);
+  console.log('');
   console.log('Files:');
   console.log(describe(planned, o.home));
   if (commands.length) {
@@ -323,6 +326,7 @@ async function uninstall(o) {
 async function main() {
   const o = parseArgs(process.argv.slice(2));
   isolate(o.home);
+  shareProxy();
   if (o.command === 'help') return console.log(HELP);
   if (o.command === 'doctor') return process.exit(doctor({ home: o.home, state: readState(o.home), exec: o.exec }) ? 0 : 1);
   if (o.command === 'uninstall') return uninstall(o);
