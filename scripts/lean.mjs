@@ -340,7 +340,7 @@ async function install(o) {
   if (!yesNo(await p.ask('Apply these changes?', 'y'))) { p.close(); console.log('Cancelled.'); return; }
   p.close();
   const ui = p.menus ? await menuProgress() : null;
-  Object.assign(process.env, childEnv(o.network), { BUN_INSTALL: path.join(o.home, '.bun') });
+  Object.assign(process.env, childEnv(o.network));
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupDir = path.join(stateDir(o.home), 'backups', stamp);
@@ -354,7 +354,7 @@ async function install(o) {
       if (c.skipIfOutput && quiet(c.skipIfOutput.cmd).ok) continue;
       if (ui) ui.step(i + 1, commands.length, c.desc);
       else console.log(`- ${c.desc}`);
-      const ok = c.run.every((argv) => run(argv, { dryRun: false, log: console.log }));
+      const ok = c.run.every((argv) => run(argv, { dryRun: false, log: console.log, env: c.env }));
       if (ui) ui.result(ok || c.optional, c.desc);
       else if (!ok && !c.optional) console.log(`  ! failed: ${c.desc}. Run the command above by hand, then --doctor.`);
       // An optional step (Bun) that fails only means Context Mode runs on Node; nothing to undo.

@@ -683,6 +683,7 @@ test('bunInstall: one argv route per OS, undo only for what it installs', () => 
   assert.equal(win.run[0][0], 'curl.exe');
   assert.ok(win.run[1].includes('-File') && win.run[1].at(-1).endsWith('bun-install.ps1'));
   assert.ok(win.undo[0].at(-1).endsWith('uninstall.ps1'));
+  assert.deepEqual(win.env, { BUN_INSTALL: path.join('/h', '.bun') });
 });
 
 test('Bun: on by default with Context Mode, --no-bun is saved and reused, --update keeps it', () => {

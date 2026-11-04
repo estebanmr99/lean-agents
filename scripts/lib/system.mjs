@@ -103,7 +103,7 @@ export function bunInstall(home, dir, platform, pm) {
   if (platform === 'win32') {
     const file = path.join(dir, 'bun-install.ps1');
     const ps = ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File'];
-    return { tool: 'bun', desc: 'install bun', run: [['curl.exe', '-fsSL', '-o', file, 'https://bun.com/install.ps1'], [...ps, file]], undo: [[...ps, path.join(bunDir, 'uninstall.ps1')]], optional: true };
+    return { tool: 'bun', desc: 'install bun', run: [['curl.exe', '-fsSL', '-o', file, 'https://bun.com/install.ps1'], [...ps, file]], env: { BUN_INSTALL: bunDir }, undo: [[...ps, path.join(bunDir, 'uninstall.ps1')]], optional: true };
   }
   const file = path.join(dir, 'bun-install.sh');
   return {
@@ -115,10 +115,10 @@ export function bunInstall(home, dir, platform, pm) {
 
 export const bunPresent = (home) => Boolean(which('bun')) || fs.existsSync(path.join(home, '.bun', 'bin', isWin ? 'bun.exe' : 'bun'));
 
-export function run(argv, { dryRun, log }) {
+export function run(argv, { dryRun, log, env }) {
   log(`  $ ${argv.join(' ')}`);
   if (dryRun) return true;
-  const r = spawnSync(argv[0], argv.slice(1), { stdio: 'inherit', shell: useShell(argv[0]) });
+  const r = spawnSync(argv[0], argv.slice(1), { stdio: 'inherit', shell: useShell(argv[0]), env: env && { ...process.env, ...env } });
   return r.status === 0;
 }
 

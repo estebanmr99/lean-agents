@@ -53,7 +53,7 @@ if (label === 'check') {
   const doctor = tools.includes('ctx_doctor') ? text(await rpc('tools/call', { name: 'ctx_doctor', arguments: {} })) : 'ctx_doctor not offered';
   const ts = await rpc('tools/call', { name: 'ctx_execute', arguments: { language: 'typescript', code: 'const n: number = 6 * 7; console.log(`ts-ok ${n}`);' } });
   console.log(`${doctor}\nTS: ${ts.isError ? 'error ' : ''}${text(ts)}`);
-  if (process.platform === 'linux') console.log(spawnSync('ps', ['-eo', 'args'], { encoding: 'utf8' }).stdout.split('\n').filter((l) => /bun/.test(l) && !/ps -eo/.test(l)).map((l) => `PS: ${l}`).join('\n'));
+  if (process.platform === 'linux') console.log(spawnSync('ps', ['-eo', 'args'], { encoding: 'utf8' }).stdout.split('\n').filter((l) => /(^|\/)bun\s/.test(l)).map((l) => `PS: ${l}`).join('\n'));
   process.exit(0);
 }
 
