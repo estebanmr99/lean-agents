@@ -8,7 +8,7 @@
 
 ## What does Orca change in my agents?
 
-[Orca](https://github.com/stablyai/orca) adds its own status hooks to Claude Code and Codex, a status plugin to OpenCode's `tui.json`, and the `orca-cli`, `orchestration` and `computer-use` skills to `~/.agents/skills`. If you choose its Yolo (full-access) mode, it also starts agents with bypass flags such as `--dangerously-skip-permissions` or `--yolo`. New sessions use the agent's own permission settings unless you change that. To keep approvals, set Settings > Agents > Agent permissions to Manual or keep the default, and keep bypass flags out of the per-agent default arguments. `orca agent hooks off` removes its hooks but not the OpenCode plugin or the skills; the removal steps are in the compatibility doc. Details and sources: [compatibility](compatibility.md#orca).
+[Orca](https://github.com/stablyai/orca) adds its own status hooks to Claude Code and Codex, a status plugin to OpenCode's `tui.json` (or `tui.jsonc`), and the `orca-cli`, `orchestration` and `computer-use` skills to `~/.agents/skills`. If you choose its Yolo (full-access) mode, it also starts agents with bypass flags such as `--dangerously-skip-permissions` or `--yolo`. New sessions use the agent's own permission settings unless you change that. To keep approvals, set Settings > Agents > Agent permissions to Manual or keep the default, and keep bypass flags out of the per-agent default arguments. `orca agent hooks off` removes its hooks but not the OpenCode plugin or the skills; the removal steps are in the compatibility doc. Details and sources: [compatibility](compatibility.md#orca).
 
 ## Does it change my existing config?
 

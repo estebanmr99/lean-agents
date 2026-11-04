@@ -61,7 +61,7 @@ Research only (session 8). lean-agents installs neither app yet. Checked 2026-11
 | Turn bypass off | Settings > Agents > Agent permissions: pick Manual (`ask`) or keep the default `own` (UI path and runtime default: **VERIFY** in a running app); check that no bypass flag sits in the per-agent default arguments |
 | Folder trust | "Trust the folder when Orca starts an agent" is on by default and skips each agent's trust prompt; turn it off in Settings > Agents |
 | Telemetry | Settings > Privacy "Share anonymous usage data", or `DO_NOT_TRACK=1` / `ORCA_TELEMETRY_DISABLED=1`. Sends version, OS, app opens, agent type, coarse errors; not prompts |
-| Remove | 1. `orca agent hooks off`. 2. Skills: Orca Skills page > Delete, or `npx skills remove orca-cli orchestration computer-use -g -y`. 3. OpenCode: delete Orca's `file://…/plugins/…` entry from `plugin` in `tui.json` / `tui.jsonc` and its files in `plugins/` (file name: **VERIFY**). 4. Remove the app (`brew uninstall --cask stablyai/orca/orca`, **VERIFY**). No uninstall page found upstream |
+| Remove | 1. `orca agent hooks off`. 2. Skills: Orca Skills page > Delete (**VERIFY**), or `npx skills remove orca-cli orchestration computer-use -g -y` (whether it also clears the copies in agent folders such as `~/.claude/skills`: **VERIFY**). 3. OpenCode: delete Orca's `file://…/plugins/…` entry from `plugin` in `tui.json` / `tui.jsonc` and its files in `plugins/` (file name: **VERIFY**). 4. Remove the app (`brew uninstall --cask stablyai/orca/orca`, **VERIFY**). No uninstall page found upstream |
 
 ## Verification log
 
