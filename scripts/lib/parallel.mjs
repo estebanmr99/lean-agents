@@ -224,7 +224,7 @@ export function merge(cwd, name) {
     if (r.status !== 0) throw new Error(`check "${w.check}" failed:\n${(r.stdout ?? '').slice(-LOG_TAIL_BYTES)}${(r.stderr ?? '').slice(-LOG_TAIL_BYTES)}`);
   }
   const m = git(top, ['merge', '--no-ff', '--no-edit', w.branch]);
-  if (!m.ok) { git(top, ['merge', '--abort']); throw new Error(`merge of "${name}" conflicts; resolve it in ${w.dir} (rebase on ${data.base}) and retry`); }
+  if (!m.ok) { git(top, ['merge', '--abort']); throw new Error(`merge of "${name}" failed: ${m.err || m.out}\nIf it conflicts, rebase it on ${data.base} in ${w.dir} and retry`); }
   w.merged = true;
   saveWorkers(stateDir, data);
   const rebased = [];

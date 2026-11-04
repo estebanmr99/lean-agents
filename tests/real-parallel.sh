@@ -7,6 +7,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOME="$(mktemp -d)"
 export HOME
 WORK="$HOME"
+export GIT_AUTHOR_NAME=Test GIT_AUTHOR_EMAIL=test@example.com GIT_COMMITTER_NAME=Test GIT_COMMITTER_EMAIL=test@example.com
 trap 'rm -rf "$WORK"' EXIT
 PAR=(node "$ROOT/scripts/parallel.mjs" --repo "$WORK/proj")
 
