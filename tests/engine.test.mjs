@@ -789,9 +789,11 @@ test('Antigravity app and CLI install only through verified ids, else print the 
   const runs = (pm, platform) => antigravityPrereqs(pm, platform, home).map((c) => c.run[0]?.join(' ') ?? 'manual');
   assert.ok(runs('brew', 'darwin').includes('brew install --cask antigravity'));
   assert.ok(runs('brew', 'darwin').every((r) => !r.startsWith('winget')));
+  // Without a package route the app is only a note; a missing CLI is a manual step.
   const linux = antigravityPrereqs('brew', 'linux', home);
-  assert.ok(linux.every((c) => c.manual && !c.run.length));
+  assert.ok(linux.some((c) => c.note) && !linux.some((c) => c.note && c.manual));
+  assert.deepEqual(antigravityPrereqs('brew', 'darwin', home, false).filter((c) => c.desc.includes('app')), []);
   // The Windows CLI id has no documented scope, so it is never run; only the app (scope user) is.
-  assert.ok(antigravityPrereqs(null, 'win32', home).every((c) => c.manual));
+  assert.ok(antigravityPrereqs(null, 'win32', home).every((c) => c.manual || c.note));
   assert.ok(!runs('winget', 'win32').some((r) => r.includes('AntigravityCLI')));
 });

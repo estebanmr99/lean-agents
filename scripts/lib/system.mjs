@@ -95,7 +95,7 @@ export function prereqFor(tool, pm) {
 
 // Antigravity CLI and app, only when the user picked Antigravity. Only ids checked upstream (2026-11-03) run;
 // the rest print the vendor link. Windows CLI: `Google.AntigravityCLI` has no documented scope, so install.ps1 stays manual.
-export function antigravityPrereqs(pm, platform, home) {
+export function antigravityPrereqs(pm, platform, home, app = true) {
   const out = [];
   const winApp = pm === 'winget' && platform === 'win32';
   if (!which('agy')) {
@@ -103,13 +103,14 @@ export function antigravityPrereqs(pm, platform, home) {
       ? { desc: 'install agy', run: [['brew', 'install', '--cask', 'antigravity-cli']] }
       : { desc: `agy is missing: install it from https://antigravity.google/docs/getting-started`, run: [], manual: true });
   }
+  if (!app) return out;
   const appInstalled = platform === 'darwin'
     ? exists('/Applications/Antigravity.app') || exists(path.join(home, 'Applications', 'Antigravity.app'))
     : winApp && quiet(['winget', 'list', '--id', 'Google.Antigravity', '-e']).ok;
   if (!appInstalled) {
     if (platform === 'darwin' && pm === 'brew') out.push({ desc: 'install the Antigravity app', run: [['brew', 'install', '--cask', 'antigravity']] });
     else if (winApp) out.push({ desc: 'install the Antigravity app', run: [['winget', 'install', '--id', 'Google.Antigravity', '-e', '--scope', 'user', '--accept-source-agreements', '--accept-package-agreements']] });
-    else out.push({ desc: 'the Antigravity app is optional: download it from https://antigravity.google/download', run: [], manual: true });
+    else out.push({ desc: 'The Antigravity app is optional: download it from https://antigravity.google/download', note: true });
   }
   return out;
 }

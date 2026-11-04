@@ -41,7 +41,7 @@ Prefer your agent to do it? Paste a prompt from [INSTALL_WITH_AGENT.md](INSTALL_
 
 Always start with `--dry-run`: it shows every file and command before anything changes. Then run it again without `--dry-run`; it asks which agents, tools, privacy level, language and model profile you want. Useful flags: `--all-tools`, `--privacy strict`, `--lang es`, `--profile vertex-gemini`, `--update`, `--uninstall`, `--doctor` (`--help` lists them all). In PowerShell the common flags are PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`. Any other flag is passed as it is, for example `-DryRun --network off`.
 
-Context Mode needs Node.js 22.5 or newer. Everything else works on Node.js 20.12. With Context Mode, the installer also sets up Bun by default (faster `ctx_execute`); add `--no-bun` (`-NoBun` in PowerShell) to skip it. See the Bun row in [Install tiers](#install-tiers).
+Context Mode needs Node.js 22.5 or newer. Everything else works on Node.js 20.12. With Context Mode, the installer also sets up Bun by default (faster `ctx_execute`); add `--no-bun` (`-NoBun` in PowerShell) to skip it. With Antigravity, `--no-app` (`-NoApp`) skips installing the app. See the Bun row in [Install tiers](#install-tiers).
 
 ## Demo: OpenCode with GitHub Copilot models
 

@@ -58,7 +58,7 @@ function parseArgs(argv) {
   const o = {
     command: 'install', dryRun: false, yes: false, agents: null, tools: null, privacy: null, profile: null,
     lang: null, home: os.homedir(), exec: true, adhdAlways: null, ponytailMode: null,
-    networkPreset: null, networkFlags: {}, gh: null, bun: null, terminals: null,
+    networkPreset: null, networkFlags: {}, gh: null, bun: null, terminals: null, app: true,
   };
   const list = (v) => v.split(',').map((s) => s.trim()).filter(Boolean);
   for (let i = 0; i < argv.length; i++) {
@@ -74,6 +74,7 @@ function parseArgs(argv) {
       case '--terminal': o.terminals = parseTerminal(next()); break;
       case '--bun': o.bun = true; break;
       case '--no-bun': o.bun = false; break;
+      case '--no-app': o.app = false; break;
       case '--privacy': o.privacy = next(); fromPrivacy(o.privacy); break;
       case '--gh': o.gh = true; break;
       case '--network': o.networkPreset = onOff(a, next()); break;
@@ -118,6 +119,7 @@ const HELP = `Usage: lean-agents [options]
                          Agent integrations for a terminal you already have (default: the detected ones;
                          ignored with --project)
   --gh                   Install GitHub CLI (gh) if it is missing
+  --no-app               Do not install the Antigravity app (the CLI is still installed when missing)
   --bun / --no-bun       Install Bun for Context Mode (default: on; faster JS, TypeScript)
   --project <dir>        Write the shared team files into one repository
                          (AGENTS.md, .github/, .vscode/mcp.json, .cursor/)
@@ -315,7 +317,10 @@ function prereqCommands(o) {
     else out.push({ tool: t, desc: `${p.bin} is missing: install it from ${p.manual}`, run: [], undo: [], manual: true });
   }
   if (o.agents.includes('antigravity')) {
-    out.push(...antigravityPrereqs(pm, process.platform, os.homedir()).map((c) => ({ tool: 'antigravity', undo: [], ...c })));
+    for (const c of antigravityPrereqs(pm, process.platform, o.home, o.app)) {
+      if (c.note) console.log(c.desc);
+      else out.push({ tool: 'antigravity', undo: [], ...c });
+    }
   }
   if (o.bun && o.tools.includes('context-mode') && process.platform !== 'linux' && !which('bun') && bunPresent(o.home)) {
     console.log('! Bun is in ~/.bun/bin but not on PATH; Context Mode needs it on PATH here. Add that folder to PATH.');

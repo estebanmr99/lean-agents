@@ -19,7 +19,7 @@ Las mismas reglas, subagentes baratos por defecto, herramientas que ahorran cont
 
 </div>
 
-> **Estado: versión preliminar v0.5.** El instalador funciona para **Claude Code**, **OpenCode 1.x y 2.x**, **GitHub Copilot CLI**, **Antigravity CLI**, **VS Code Copilot** y **Cursor** en macOS, Linux y Windows . Dale una estrella al repo para enterarte cuando salga `v1.0.0`.
+> **Estado: versión preliminar v0.5.** El instalador funciona para **Claude Code**, **OpenCode 1.x y 2.x**, **GitHub Copilot CLI**, **Antigravity CLI**, **VS Code Copilot** y **Cursor** en macOS, Linux y Windows. Dale una estrella al repo para enterarte cuando salga `v1.0.0`.
 
 <img src="docs/assets/demo.gif" alt="install.sh --dry-run lista cada archivo y comando que cambiaría" width="720">
 
@@ -41,7 +41,7 @@ Windows PowerShell:
 
 Empieza siempre con `--dry-run`: muestra cada archivo y comando antes de cambiar nada. Luego córrelo otra vez sin `--dry-run`; te pregunta qué agentes, herramientas, nivel de privacidad, idioma y perfil de modelos quieres. Opciones útiles: `--all-tools`, `--privacy strict`, `--lang es`, `--profile vertex-gemini`, `--update`, `--uninstall`, `--doctor` (`--help` las lista todas). En PowerShell las opciones comunes van en PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`. Cualquier otra opción se pasa tal cual, por ejemplo `-DryRun --network off`.
 
-Context Mode necesita Node.js 22.5 o superior. Todo lo demás funciona con Node.js 20.12. Con Context Mode, el instalador también instala Bun por defecto (`ctx_execute` más rápido); añade `--no-bun` (`-NoBun` en PowerShell) para omitirlo. Ver la fila de Bun en [Niveles de instalación](#niveles-de-instalación).
+Context Mode necesita Node.js 22.5 o superior. Todo lo demás funciona con Node.js 20.12. Con Context Mode, el instalador también instala Bun por defecto (`ctx_execute` más rápido); añade `--no-bun` (`-NoBun` en PowerShell) para omitirlo. Con Antigravity, `--no-app` (`-NoApp`) omite la instalación de la app. Ver la fila de Bun en [Niveles de instalación](#niveles-de-instalación).
 
 ## Demo: OpenCode con modelos de GitHub Copilot
 
