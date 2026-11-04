@@ -167,6 +167,7 @@ Si tu empresa paga GitHub Copilot, la forma oficial de usar Claude como agente e
 | Privacidad estricta | Sin telemetría, sin auto updates, sin compartir sesiones, sin proveedores que entrenan con tus prompts | Apagado, se activa con `--privacy strict` |
 | Preset de red | Todo apagado (PC de trabajo), todo encendido, o por categoría: telemetría, auto updates, otras salidas | Todo encendido; `--network off` (igual que `--privacy strict`) o `--telemetry`, `--auto-update`, `--outbound` |
 | GitHub CLI (`gh`) | Se instala con brew o winget sin admin; tú corres `gh auth login` | Se pregunta si falta; `--gh` |
+| Bun (para Context Mode) | `ctx_execute` más rápido en JavaScript y TypeScript. Linux: script oficial en `~/.bun` sin editar el perfil del shell; macOS: `brew install oven-sh/bun/bun`; Windows: `install.ps1` oficial (PATH de usuario, sin admin). Un Bun que ya tengas se reutiliza y nunca se borra. Si la instalación falla, Context Mode corre con Node. Con telemetría apagada, `~/.bunfig.toml` recibe un bloque marcado `telemetry = false`. `--uninstall` quita solo lo que instaló lean-agents | Activo; `--no-bun` (`-NoBun` en PowerShell) |
 
 ## En una PC de trabajo: proxy, red y revisión de seguridad
 
