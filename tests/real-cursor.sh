@@ -6,6 +6,7 @@ set -euo pipefail
 
 # `! cmd` never stops a set -e script, so negative checks go through this.
 refute() { if "$@"; then echo "must not succeed: $*" >&2; exit 1; fi; }
+trap 'echo "failed at line $LINENO" >&2' ERR
 
 command -v agent >/dev/null || { echo "agent (Cursor CLI) not on PATH" >&2; exit 1; }
 
@@ -26,7 +27,8 @@ grep -q '^readonly: true$' "$dir/agents/explore.md"
 grep -q '^model: inherit$' "$dir/agents/planner.md"
 test -f "$dir/hooks.json"
 grep -q rtk "$dir/hooks.json"
-test -f "$dir/skills/caveman/SKILL.md"
+# The Skills CLI puts Cursor skills in ~/.agents/skills, which Cursor reads.
+test -f "$HOME/.agents/skills/caveman/SKILL.md"
 grep -q '^disable-model-invocation: false$' "$HOME/.agents/skills/i-have-adhd/SKILL.md"
 
 # grep -q closes the pipe early, so read CLI output from files.
@@ -42,7 +44,7 @@ node "$repo/scripts/lean.mjs" --uninstall --yes </dev/null 2>&1 | tee "$HOME/uni
 refute grep -qE '^ *! ' "$HOME/uninstall.txt"
 refute test -e "$dir/agents/explore.md"
 refute grep -qs rtk "$dir/hooks.json"
-refute test -e "$dir/skills/caveman"
+refute test -e "$HOME/.agents/skills/caveman"
 refute grep -qs serena "$dir/mcp.json"
 
 # Team mode: with the user config gone, Cursor can only find serena in the repo's .cursor/mcp.json.

@@ -6,6 +6,7 @@ set -euo pipefail
 
 # `! cmd` never stops a set -e script, so negative checks go through this.
 refute() { if "$@"; then echo "must not succeed: $*" >&2; exit 1; fi; }
+trap 'echo "failed at line $LINENO" >&2' ERR
 
 command -v code >/dev/null || { echo "code not on PATH" >&2; exit 1; }
 
@@ -31,14 +32,15 @@ grep -q '"telemetry.telemetryLevel": "off"' "$user/settings.json"
 "$code_bin" --add-mcp '{"name":"probe","command":"node","args":["--version"]}' </dev/null
 node -e '
   const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).servers;
-  for (const k of ["probe", "serena", "playwright", "context-mode"]) if (!s[k]) throw new Error(`no ${k} in user mcp.json`);
+  for (const k of ["probe", "serena", "playwright", "context-mode"]) if (!s[k]) throw new Error("no " + k + " in user mcp.json");
   if (s.serena.type !== "stdio") throw new Error("serena is not stdio");
 ' "$user/mcp.json"
 
 ext="$HOME/vscode-extensions"
-"$code_bin" --extensions-dir "$ext" --install-extension GitHub.copilot-chat </dev/null
-"$code_bin" --extensions-dir "$ext" --list-extensions </dev/null > "$HOME/extensions.txt"
-grep -qi '^github.copilot-chat$' "$HOME/extensions.txt"
+# Copilot Chat ships inside VS Code, so even an empty extensions dir reports it as installed.
+"$code_bin" --extensions-dir "$ext" --install-extension GitHub.copilot-chat </dev/null > "$HOME/extensions.txt" 2>&1
+cat "$HOME/extensions.txt"
+grep -qiE 'already installed|successfully installed' "$HOME/extensions.txt"
 
 node "$repo/scripts/lean.mjs" --doctor </dev/null
 
@@ -57,7 +59,7 @@ git -C "$proj" init -q
 node "$repo/scripts/lean.mjs" --project "$proj" --yes --tools serena,playwright --privacy standard --lang en </dev/null
 node -e '
   const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).servers;
-  for (const k of ["serena", "playwright", "context-mode"]) if (s[k]?.type !== "stdio") throw new Error(`no stdio ${k}`);
+  for (const k of ["serena", "playwright", "context-mode"]) if (s[k]?.type !== "stdio") throw new Error("no stdio " + k);
 ' "$proj/.vscode/mcp.json"
 grep -q '^name: review$' "$proj/.github/agents/review.agent.md"
 grep -q 'AGENTS.md' "$proj/.github/copilot-instructions.md"
