@@ -265,6 +265,7 @@ The undocumented items below (Antigravity telemetry and auto-update, Serena conf
 - **VERIFY (session 11):** whether the app has a launcher command that runs headless in CI.
 - **VERIFY (session 11):** the "3-5x faster" Bun claim for `ctx_execute`; unmeasured until the `bench-context-mode` CI job runs on each OS.
 - **VERIFY (session 11):** when `better-sqlite3` compiles instead of using a prebuilt binary, per OS, and whether Context Mode on Node.js 22.5+ picks `node:sqlite` on each runner.
-- **VERIFY (session 13):** `real-bun` assumptions: `ctx_doctor` prints `Performance: FAST (Bun)`, the Linux server process runs under Bun, and the Windows `uninstall.ps1` removes the user PATH entry.
+- Verified on macOS (owner, local, 2026-11-03, Bun 1.4.4, context-mode 1.0.169): `ctx_doctor` prints `Performance: FAST (Bun)`. `real-bun` asserts it on all three OSes.
+- **VERIFY (session 13):** `real-bun` assumptions: the Linux server process runs under Bun, and the Windows `uninstall.ps1` removes the user PATH entry.
 - **VERIFY (session 11):** the winget `Oven-sh.Bun` install scope and PATH (upstream issues report `bun` missing from PATH after a winget install), and whether the Bun installer honors `BUN_INSTALL`, which Context Mode ignores.
 - **VERIFY (session 11):** `better-sqlite3` load failures under Bun on Windows (Bun issues up to 1.3.0); Context Mode avoids them with `bun:sqlite`, but the status on 1.4.x is unknown.
