@@ -40,7 +40,8 @@ function checkCopilot(o, add) {
 }
 
 function checkCursor(o, add) {
-  const mcp = quiet(['cursor-agent', 'mcp', 'list']);
+  // `mcp list` starts every server, and Serena through uvx can take longer than 30s.
+  const mcp = quiet(['cursor-agent', 'mcp', 'list'], 120000);
   for (const s of ['serena', 'playwright', 'context-mode'].filter((t) => o.tools.includes(t))) {
     add(`cursor mcp ${s}`, mcp.ok && mcp.out.includes(s) ? 'ok' : 'error', mcp.ok ? '' : 'cursor-agent mcp list failed');
   }
