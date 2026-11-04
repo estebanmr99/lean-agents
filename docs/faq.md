@@ -4,7 +4,11 @@
 
 - **Oh My OpenAgent (OMO):** powerful, but it adds many MCP servers and integrations, which costs context on every turn and widens what the agent can reach. lean-agents keeps the MCP list short and gets similar planning/building routing from tiered subagents.
 - **Graphify:** builds a code graph with AI calls, which costs a lot of tokens up front. Serena gives symbol-level navigation through a language server at no model cost.
-- **Terminal-specific plugins (for example Warp):** they only help users of one terminal. Notification hooks may be documented later in a terminal-neutral way.
+- **Terminal-specific plugins (for example Warp):** they only help users of one terminal. This covers Warp's Claude Code plugin ([`warpdotdev/claude-code-warp`](https://github.com/warpdotdev/claude-code-warp)) and its OpenCode plugin ([`warpdotdev/opencode-warp`](https://github.com/warpdotdev/opencode-warp)). Notification hooks may be documented later in a terminal-neutral way.
+
+## I run my agents inside Orca. Is that safe?
+
+[Orca](https://github.com/stablyai/orca) adds its own status hooks to Claude Code and Codex. If you choose its Yolo (full-access) mode, it also starts agents with bypass flags such as `--dangerously-skip-permissions` or `--yolo`. New sessions use the agent's own permission settings unless you change that. To keep approvals, set Settings > Agents > Agent permissions to Manual, or leave the default, and keep bypass flags out of the per-agent default arguments. `orca agent hooks off` removes its hooks. Details and sources: [compatibility](compatibility.md#orca).
 
 ## Does it change my existing config?
 
