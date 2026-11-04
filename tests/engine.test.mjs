@@ -359,7 +359,7 @@ test('real-binary scripts run no agent CLI before HOME is a throwaway', () => {
     const lines = fs.readFileSync(path.join(ROOT, 'tests', f), 'utf8').split('\n');
     const home = lines.findIndex((l) => /^HOME="\$\(mktemp -d\)"/.test(l));
     assert.ok(home >= 0, `${f}: no throwaway HOME`);
-    const early = lines.slice(0, home).filter((l) => !/^\s*#|command -v/.test(l) && /\b(agy|claude|copilot|opencode|rtk|npx|npm)\b/.test(l));
+    const early = lines.slice(0, home).filter((l) => !/^\s*#|command -v/.test(l) && /\b(agy|claude|copilot|opencode|rtk|npx|npm|agent|code)\b/.test(l));
     assert.deepEqual(early, [], `${f}: runs a CLI before HOME is set`);
   }
 });

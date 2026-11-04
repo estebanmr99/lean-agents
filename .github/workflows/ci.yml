@@ -376,7 +376,59 @@ jobs:
       - name: Install, ask agy what loaded, doctor, uninstall
         run: bash tests/real-antigravity.sh
 
-  real-winget:
+  real-cursor:
+    # Real Cursor CLI and real tools, throwaway HOME, no login and no TTY.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Install Cursor CLI
+        run: |
+          curl https://cursor.com/install -fsS | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Use the runner's Linuxbrew
+        if: runner.os == 'Linux'
+        run: echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
+      - name: Install, ask Cursor what loaded, project mode, doctor, uninstall
+        run: bash tests/real-cursor.sh
+
+  real-vscode:
+    # Real VS Code CLI and real tools, throwaway HOME, no login and no TTY.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Install VS Code (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/code.tar.gz" 'https://update.code.visualstudio.com/latest/linux-x64/stable'
+          tar -xzf "$RUNNER_TEMP/code.tar.gz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/VSCode-linux-x64/bin" >> "$GITHUB_PATH"
+          echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
+      - name: Install VS Code (macOS)
+        if: runner.os == 'macOS'
+        run: brew install --cask visual-studio-code
+      - name: Install, let code write the same files, project mode, doctor, uninstall
+        run: bash tests/real-vscode.sh
+
     # The winget commands from prereqFor, with the runner's image missing winget.
     runs-on: windows-latest
     steps:
