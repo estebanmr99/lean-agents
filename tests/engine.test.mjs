@@ -390,7 +390,7 @@ test('release notes come from one CHANGELOG section, and a wrong version stops t
 
 test('without a TTY and without --yes: asks nothing, changes nothing, says why', { skip: process.platform === 'win32' }, () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
-  const args = ['--no-exec', '--agents', 'claude', '--tools', 'serena', '--privacy', 'standard', '--lang', 'en'];
+  const args = ['--no-exec', '--agents', 'claude', '--tools', 'serena', '--privacy', 'standard', '--lang', 'en', '--bun'];
   // detached starts a new session, which has no controlling terminal: /dev/tty cannot open.
   const noTty = (extra) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args, ...extra], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], detached: true, timeout: 20000 });
   const apply = noTty([]);

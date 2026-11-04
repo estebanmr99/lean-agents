@@ -63,7 +63,7 @@ esac
 grep -q '"bun": true' "$HOME/.config/lean-agents/state.json" || fail "state does not record bun"
 node "$repo/tests/bench-context-mode.mjs" check | tee "$HOME/check.txt"
 grep -q 'Performance: FAST (Bun)' "$HOME/check.txt" || fail "ctx_doctor does not report Bun"
-grep -q 'TS: ts-ok 42' "$HOME/check.txt" || fail "TypeScript ctx_execute failed"
+grep -qx 'ts-ok 42' "$HOME/check.txt" || fail "TypeScript ctx_execute failed"
 if [ "$os" = linux ]; then grep -Eq 'PS: ([^ ]*/)?bun( |$)' "$HOME/check.txt" || fail "the MCP server does not run under Bun"; fi
 
 echo "--- uninstall removes the Bun it installed"
