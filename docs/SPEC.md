@@ -614,8 +614,16 @@ Branch: `session-11-antigravity`. Code starts after sessions 6 and 7 merge: reus
 5. **Windows CLI:** `tests/real-antigravity.ps1` like `tests/real-copilot.ps1`; `%LOCALAPPDATA%\agy\bin` on PATH; RTK and Context Mode plugins under a temp `USERPROFILE` (`rtk init` writes to the OS profile folder); Skills CLI detection.
 6. **Network:** pass the session 6 proxy variables to `agy` and every child command. Antigravity documents no proxy, CA or auto-update setting (only `sandboxProxy` for sandboxed commands) and keeps telemetry on the account: the all-off preset prints the account step; recheck each (**VERIFY**).
 7. Docs: an Antigravity app column in the README tables (EN and ES), `docs/compatibility.md`, `docs/privacy.md`, CHANGELOG.
+8. **Bun for Context Mode (evaluate, opt-in).** Upstream says Context Mode detects Bun on PATH or in `~/.bun/bin` and then runs JS/TS in `ctx_execute` "3-5x faster" and uses `bun:sqlite` instead of `better-sqlite3`. No benchmark backs the number (**VERIFY**). A CI job `bench-context-mode` on Ubuntu, macOS and Windows, throwaway HOME (`USERPROFILE` on Windows), runs the same fixed `ctx_execute` JS and TS workload a set number of times with Node only and then with Bun, and records:
+   - median and spread of the run time, Node and Bun;
+   - install time of `npm i -g context-mode` and of Bun;
+   - whether `better-sqlite3` used a prebuilt binary or compiled, and which SQLite backend Context Mode picked (`bun:sqlite`, `node:sqlite`, `better-sqlite3`);
+   - the numbers go to the job summary and to `docs/compatibility.md` with the Bun, Node and Context Mode versions.
+9. **Bun decision from the numbers.** If Bun is clearly faster on the workload and installs at user scope without a TTY on each OS, the installer offers `--bun` (off by default) with `curl -fsSL https://bun.com/install | bash`, `brew install oven-sh/bun/bun` or winget `Oven-sh.Bun` (**VERIFY** scope and PATH), and `--uninstall` removes only a Bun that lean-agents installed. Otherwise `docs/manual-install.md` only documents it. Record the decision and the numbers in this section.
 
 Done when: CI jobs with real binaries and a throwaway HOME (`USERPROFILE` on Windows) install `agy`, run the installer, `agy agents`, `agy mcp list`, `--doctor` and `--uninstall` on Ubuntu, macOS and Windows; the app installs in CI where the OS allows it, or the job documents why it cannot, and the files lean-agents writes for it are validated. Anything that needs a login to prove stays ⚠️ with a **VERIFY** note.
+
+Done when (Bun): `bench-context-mode` is green on Ubuntu, macOS and Windows, its numbers are in `docs/compatibility.md`, and the `--bun` or docs-only decision is recorded.
 
 ## 15. Definition of done (every session)
 
