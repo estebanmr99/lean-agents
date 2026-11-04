@@ -208,6 +208,28 @@ jobs:
       - name: Install lean-agents and check what OpenCode resolved
         run: bash tests/real-opencode-v1.sh
 
+  real-parallel:
+    # Real git worktrees in a throwaway repo and HOME; real Claude Code and OpenCode only get their flags checked.
+    # The Orca path stays VERIFY until a job installs Orca.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Install Claude Code and OpenCode 2
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          curl -fsSL https://opencode.ai/v2/install | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+      - run: bash tests/real-parallel.sh
+
   real-claude:
     # Real Claude Code, throwaway HOME, no login: MCP servers go through the claude CLI.
     runs-on: ubuntu-latest
