@@ -23,6 +23,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - `--project <dir>` (`-Project` in PowerShell): writes the team setup into one repository (`AGENTS.md`, `.github/`, `.vscode/mcp.json`, `.cursor/`). State stays in the user's home.
 - `docs/claude-with-copilot.md`: the official route to Claude through GitHub Copilot (partner agent); token proxies are documented as not supported.
 - CI jobs `real-cursor` and `real-vscode`: real Cursor CLI and VS Code CLI in a throwaway HOME, Linux and macOS.
+- Plan and research for full Antigravity support (app and CLI on macOS, Windows and Linux): `docs/SPEC.md` session 11, `docs/compatibility.md`, both READMEs.
 
 ### Changed
 

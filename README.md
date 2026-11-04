@@ -75,6 +75,8 @@ Context Mode needs Node.js 22.5 or newer. Everything else works on Node.js 20.12
 | Context Mode, Serena, Playwright | ✅ MCP | ✅ MCP | ✅ `.vscode/mcp.json`, `.cursor/mcp.json` |
 | Caveman, i-have-adhd skills | ⚠️ written, load unproven | ⚠️ written, load unproven | ➖ per user |
 
+**Planned: full Antigravity support.** Today lean-agents sets up the Antigravity CLI (`agy`) on macOS and Linux. Next it adds the Antigravity desktop app and the CLI on Windows, so the app and the CLI share one set of rules, subagents, skills and MCP servers on macOS, Windows and Linux. Each part ships only once CI proves it with real binaries. Plan: [Session 11](docs/SPEC.md#session-11--antigravity-full-setup).
+
 ## VS Code Copilot and Cursor
 
 lean-agents sets up the Copilot chat in VS Code and Cursor (the editor and its `agent` CLI) like the other agents:
@@ -184,6 +186,7 @@ lean-agents is glue. The heavy lifting is done by these projects; please star th
 - [x] Windows installer and OpenCode 1.x
 - [x] Copilot CLI, Antigravity CLI, Codeburn, AutoSkills, GSD, original skills, model profiles
 - [x] VS Code Copilot, Cursor, team mode (`--project`), Claude through Copilot
+- [ ] Antigravity app, and the Antigravity CLI on Windows
 - [ ] `v1.0.0`
 - Later: Codex CLI, Gemini CLI
 
