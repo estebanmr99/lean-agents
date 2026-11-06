@@ -62,7 +62,7 @@ if ([version]$nodeVersion.TrimStart('v') -lt [version]'20.12.0') {
 # The OpenCode 2 upstream script (Git Bash) installs here and only edits ~/.bashrc, so PowerShell never sees it.
 $OpenCodeBin = Join-Path $env:USERPROFILE '.opencode\bin'
 if (-not (Test-Command 'opencode') -and (Test-Path (Join-Path $OpenCodeBin 'opencode.exe'))) {
-  Write-Host "OpenCode is in $OpenCodeBin but not on your PATH. Detecting it for this run only; to fix it for good, add that folder to your user PATH."
+  Write-Warning "OpenCode is in $OpenCodeBin but not on your PATH. Detecting it for this run only; to fix it for good, add that folder to your user PATH."
   $env:Path = "$env:Path;$OpenCodeBin"
 }
 
