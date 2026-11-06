@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { sha } from './fsops.mjs';
-import { version, quiet } from './system.mjs';
+import { version, quiet, contextModeNodeNote } from './system.mjs';
 import { adhdSkillFiles } from './adhd.mjs';
 import { proxyReport } from './network.mjs';
 import { leftovers } from './parallel.mjs';
@@ -58,14 +58,17 @@ function checkAntigravity(o, core, add) {
   }
 }
 
-export function doctor({ home, state, exec }) {
+export function doctor({ home, state, exec, nodeVersion = process.versions.node }) {
   const rows = [];
   const add = (item, status, detail = '') => rows.push({ item, status, detail });
   if (!state) {
     add('lean-agents', 'missing', 'not installed (run the installer)');
   } else {
-    const o = state.options;
+    const o = { ...state.options };
+    const nodeNote = o.tools.includes('context-mode') ? contextModeNodeNote(nodeVersion) : '';
+    if (nodeNote) o.tools = o.tools.filter((t) => t !== 'context-mode');
     add('lean-agents', 'ok', `v${state.version}, agents: ${o.agents.join(', ')}, privacy: ${o.privacy}`);
+    if (nodeNote) add('context-mode', 'note', nodeNote);
     if (o.terminals?.length) add('terminals', 'ok', `integrations for ${o.terminals.join(', ')} (commands listed below; app settings are yours)`);
     const latest = [...new Map(state.files.map((f) => [f.path, f])).values()];
     for (const f of latest) {

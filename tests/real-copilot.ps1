@@ -40,7 +40,7 @@ if ((copilot mcp list --json | Out-String) -notmatch '"context-mode"') { throw '
 if (Test-Path "$copilot\agents\planner.agent.md") { throw 'subagents were not removed' }
 if (Test-Path $rtkHook) { throw 'RTK hook was not removed' }
 if (Test-Path "$dir\.agents\skills\caveman") { throw 'Caveman skills were not removed' }
-# With no servers left, the reverted mcp-config.json has no mcpServers key and `mcp list` exits 1 ("mcpServers: Required").
-$after = copilot mcp list --json 2>&1 | Out-String
+# Uninstall must leave a config Copilot accepts (it rejects a file without mcpServers).
+$after = copilot mcp list --json | Out-String
+if ($LASTEXITCODE -ne 0) { throw 'copilot mcp list failed after uninstall' }
 if ($after -match '"context-mode"') { throw 'Context Mode was not removed' }
-$global:LASTEXITCODE = 0

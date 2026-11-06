@@ -58,7 +58,7 @@ refute compgen -G "$dir/agents/gsd-*"
 refute grep -qs 'lean-agents:start' "$dir/copilot-instructions.md"
 refute grep -qs serena "$dir/mcp-config.json"
 refute grep -qs playwright-extension "$dir/mcp-config.json"
-# With no servers left, `mcp list` exits non-zero.
-copilot mcp list --json </dev/null > "$HOME/mcp-after.txt" || true
+# Uninstall must leave a config Copilot accepts (it rejects a file without mcpServers).
+copilot mcp list --json </dev/null > "$HOME/mcp-after.txt"
 refute grep -q '"context-mode"' "$HOME/mcp-after.txt"
 echo "real-copilot: OK"

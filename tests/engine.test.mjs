@@ -10,12 +10,16 @@ import { parse } from 'jsonc-parser';
 import { applyJsonEdits, revertJsonEdits } from '../scripts/lib/fsops.mjs';
 import { diffModels } from '../scripts/models-refresh.mjs';
 import { releaseNotes } from '../scripts/release.mjs';
-import { prereqFor, antigravityPrereqs, bunInstall } from '../scripts/lib/system.mjs';
+import { prereqFor, antigravityPrereqs, bunInstall, contextModeNodeNote } from '../scripts/lib/system.mjs';
+import { doctor } from '../scripts/lib/doctor.mjs';
 import { detectTerminals } from '../scripts/lib/terminals.mjs';
 import { vscodeUserDir } from '../scripts/lib/adapters/vscode-copilot.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ALL = ['--yes', '--no-exec', '--agents', 'claude,opencode-v2', '--all-tools', '--privacy', 'strict', '--lang', 'en', '--profile', 'vertex-gemini', '--adhd-always', '--ponytail-mode', 'lite'];
+
+// The host Node must not decide whether Context Mode is planned (it needs Node 24.15+); child engines inherit this.
+process.env.LEAN_AGENTS_NODE ??= '24.22.2';
 
 function lean(home, args, env = process.env) {
   const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args], { encoding: 'utf8', env });
@@ -279,6 +283,53 @@ test('Context Mode v2: Copilot CLI adds only the MCP server (undo: mcp remove), 
   assert.match(out, /context-mode setup --print copilot-cli/);
   assert.match(out, /no Antigravity setup in v2: skipped/);
   assert.ok(!/plugin install/.test(out));
+});
+
+test('--uninstall leaves Copilot mcp-config.json valid (mcpServers present) or removes the file lean-agents created', () => {
+  const run = (home, before) => {
+    const file = path.join(home, '.copilot', 'mcp-config.json');
+    if (before) { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, before); }
+    lean(home, ['--yes', '--no-exec', '--agents', 'copilot-cli', '--tools', 'serena', '--lang', 'en']);
+    // `copilot mcp add` / `remove` rewrite the file, so it no longer matches lean-agents' hash.
+    fs.writeFileSync(file, `${fs.readFileSync(file, 'utf8')}\n`);
+    lean(home, ['--uninstall', '--yes', '--no-exec']);
+    return file;
+  };
+  const created = run(fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-')));
+  assert.ok(!fs.existsSync(created), 'a file lean-agents created is removed');
+  const kept = run(fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-')), '{ "other": 1 }\n');
+  const after = JSON.parse(fs.readFileSync(kept, 'utf8'));
+  assert.equal(after.other, 1);
+  assert.deepEqual(after.mcpServers, {});
+});
+
+test('Context Mode 2 is skipped below Node 24.15, with one line saying how to fix it', () => {
+  for (const v of ['20.12.0', '22.23.4', '24.14.9']) {
+    assert.equal(contextModeNodeNote(v), `Context Mode 2 needs Node 24.15+, found ${v}: skipped. Upgrade Node (or nvm install 24) and run --update.`);
+  }
+  for (const v of ['24.15.0', '24.22.2', '25.0.0', '26.12.1']) assert.equal(contextModeNodeNote(v), '');
+});
+
+test('--doctor reports a skipped Context Mode as a note, not an error', () => {
+  const state = { version: 'test', options: { agents: ['copilot-cli'], tools: ['rtk', 'context-mode'], privacy: 'standard' }, files: [], commands: [] };
+  const rows = [];
+  const log = console.log;
+  console.log = (line) => rows.push(String(line));
+  let ok;
+  try { ok = doctor({ home: os.tmpdir(), state, exec: false, nodeVersion: '22.23.4' }); } finally { console.log = log; }
+  assert.ok(ok, 'a note does not fail the doctor');
+  assert.ok(rows.some((r) => /^note\s+context-mode\s+Context Mode 2 needs Node 24\.15\+, found 22\.23\.4: skipped/.test(r)));
+});
+
+test('the engine drops Context Mode on an old Node and keeps it on a new one', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const plan = (node) => lean(home, ['--yes', '--no-exec', '--dry-run', '--agents', 'copilot-cli', '--tools', 'context-mode', '--lang', 'en'], { ...process.env, LEAN_AGENTS_NODE: node });
+  const old = plan('22.23.4');
+  assert.match(old, /Context Mode 2 needs Node 24\.15\+, found 22\.23\.4: skipped/);
+  assert.ok(!/tools: .*context-mode/.test(old));
+  const current = plan('24.22.2');
+  assert.ok(!/needs Node 24\.15/.test(current));
+  assert.match(current, /tools: .*context-mode/);
 });
 
 test('GSD defaults use profile models, and existing defaults survive uninstall', () => {

@@ -19,7 +19,7 @@ import { cursorAdapter } from './lib/adapters/cursor.mjs';
 import { projectPlan, projectStateDir } from './lib/project.mjs';
 import { gsdPlan } from './lib/gsd.mjs';
 import { adhdCommand } from './lib/adhd.mjs';
-import { detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPresent, which, run, quiet, exists, isolate } from './lib/system.mjs';
+import { contextModeNodeNote, detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPresent, which, run, quiet, exists, isolate } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
 import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
@@ -176,6 +176,9 @@ function readState(home) {
   return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null;
 }
 
+// LEAN_AGENTS_NODE fakes the Node version, so tests do not depend on the host.
+const NODE_VERSION = process.env.LEAN_AGENTS_NODE ?? process.versions.node;
+
 async function choose(o, saved) {
   const p = await prompter(o.yes);
   if (!o.agents) {
@@ -204,6 +207,13 @@ async function choose(o, saved) {
   const unknown = o.tools.filter((t) => !known.includes(t));
   if (unknown.length) throw new Error(`unknown tools: ${unknown.join(', ')} (available: ${known.join(', ')})`);
   if (!o.agents.includes('opencode-v1')) o.tools = o.tools.filter((t) => t !== 'dcp');
+  // The saved choice keeps Context Mode, so --update installs it once Node is new enough.
+  o.chosenTools = o.tools;
+  const nodeNote = o.tools.includes('context-mode') ? contextModeNodeNote(NODE_VERSION) : '';
+  if (nodeNote) {
+    console.log(nodeNote);
+    o.tools = o.tools.filter((t) => t !== 'context-mode');
+  }
   if (o.project) o.terminals = [];
   else if (!o.terminals) {
     // Terminals are never installed, only detected; nothing found means no question.
@@ -397,7 +407,7 @@ async function install(o) {
     version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version,
     installedAt: previous?.installedAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    options: { agents: o.agents, tools: o.tools, privacy: o.privacy, network: o.network, gh: o.gh, terminals: o.terminals, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun },
+    options: { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, gh: o.gh, terminals: o.terminals, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun },
     files: [...(previous?.files ?? []), ...files],
     commands: [...(previous?.commands ?? []), ...ran],
   };
@@ -464,7 +474,7 @@ async function main() {
   isolate(o.home);
   shareProxy();
   if (o.command === 'help') return console.log(HELP);
-  if (o.command === 'doctor') return process.exit(doctor({ home: o.home, state: readState(o.home), exec: o.exec }) ? 0 : 1);
+  if (o.command === 'doctor') return process.exit(doctor({ home: o.home, state: readState(o.home), exec: o.exec, nodeVersion: NODE_VERSION }) ? 0 : 1);
   if (o.command === 'uninstall') return uninstall(o);
   return install(o);
 }

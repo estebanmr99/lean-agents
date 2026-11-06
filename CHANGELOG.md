@@ -10,6 +10,8 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - The test "--yes keeps every tool default for undocumented settings" no longer depends on a host proxy (#31).
 - `install.ps1` finds OpenCode 2 in `%USERPROFILE%\.opencode\bin` when it is not on PATH and says how to fix the PATH (#32).
 - Context Mode 2 on Copilot CLI: pinned `context-mode@2.1.4`, registered with `copilot mcp add` (the old plugin path no longer exists and `setup` is a no-op for Copilot); hooks and skills are left to `context-mode setup --print copilot-cli`. Antigravity is skipped with a note because `setup --list` has no Antigravity agent. `--uninstall` runs `copilot mcp remove context-mode` (#39).
+- Context Mode is skipped for every agent, with one line, when Node is older than 24.15 (its `engines`); `--doctor` reports it as a `note` and `--update` installs it after a Node upgrade (#39; an `nvm` helper is issue #44).
+- `--uninstall` no longer leaves `~/.copilot/mcp-config.json` without `mcpServers`, which Copilot rejects: a file lean-agents created is removed, a file you own keeps `mcpServers: {}` (#39).
 
 ### Changed
 
