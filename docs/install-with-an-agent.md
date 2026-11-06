@@ -26,6 +26,17 @@ Never read, print or store my API keys or tokens, and never run gh auth login fo
 
 Undo everything with `--uninstall`.
 
+## Update with an agent
+
+The `lean-update` skill (installed by lean-agents for every agent) runs these steps; without it, the agent follows them from this page. The script is the only thing that changes files. Doing it by hand from [manual-install.md](manual-install.md) is the fallback for a machine that cannot run Node.
+
+1. **Latest release.** `gh release view --repo estebanmr99/lean-agents --json tagName -q .tagName`. Read `core/pins.json` from `https://raw.githubusercontent.com/estebanmr99/lean-agents/<tag>/`, and the release notes and `CHANGELOG.md` sections between the installed version and the latest. Breaking changes and upgrade steps come first; a release without clear upgrade notes is called out as such.
+2. **Detect.** With `state.json`: `node scripts/lean.mjs --doctor --json`; `behind` lists `{tool, installed, pinned}`. Without it (hand install): the read-only commands in [manual-install.md section 6](manual-install.md#6-detect-what-is-installed-read-only), then pass what they found as `--agents` and `--tools`; the script writes the state from then on and never overwrites your files.
+3. **Dry run.** `node scripts/lean.mjs --update --dry-run --yes --json` (hand install: the same flags as a fresh install). The agent shows `tool | installed | pinned | impact | upgrade notes | what it would run` and asks.
+4. **Back up, update.** One folder under the OS temp dir with only the files that change ([section 7](manual-install.md#7-back-up-before-changing-delete-after)), then the same command without `--dry-run`. `--update` prints `tool: old -> new` and installs only pinned versions.
+5. **Read back.** `--doctor --json`. When `ok` is true and `behind` is empty, the backup folder is deleted and the agent says so. `--uninstall` still undoes everything.
+6. **Share findings (optional).** Same rules as the next section, with `--feedback-kind update`: never under strict or off, a redacted draft, a duplicate check, `gh issue create` only after a yes.
+
 ## Opt-in feedback after a failure
 
 Only if a step failed, and only if the network preset allows outbound calls (`--network on`, or the saved preset). With `--privacy strict`, `--network off` or `--outbound off` the agent never offers.

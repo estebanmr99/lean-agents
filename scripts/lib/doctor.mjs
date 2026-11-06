@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { sha } from './fsops.mjs';
-import { PINS, npmSpec } from './pins.mjs';
+import { PINS, npmSpec, behindPins } from './pins.mjs';
 import { version, quiet, contextModeNodeNote } from './system.mjs';
 import { stillNeeded } from './terminals.mjs';
 import { adhdSkillFiles } from './adhd.mjs';
@@ -138,7 +138,8 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
   if (left.length) add('parallel workers', 'changed', `left in this repo: ${left.join(', ')} (merge them, then run scripts/parallel.mjs clean)`);
   for (const line of proxyReport()) add('network env', 'ok', line);
   const ok = !rows.some((r) => r.status === 'error' || r.status === 'missing');
-  if (json) process.stdout.write(`${JSON.stringify({ ok, rows }, null, 2)}\n`);
+  const behind = state ? behindPins(state) : [];
+  if (json) process.stdout.write(`${JSON.stringify({ ok, behind, rows }, null, 2)}\n`);
   else print(rows);
   return ok;
 }

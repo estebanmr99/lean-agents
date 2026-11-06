@@ -6,19 +6,20 @@ import { redactText } from './doctor.mjs';
 export const feedbackAllowed = (network) => network?.outbound === 'on';
 
 // Returns null when the preset forbids it. Everything free-form goes through redactText.
-export function draftIssue({ network, home, env = process.env, versions = {}, command, error, platform = `${os.platform()} ${os.arch()}` }) {
+export function draftIssue({ network, home, env = process.env, versions = {}, command, error, kind = 'install', platform = `${os.platform()} ${os.arch()}` }) {
   if (!feedbackAllowed(network)) return null;
   const clean = (t) => redactText(t, { home, env });
+  const update = kind === 'update';
   const versionLines = Object.entries(versions).map(([k, v]) => `- ${k}: ${clean(v)}`);
   return {
-    title: clean(`Install failed: ${command}`).slice(0, 100),
+    title: clean(`${update ? 'Update finding' : 'Install failed'}: ${command}`).slice(0, 100),
     body: [
-      '## What failed',
+      update ? '## What the update found' : '## What failed',
       `- OS: ${platform}`,
       ...versionLines,
-      `- Command: \`${clean(command)}\``,
+      `- ${update ? 'Tool' : 'Command'}: \`${clean(command)}\``,
       '',
-      '## Error',
+      update ? '## Details' : '## Error',
       '```',
       clean(error).trim(),
       '```',

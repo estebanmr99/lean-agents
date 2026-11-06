@@ -73,3 +73,35 @@ Add `.serena/` to your global git ignore (`~/.config/git/ignore`).
 ## 5. Strict privacy
 
 See [privacy.md](privacy.md).
+
+## 6. Detect what is installed (read-only)
+
+Works with or without `state.json`; the `lean-update` skill runs exactly these commands. None of them writes a file. A non-zero exit, or a missing file, means the tool is not installed.
+
+| Tool | Command | Read |
+| --- | --- | --- |
+| Claude Code | `claude --version` | first number |
+| Claude plugins (Context Mode, Ponytail, i-have-adhd) | `claude plugin list` | `Version:` under each name |
+| OpenCode | `opencode --version` | first number |
+| OpenCode plugins, MCP servers, rules | `opencode debug config` | `plugin`/`plugins` entries (with `@version`), `mcp` keys |
+| RTK | `rtk --version` | second word |
+| Context Mode (npm) | `npm ls -g context-mode --depth=0 --json` | `dependencies.context-mode.version` |
+| Serena (Claude Code) | `node -e "const j=JSON.parse(require('fs').readFileSync(require('os').homedir()+'/.claude.json','utf8'));console.log(j.mcpServers?.serena?.args?.join(' '))"` | the `--from` ref; Serena is not pinned, so it follows the git ref |
+| Serena runner | `uvx --version` | second word |
+| Playwright MCP (Claude Code) | `node -e "const j=JSON.parse(require('fs').readFileSync(require('os').homedir()+'/.claude.json','utf8'));console.log(j.mcpServers?.playwright?.args?.join(' '))"` | the `@playwright/mcp@x.y.z` argument |
+| Skills (Caveman, i-have-adhd, lean-update, ...) | `node -e "const l=JSON.parse(require('fs').readFileSync(require('os').homedir()+'/.agents/.skill-lock.json','utf8'));for(const [n,s] of Object.entries(l.skills)) console.log(n,s.source,s.ref)"` | `ref` is the installed tag (verified with skills 1.7.4, 2026-11-06) |
+| Skills CLI | `npm ls -g skills --depth=0 --json` | `dependencies.skills.version`; `npx` runs use the pinned version, so this may be absent |
+
+Compare each result with `core/pins.json` at the latest release: `https://raw.githubusercontent.com/estebanmr99/lean-agents/<tag>/core/pins.json`. With the engine, `lean-agents --doctor --json` does the same and lists `behind`.
+
+## 7. Back up before changing, delete after
+
+One folder, only the files that will change, under the OS temp dir. Remove it once `--doctor` passes (keep it, and say where, when it does not).
+
+```sh
+B="${TMPDIR:-/tmp}/lean-agents-backup-$(date +%Y%m%d-%H%M%S)"; mkdir -p "$B"
+# for each file P (absolute path) you are about to change:
+mkdir -p "$B$(dirname "$P")" && cp -p "$P" "$B$P"
+# after the update and a passing --doctor:
+rm -rf "$B"
+```

@@ -208,6 +208,7 @@ test('a failed install command exits 1 and still records state', { skip: process
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
   const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-bin-'));
   for (const name of ['rtk', 'context-mode']) fs.writeFileSync(path.join(bin, name), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+  fs.writeFileSync(path.join(bin, 'npx'), '#!/bin/sh\nexit 0\n', { mode: 0o755 }); // the lean-update skill install
   const args = ['--yes', '--agents', 'opencode-v2', '--tools', 'rtk', '--privacy', 'standard', '--lang', 'en', '--profile', 'none'];
   const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args], { encoding: 'utf8', env: { ...process.env, PATH: bin } });
   assert.equal(r.status, 1, r.stdout);
@@ -450,6 +451,7 @@ test('--home reaches child tools, and a failed undo exits 1', { skip: process.pl
   const rtk = path.join(bin, 'rtk');
   fs.writeFileSync(rtk, '#!/bin/sh\necho "$XDG_CONFIG_HOME" > "$HOME/rtk-ran"\n', { mode: 0o755 });
   fs.writeFileSync(path.join(bin, 'context-mode'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  fs.writeFileSync(path.join(bin, 'npx'), '#!/bin/sh\nexit 0\n', { mode: 0o755 }); // the lean-update skill install
   const env = { ...process.env, HOME: real, XDG_CONFIG_HOME: path.join(real, '.config'), PATH: `${bin}${path.delimiter}${process.env.PATH}` };
   const engine = (args) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args], { encoding: 'utf8', env });
   const r = engine(['--yes', '--agents', 'opencode-v2', '--tools', 'rtk', '--privacy', 'standard', '--lang', 'en', '--profile', 'none']);
@@ -1036,4 +1038,63 @@ test('--doctor reports no pin drift after install and a changed row when a recor
   state.pins.caveman = 'v0.0.1';
   fs.writeFileSync(file, JSON.stringify(state));
   assert.match(lean(home, ['--doctor', '--no-exec']), /changed\s+pin caveman.*installed v0\.0\.1/);
+});
+
+test('every agent gets the lean-update skill from the pinned tag, with an undo', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const out = lean(home, ['--yes', '--no-exec', '--dry-run', '--agents', 'claude,opencode-v2,copilot-cli,vscode-copilot,cursor,antigravity', '--tools', 'rtk']);
+  const adds = out.split('\n').filter((l) => /--skill lean-update/.test(l));
+  for (const flag of ['claude-code', 'opencode', 'github-copilot', 'cursor', 'antigravity-cli']) {
+    assert.equal(adds.filter((l) => l.includes(`-a ${flag} `)).length, 1, flag);
+  }
+  for (const l of adds) assert.match(l, /skills@\d[\d.]* add estebanmr99\/lean-agents#v\d+\.\d+\.\d+ --skill lean-update/);
+});
+
+test('--uninstall removes the lean-update skill', { skip: process.platform === 'win32' }, () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-bin-'));
+  const log = path.join(bin, 'npx.log');
+  fs.writeFileSync(path.join(bin, 'npx'), `#!/bin/sh\necho "$@" >> "${log}"\n`, { mode: 0o755 });
+  const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` };
+  lean(home, ['--yes', '--agents', 'claude', '--no-tools', '--no-core', '--no-gh', '--no-bun', '--lang', 'en', '--profile', 'none'], env);
+  lean(home, ['--uninstall', '--yes'], env);
+  assert.match(fs.readFileSync(log, 'utf8'), /skills@\d[\d.]* remove lean-update -g -y/);
+});
+
+test('--update prints old -> new for pins in use; --doctor --json lists them under behind', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--tools', 'caveman', '--lang', 'en', '--profile', 'none']);
+  const file = path.join(home, '.config', 'lean-agents', 'state.json');
+  const state = JSON.parse(fs.readFileSync(file, 'utf8'));
+  state.pins.caveman = 'v0.0.1';
+  state.pins['codeburn'] = '0.0.1'; // not installed: must not be reported
+  fs.writeFileSync(file, JSON.stringify(state));
+  const json = JSON.parse(lean(home, ['--doctor', '--no-exec', '--json']));
+  assert.deepEqual(json.behind, [{ tool: 'caveman', installed: 'v0.0.1', pinned: PINS.caveman.version }]);
+  const plan = JSON.parse(lean(home, ['--update', '--yes', '--no-exec', '--dry-run', '--json']));
+  assert.deepEqual(plan.behind, json.behind);
+  const out = lean(home, ['--update', '--yes', '--no-exec']);
+  assert.match(out, new RegExp(`caveman: v0\\.0\\.1 -> ${PINS.caveman.version.replace(/\./g, '\\.')}`));
+  assert.ok(!/codeburn:/.test(out));
+  assert.deepEqual(JSON.parse(lean(home, ['--doctor', '--no-exec', '--json'])).behind, []);
+});
+
+test('--update installs a pinned npm tool again when it is behind, and records the command once', { skip: process.platform === 'win32' }, () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-bin-'));
+  const log = path.join(bin, 'calls.log');
+  for (const name of ['npm', 'npx', 'context-mode', 'rtk']) fs.writeFileSync(path.join(bin, name), `#!/bin/sh\necho "${name} $@" >> "${log}"\n`, { mode: 0o755 });
+  const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, LEAN_AGENTS_SKILL_SOURCE: '' };
+  const args = ['--yes', '--agents', 'opencode-v1', '--tools', 'context-mode', '--no-gh', '--no-bun', '--lang', 'en', '--profile', 'none'];
+  lean(home, args, env);
+  assert.ok(!/npm install -g/.test(fs.readFileSync(log, 'utf8')), 'context-mode is on PATH: no install');
+  const file = path.join(home, '.config', 'lean-agents', 'state.json');
+  const state = JSON.parse(fs.readFileSync(file, 'utf8'));
+  state.pins['context-mode'] = '0.0.1';
+  fs.writeFileSync(file, JSON.stringify(state));
+  lean(home, ['--update', '--yes'], env);
+  assert.match(fs.readFileSync(log, 'utf8'), new RegExp(`npm install -g context-mode@${PINS['context-mode'].version.replace(/\./g, '\\.')}`));
+  const after = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const descs = after.commands.map((c) => c.desc);
+  assert.equal(new Set(descs).size, descs.length, 'no command recorded twice');
 });

@@ -95,6 +95,14 @@ Follow docs/install-with-an-agent.md in that repo. Ask before every change.
 Never read, print or store my API keys or tokens, and never run gh auth login for me.
 ```
 
+To update later, paste this (the `lean-update` skill is installed with lean-agents; without it, the agent reads [the guide](docs/install-with-an-agent.md#update-with-an-agent)). It also takes over an install you made by hand:
+
+```text
+Update lean-agents for me from https://github.com/estebanmr99/lean-agents.
+Use the lean-update skill, or follow docs/install-with-an-agent.md "Update with an agent". Show me a table first and ask before every change.
+Never read, print or store my API keys or tokens.
+```
+
 Use `--lang es` to get the rules and replies in Spanish.
 
 Always start with `--dry-run`: it shows every file and command before anything changes. Then run it again without `--dry-run`; it asks which agents, tools, privacy level, language and model profile you want.

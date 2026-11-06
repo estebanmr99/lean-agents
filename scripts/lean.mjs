@@ -23,7 +23,8 @@ import { adhdCommand } from './lib/adhd.mjs';
 import { contextModeNodeNote, gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPresent, which, run, quiet, exists, isolate } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
 import { draftIssue } from './lib/feedback.mjs';
-import { pinVersions } from './lib/pins.mjs';
+import { pinVersions, behindPins, pinTool } from './lib/pins.mjs';
+import { leanUpdateCommands } from './lib/lean-update.mjs';
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
 import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
 import { unverifiedItems, notesFile } from './lib/unverified.mjs';
@@ -85,6 +86,7 @@ function parseArgs(argv) {
       case '--json': o.json = true; break;
       case '--feedback-draft': o.command = 'feedback'; break;
       case '--failed-command': o.failedCommand = next(); break;
+      case '--feedback-kind': o.feedbackKind = next(); break;
       case '--network': o.networkPreset = onOff(a, next()); break;
       case '--telemetry': o.networkFlags.telemetry = onOff(a, next()); break;
       case '--auto-update': o.networkFlags.autoUpdate = onOff(a, next()); break;
@@ -131,6 +133,7 @@ const HELP = `Usage: lean-agents [options]
                          ignored with --project)
   --gh / --no-gh         Install GitHub CLI (gh) if it is missing (default: on; you run gh auth login yourself)
   --feedback-draft       After a failed install: read the error on stdin, print a redacted issue draft as JSON
+                         (--feedback-kind update: the text is a finding from an update, not an error)
                          ({"offer":false} when the network preset forbids it). Needs --failed-command <text>;
                          pass --network on|off when nothing is installed yet. Files nothing.
   --json                 With --dry-run or --doctor: print one JSON object on stdout (messages go to stderr)
@@ -349,6 +352,7 @@ function buildPlan(o) {
     actions.push(...r.actions);
     commands.push(...r.commands.map((c) => ({ ...c, agent })));
   }
+  commands.push(...leanUpdateCommands(o.agents));
   commands.push(...terminalCommands({ terminals: o.terminals, agents: o.agents, network: o.network, system: o.home === REAL_HOME }));
   actions.push(...gitBashActions({ home: o.home, terminals: o.terminals, agents: o.agents }));
   if (o.tools.includes('gsd')) {
@@ -362,12 +366,13 @@ function buildPlan(o) {
   return { planned: plan(actions), commands };
 }
 
-function prereqCommands(o) {
+// `behind`: tools whose pinned version is newer than the installed one (--update); their installs run even when the binary is there.
+function prereqCommands(o, behind = new Set()) {
   const pm = packageManager();
   const out = [];
   for (const t of [...o.tools, ...(o.gh ? ['gh'] : [])]) {
     const p = prereqFor(t, pm);
-    if (!p || which(p.bin)) continue;
+    if (!p || (which(p.bin) && !behind.has(t))) continue;
     if (p.install) out.push({ tool: t, desc: `install ${p.bin}`, run: p.install, undo: [], optional: t === 'gh' });
     else out.push({ tool: t, desc: `${p.bin} is missing: install it from ${p.manual}`, run: [], undo: [], manual: true, optional: t === 'gh' });
   }
@@ -400,7 +405,7 @@ function printMigration(o, m, commands) {
 }
 
 // Agents parse this instead of scraping the text plan. Paths use ~ so no home directory leaks.
-function printJson(o, planned, commands, migration) {
+function printJson(o, planned, commands, migration, behind) {
   const rel = (t) => (t.startsWith(o.home + path.sep) || t === o.home ? `~${t.slice(o.home.length)}` : t);
   const inText = (t) => t.split(o.home).join('~');
   const plan = {
@@ -408,6 +413,7 @@ function printJson(o, planned, commands, migration) {
     gh: !!o.gh, bun: !!o.bun, network: o.network, migrate: migration ? migration.names : null,
     files: planned.map((f) => ({ status: f.status, path: rel(f.path), note: f.note ?? null })),
     commands: commands.map((c) => ({ desc: inText(c.desc), agent: c.agent ?? null, run: c.run.map((a) => a.map(inText)) })),
+    ...(behind && { behind }),
   };
   process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
 }
@@ -445,16 +451,19 @@ async function install(o) {
   const p = await choose(o, saved?.options);
   const { planned, commands: agentCommands, migration } = buildPlan(o);
   if (migration && !migration.rows.length) { p.close(); console.log('Nothing to migrate: no rules, agents, skills, prompts, MCP servers or hooks found.'); return; }
-  const commands = [...(o.exec ? prereqCommands(o) : []), ...agentCommands];
+  const behind = new Set((saved ? behindPins(saved) : []).map((b) => pinTool(b.tool)));
+  const commands = [...(o.exec ? prereqCommands(o, behind) : []), ...agentCommands];
   const noGit = migration ? null : gitHint(packageManager());
   if (noGit) console.log(noGit);
   if (o.json) {
     if (!o.dryRun) throw new Error('--json needs --dry-run (or --doctor)');
     p.close();
-    return printJson(o, planned, commands, migration);
+    return printJson(o, planned, commands, migration, saved ? behindPins(saved) : undefined);
   }
   if (migration) printMigration(o, migration, o.exec ? commands : []);
   else printPlan(o, planned, commands);
+  if (saved && behindPins(saved).length) console.log('Pins that will change (old -> new):');
+  if (saved) for (const b of behindPins(saved)) console.log(`${b.tool}: ${b.installed} -> ${b.pinned}`);
   if (o.dryRun) { p.close(); console.log('Dry run: nothing was changed.'); return; }
   if (!yesNo(await p.ask('Apply these changes?', 'y'))) { p.close(); console.log('Cancelled.'); return; }
   p.close();
@@ -470,15 +479,23 @@ async function install(o) {
     for (const [i, c] of commands.entries()) {
       // gh is on by default, so having no installer for it (no brew or winget) must not fail the run.
       if (c.manual) { console.log(`! ${c.desc}`); if (!c.optional) failed++; continue; }
-      if (c.skipIfExists && exists(c.skipIfExists)) continue;
-      if (c.skipIfOutput && quiet(c.skipIfOutput.cmd).ok) continue;
+      const there = (c.skipIfExists && exists(c.skipIfExists)) || (c.skipIfOutput && quiet(c.skipIfOutput.cmd).ok);
+      if (there) {
+        if (!behind.has(c.tool)) continue;
+        // Installed at an older pin: undo it, then add it again at the new pin.
+        if (!c.undo.every((argv) => run(argv, { dryRun: false, log: console.log, env: c.env }))) {
+          console.log(`  ! could not remove the old ${c.desc}; left as it is. Fix it by hand, then --update.`);
+          failed++;
+          continue;
+        }
+      }
       if (ui) ui.step(i + 1, commands.length, c.desc);
       else console.log(`- ${c.desc}`);
       const ok = c.run.every((argv) => run(argv, { dryRun: false, log: console.log, env: c.env }));
       if (ui) ui.result(ok || c.optional, c.desc);
       else if (!ok && !c.optional) console.log(`  ! failed: ${c.desc}. Run the command above by hand, then --doctor.`);
       // An optional step (Bun) that fails only means Context Mode runs on Node; nothing to undo.
-      if (!ok && c.optional) { console.log(c.tool === 'gh' ? '! gh install failed; install it yourself (--no-gh skips it).' : '! Bun install failed; Context Mode will run on Node.'); continue; }
+      if (!ok && c.optional) { console.log(c.tool === 'gh' ? '! gh install failed; install it yourself (--no-gh skips it).' : c.tool === 'lean-update' ? '! lean-update skill failed to install; run the command above by hand later.' : '! Bun install failed; Context Mode will run on Node.'); continue; }
       if (!ok) failed++;
       ran.push({ desc: c.desc, ok, undo: c.undo });
     }
@@ -491,7 +508,8 @@ async function install(o) {
     pins: pinVersions(),
     options: o.migrate ? previous?.options ?? { migrateOnly: true, agents: o.agents, tools: [], privacy: o.privacy, network: o.network, gh: false, terminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false } : { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, gh: o.gh, terminals: o.terminals, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun },
     files: [...(previous?.files ?? []), ...files],
-    commands: [...(previous?.commands ?? []), ...ran],
+    // A command that ran again replaces its earlier record, so --uninstall undoes it once.
+    commands: [...(previous?.commands ?? []).filter((c) => !ran.some((r) => r.desc === c.desc)), ...ran],
   };
   fs.mkdirSync(stateDir(o.home), { recursive: true });
   fs.writeFileSync(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(state, null, 2)}\n`);
@@ -556,7 +574,7 @@ function feedback(o) {
   const state = readState(o.home);
   const network = { ...(o.networkPreset ? preset(o.networkPreset) : fromPrivacy(o.privacy) ?? state?.options.network ?? {}), ...o.networkFlags };
   const versions = { 'lean-agents': JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version, node: NODE_VERSION };
-  const draft = draftIssue({ network, home: [o.home, os.homedir()], versions, command: o.failedCommand, error: fs.readFileSync(0, 'utf8') });
+  const draft = draftIssue({ network, home: [o.home, os.homedir()], versions, command: o.failedCommand, error: fs.readFileSync(0, 'utf8'), kind: o.feedbackKind });
   process.stdout.write(`${JSON.stringify(draft ?? { offer: false })}\n`);
 }
 
