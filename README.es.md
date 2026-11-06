@@ -323,8 +323,12 @@ lean-agents es pegamento. El trabajo pesado lo hacen estos proyectos; dales una 
 - [x] Sesiones de agentes en paralelo (`scripts/parallel.mjs`)
 - [x] Integraciones de Warp y Orca para quien ya las usa
 - [x] App y CLI de Antigravity en macOS, Linux y Windows (la carga en la app sigue en VERIFY)
+- [ ] `v0.5.1`: arreglos de instalaciones reales en Windows con proxy (Cursor CLI, Orca, GSD, docs)
+- [ ] `v0.6.0`: `--no-core`, versiones fijas de MCP y skills, migrar desde otro harness, instalar con un agente, GIFs por caso de uso
 - [ ] `v1.0.0`
 - Más adelante: Codex CLI, Gemini CLI
+
+Detalle e issues enlazados: [docs/ROADMAP.md](docs/ROADMAP.md) (en inglés).
 
 ## Contribuir
 

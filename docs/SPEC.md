@@ -33,6 +33,7 @@ Repeat the same prompt for each session. Each session must leave the repository 
 - Commits are authored by the owner (`git config user.name/user.email` set to their GitHub no-reply address) with a `Co-Authored-By` trailer for the agent.
 - Since session 6: Node.js 20.12+ and one more dependency, `@clack/prompts` (menus only on a real terminal). Network choices live in `scripts/lib/network.mjs` (`options.network` in `state.json`, `privacy` derived from it, so adapters can still read `opts.privacy`); undocumented settings in `scripts/lib/unverified.mjs` are never configured, only saved as user notes under `~/.config/lean-agents/notes/`.
 - Session 7 (2026-11-03): adapters `vscode-copilot` and `cursor`, `--project <dir>` team mode, `docs/claude-with-copilot.md`. Cursor user rules have no file (settings UI only). The VS Code user `mcp.json` path is proven by `code --add-mcp` in `real-vscode` (Linux, macOS); Copilot Chat ships built into VS Code; Cursor skills land in `~/.agents/skills`.
+- Order after 0.5.0 (2026-11-05): sessions 16, 17, 18, 19, 20, then 9. `docs/ROADMAP.md` maps each to its issues and release. Session 9 waits because new visitors should hit the fixed Windows path first.
 - Private terms are blocked by `scripts/check-private.sh` using the `PRIVATE_DENYLIST` repository secret in CI and a gitignored `.private-denylist` locally.
 
 ## 1. Product
@@ -472,6 +473,11 @@ Mark each `[x]` when merged.
 - [x] **Session 13 — Bun for Context Mode** (PR #14). Bun installed by default at user scope when Context Mode is selected (`--no-bun` opts out), faster `ctx_execute` and TypeScript. Fixes the Playwright rule line for Claude-only installs.
 - [x] **Session 14 — 0.5.0 final check.** README audit for the demo, proxy, menus, VS Code Copilot, Cursor, `--project`, Playwright extension and Bun; CHANGELOG 0.5.0 complete; release dry run in a scratch clone. No tag.
 - [x] **Session 15 — README look and feel.** Hero, one badge row, table of contents, collapsible long sections, consistent tables in README EN and ES; a script checks links, anchors, EN/ES parity and that every shown installer command exits 0 in a dry run. 0.5.0 CHANGELOG housekeeping. No feature claims change.
+- [ ] **Session 16 — Fixes and docs from real installs** (0.5.1). Issues #20, #27, #31, #32, #39.
+- [ ] **Session 17 — Windows: Cursor CLI and Orca** (0.5.1). Issues #21, #22, #23, #25, #26, #28, #29.
+- [ ] **Session 18 — Pick only what you need, pin what runs** (0.6.0). Issues #30, #33, #40.
+- [ ] **Session 19 — Migrate from one harness to another** (0.6.0). Issue #34.
+- [ ] **Session 20 — Install with an agent, opt-in feedback, gh by default** (0.6.0). Issues #35, #36, #37.
 
 ### Session 3 — Windows + OpenCode 1.x + wider CI
 
@@ -681,6 +687,66 @@ Branch: `session-15-readme`. Goal: both READMEs look professional on the GitHub 
 4. **Housekeeping:** 0.5.0 is untagged, so the CHANGELOG `Unreleased` items move into `[0.5.0]`; `node scripts/release.mjs 0.5.0` in a scratch clone lists Warp/Orca, parallel sessions and Antigravity. No tag.
 
 Done when: `npm test` and `scripts/check-private.sh` pass and CI is green.
+
+### Session 16 — Fixes and docs from real installs
+
+Branch: `session-16-fixes`. Release: 0.5.1. Each issue's body has the repro, cause and a tested fix; reproduce first, then apply the smallest fix. PR body: `Closes #20, #27, #31, #32, #39`.
+
+1. **#20 GSD crash with Cursor.** Add `cursor: '--cursor'` to `FLAGS` in `scripts/lib/gsd.mjs`. Agents without a flag (`vscode-copilot`) are skipped with a note instead of crashing. Test: `--agents cursor,vscode-copilot --tools gsd` dry run plans `--cursor` and notes the skip. Proof: run GSD for Cursor in the `real-cursor` CI job (throwaway HOME).
+2. **#31 test depends on the host proxy.** Strip `HTTP(S)_PROXY`/`ALL_PROXY` from the env of that one test, as in the issue.
+3. **#27 docs.** Fix the `docs/privacy.md` table (blank line, rows for Cursor, VS Code Copilot, Warp, Orca), rewrite `tests/README.md` for `npm test` and the `tests/real-*` scripts, correct the Cursor CLI install row for Windows in `docs/compatibility.md`.
+4. **#32 OpenCode 2 on Windows.** Add the verified PowerShell block to the demo step 1 (EN, ES). `install.ps1` (or the engine on win32) finds `%USERPROFILE%\.opencode\bin\opencode.exe` when `opencode` is not on PATH and prints the PATH fix; it does not change PATH. Note in `docs/SECURITY-REVIEW.md` that the upstream script checks no tarball checksum.
+
+5. **#39 Context Mode v2 install.** Upstream removed `configs/copilot-cli` and `configs/antigravity-cli`. Copilot CLI uses `npm i -g context-mode` then `context-mode setup --yes --agents copilot-cli`; Antigravity uses `setup` if `context-mode setup --list` has it, else skips with a note. `--uninstall` undoes it. Proof: `real-copilot`, `real-antigravity` and `real-proxy` green.
+
+Done when: `npm test` passes on all three OS in CI, `scripts/check-private.sh` and `scripts/check-readme.mjs` pass, CHANGELOG `Unreleased` lists each fix with its issue number.
+
+### Session 17 — Windows: Cursor CLI and Orca
+
+Branch: `session-17-windows-cursor-orca`. Release: 0.5.1. Start from the patch in #29, which covers #21, #22, #26 and #28 and was tested on Windows 11 behind a proxy; review it against section 2 before applying. PR body: `Closes #21, #22, #23, #25, #26, #28, #29`.
+
+1. **#21 Orca skill for every agent.** `ORCA_SKILL_AGENT` gets `cursor` and `vscode-copilot: 'github-copilot'`.
+2. **#23, #28 Cursor CLI in Git Bash.** When Git Bash is detected on Windows, a marked block in `~/.bashrc` adds `alias agent='MSYSTEM= SHELL= agent.cmd'` and the same for `cursor-agent`; undone by `--uninstall`. `tests/real-cursor.sh` uses `agent.cmd` on Windows.
+3. **#25 Cursor behind a proxy.** Only when a proxy is set and Cursor is selected: `json` action sets `network.useHttp1ForAgent: true` in `~/.cursor/cli-config.json`, keeping other keys; print one line that `NODE_USE_ENV_PROXY=1` and the proxy vars belong in the shell profile. Proxy values are never written to disk.
+4. **#28 Orca status behind a proxy.** On Windows with a proxy, add only the missing loopback entries (`localhost`, `127.0.0.1`, `::1`) to `NO_PROXY` in the marked `~/.bashrc` block and the Windows user env; undo removes only those entries. **Owner decision before building:** writing the Windows user env is new for lean-agents; if not approved, print it as a checklist item instead.
+5. **#22 Orca facts.** Move the verified Windows paths, first-launch status hooks (including the always-allow Cursor hook) and `DO_NOT_TRACK=1` from **VERIFY** to verified in `docs/compatibility.md`, source "real install, #22, 2026-11-05". `--doctor` reports Orca's hook entries in `~/.claude/settings.json` and `~/.cursor/hooks.json` as `note`; `--uninstall` leaves them alone. README "Warp and Orca" says Orca writes these on first launch.
+6. **#26 "Still needed from you".** The run ends with a list built from the selected agents, terminals and MCP servers (Cursor login, `agent mcp login`, Cursor User Rules, Orca first launch and **Install CLI & Skills**). `--doctor` prints the same list, marking done or pending where it can check.
+
+Done when: unit tests cover each item against a temp HOME, the Windows `real-cursor` and `real-terminals` jobs are green, and the README tables (EN, ES) and `docs/compatibility.md` match. Orca GUI behaviour that CI cannot launch stays sourced to #22 and #28.
+
+### Session 18 — Pick only what you need, pin what runs
+
+Branch: `session-18-core-and-pins`. Release: 0.6.0. PR body: `Closes #30, #33, #40`.
+
+1. **#30 `--no-core`** (`-NoCore`): removes `rtk` and `context-mode` from the tool list, and the menu starts empty. `--update` keeps the choice from `state.json`. Test from the issue: `--no-core --tools playwright-extension` plans only that server.
+2. **#33 pinned versions.** `core/mcp.json` uses exact versions (for example `@playwright/mcp@<current>`), checked against npm on the day. Skills installed with `npx skills add` are pinned to a tag or commit if the skills CLI supports it (**research first**); otherwise the installed commit is recorded in `state.json` and `--doctor` reports drift. `codeburn` and `autoskills` get pinned versions too.
+3. **Bumping:** extend the `update-models` skill (or add `update-tools`) to list newer versions and change them only after the user approves, like the dated model profiles.
+4. List run-time fetches as their own category in `docs/SECURITY-REVIEW.md` and in the README "On a work PC".
+
+5. **#40 Daily version watch.** The pins from item 2 are the list of versions confirmed to work (date and CI run each). A scheduled workflow (daily plus `workflow_dispatch`, `GITHUB_TOKEN` with `issues: write` only) checks npm and GitHub releases; per item with a newer version it opens one `version-watch` issue `Update available: <item>`, or comments on the open one, never twice for the same version. Each lists the confirmed and new version, release notes, and the `real-*` jobs to run before bumping. It never changes pins.
+
+Done when: a CI job installs with the pinned versions in a throwaway HOME and `--doctor` reports no drift; a dispatched version-watch run opens one issue, a second adds a comment, a third does nothing; `npm test`, the privacy check and the README check pass.
+
+### Session 19 — Migrate from one harness to another
+
+Branch: `session-19-migrate`. Release: 0.6.0. PR body: `Closes #34`.
+
+1. **Research first** (`research` subagent): each harness's current file locations for rules, agents, skills, MCP servers, prompts/commands and hooks, at user and project scope (VS Code Copilot `.github/` and `.vscode/mcp.json`, Claude Code, Cursor, OpenCode 1 and 2, Copilot CLI). Record source and date in `docs/compatibility.md`; anything unproven stays **VERIFY**.
+2. **`--migrate <from|auto>`** at user scope and with `--project <dir>`: read the source harness, convert to the neutral core shape, render for the target agents with the existing adapters.
+3. **Safety:** copy, never move; never overwrite (on a conflict, skip and note); every write is a `file`, `json` or `block` action undone by `--uninstall`; MCP `env` and header values are never copied, only the variable names, with a line telling the user to set them. Hooks are report-only unless the target's hook format is verified; migrating hooks for real needs the owner's yes.
+4. **`--dry-run`** prints a migration table: item, source path, target path, migrated / skipped / reported.
+
+Done when: a CI job builds a fixture `.github/` plus `.vscode/mcp.json`, migrates it to `opencode-v2` and `claude` with real binaries in a throwaway HOME, and checks the result with `opencode debug config` / `opencode debug agents`; `npm test`, the privacy check and the README check pass.
+
+### Session 20 — Install with an agent, opt-in feedback, gh by default
+
+Branch: `session-20-agent-install`. Release: 0.6.0, after sessions 18 and 19. PR body: `Closes #35, #36, #37`.
+
+1. **#35 Install with an agent.** `docs/install-with-an-agent.md` and a copy-paste prompt near the top of README EN and ES. The agent: detects the setup (`--doctor --json`); asks which agents and tools, whether to migrate (session 19) and which network preset; shows the `--dry-run` plan and gets a yes; installs with exact flags (`--tools`, `--no-core`); verifies with `--doctor`. Add `--json` output for `--dry-run` and `--doctor`.
+2. **#36 Opt-in feedback.** Only when the network preset allows it, the agent offers to file an issue after a failure. The draft holds redacted data only (OS, versions, failing command, error) via `redact`; no usernames, paths, employers or proxy values. It checks duplicates with `gh issue list --search`, shows the draft, and runs `gh issue create` only after a yes. The strict/off preset never offers.
+3. **#37 `gh` by default.** Preselect `gh` when missing (today default "n" in `scripts/lean.mjs`); add `--no-gh` / `-NoGh`. Check that `git` is present and print the install hint if not. The user runs `gh auth login` themselves.
+
+Done when: tests parse the `--json` output and check the redacted draft against a temp HOME; `npm test`, the privacy check and the README check pass; README tables (EN, ES) and `docs/compatibility.md` list the new flags.
 
 ## 15. Definition of done (every session)
 
