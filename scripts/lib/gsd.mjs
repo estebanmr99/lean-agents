@@ -5,7 +5,7 @@ import path from 'node:path';
 import { loadProfile, modelFor } from './render.mjs';
 
 const PACKAGE = '@opengsd/gsd-core@latest';
-const FLAGS = { claude: '--claude', 'opencode-v1': '--opencode', 'opencode-v2': '--opencode', 'copilot-cli': '--copilot', antigravity: '--antigravity' };
+const FLAGS = { claude: '--claude', 'opencode-v1': '--opencode', 'opencode-v2': '--opencode', 'copilot-cli': '--copilot', antigravity: '--antigravity', cursor: '--cursor' };
 
 export function gsdProfileName(o) {
   // --profile only selects OpenCode models; its IDs mean nothing to the other runtimes.
@@ -15,7 +15,8 @@ export function gsdProfileName(o) {
 }
 
 export function gsdPlan(root, home, o) {
-  const commands = [...new Set(o.agents.map((a) => FLAGS[a]))].map((flag) => ({
+  for (const a of o.agents.filter((x) => !FLAGS[x])) console.log(`GSD Core has no installer for ${a}: skipped.`);
+  const commands = [...new Set(o.agents.map((a) => FLAGS[a]).filter(Boolean))].map((flag) => ({
     tool: 'gsd',
     desc: `GSD Core (${flag.slice(2)})`,
     run: [['npx', '-y', PACKAGE, flag, '--global']],

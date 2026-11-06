@@ -265,6 +265,13 @@ test('--all-tools leaves out opt-in tools; --tools adds them', () => {
   assert.match(some, /@opengsd\/gsd-core@latest --antigravity --global/);
 });
 
+test('GSD plans --cursor and skips agents without an installer instead of crashing', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const out = lean(home, ['--no-exec', '--yes', '--dry-run', '--agents', 'cursor,vscode-copilot', '--tools', 'gsd']);
+  assert.match(out, /@opengsd\/gsd-core@latest --cursor --global/);
+  assert.match(out, /no installer for vscode-copilot: skipped/);
+});
+
 test('GSD defaults use profile models, and existing defaults survive uninstall', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
   const file = path.join(home, '.gsd', 'defaults.json');
