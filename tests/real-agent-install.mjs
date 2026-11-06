@@ -53,7 +53,7 @@ const bin = path.join(tmp, 'bin');
 const log = path.join(tmp, 'gh.log');
 fs.mkdirSync(bin);
 fs.writeFileSync(path.join(bin, 'gh.mjs'), `import fs from 'node:fs';\nfs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(process.argv.slice(2)) + '\\n');\n`);
-fs.writeFileSync(path.join(bin, win ? 'gh.cmd' : 'gh'), win ? `@"${process.execPath}" "%~dp0gh.mjs" %*\r\n` : `#!/bin/sh\nexec "${process.execPath}" "$(dirname "$0")/gh.mjs" "$@"\n`, { mode: 0o755 });
+fs.writeFileSync(path.join(bin, win ? 'gh.cmd' : 'gh'), win ? `@"${process.execPath}" "%~dp0gh.mjs" %*\r\n` : `#!/bin/sh\nexec "${process.execPath}" "\${0%/*}/gh.mjs" "$@"\n`, { mode: 0o755 });
 const ghEnv = { ...env, PATH: `${bin}${path.delimiter}${noGhPath}`, HTTPS_PROXY: 'http://proxy.corp.example:3128' };
 
 const draft = json(lean(['--feedback-draft', '--failed-command', 'winget install gh', '--network', 'on'], { env: ghEnv, input: `failed in ${home}\\x via ${ghEnv.HTTPS_PROXY} as ${os.userInfo().username}` }));

@@ -27,12 +27,12 @@ export function redactText(text, { home, env = process.env, user = env.USER || e
   const values = [...PROXY_VARS, ...CA_VARS].flatMap((n) => [env[n], env[n.toLowerCase()]]).filter((v) => v && v.length > 3);
   for (const v of new Set(values)) out = out.replace(new RegExp(esc(v), 'g'), '<redacted>');
   out = out.replace(/\b[a-z][a-z0-9+.-]*:\/\/[^\s/@]*@[^\s]*/gi, '<redacted-url>');
-  if (home) out = out.replace(new RegExp(esc(home).replace(/\\\\|\//g, '[\\\\/]'), 'gi'), '~');
-  out = out.replace(/(\/Users\/|\/home\/|[A-Za-z]:\\Users\\)[^\/\\\s]+/g, '$1<user>');
+  for (const h of [home].flat().filter(Boolean)) out = out.replace(new RegExp(esc(h).replace(/\\\\|\//g, '[\\\\/]'), 'gi'), '~');
+  out = out.replace(/(\/Users\/|\/home\/|[A-Za-z]:\\Users\\)[^\/\\\s]+/gi, '$1<user>');
   if (user && user.length > 1) out = out.replace(new RegExp(`\\b${esc(user)}\\b`, 'g'), '<user>');
   return out
     .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, '<email>')
-    .replace(/\b(gh[pousr]_|github_pat_|sk-|xox[bp]-)[\w-]{8,}/g, '<token>')
+    .replace(/\b(gh[pousr]_|github_pat_|sk-|xox[bp]-|npm_|glpat-)[\w-]{8,}|\bAKIA[0-9A-Z]{12,}/g, '<token>')
     .replace(/\b(Bearer|token)\s+[\w.~+/=-]{8,}/gi, '$1 <token>');
 }
 

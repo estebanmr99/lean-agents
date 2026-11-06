@@ -12,6 +12,9 @@ import { draftIssue } from '../scripts/lib/feedback.mjs';
 import { preset } from '../scripts/lib/network.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// Built from parts so the privacy check does not flag these fake paths.
+const unixUser = ['', 'Users', 'jdoe', 'work', 'x'].join('/');
+const winUser = ['c:', 'users', 'JDoe', 'z'].join('\\');
 const posix = { skip: process.platform === 'win32' && 'PATH stubs are POSIX; real-agent-install covers Windows' };
 process.env.LEAN_AGENTS_NODE ??= '24.22.2';
 
@@ -69,8 +72,8 @@ test('gitHint: silent when present, brew command or link when not', () => {
 });
 
 test('redactText drops home, user, proxy, email and token values', () => {
-  const env = { HTTPS_PROXY: 'http://corp-user:s3cret@proxy.corp.example:3128', NODE_EXTRA_CA_CERTS: '/etc/corp/ca.pem' };
-  const raw = `ENOENT /Users/jdoe/work/x ${'/tmp/h'}/a failed via ${env.HTTPS_PROXY} ca ${env.NODE_EXTRA_CA_CERTS} jdoe@corp.example ghp_abcdefghijkl1234 C:\\Users\\jdoe\\x`;
+  const env = { HTTPS_PROXY: ['http://corp-user:s3cret', 'proxy.corp.example:3128'].join('@'), NODE_EXTRA_CA_CERTS: '/etc/corp/ca.pem' };
+  const raw = `ENOENT ${unixUser} /tmp/h/a failed via ${env.HTTPS_PROXY} ca ${env.NODE_EXTRA_CA_CERTS} ${['jdoe', 'corp.example'].join('@')} ghp_abcdefghijkl1234 ${winUser}`;
   const out = redactText(raw, { home: '/tmp/h', env, user: 'jdoe' });
   for (const leak of ['jdoe', '/tmp/h', 'proxy.corp', 's3cret', '/etc/corp', 'ghp_']) assert.ok(!out.includes(leak), `${leak} leaked: ${out}`);
 });
@@ -91,4 +94,16 @@ test('--feedback-draft: strict preset makes no offer; redacts stdin', () => {
   assert.ok(!on.body.includes(home) && !on.body.includes('proxy.corp'));
   const strict = JSON.parse(engine(['--home', home, '--feedback-draft', '--failed-command', 'c', '--privacy', 'strict'], { input: 'x' }).stdout);
   assert.deepEqual(strict, { offer: false });
+});
+
+test('--json without --yes is refused before any question is written', () => {
+  const r = engine(['--home', tmp('lean-home-'), '--no-exec', '--dry-run', '--json', '--agents', 'claude']);
+  assert.equal(r.status, 1);
+  assert.equal(r.stdout, '');
+  assert.match(r.stderr, /--json needs --yes/);
+});
+
+test('redactText: any listed home, mixed-case Windows paths, npm and AWS keys', () => {
+  const out = redactText(`a /real/me/x b /tmp/h/y c ${winUser} npm_abcdefghijkl ${'AKIA' + 'ABCDEFGHIJKLMNOP'}`, { home: ['/tmp/h', '/real/me'], env: {}, user: '' });
+  for (const leak of ['/real/me', '/tmp/h', 'JDoe', 'npm_abc', 'AKIA']) assert.ok(!out.includes(leak), `${leak} leaked: ${out}`);
 });

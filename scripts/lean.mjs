@@ -368,7 +368,7 @@ function prereqCommands(o) {
   for (const t of [...o.tools, ...(o.gh ? ['gh'] : [])]) {
     const p = prereqFor(t, pm);
     if (!p || which(p.bin)) continue;
-    if (p.install) out.push({ tool: t, desc: `install ${p.bin}`, run: p.install, undo: [] });
+    if (p.install) out.push({ tool: t, desc: `install ${p.bin}`, run: p.install, undo: [], optional: t === 'gh' });
     else out.push({ tool: t, desc: `${p.bin} is missing: install it from ${p.manual}`, run: [], undo: [], manual: true, optional: t === 'gh' });
   }
   if (o.agents.includes('antigravity')) {
@@ -401,12 +401,13 @@ function printMigration(o, m, commands) {
 
 // Agents parse this instead of scraping the text plan. Paths use ~ so no home directory leaks.
 function printJson(o, planned, commands, migration) {
-  const rel = (f) => (f.startsWith(o.home) ? `~${f.slice(o.home.length)}` : f);
+  const rel = (t) => (t.startsWith(o.home + path.sep) || t === o.home ? `~${t.slice(o.home.length)}` : t);
+  const inText = (t) => t.split(o.home).join('~');
   const plan = {
     agents: o.agents, tools: o.tools, privacy: o.privacy, lang: o.lang, profile: o.profile ?? null, terminals: o.terminals,
     gh: !!o.gh, bun: !!o.bun, network: o.network, migrate: migration ? migration.names : null,
     files: planned.map((f) => ({ status: f.status, path: rel(f.path), note: f.note ?? null })),
-    commands: commands.map((c) => ({ desc: c.desc, agent: c.agent ?? null, run: c.run })),
+    commands: commands.map((c) => ({ desc: inText(c.desc), agent: c.agent ?? null, run: c.run.map((a) => a.map(inText)) })),
   };
   process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
 }
@@ -437,6 +438,7 @@ function printPlan(o, planned, commands) {
 }
 
 async function install(o) {
+  if (o.json && !o.yes) throw new Error('--json needs --yes: the menus would write questions to stdout');
   const saved = o.command === 'update' ? readState(o.home) : null;
   if (o.command === 'update' && !saved) throw new Error('nothing to update: lean-agents is not installed');
   if (o.command === 'update' && saved.options.migrateOnly) throw new Error('nothing to update: only --migrate ran here');
@@ -476,7 +478,7 @@ async function install(o) {
       if (ui) ui.result(ok || c.optional, c.desc);
       else if (!ok && !c.optional) console.log(`  ! failed: ${c.desc}. Run the command above by hand, then --doctor.`);
       // An optional step (Bun) that fails only means Context Mode runs on Node; nothing to undo.
-      if (!ok && c.optional) { console.log('! Bun install failed; Context Mode will run on Node.'); continue; }
+      if (!ok && c.optional) { console.log(c.tool === 'gh' ? '! gh install failed; install it yourself (--no-gh skips it).' : '! Bun install failed; Context Mode will run on Node.'); continue; }
       if (!ok) failed++;
       ran.push({ desc: c.desc, ok, undo: c.undo });
     }
@@ -554,7 +556,7 @@ function feedback(o) {
   const state = readState(o.home);
   const network = { ...(o.networkPreset ? preset(o.networkPreset) : fromPrivacy(o.privacy) ?? state?.options.network ?? {}), ...o.networkFlags };
   const versions = { 'lean-agents': JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version, node: NODE_VERSION };
-  const draft = draftIssue({ network, home: o.home, versions, command: o.failedCommand, error: fs.readFileSync(0, 'utf8') });
+  const draft = draftIssue({ network, home: [o.home, os.homedir()], versions, command: o.failedCommand, error: fs.readFileSync(0, 'utf8') });
   process.stdout.write(`${JSON.stringify(draft ?? { offer: false })}\n`);
 }
 
