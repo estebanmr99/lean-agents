@@ -54,7 +54,7 @@ console.log('top-level keys:', Object.keys(cfg).sort().join(', '));
 if (failed) { console.log('--- config ---'); console.log(out.split('\n').slice(0, 150).join('\n')); console.log('--- agents ---'); console.log(agentsOut.slice(0, 4000)); process.exit(1); }
 JS
 
-# Session 79: --doctor names the 1.x guard (fatal if missing).
+# --doctor names the 1.x guard (fatal if missing).
 node "$repo/scripts/lean.mjs" --home "$HOME" --doctor > "$HOME/doctor.txt" 2>&1 || true
 grep -F 'OpenCode 1.x: supported; lean-agents will not upgrade it' "$HOME/doctor.txt"
 

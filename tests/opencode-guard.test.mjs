@@ -1,4 +1,4 @@
-// Session 79: lean-agents never installs or upgrades OpenCode itself, and says so on 1.x. Temp HOME, no external commands.
+// lean-agents never installs or upgrades OpenCode itself, and says so on 1.x. Temp HOME, no external commands.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -25,11 +25,17 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
 const planJson = (home, args) => JSON.parse(lean(home, ['--yes', '--no-exec', '--dry-run', '--json', ...args]));
 
 // True for a command that installs or upgrades OpenCode: a package manager, brew or the install script on `opencode`/`opencode-ai`, or `opencode upgrade`.
+// Shell wrappers (`sh -c`, `powershell -Command`) are unwrapped; a bare `brew upgrade` that names no package is not flagged (none exists in the plans).
 function touchesOpenCode(argv) {
-  const [bin, ...rest] = argv;
-  const isPkg = (t) => /^(?:[\w@./-]*\/)?opencode(?:-ai)?(?:@[\w.-]+)?$/.test(t);
-  if (/^(npm|pnpm|yarn|bun|brew|winget|scoop|choco|paru|yay|pacman)(\.cmd)?$/.test(bin)) return rest.some(isPkg);
-  if (/^(opencode|opencode\.exe)$/.test(bin)) return /^(upgrade|update)$/.test(rest[0]);
+  const [first, ...rest] = argv;
+  const bin = path.basename(first).replace(/\.(cmd|exe)$/i, '');
+  const isPkg = (t) => /^(?:[\w@.-]+\/)*(?:[\w-]+\.)?opencode(?:-[\w-]+)?(?:@[\w.-]+)?$/i.test(t);
+  if (/^(sh|bash|zsh|cmd|powershell|pwsh)$/.test(bin)) {
+    const i = rest.findIndex((t) => /^(-c|\/c|-command)$/i.test(t));
+    if (i >= 0) return touchesOpenCode(rest[i + 1].split(/\s+/)) || /opencode\.ai\/install/.test(rest[i + 1]);
+  }
+  if (/^(npm|pnpm|yarn|bun|brew|winget|scoop|choco|paru|yay|pacman)$/.test(bin)) return rest.some(isPkg);
+  if (bin === 'opencode') return /^(upgrade|update)$/.test(rest[0]);
   return /opencode\.ai\/install|sst\/opencode|anomalyco\/opencode/.test(argv.join(' ')) && /curl|wget|iwr|irm|install/.test(argv.join(' '));
 }
 const offenders = (commands) => commands.flatMap((c) => c.run ?? []).filter(touchesOpenCode).map((a) => a.join(' '));
@@ -38,7 +44,8 @@ test('the OpenCode predicate flags every way to install or upgrade it, and nothi
   for (const argv of [
     ['npm', 'i', '-g', 'opencode-ai'], ['npm', 'install', '-g', 'opencode-ai@1.19.0'], ['bun', 'add', '-g', 'opencode-ai'],
     ['pnpm', 'add', '-g', 'opencode-ai'], ['brew', 'install', 'sst/tap/opencode'], ['brew', 'upgrade', 'opencode'],
-    ['sh', '-c', 'curl -fsSL https://opencode.ai/install | bash'], ['opencode', 'upgrade'], ['opencode', 'update'],
+    ['sh', '-c', 'curl -fsSL https://opencode.ai/install | bash'], ['opencode', 'upgrade'], ['opencode', 'update'], ['/opt/homebrew/bin/brew', 'install', 'opencode'],
+    ['sh', '-c', 'npm i -g opencode-ai'], ['powershell', '-Command', 'winget install SST.opencode'], ['npm', 'i', '-g', 'opencode-linux-x64'],
   ]) assert.ok(touchesOpenCode(argv), argv.join(' '));
   for (const argv of [
     ['npm', 'i', '-g', '@tarquinen/opencode-dcp@3.1.9'], ['bun', 'add', '-g', 'context-mode'], ['opencode', 'debug', 'config'],
@@ -70,7 +77,8 @@ test('--migrate plans never install or upgrade OpenCode', () => {
   fs.writeFileSync(path.join(home, '.cursor', 'agents', 'x.md'), '---\nname: x\ndescription: Does x\n---\nBe careful.\n');
   fs.writeFileSync(path.join(home, '.cursor', 'mcp.json'), JSON.stringify({ mcpServers: { gh: { command: 'npx', args: ['-y', 'gh-mcp'] } } }));
   const j = planJson(home, ['--migrate', 'cursor', '--agents', 'claude,opencode-v1']);
-  assert.deepEqual(offenders(j.commands ?? []), []);
+  assert.ok(j.commands?.length > 0, 'plan has commands to check');
+  assert.deepEqual(offenders(j.commands), []);
 });
 
 test('the lean-update flow installs only the skill, for every agent', () => {
@@ -89,7 +97,7 @@ function doctorRows(agents, extra = {}) {
   const lines = [];
   const log = console.log;
   console.log = (l) => lines.push(String(l));
-  try { doctor({ home: os.tmpdir(), state, exec: false, json: false }); } finally { console.log = log; }
+  try { doctor({ home: tmp(), state, exec: false, json: false }); } finally { console.log = log; }
   return lines;
 }
 

@@ -101,30 +101,30 @@ Detection (a run with `--home` looks only inside it; `orca` on Linux is the GNOM
 
 lean-agents never installs or upgrades OpenCode: the engine only writes config for the OpenCode you already have, and `--doctor` says "OpenCode 1.x: supported; lean-agents will not upgrade it". `tests/opencode-guard.test.mjs` fails if any install, `--update`, `--migrate` or `lean-update` plan contains a command that installs or upgrades OpenCode. Moving from 1.x to 2.x is your own step.
 
-Why back up first: the session history lives in a database, `opencode.db`, and OpenCode 2 does not read your old sessions from it (owner report, 2026-11-06; **VERIFY** against the OpenCode 2 release notes). Copy it (never move it) before any major upgrade.
+Why back up first: the session history lives in a database, `opencode.db`, and OpenCode 2 reportedly does not carry your old sessions over (owner report, 2026-11-06; **VERIFY** against the OpenCode 2 release notes). Copy it (never move it) before any major upgrade.
 
 | Item | Where | Status |
 | --- | --- | --- |
 | Data folder and `opencode.db` on macOS and Linux | `~/.local/share/opencode/opencode.db`; `OPENCODE_DB` overrides it | Docs ([troubleshooting](https://opencode.ai/docs/troubleshooting/)), 2026-11-06 |
 | Data folder on Windows | `%USERPROFILE%\.local\share\opencode` | **VERIFY**: only a user report in the upstream tracker, no docs |
 | `XDG_DATA_HOME` handling | not in the docs | **VERIFY** |
-| Exact paths on your machine | `opencode debug paths` (all paths), `opencode debug paths db` (the database) | Docs ([CLI](https://opencode.ai/docs/cli/)), 2026-11-06; `real-opencode-v1` prints the output (non-fatal) |
+| Exact paths on your machine | `opencode debug paths` (all paths) | Docs ([CLI](https://opencode.ai/docs/cli/)), 2026-11-06; the `db` selector is **VERIFY**; `real-opencode-v1` prints the output (non-fatal) |
 | User config | `~/.config/opencode/` (`opencode.json` or `opencode.jsonc`) | Docs ([config](https://opencode.ai/docs/config/)), 2026-11-06 |
-| Version that introduced `opencode.db` | unknown (the 1.2.0 changelog says "Revert to SQLite database implementation") | **VERIFY** |
+| Version that introduced `opencode.db` | unknown (the [1.2.0 changelog](https://opencode.ai/changelog/v1.2.0) says "Revert to SQLite database implementation") | **VERIFY** |
 
-Back up (macOS, Linux; close OpenCode first). This copies and removes nothing:
+Back up (macOS, Linux; close OpenCode first). This copies and removes nothing. The copy can hold your provider logins, so keep it private:
 
 ```bash
-b="${TMPDIR:-/tmp}/opencode-backup-$(date +%Y%m%d-%H%M%S)"
-mkdir -p "$b"
-cp -R "$(dirname "$(opencode debug paths db)")" "$b/data"   # includes opencode.db
+b="$HOME/opencode-backup-$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$b" && chmod 700 "$b"
+cp -R ~/.local/share/opencode "$b/data"   # includes opencode.db; run `opencode debug paths` if yours differs
 cp -R ~/.config/opencode "$b/config"
 echo "Backup in $b"
 ```
 
-If `opencode debug paths db` does not exist on your 1.x, use `~/.local/share/opencode`. On Windows, copy the same two folders in Explorer. Keep the backup until you are sure you do not need your old sessions.
+On Windows, copy the same two folders in Explorer. Keep the backup until you are sure you do not need your old sessions.
 
-A community script that downgrades 2.x back to 1.19 exists ([gist](https://gist.github.com/iarna/5d030e28c56c137f489a9d7ad12aa74a), SQL, macOS and Linux only). It is community code, use at your own risk. lean-agents has not reviewed it and never runs it.
+A community script that downgrades 2.x back to 1.19 exists ([gist](https://gist.github.com/iarna/5d030e28c56c137f489a9d7ad12aa74a), SQL; check its own text for platforms). It is community code, use at your own risk. lean-agents has not reviewed it and never runs it.
 
 ## Verification log
 
