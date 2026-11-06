@@ -481,6 +481,7 @@ Mark each `[x]` when merged.
 - [x] **Session 20 — Install with an agent, opt-in feedback, gh by default** (0.6.0). Issues #35, #36, #37.
 - [x] **Session 22 — Repo audit, issue forms, labeled backlog** (0.7.0). `docs/audit-2026-11.md`, forms in `.github/ISSUE_TEMPLATE` (bug, feature, update-finding, agent-support, config), `scripts/labels.sh`, the backlog as labeled issues, "Before each release" checklist. Audit findings are filed as issues, not fixed here.
 - [x] **Session 45 — Agent-first updates** (0.7.0). Issue #45. `lean-update` skill, read-only detection table in `docs/manual-install.md`, one temp backup removed after `--doctor`, `--update` prints old -> new, `--doctor --json` lists `behind`, daily green `ci-latest` opens a pin-bump PR.
+- [x] **Session 58 — 1-minute README** (0.7.0). Issue #58, PR #81. Short README EN and ES with a support matrix, "what you get" and "who it is for"; `scripts/check-readme.mjs` enforces the 1-minute rule in CI.
 - [ ] **Session 59 — Architecture checkpoint** (0.7.0). Issue #59. [`docs/checkpoints/0.7.0.md`](checkpoints/0.7.0.md): one keep / change / spike per question, and the 0.7.0 sessions below.
 
 0.7.0 sessions proposed by the checkpoint, pending the owner's pick (order and parallel groups in [`docs/checkpoints/0.7.0.md`](checkpoints/0.7.0.md) section 5):
