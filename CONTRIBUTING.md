@@ -42,8 +42,8 @@ Open an "Agent support" issue first with links to the agent's docs for global in
 
 Third-party tools are not added on a pull request alone. The owner decides first.
 
-1. Open an issue with the tool's details in the [SPEC section 7](docs/SPEC.md#7-third-party-tools-tools-tool) format: name, upstream link, license, install command per OS, which agents it wires into, and tier (minimal, optional or opt-in).
-2. Wait for the owner to approve the tool. Only then open a pull request, which adds `tools/<tool>/README.md` and the recipe.
+1. Open an issue with the tool's details in the [SPEC section 7](docs/SPEC.md#7-third-party-tools-tools-tool) format: name, upstream link, license, what it does in one line, how to remove it, install command per OS, which agents it wires into, and tier (Minimal, Optional or Docs only).
+2. Wait for the owner to approve the tool. Only then open a pull request. It adds the recipe (`tools/<tool>/` with `README.md`, `install.sh`, `install.ps1`, the uninstall scripts and a `check` function) and follows the checklist in [AGENTS.md](AGENTS.md#git): CHANGELOG, README compatibility tables and `docs/compatibility.md`.
 3. Not accepted: Oh My OpenAgent and Graphify. The owner rejected both; see [docs/faq.md](docs/faq.md).
 
 See [tools/README.md](tools/README.md) for the tools that already exist.
