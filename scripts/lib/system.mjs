@@ -153,8 +153,8 @@ export function run(argv, { dryRun, log, env }) {
   return r.status === 0;
 }
 
-export function quiet(argv, timeout = 30000) {
-  const r = spawnSync(argv[0], argv.slice(1), { encoding: 'utf8', shell: useShell(argv[0]), timeout });
+export function quiet(argv, timeout = 30000, env = {}) {
+  const r = spawnSync(argv[0], argv.slice(1), { encoding: 'utf8', shell: useShell(argv[0]), timeout, env: { ...process.env, ...env } });
   return { ok: r.status === 0, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
 }
 

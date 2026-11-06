@@ -6,7 +6,7 @@ import { PINS, npmSpec, behindPins } from './pins.mjs';
 import { version, quiet, contextModeNodeNote } from './system.mjs';
 import { stillNeeded } from './terminals.mjs';
 import { adhdSkillFiles } from './adhd.mjs';
-import { proxyReport, PROXY_VARS, CA_VARS } from './network.mjs';
+import { proxyReport, PROXY_VARS, CA_VARS, childEnv, fromPrivacy } from './network.mjs';
 import { leftovers } from './parallel.mjs';
 
 const CORE_AGENTS = ['debug', 'explore', 'planner', 'research', 'review'];
@@ -46,43 +46,47 @@ export function resolvedOpenCodeConfig(text) {
   return merged;
 }
 
-function checkCopilot(o, add) {
-  const mcp = quiet(['copilot', 'mcp', 'list', '--json']);
-  for (const s of ['serena', 'playwright', 'playwright-extension', 'context-mode'].filter((t) => o.tools.includes(t))) {
+function checkCopilot(o, add, q, withMcp) {
+  const mcp = withMcp ? q(['copilot', 'mcp', 'list', '--json']) : { ok: false, out: '' };
+  for (const s of ['serena', 'playwright', 'playwright-extension', 'context-mode'].filter((t) => withMcp && o.tools.includes(t))) {
     add(`copilot mcp ${s}`, mcp.ok && mcp.out.includes(`"${s}"`) ? 'ok' : 'error', mcp.ok ? '' : 'copilot mcp list failed');
   }
-  const rules = quiet(['copilot', 'instruction', 'list']);
+  const rules = q(['copilot', 'instruction', 'list']);
   add('copilot rules loaded', rules.ok && rules.out.includes('copilot-instructions.md') ? 'ok' : 'error');
 }
 
-function checkCursor(o, add) {
+function checkCursor(o, add, q) {
   // `mcp list` starts every server, and Serena through uvx can take longer than 30s.
-  const mcp = quiet(['cursor-agent', 'mcp', 'list'], 120000);
+  const mcp = q(['cursor-agent', 'mcp', 'list'], 120000);
   for (const s of ['serena', 'playwright', 'playwright-extension', 'context-mode'].filter((t) => o.tools.includes(t))) {
     add(`cursor mcp ${s}`, mcp.ok && mcp.out.includes(s) ? 'ok' : 'error', mcp.ok ? '' : 'cursor-agent mcp list failed');
   }
 }
 
-function checkAntigravity(o, core, add) {
-  const agents = quiet(['agy', 'agents']).out;
+function checkAntigravity(o, core, add, q, withMcp) {
+  const agents = q(['agy', 'agents']).out;
   add('agy subagents loaded', core.every((a) => agents.includes(a)) ? 'ok' : 'error');
-  const mcp = quiet(['agy', 'mcp', 'list']);
-  for (const s of ['serena', 'playwright'].filter((t) => o.tools.includes(t))) {
+  const mcp = withMcp ? q(['agy', 'mcp', 'list']) : { ok: false, out: '' };
+  for (const s of ['serena', 'playwright'].filter((t) => withMcp && o.tools.includes(t))) {
     add(`agy mcp ${s}`, mcp.ok && mcp.out.includes(s) ? 'ok' : 'error', mcp.ok ? '' : 'agy mcp list failed');
   }
-  const plugins = quiet(['agy', 'plugin', 'list', '--json']).out;
+  const plugins = q(['agy', 'plugin', 'list', '--json']).out;
   for (const t of ['rtk'].filter((p) => o.tools.includes(p))) {
     add(`agy plugin ${t}`, plugins.includes(`"${t}"`) ? 'ok' : 'error');
   }
 }
 
-export function doctor({ home, state, exec, nodeVersion = process.versions.node, json = false }) {
+export function doctor({ home, state, exec, nodeVersion = process.versions.node, json = false, run = quiet }) {
   const rows = [];
   const add = (item, status, detail = '') => rows.push({ item, status, detail });
   if (!state) {
     add('lean-agents', 'missing', 'not installed (run the installer)');
   } else {
     const o = { ...state.options };
+    const network = o.network ?? fromPrivacy(o.privacy) ?? {};
+    const q = (argv, timeout) => run(argv, timeout, childEnv(network));
+    // `mcp list` starts every server (Serena through uvx git, Playwright), which is outbound traffic.
+    const withMcp = network.outbound !== 'off';
     const nodeNote = o.tools.includes('context-mode') ? contextModeNodeNote(nodeVersion) : '';
     if (nodeNote) o.tools = o.tools.filter((t) => t !== 'context-mode');
     add('lean-agents', 'ok', `v${state.version}, agents: ${o.agents.join(', ')}, privacy: ${o.privacy}`);
@@ -120,19 +124,20 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
         const v = version(bin);
         add(`${bin} on PATH`, v ? 'ok' : 'error', v ?? 'not found');
       }
-      if (o.agents.includes('cursor')) checkCursor(o, add);
-      if (o.agents.includes('claude')) {
-        const mcp = quiet(['claude', 'mcp', 'list']);
+      if (!withMcp) add('mcp servers', 'skipped', 'network off (outbound off): `mcp list` not run');
+      if (o.agents.includes('cursor') && withMcp) checkCursor(o, add, q);
+      if (o.agents.includes('claude') && withMcp) {
+        const mcp = q(['claude', 'mcp', 'list']);
         for (const s of ['serena', 'playwright'].filter((t) => o.tools.includes(t))) {
           add(`claude mcp ${s}`, mcp.ok && mcp.out.includes(s) ? 'ok' : 'error', mcp.ok ? '' : 'claude mcp list failed');
         }
       }
-      if (o.agents.some((a) => a.startsWith('opencode'))) checkOpenCode(o, add);
-      if (o.agents.includes('copilot-cli')) checkCopilot(o, add);
-      if (o.agents.includes('antigravity')) checkAntigravity(o, CORE_AGENTS, add);
+      if (o.agents.some((a) => a.startsWith('opencode'))) checkOpenCode(o, add, q);
+      if (o.agents.includes('copilot-cli')) checkCopilot(o, add, q, withMcp);
+      if (o.agents.includes('antigravity')) checkAntigravity(o, CORE_AGENTS, add, q, withMcp);
       // npx may have to download, which takes longer than a local check.
-      if (o.tools.includes('codeburn')) add('codeburn runs', quiet(['npx', '-y', npmSpec('codeburn'), '--version'], 120000).ok ? 'ok' : 'error');
-      if (o.tools.includes('autoskills')) add('autoskills runs', quiet(['npx', '-y', npmSpec('autoskills'), '--help'], 120000).ok ? 'ok' : 'error');
+      if (o.tools.includes('codeburn')) add('codeburn runs', q(['npx', '-y', npmSpec('codeburn'), '--version'], 120000).ok ? 'ok' : 'error');
+      if (o.tools.includes('autoskills')) add('autoskills runs', q(['npx', '-y', npmSpec('autoskills'), '--help'], 120000).ok ? 'ok' : 'error');
     }
   }
   const left = leftovers(process.cwd());
@@ -145,8 +150,8 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
   return ok;
 }
 
-function checkOpenCode(o, add) {
-  const r = quiet(['opencode', 'debug', 'config']);
+function checkOpenCode(o, add, q) {
+  const r = q(['opencode', 'debug', 'config']);
   if (!r.ok) return add('opencode resolved config', 'error', '`opencode debug config` failed');
   let cfg;
   try { cfg = resolvedOpenCodeConfig(r.out); } catch { return add('opencode resolved config', 'changed', 'could not parse output; check by hand'); }
