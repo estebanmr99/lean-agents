@@ -116,12 +116,12 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
       for (const [bin, tool] of [['claude', 'claude'], ['opencode', 'opencode-v1'], ['opencode', 'opencode-v2'], ['copilot', 'copilot-cli'], ['agy', 'antigravity'], ['rtk', 'rtk'], ['context-mode', 'context-mode'], ['uvx', 'serena']]) {
         const needed = o.agents.includes(tool) || o.tools.includes(tool);
         if (!needed) continue;
-        const v = version(bin);
+        const v = version(bin, undefined, childEnv(network));
         add(`${bin} on PATH`, v ? 'ok' : 'error', v ?? 'not found');
       }
       for (const [bin, agent] of [['code', 'vscode-copilot'], ['cursor-agent', 'cursor']]) {
         if (!o.agents.includes(agent)) continue;
-        const v = version(bin);
+        const v = version(bin, undefined, childEnv(network));
         add(`${bin} on PATH`, v ? 'ok' : 'error', v ?? 'not found');
       }
       if (!withMcp) add('mcp servers', 'skipped', 'network off (outbound off): `mcp list` not run');

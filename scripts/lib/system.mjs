@@ -15,9 +15,9 @@ export function which(bin) {
 // Windows .cmd shims (npm, npx) need a shell; real .exe files must not get one, or paths with spaces split.
 const useShell = (bin) => isWin && !/\.exe$/i.test(which(bin) ?? '');
 
-export function version(bin, args = ['--version']) {
+export function version(bin, args = ['--version'], env = {}) {
   if (!which(bin)) return null;
-  const r = spawnSync(bin, args, { encoding: 'utf8', shell: useShell(bin), timeout: 20000 });
+  const r = spawnSync(bin, args, { encoding: 'utf8', shell: useShell(bin), timeout: 20000, env: { ...process.env, ...env } });
   const m = `${r.stdout}${r.stderr}`.match(/(\d+)\.(\d+)\.(\d+)/);
   return m ? m[0] : 'unknown';
 }
