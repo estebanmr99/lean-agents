@@ -42,6 +42,8 @@ grep -q caveman "$HOME/skills.txt"
 grep -q i-have-adhd "$HOME/skills.txt"
 # Context Mode 2 is added with `copilot mcp add` (upstream docs/install/copilot-cli.md), so it shows in `mcp list`.
 grep -q '"context-mode"' "$HOME/mcp.txt"
+# The registered server file must exist, or Copilot would list a server that cannot start.
+node -e 'const fs = require("fs"); const s = JSON.parse(fs.readFileSync(process.argv[1], "utf8")).mcpServers["context-mode"]; process.exit(fs.existsSync(s.args.find((a) => a.endsWith("server.mjs"))) ? 0 : 1)' "$HOME/mcp.txt"
 
 node "$repo/scripts/lean.mjs" --doctor </dev/null
 
