@@ -4,6 +4,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-06
+
+0.5.1 was folded into this release: its fixes are listed below.
+
 ### Fixed
 
 - GSD Core no longer crashes when Cursor is selected: Cursor installs with `--cursor`, and agents without a GSD installer (`vscode-copilot`) are skipped with a note (#20).
@@ -15,6 +19,8 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Changed
 
+- **Breaking:** the minimum Node.js is now 22.20 (was 20.12), because Node 20 is end of life and `skills` 1.5.19 and later need 22.20. `package.json` `engines`, `install.sh`, `install.ps1`, the README and the docs say so; CI drops the Node 20 job.
+- `skills-cli` pinned at 1.7.4 (was 1.5.18), the newest 1.7.x at least 14 days old (#49).
 - CI (#42): pull requests use the pinned versions, now including the Claude Code, OpenCode 1.x and Copilot CLI npm packages (`ciOnly` pins in `core/pins.json`, not installed for users; Claude Code is installed from npm in CI instead of `claude.ai/install.sh`; OpenCode 2, Cursor and `agy` stay on their installers); docs-only PRs run only `lint`, `test` and the Secret scan; every job has `timeout-minutes`; macOS dropped where it added nothing; shellcheck and PSScriptAnalyzer cover every tracked script.
 - `gh` (GitHub CLI) is installed by default when missing; it used to default to no (#37).
 - MCP servers, npx tools and skills no longer fetch `@latest` or the default branch: exact versions and tags come from `core/pins.json`. Skills install with `owner/repo#<tag>` (a trailing `@<tag>` is ignored and installs HEAD). The Skills CLI is pinned to 1.5.18, the last release that runs on Node 20 (1.5.19 and later need Node 22.20+). `docs/SECURITY-REVIEW.md` and the README "On a work PC" list run-time fetches as their own category (#33).

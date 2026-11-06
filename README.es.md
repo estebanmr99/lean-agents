@@ -101,7 +101,7 @@ Empieza siempre con `--dry-run`: muestra cada archivo y comando antes de cambiar
 
 - Opciones útiles: `--all-tools`, `--privacy strict`, `--lang es`, `--profile vertex-gemini`, `--update`, `--uninstall`, `--doctor`, `--json` (con `--dry-run` o `--doctor`, para agentes) (`--help` las lista todas).
 - En PowerShell las opciones comunes van en PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`. Cualquier otra opción se pasa tal cual, por ejemplo `-DryRun --network off`.
-- Context Mode necesita Node.js 22.5 o superior. Todo lo demás funciona con Node.js 20.12.
+- Context Mode necesita Node.js 22.5 o superior. Todo lo demás funciona con Node.js 22.20 o superior.
 - Con Context Mode, el instalador también instala Bun por defecto (`ctx_execute` más rápido); añade `--no-bun` (`-NoBun` en PowerShell) para omitirlo. Con Antigravity, `--no-app` (`-NoApp`) omite la instalación de la app. Ver la fila de Bun en [Niveles de instalación](#niveles-de-instalación).
 
 ## Por qué
@@ -374,8 +374,8 @@ lean-agents es pegamento. El trabajo pesado lo hacen estos proyectos; dales una 
 - [x] Sesiones de agentes en paralelo (`scripts/parallel.mjs`)
 - [x] Integraciones de Warp y Orca para quien ya las usa
 - [x] App y CLI de Antigravity en macOS, Linux y Windows (la carga en la app sigue en VERIFY)
-- [ ] `v0.5.1`: arreglos de instalaciones reales en Windows con proxy (Cursor CLI, Orca, GSD, docs)
-- [ ] `v0.6.0`: `--no-core`, versiones fijas de MCP y skills, migrar desde otro harness, instalar con un agente, GIFs por caso de uso
+- [x] `v0.6.0` (incluye el 0.5.1 previsto): arreglos de instalaciones reales en Windows con proxy, `--no-core`, versiones fijas de MCP y skills, migrar desde otro harness, instalar con un agente; Node.js 22.20 o superior
+- [ ] Próxima versión (en espera): GIFs por caso de uso, actualizar desde versiones verificadas, CLI instalable en npm
 - [ ] `v1.0.0`
 - Más adelante: Codex CLI, Gemini CLI
 

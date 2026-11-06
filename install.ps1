@@ -1,5 +1,5 @@
 # lean-agents bootstrap for Windows (PowerShell 5.1 and 7).
-# Makes sure git and Node.js 20.12+ exist, fetches lean-agents, then hands over to the
+# Makes sure git and Node.js 22.20+ exist, fetches lean-agents, then hands over to the
 # Node engine (scripts/lean.mjs), which shows the full plan before changing anything.
 #
 #   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -DryRun
@@ -55,8 +55,8 @@ Install-Prerequisite 'git' 'Git.Git' 'https://git-scm.com/downloads'
 Install-Prerequisite 'node' 'OpenJS.NodeJS.LTS' 'https://nodejs.org/'
 if (-not (Test-Command 'node')) { throw 'lean-agents: Node.js is required for the engine. Install it and run this again.' }
 $nodeVersion = & node --version
-if ([version]$nodeVersion.TrimStart('v') -lt [version]'20.12.0') {
-  throw "lean-agents: Node.js 20.12 or newer is required (found $nodeVersion). Update from https://nodejs.org/"
+if ([version]$nodeVersion.TrimStart('v') -lt [version]'22.20.0') {
+  throw "lean-agents: Node.js 22.20 or newer is required (found $nodeVersion). Update from https://nodejs.org/"
 }
 
 # The OpenCode 2 upstream script (Git Bash) installs here and only edits ~/.bashrc, so PowerShell never sees it.
