@@ -87,6 +87,7 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
     if (nodeNote) o.tools = o.tools.filter((t) => t !== 'context-mode');
     add('lean-agents', 'ok', `v${state.version}, agents: ${o.agents.join(', ')}, privacy: ${o.privacy}`);
     if (nodeNote) add('context-mode', 'note', nodeNote);
+    if (o.agents.includes('opencode-v1')) add('OpenCode 1.x: supported; lean-agents will not upgrade it', 'ok');
     if (o.terminals?.length) add('terminals', 'ok', `integrations for ${o.terminals.join(', ')} (commands listed below; app settings are yours)`);
     for (const t of stillNeeded({ home, terminals: o.terminals ?? [], agents: o.agents, exec })) {
       add('still needed', t.check?.() ? 'ok' : 'note', t.text);

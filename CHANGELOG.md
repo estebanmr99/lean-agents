@@ -13,6 +13,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Added
 
+- OpenCode 1.x guard (#79): `--doctor` (text and `--json`) says "OpenCode 1.x: supported; lean-agents will not upgrade it"; `tests/opencode-guard.test.mjs` fails if an install, `--update`, `--migrate` or `lean-update` plan installs or upgrades OpenCode; the `lean-update` skill leaves an OpenCode 2 upgrade to the user and tells them to back up `opencode.db` and config first; "Staying on OpenCode 1.x" in `docs/compatibility.md` (data folder, backup; Windows path still **VERIFY**).
 - `docs/checkpoints/0.7.0.md`: first architecture checkpoint (#59). It recommends keep, change or spike on the installer's form, the script-plus-agent split, what to stop, the numbers, and the 0.7.0 scope.
 - Issue forms for bug, feature, update finding and agent support; blank issues are off and vulnerabilities point to `SECURITY.md`. The bug and update-finding forms list the fields the opt-in feedback flow fills (os, version, agents, command, error).
 - `scripts/labels.sh`: idempotent label set (`type:`, `priority:`, `area:`); it renames GitHub's default `bug`, `documentation` and `enhancement` so existing issues keep them.

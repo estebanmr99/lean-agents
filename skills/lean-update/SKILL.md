@@ -11,6 +11,7 @@ Run the script from a clone (`node scripts/lean.mjs ...`) or without one: `curl 
 
 1. **Read the release.** Fetch `core/pins.json` at that tag from `https://raw.githubusercontent.com/estebanmr99/lean-agents/<tag>/`. Then read every release between the installed lean-agents version (`version` in `state.json`; for a hand install, ask or say it is unknown and read from the oldest release you can match) and the latest: `gh release view <tag> --repo estebanmr99/lean-agents --json body -q .body`, and the matching `CHANGELOG.md` sections. A pin's `note` adds to the impact.
    - Start your answer with the **breaking changes and upgrade steps** from those notes, before any table.
+   - The notes mention OpenCode 2: say that upgrading OpenCode is the user's own step (lean-agents never upgrades it), and that before it they should back up the OpenCode data folder (`opencode.db`) and config; see "Staying on OpenCode 1.x" in `docs/compatibility.md`. This skill never runs the OpenCode upgrade.
    - A release with no clear "Upgrade" or "Breaking" notes: say so in plain words, and put "none in the release notes" in the table.
 2. **Detect.**
    - `~/.config/lean-agents/state.json` exists (or `--doctor --json` works): run `--doctor --json`. Its `behind` list is what is older than the pins.
