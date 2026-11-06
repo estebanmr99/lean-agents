@@ -14,6 +14,11 @@ export XDG_CONFIG_HOME="$HOME/.config"
 export NPM_CONFIG_PREFIX="$HOME/npm"
 export PATH="$NPM_CONFIG_PREFIX/bin:$PATH"
 unset XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
+# RTK is core but not under test: a stub keeps the run the same on a runner without it.
+mkdir -p "$work/stub"
+printf '#!/bin/sh\nexit 0\n' > "$work/stub/rtk"
+chmod +x "$work/stub/rtk"
+export PATH="$work/stub:$PATH"
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 # The pinned release tag of the lean-update skill does not exist before release; install it from this checkout.
 export LEAN_AGENTS_SKILL_SOURCE="${LEAN_AGENTS_SKILL_SOURCE:-$repo}"

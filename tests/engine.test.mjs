@@ -1056,7 +1056,7 @@ test('--uninstall removes the lean-update skill', { skip: process.platform === '
   const log = path.join(bin, 'npx.log');
   fs.writeFileSync(path.join(bin, 'npx'), `#!/bin/sh\necho "$@" >> "${log}"\n`, { mode: 0o755 });
   const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` };
-  lean(home, ['--yes', '--agents', 'claude', '--no-tools', '--lang', 'en', '--profile', 'none'], env);
+  lean(home, ['--yes', '--agents', 'claude', '--no-tools', '--no-core', '--no-gh', '--no-bun', '--lang', 'en', '--profile', 'none'], env);
   lean(home, ['--uninstall', '--yes'], env);
   assert.match(fs.readFileSync(log, 'utf8'), /skills@\d[\d.]* remove lean-update -g -y/);
 });
@@ -1083,9 +1083,9 @@ test('--update installs a pinned npm tool again when it is behind, and records t
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
   const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-bin-'));
   const log = path.join(bin, 'calls.log');
-  for (const name of ['npm', 'npx', 'context-mode']) fs.writeFileSync(path.join(bin, name), `#!/bin/sh\necho "${name} $@" >> "${log}"\n`, { mode: 0o755 });
+  for (const name of ['npm', 'npx', 'context-mode', 'rtk']) fs.writeFileSync(path.join(bin, name), `#!/bin/sh\necho "${name} $@" >> "${log}"\n`, { mode: 0o755 });
   const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, LEAN_AGENTS_SKILL_SOURCE: '' };
-  const args = ['--yes', '--agents', 'opencode-v1', '--tools', 'context-mode', '--lang', 'en', '--profile', 'none'];
+  const args = ['--yes', '--agents', 'opencode-v1', '--tools', 'context-mode', '--no-gh', '--no-bun', '--lang', 'en', '--profile', 'none'];
   lean(home, args, env);
   assert.ok(!/npm install -g/.test(fs.readFileSync(log, 'utf8')), 'context-mode is on PATH: no install');
   const file = path.join(home, '.config', 'lean-agents', 'state.json');
