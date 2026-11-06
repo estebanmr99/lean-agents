@@ -18,9 +18,15 @@ Found while installing on two Windows 11 work PCs behind a corporate proxy.
 | Session | Issues | What changes |
 | --- | --- | --- |
 | 18 — Pick only what you need, pin versions | [#30](https://github.com/estebanmr99/lean-agents/issues/30), [#33](https://github.com/estebanmr99/lean-agents/issues/33), [#40](https://github.com/estebanmr99/lean-agents/issues/40) | `--no-core` skips RTK and Context Mode; MCP servers and skills use pinned versions, bumped by a skill with your approval; `--doctor` reports drift; a daily check opens one issue per tool when a new version ships |
+| 21 — Lean CI | [#42](https://github.com/estebanmr99/lean-agents/issues/42) | PRs use pinned versions and skip real-binary jobs on docs-only changes; every job has a timeout; a trimmed matrix; a daily run with the latest versions opens one issue when it breaks; the required checks and the `gh api` command are documented |
 | 19 — Migrate from another harness | [#34](https://github.com/estebanmr99/lean-agents/issues/34) | `--migrate <from|auto>` copies rules, agents, skills, MCP servers and prompts from VS Code Copilot, Claude Code, Cursor, OpenCode or Copilot CLI to the agents you pick; never overwrites, never copies secret values, reports hooks instead of converting them |
 | 20 — Install with an agent | [#35](https://github.com/estebanmr99/lean-agents/issues/35), [#36](https://github.com/estebanmr99/lean-agents/issues/36), [#37](https://github.com/estebanmr99/lean-agents/issues/37) | A guide and copy-paste prompt so your agent installs only what you ask; `--json` for `--dry-run` and `--doctor`; opt-in, redacted issue drafts after a failure; `gh` preselected with `--no-gh` |
 | 9 — Showcase | — | Logo, one short GIF per use case (dry run, uninstall, all-off preset, team mode), "who it is for" in the README |
+
+### Unscheduled, 0.6.x or 0.7.0
+
+- [#45](https://github.com/estebanmr99/lean-agents/issues/45): update from verified pins (after session 18).
+- [#46](https://github.com/estebanmr99/lean-agents/issues/46): installable CLI on npm, any OS.
 
 ## Later: 1.0.0
 

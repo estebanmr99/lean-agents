@@ -15,6 +15,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Changed
 
+- CI (#42): pull requests use the pinned versions, now including the Claude Code, OpenCode 1.x and Copilot CLI npm packages (`ciOnly` pins in `core/pins.json`, not installed for users); docs-only PRs run only `lint`, `test` and the Secret scan; every job has `timeout-minutes`; macOS dropped where it added nothing; `real-opencode-xdg` folded into `real-opencode`; shellcheck and PSScriptAnalyzer cover every tracked script.
 - MCP servers, npx tools and skills no longer fetch `@latest` or the default branch: exact versions and tags come from `core/pins.json`. Skills install with `owner/repo#<tag>` (a trailing `@<tag>` is ignored and installs HEAD). The Skills CLI is pinned to 1.5.18, the last release that runs on Node 20 (1.5.19 and later need Node 22.20+). `docs/SECURITY-REVIEW.md` and the README "On a work PC" list run-time fetches as their own category (#33).
 - Docs: `docs/privacy.md` table renders again and covers Cursor, VS Code Copilot, Warp and Orca; `tests/README.md` describes `npm test` and the `real-*` scripts; the Cursor CLI install row in `docs/compatibility.md` is correct for Windows (#27).
 - Docs: the demo step 1 has a verified Windows PowerShell block for OpenCode 2 (EN, ES); `docs/SECURITY-REVIEW.md` notes the upstream script checks no tarball checksum (#32).
@@ -22,6 +23,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ### Added
 
 - `--migrate <from|auto>` (`-Migrate` on Windows): copies rules, subagents, skills, prompts and MCP servers from Claude Code, VS Code Copilot, Cursor, Copilot CLI or OpenCode 1/2 to the agents in `--agents`, at user scope or inside a repository with `--project`. Never moves or overwrites; MCP env and header values are not copied, only their names; hooks are listed, not migrated; `--dry-run` prints an item / source / target / status table. CI job `real-migrate` runs it with the real OpenCode 2 and Claude Code (#34).
+- `ci-latest.yml`: a daily run of the real-binary jobs with the newest upstream versions; a failure opens or comments on one `version-watch` issue instead of blocking PRs (#42). `docs/branch-protection.md` has the command that makes the key checks required.
 - Orca on Windows: `ORCA_SKILL_AGENT` covers Cursor and VS Code Copilot (#21); with the all-off preset it sets `DO_NOT_TRACK=1` and `ORCA_TELEMETRY_DISABLED=1` in the user env when absent, and behind a proxy it appends the missing `localhost`, `127.0.0.1`, `::1` to the user `NO_PROXY` (#22, #28). Undo removes only what it set.
 - Git Bash: a marked `~/.bashrc` block with the Cursor `agent` / `cursor-agent` aliases (`MSYSTEM= SHELL=`) and the loopback `NO_PROXY` entries (#23, #28).
 - Cursor behind a proxy: `network.useHttp1ForAgent: true` merged into `~/.cursor/cli-config.json`; proxy values are never written (#25).

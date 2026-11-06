@@ -10,8 +10,11 @@ $env:NPM_CONFIG_PREFIX = "$dir\npm"
 New-Item -ItemType Directory -Path $env:NPM_CONFIG_PREFIX | Out-Null
 $env:Path = "$dir\npm;$env:Path"
 
-npm install -g @github/copilot
-if ($LASTEXITCODE -ne 0) { throw 'npm install @github/copilot failed' }
+Push-Location $repo
+$spec = node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('copilot-cli')))"
+Pop-Location
+npm install -g $spec
+if ($LASTEXITCODE -ne 0) { throw "npm install $spec failed" }
 copilot --version
 
 # winget is not on the runner image; install.ps1 falls back to the release zip.

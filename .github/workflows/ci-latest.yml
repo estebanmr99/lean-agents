@@ -1,0 +1,54 @@
+name: CI latest
+
+# Same real-binary jobs as ci.yml, with the newest upstream versions instead of core/pins.json.
+# A failure opens or updates one `version-watch` issue; it never blocks a PR.
+on:
+  schedule:
+    - cron: '53 6 * * *'
+  workflow_dispatch:
+    inputs:
+      force-fail:
+        description: Fail on purpose to test the issue report
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    with:
+      latest: true
+
+  forced:
+    if: inputs.force-fail
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: echo 'forced failure' && exit 1
+
+  report:
+    needs: [ci, forced]
+    if: always() && (needs.ci.result == 'failure' || needs.forced.result == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Open or update the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          FAILED_JOBS="$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json jobs -q '.jobs[] | select(.conclusion == "failure") | .name')"
+          export FAILED_JOBS
+          node scripts/ci-latest-report.mjs

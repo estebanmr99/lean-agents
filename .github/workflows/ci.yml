@@ -4,12 +4,18 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:
+    inputs:
+      latest:
+        description: Run the real-* jobs with the newest upstream versions instead of core/pins.json
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ inputs.latest && 'latest-' || '' }}${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -17,14 +23,35 @@ env:
   NODE_FOR_CONTEXT_MODE: 24
 
 jobs:
+  # Docs-only PRs skip the real-binary jobs. lint, test and the Secret scan always run.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.base_ref }}
+        run: |
+          code=true
+          if [ "$EVENT" = pull_request ] && ! git diff --name-only "origin/$BASE...HEAD" | grep -qvE '^(docs/|assets/)|\.md$'; then code=false; fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
   lint:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: shellcheck
-        run: shellcheck install.sh scripts/check-private.sh tests/*.sh
+        run: shellcheck $(git ls-files '*.sh')
 
   test:
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 15 || 10 }}
     strategy:
       fail-fast: false
       matrix:
@@ -55,7 +82,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $issues = 'install.ps1', 'tests/real-copilot.ps1' | ForEach-Object { Invoke-ScriptAnalyzer -Path $_ -Severity Warning,Error }
+          $issues = git ls-files '*.ps1' | ForEach-Object { Invoke-ScriptAnalyzer -Path $_ -Severity Warning,Error }
           $issues | Format-List
           if ($issues) { exit 1 }
       - name: install.ps1 on PowerShell 5.1
@@ -126,6 +153,9 @@ jobs:
 
   release-build:
     # The steps of release.yml up to the publish, plus a look inside the archives.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -145,9 +175,14 @@ jobs:
 
   real-opencode:
     # Real OpenCode 2 binary, throwaway HOME: proves the keys we write are accepted.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
@@ -158,20 +193,34 @@ jobs:
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - name: Install lean-agents and check what OpenCode resolved
         run: bash tests/real-opencode.sh
+      - name: Non-default XDG_CONFIG_HOME reaches the real OpenCode
+        run: |
+          export HOME="$(mktemp -d)"
+          export XDG_CONFIG_HOME="$HOME/custom-config"
+          bash install.sh --yes --no-exec --agents opencode-v2 --privacy strict --profile anthropic-api
+          test -d "$XDG_CONFIG_HOME/opencode"
+          test ! -e "$HOME/.config/opencode"
+          opencode debug config > "$HOME/resolved.txt"
+          grep -q lean-agents "$HOME/resolved.txt"
 
   real-migrate:
     # --migrate with the real OpenCode 2 and Claude Code binaries, throwaway HOME, no login:
     # `claude mcp add` runs here (no --no-exec) and `claude mcp get` reads the result back.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
       - run: npm ci
       - name: Install Claude Code and OpenCode 2
         run: |
-          curl -fsSL https://claude.ai/install.sh | bash
+          npm install -g "$(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('claude-code')))")"
           curl -fsSL https://opencode.ai/v2/install | bash
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
@@ -179,9 +228,14 @@ jobs:
 
   real-proxy:
     # Real install through a squid proxy with direct traffic blocked, network preset all off.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
@@ -201,41 +255,23 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash tests/real-proxy.sh
 
-  real-opencode-xdg:
-    # Its own job: OpenCode's background service holds a fixed port and keeps the first HOME.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
-      - run: npm ci
-      - name: Install OpenCode 2
-        run: |
-          curl -fsSL https://opencode.ai/v2/install | bash
-          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
-      - name: Non-default XDG_CONFIG_HOME reaches the real OpenCode
-        run: |
-          export HOME="$(mktemp -d)"
-          export XDG_CONFIG_HOME="$HOME/custom-config"
-          bash install.sh --yes --no-exec --agents opencode-v2 --privacy strict --profile anthropic-api
-          test -d "$XDG_CONFIG_HOME/opencode"
-          test ! -e "$HOME/.config/opencode"
-          opencode debug config > "$HOME/resolved.txt"
-          grep -q lean-agents "$HOME/resolved.txt"
-
   real-opencode-v1:
     # Real OpenCode 1.x binary, throwaway HOME: proves the 1.x keys are accepted.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
       - run: npm ci
       - name: Install OpenCode 1.19
         run: |
-          curl -fsSL https://opencode.ai/install | bash -s -- --version 1.19.0
+          npm install -g "$(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('opencode-v1')))")"
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - name: Install lean-agents and check what OpenCode resolved
         run: bash tests/real-opencode-v1.sh
@@ -243,20 +279,25 @@ jobs:
   real-parallel:
     # Real git worktrees in a throwaway repo and HOME; real Claude Code and OpenCode only get their flags checked.
     # The Orca path stays VERIFY until a job installs Orca.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
       - run: npm ci
       - name: Install Claude Code and OpenCode 2
         run: |
-          curl -fsSL https://claude.ai/install.sh | bash
+          npm install -g "$(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('claude-code')))")"
           curl -fsSL https://opencode.ai/v2/install | bash
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
@@ -264,18 +305,23 @@ jobs:
 
   real-claude:
     # Real Claude Code, throwaway HOME, no login: MCP servers go through the claude CLI.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
       - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
       - run: npm ci
       - name: Install Claude Code
         run: |
-          curl -fsSL https://claude.ai/install.sh | bash
+          npm install -g "$(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('claude-code')))")"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Use the runner's Linuxbrew
         run: echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
@@ -307,15 +353,20 @@ jobs:
 
   real-tools:
     # Real tool installs through the engine, throwaway HOME, real OpenCode 2 for the doctor.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
       - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
@@ -355,16 +406,24 @@ jobs:
 
   real-skills-undo:
     # Real Skills CLI, throwaway HOME: uninstall must remove ~/.agents/skills for every agent.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
         agents: [claude, opencode-v1, opencode-v2, 'claude,opencode-v2']
+        include:
+          - os: macos-latest
+            agents: 'claude,opencode-v2'
     runs-on: ${{ matrix.os }}
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
       - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
@@ -375,12 +434,15 @@ jobs:
       - name: Install Claude Code
         if: contains(matrix.agents, 'claude')
         run: |
-          curl -fsSL https://claude.ai/install.sh | bash
+          npm install -g "$(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('claude-code')))")"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - run: bash tests/real-skills-undo.sh '${{ matrix.agents }}'
 
   real-terminals:
     # Warp and Orca agent integrations with real Claude Code and OpenCode, throwaway HOME. The apps are GUI-only: not installed.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -388,6 +450,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
@@ -395,12 +459,12 @@ jobs:
       - name: Install Claude Code
         if: matrix.agent == 'claude'
         run: |
-          curl -fsSL https://claude.ai/install.sh | bash
+          npm install -g "$(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('claude-code')))")"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Install OpenCode 1.19
         if: matrix.agent == 'opencode-v1'
         run: |
-          curl -fsSL https://opencode.ai/install | bash -s -- --version 1.19.0
+          npm install -g "$(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('opencode-v1')))")"
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - name: Install OpenCode 2
         if: matrix.agent == 'opencode-v2'
@@ -411,6 +475,9 @@ jobs:
 
   real-copilot:
     # Real Copilot CLI and real tools, throwaway HOME, no login and no TTY.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -420,11 +487,13 @@ jobs:
       HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
       - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
       - run: npm ci
-      - run: npm install -g @github/copilot
+      - run: npm install -g "$(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('copilot-cli')))")"
       - name: Use the runner's Linuxbrew
         if: runner.os == 'Linux'
         run: echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
@@ -433,9 +502,14 @@ jobs:
 
   real-copilot-windows:
     # Real Copilot CLI on Windows through install.ps1, throwaway USERPROFILE.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 15
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
@@ -446,6 +520,9 @@ jobs:
 
   real-antigravity:
     # Real Antigravity CLI and real tools, throwaway HOME, no login and no TTY.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -455,6 +532,8 @@ jobs:
       HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
       - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
@@ -471,9 +550,14 @@ jobs:
 
   real-antigravity-windows:
     # Real Antigravity CLI on Windows through install.ps1, throwaway USERPROFILE.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 15
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
@@ -484,16 +568,21 @@ jobs:
 
   bench-context-mode:
     # Context Mode ctx_execute with Node only, then with Bun (session 11, items 8 and 9). Numbers go to the job summary.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     defaults:
       run:
         shell: bash
     steps:
       - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
@@ -543,10 +632,13 @@ jobs:
 
   real-bun:
     # Bun installed by default for Context Mode, found through the MCP client, plus reuse, --no-bun, fallback and uninstall (session 13).
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1
@@ -555,6 +647,8 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
@@ -564,15 +658,20 @@ jobs:
 
   real-cursor:
     # Real Cursor CLI and real tools, throwaway HOME, no login and no TTY.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
       - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
@@ -589,10 +688,14 @@ jobs:
 
   real-cursor-windows:
     # Real Cursor CLI on Windows (agent.cmd, Git Bash alias block), throwaway USERPROFILE.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -604,10 +707,14 @@ jobs:
   real-terminals-windows:
     # Orca user-env writes (telemetry, loopback NO_PROXY) and their undo, throwaway USERPROFILE.
     # The variables live in the runner's real user env, so the script restores them. npx is stubbed.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -618,6 +725,9 @@ jobs:
 
   real-vscode:
     # Real VS Code CLI and real tools, throwaway HOME, no login and no TTY.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -627,6 +737,8 @@ jobs:
       HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
       - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
@@ -646,6 +758,9 @@ jobs:
 
   real-winget:
     # The winget commands from prereqFor, with the runner's image missing winget.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 15
     runs-on: windows-latest
     steps:
       - name: Install winget
@@ -671,9 +786,14 @@ jobs:
 
   real-windows:
     # Real OpenCode 1.x and real tools through install.ps1, throwaway USERPROFILE.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 15
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}

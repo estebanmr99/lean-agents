@@ -33,7 +33,7 @@ Repeat the same prompt for each session. Each session must leave the repository 
 - Commits are authored by the owner (`git config user.name/user.email` set to their GitHub no-reply address) with a `Co-Authored-By` trailer for the agent.
 - Since session 6: Node.js 20.12+ and one more dependency, `@clack/prompts` (menus only on a real terminal). Network choices live in `scripts/lib/network.mjs` (`options.network` in `state.json`, `privacy` derived from it, so adapters can still read `opts.privacy`); undocumented settings in `scripts/lib/unverified.mjs` are never configured, only saved as user notes under `~/.config/lean-agents/notes/`.
 - Session 7 (2026-11-03): adapters `vscode-copilot` and `cursor`, `--project <dir>` team mode, `docs/claude-with-copilot.md`. Cursor user rules have no file (settings UI only). The VS Code user `mcp.json` path is proven by `code --add-mcp` in `real-vscode` (Linux, macOS); Copilot Chat ships built into VS Code; Cursor skills land in `~/.agents/skills`.
-- Order after 0.5.0 (2026-11-05): sessions 16, 17, 18, 19, 20, then 9. `docs/ROADMAP.md` maps each to its issues and release. Session 9 waits because new visitors should hit the fixed Windows path first.
+- Order after 0.5.0 (2026-11-05): sessions 16, 17, 18, 21, 19, 20, then 9. `docs/ROADMAP.md` maps each to its issues and release. Session 9 waits because new visitors should hit the fixed Windows path first.
 - Private terms are blocked by `scripts/check-private.sh` using the `PRIVATE_DENYLIST` repository secret in CI and a gitignored `.private-denylist` locally.
 
 ## 1. Product
@@ -476,7 +476,8 @@ Mark each `[x]` when merged.
 - [x] **Session 16 — Fixes and docs from real installs** (0.5.1). Issues #20, #27, #31, #32, #39.
 - [x] **Session 17 — Windows: Cursor CLI and Orca** (0.5.1). Issues #21, #22, #23, #25, #26, #28, #29.
 - [x] **Session 18 — Pick only what you need, pin what runs** (0.6.0). Issues #30, #33, #40.
-- [ ] **Session 19 — Migrate from one harness to another** (0.6.0). Issue #34.
+- [ ] **Session 21 — Lean CI: pinned on PRs, latest daily** (0.6.0, after session 18). Issue #42.
+- [x] **Session 19 — Migrate from one harness to another** (0.6.0). Issue #34.
 - [ ] **Session 20 — Install with an agent, opt-in feedback, gh by default** (0.6.0). Issues #35, #36, #37.
 
 ### Session 3 — Windows + OpenCode 1.x + wider CI
@@ -726,6 +727,20 @@ Branch: `session-18-core-and-pins`. Release: 0.6.0. PR body: `Closes #30, #33, #
 5. **#40 Daily version watch.** The pins from item 2 are the list of versions confirmed to work (date and CI run each). A scheduled workflow (daily plus `workflow_dispatch`, `GITHUB_TOKEN` with `issues: write` only) checks npm and GitHub releases; per item with a newer version it opens one `version-watch` issue `Update available: <item>`, or comments on the open one, never twice for the same version. Each lists the confirmed and new version, release notes, and the `real-*` jobs to run before bumping. It never changes pins.
 
 Done when: a CI job installs with the pinned versions in a throwaway HOME and `--doctor` reports no drift; a dispatched version-watch run opens one issue, a second adds a comment, a third does nothing; `npm test`, the privacy check and the README check pass.
+
+### Session 21 — Lean CI: pinned on PRs, latest daily
+
+Branch: `session-21-lean-ci`. Release: 0.6.0, after session 18. PR body: `Closes #42`. Owner decisions (2026-11-05): PR jobs use the pins from #33; `@latest` runs daily and opens or comments on an issue instead of blocking PRs; the maintainer runs the branch-protection command, CI never changes repo settings.
+
+1. **Pins for harness CLIs.** `claude-code`, `opencode-v1` and `copilot-cli` are npm pins marked `"ciOnly": true` in `core/pins.json`: CI installs them with `npm install -g <pin>`, users never get them from lean-agents, so `pinVersions()` leaves them out of `state.json` and `--doctor`. The version watch covers them. OpenCode 2, Cursor and `agy` have no npm package; they stay on the latest installer and their jobs print the version.
+2. **`paths` filter.** A `changes` job skips every `real-*`, `bench-*` and `release-build` job on a PR that only touches `docs/**`, `assets/**` or `*.md`. `lint`, `test` and the Secret scan always run.
+3. **`timeout-minutes`** on every job.
+4. **Trimmed matrix.** One OS where the OS adds nothing; Windows jobs and macOS where macOS behaviour is the point stay. `real-opencode-xdg` is a step of `real-opencode`.
+5. **Gaps.** PSScriptAnalyzer and shellcheck run on every tracked `*.ps1` and `*.sh`. `--project` only exists for Cursor and VS Code Copilot (both covered); the other adapters have no project mode.
+6. **Latest daily.** `ci-latest.yml` (cron plus `workflow_dispatch`) calls `ci.yml` with `latest: true`; each real job runs `scripts/pins-latest.mjs` on its own checkout. A failure opens or comments on one `version-watch` issue "Latest versions break CI" (`scripts/ci-latest-report.mjs`), once per run.
+7. **Required checks.** `docs/branch-protection.md` has the exact `gh api` command.
+
+Done when: a docs-only PR runs only `lint`, `test` and the Secret scan; a code PR runs the trimmed set green with pinned versions; a dispatch of `ci-latest` with `force-fail` opens an issue and a second dispatch comments; `docs/branch-protection.md` lists the checks and the command. The PR body lists job count and job-minutes before and after for a docs-only and a code PR.
 
 ### Session 19 — Migrate from one harness to another
 

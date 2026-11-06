@@ -16,4 +16,4 @@ export const npmSpec = (key) => `${pin(key).source}@${pin(key).version}`;
 // owner/repo#tag: `skills add` ignores a trailing @tag (installs HEAD) but honors #tag (verified skills 1.5.18 and 1.7.4).
 export const skillSource = (key) => `${pin(key).source}#${pin(key).version}`;
 export const skillsCli = () => npmSpec('skills-cli');
-export const pinVersions = () => Object.fromEntries(Object.entries(PINS).map(([k, p]) => [k, p.version]));
+export const pinVersions = () => Object.fromEntries(Object.entries(PINS).filter(([, p]) => !p.ciOnly).map(([k, p]) => [k, p.version]));
