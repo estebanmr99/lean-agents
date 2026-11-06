@@ -39,7 +39,7 @@ jobs:
           BASE: ${{ github.base_ref }}
         run: |
           code=true
-          if [ "$EVENT" = pull_request ] && ! git diff --name-only "origin/$BASE...HEAD" | grep -qvE '^(docs/|assets/)|\.md$'; then code=false; fi
+          if [ "$EVENT" = pull_request ] && ! git diff --name-only "origin/$BASE...HEAD" | grep -qvE '^(docs/|assets/)|^[^/]*\.md$'; then code=false; fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
 
   lint:

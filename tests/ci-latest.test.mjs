@@ -80,3 +80,10 @@ test('required checks in docs/branch-protection.md exist as jobs in ci.yml or se
     assert.ok(new RegExp(`^  ${job}:`, 'm').test(ci + scan), `${c}: no such job`);
   }
 });
+
+test('changes job: only docs, assets and root Markdown count as docs-only', () => {
+  const re = new RegExp(ci.match(/grep -qvE '([^']+)'/)[1].replace(/\\\./g, '\\.'));
+  const codeFor = (files) => files.some((f) => !re.test(f));
+  assert.equal(codeFor(['docs/SPEC.md', 'README.md', 'CHANGELOG.md', 'assets/a.png']), false);
+  for (const f of ['core/AGENTS.md', 'skills/token-audit/SKILL.md', 'core/agents/explore.md', '.github/workflows/ci.yml', 'scripts/lean.mjs']) assert.equal(codeFor([f]), true, f);
+});

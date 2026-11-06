@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Rewrites core/pins.json in the current checkout to the newest upstream versions, so the daily CI run tests `latest`.
-// Only the runner's copy changes; nothing is committed. Pins never move backwards.
+// Only the runner's copy changes; nothing is committed. Pins never move backwards. Deliberately no 14-day quarantine: the point is to see a brand-new release break before anyone bumps to it.
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isNewer, latestVersion } from './version-watch.mjs';
