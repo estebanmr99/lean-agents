@@ -29,7 +29,7 @@ const planJson = (home, args) => JSON.parse(lean(home, ['--yes', '--no-exec', '-
 function touchesOpenCode(argv) {
   const [first, ...rest] = argv;
   const bin = path.basename(first).replace(/\.(cmd|exe)$/i, '');
-  const isPkg = (t) => /^(?:[\w@.-]+\/)*(?:[\w-]+\.)?opencode(?:-[\w-]+)?(?:@[\w.-]+)?$/i.test(t);
+  const isPkg = (t) => /^(?:[\w@.-]+\/)*(?:[\w-]+\.)?opencode(?:-ai|-(?:linux|darwin|windows)-[\w-]+)?(?:@[\w.-]+)?$/i.test(t);
   if (/^(sh|bash|zsh|cmd|powershell|pwsh)$/.test(bin)) {
     const i = rest.findIndex((t) => /^(-c|\/c|-command)$/i.test(t));
     if (i >= 0) return touchesOpenCode(rest[i + 1].split(/\s+/)) || /opencode\.ai\/install/.test(rest[i + 1]);
