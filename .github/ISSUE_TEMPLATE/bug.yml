@@ -1,15 +1,19 @@
+# Fields the feedback flow (scripts/lib/feedback.mjs draftIssue, called from lean.mjs) fills today: os (platform + arch),
+# version and agents (its `versions` map: lean-agents, node, plus any tool versions), command, error.
+# Not filled yet, an agent adds it if it knows it: preset (the `--network` choice).
 name: Bug report
 description: Something in the installer or configs does not work
-labels: [bug]
+title: "bug: "
+labels: ["type: bug"]
 body:
   - type: markdown
     attributes:
-      value: Please remove usernames, paths, keys and company details from logs before posting.
-  - type: dropdown
+      value: Remove usernames, paths, keys, proxy URLs and company details from everything you paste. Never paste tokens.
+  - type: input
     id: os
     attributes:
       label: OS
-      options: [macOS, Windows (PowerShell), Windows (Git Bash), Linux]
+      placeholder: darwin arm64 / win32 x64 / linux x64
     validations:
       required: true
   - type: input
@@ -17,10 +21,34 @@ body:
     attributes:
       label: Agents and versions
       placeholder: claude 2.x, opencode 2.x
-  - type: textarea
-    id: what
+  - type: input
+    id: version
     attributes:
-      label: What happened
-      description: Command you ran and the doctor output (`--doctor`).
+      label: lean-agents version
+      description: The release tag or the commit you installed from.
+      placeholder: 0.6.0
+  - type: dropdown
+    id: preset
+    attributes:
+      label: Network preset
+      options: [on, off, custom flags, not sure]
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      description: The exact command you ran.
+      placeholder: node scripts/lean.mjs --yes --agents claude
     validations:
       required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Redacted error
+      description: The error text, plus the output of `--doctor` if you can.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected

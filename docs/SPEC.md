@@ -479,6 +479,7 @@ Mark each `[x]` when merged.
 - [x] **Session 21 — Lean CI: pinned on PRs, latest daily** (0.6.0, after session 18). Issue #42.
 - [x] **Session 19 — Migrate from one harness to another** (0.6.0). Issue #34.
 - [x] **Session 20 — Install with an agent, opt-in feedback, gh by default** (0.6.0). Issues #35, #36, #37.
+- [ ] **Session 22 — Repo audit, issue forms, labeled backlog** (0.7.0). `docs/audit-2026-11.md`, forms in `.github/ISSUE_TEMPLATE` (bug, feature, update-finding, agent-support, config), `scripts/labels.sh`, the backlog as labeled issues, "Before each release" checklist. Audit findings are filed as issues, not fixed here.
 
 ### Session 3 — Windows + OpenCode 1.x + wider CI
 
@@ -770,3 +771,11 @@ Done when: tests parse the `--json` output and check the redacted draft against 
 - Every new command or config key is either verified (date in `docs/compatibility.md`) or marked **VERIFY** with an open issue.
 - README and docs updated for what changed; CHANGELOG entry under Unreleased.
 - A short summary for the owner: what changed, how it was tested, what is pending.
+
+### Before each release
+
+- README EN and ES in sync with the code and the CHANGELOG (flags, tables, Node version, pins): `node scripts/check-readme.mjs` passes and a person re-read the first screen.
+- Audit rerun: update `docs/audit-2026-11.md` (or the newest `docs/audit-*.md`); every medium or higher finding is fixed or has an open issue.
+- Labels triaged: no open issue without a `type:` and a `priority:` label (`bash scripts/labels.sh` first if labels are missing); p0 issues are closed or consciously deferred.
+- Architecture checkpoint (#59).
+- `docs/ROADMAP.md` and `CHANGELOG.md` match what is merged.

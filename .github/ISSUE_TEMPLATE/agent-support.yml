@@ -1,6 +1,9 @@
+# Fields the feedback flow fills today: none. This form is for a request, not a failure. The os field is
+# optional context.
 name: Agent support
 description: Request or help add support for another coding agent
-labels: [agent-support]
+title: "agent: "
+labels: ["type: feature"]
 body:
   - type: input
     id: agent
@@ -13,3 +16,10 @@ body:
     attributes:
       label: Docs links
       description: Where the agent documents global instructions, subagents, MCP, plugins and skills.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS you use it on
+      placeholder: darwin arm64 / win32 x64 / linux x64

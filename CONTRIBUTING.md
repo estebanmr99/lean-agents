@@ -11,6 +11,10 @@ Thanks for helping. The full design is in [docs/SPEC.md](docs/SPEC.md); read its
 - Third-party tools are installed from upstream and credited, never vendored.
 - Conventional commits (`feat:`, `fix:`, `docs:`, `ci:`, `chore:`).
 
+## Issues and labels
+
+Pick a form when you open an issue (bug, feature, update finding, agent support); vulnerabilities go through [SECURITY.md](SECURITY.md), not an issue. Maintainers add a `priority:` (p0 to p2) and an `area:` label when triaging. `bash scripts/labels.sh` creates the label set.
+
 ## Private denylist
 
 `scripts/check-private.sh` also reads extra patterns from a local, gitignored `.private-denylist` file (one regex per line). Put your own username, company name and internal hostnames there so they can never be committed by accident.

@@ -1,0 +1,31 @@
+# Fields the feedback flow fills today: none. Feature requests are written by a person or an agent
+# on request; os and version are optional context.
+name: Feature request
+description: Suggest a change or a new capability
+title: "feat: "
+labels: ["type: feature"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is hard or missing today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What would you like to happen? One command or setting is easier to review than a design.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: darwin arm64 / win32 x64 / linux x64
+  - type: input
+    id: version
+    attributes:
+      label: lean-agents version
+      placeholder: 0.6.0

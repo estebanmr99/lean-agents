@@ -94,7 +94,7 @@ export function githubApi(repo, token) {
       return call('GET', `/issues?labels=${LABEL}&state=all&per_page=100`);
     },
     async comments(number) { return (await call('GET', `/issues/${number}/comments?per_page=100`)).map((c) => c.body); },
-    create: (title, body) => call('POST', '/issues', { title, body, labels: [LABEL] }),
+    create: (title, body) => call('POST', '/issues', { title, body, labels: [LABEL, 'type: update'] }),
     comment: (number, body) => call('POST', `/issues/${number}/comments`, { body }),
   };
 }
