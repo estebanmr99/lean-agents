@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -458,7 +462,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Context Mode 2 needs Node >=24.15; on older Node npm installs 1.x, and the pinned 2.1.4 loses its tools.
+          node-version: 24
       - name: Throwaway HOME and npm prefix
         run: |
           home="$(mktemp -d)"
@@ -519,7 +524,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Context Mode 2 needs Node >=24.15; on older Node npm installs 1.x, and the pinned 2.1.4 loses its tools.
+          node-version: 24
       - run: npm ci
       - name: Install, find, reuse, opt out, fall back, uninstall
         run: bash tests/real-bun.sh
