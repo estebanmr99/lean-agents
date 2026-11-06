@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # A PR opened with GITHUB_TOKEN triggers no pull_request run; the pin-bump job dispatches this on the PR branch instead.
+  workflow_dispatch:
   workflow_call:
     inputs:
       latest:
@@ -21,6 +23,8 @@ concurrency:
 env:
   # Context Mode 2 needs Node >=24.15 (on older Node npm installs 1.x, and the engine skips it), so every real-* job uses this.
   NODE_FOR_CONTEXT_MODE: 24
+  # The lean-update skill is pinned to a release tag that does not exist before release; real-* jobs install it from the checkout.
+  LEAN_AGENTS_SKILL_SOURCE: ${{ github.workspace }}
 
 jobs:
   # Docs-only PRs skip the real-binary jobs. lint, test and the Secret scan always run.
@@ -59,6 +63,7 @@ jobs:
         node: [22]
     runs-on: ${{ matrix.os }}
     env:
+      LEAN_AGENTS_SKILL_SOURCE: '' # engine tests assert the pinned tag form
       LEAN_AGENTS_REPO: https://github.com/${{ github.event.pull_request.head.repo.full_name || github.repository }}
       LEAN_AGENTS_REF: ${{ github.head_ref || github.ref_name }}
     steps:
@@ -440,6 +445,22 @@ jobs:
           if grep -qE '^ *! ' "$HOME/uninstall.txt"; then exit 1; fi
           test ! -e "$HOME/.gsd/defaults.json"
           if test -e "$HOME/.agents/skills/caveman"; then exit 1; fi
+
+  real-update:
+    # Old pins in a throwaway HOME, then --update with the current pins: old -> new, nothing behind, --uninstall undoes all.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
+      - run: npm ci
+      - run: bash tests/real-update.sh
 
   real-skills-undo:
     # Real Skills CLI, throwaway HOME: uninstall must remove ~/.agents/skills for every agent.

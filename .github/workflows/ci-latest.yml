@@ -2,6 +2,7 @@ name: CI latest
 
 # Same real-binary jobs as ci.yml, with the newest upstream versions instead of core/pins.json.
 # A failure opens or updates one `version-watch` issue; it never blocks a PR.
+# A green run opens one pin-bump PR (a human merges it).
 on:
   schedule:
     - cron: '53 6 * * *'
@@ -52,3 +53,39 @@ jobs:
           FAILED_JOBS="$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json jobs -q '.jobs[] | select(.conclusion == "failure") | .name')"
           export FAILED_JOBS
           node scripts/ci-latest-report.mjs
+
+  bump-pins:
+    needs: [ci, forced]
+    if: always() && needs.ci.result == 'success' && !inputs.force-fail
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Open a pin-bump PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          open="$(gh pr list --state open --json headRefName -q '.[] | select(.headRefName | startswith("pin-bump/")) | .headRefName')"
+          if [ -n "$open" ]; then echo "waiting for a human to merge $open"; exit 0; fi
+          body="$RUNNER_TEMP/bump.md"
+          node scripts/bump-pins.mjs "$body"
+          if git diff --quiet core/pins.json; then exit 0; fi
+          branch="pin-bump/$(date -u +%Y-%m-%d-%H%M)"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$branch"
+          git add core/pins.json
+          git commit -m 'chore: bump pins to the newest stable versions at least 14 days old (ci-latest was green; each version is checked by the dispatched CI run)'
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" --title 'chore: bump pins' --body-file "$body"
+          # VERIFY: a PR opened with GITHUB_TOKEN starts no pull_request run, so dispatch ci.yml on the branch for the checks.
+          gh workflow run ci.yml --ref "$branch"

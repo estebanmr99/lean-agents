@@ -95,6 +95,14 @@ Sigue docs/install-with-an-agent.md de ese repo. Pregunta antes de cada cambio.
 Nunca leas, muestres ni guardes mis claves o tokens, y nunca corras gh auth login por mí.
 ```
 
+Para actualizar después, pega esto (el skill `lean-update` se instala con lean-agents; sin él, el agente lee [la guía](docs/install-with-an-agent.md#update-with-an-agent)). También sirve para una instalación hecha a mano:
+
+```text
+Actualiza lean-agents por mí desde https://github.com/estebanmr99/lean-agents.
+Usa el skill lean-update, o sigue docs/install-with-an-agent.md "Update with an agent". Muéstrame primero una tabla y pregunta antes de cada cambio.
+Nunca leas, muestres ni guardes mis claves o tokens.
+```
+
 Usa `--lang es` para que las reglas y las respuestas queden en español.
 
 Empieza siempre con `--dry-run`: muestra cada archivo y comando antes de cambiar nada. Luego córrelo otra vez sin `--dry-run`; te pregunta qué agentes, herramientas, nivel de privacidad, idioma y perfil de modelos quieres.

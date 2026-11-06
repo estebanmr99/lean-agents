@@ -9,6 +9,12 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - Issue forms for bug, feature, update finding and agent support; blank issues are off and vulnerabilities point to `SECURITY.md`. The bug and update-finding forms list the fields the opt-in feedback flow fills (os, version, agents, command, error).
 - `scripts/labels.sh`: idempotent label set (`type:`, `priority:`, `area:`); it renames GitHub's default `bug`, `documentation` and `enhancement` so existing issues keep them.
 - `docs/audit-2026-11.md`: repo audit (README, security, network and privacy, repo health), and a "Before each release" checklist in `docs/SPEC.md`.
+- `lean-update` skill, installed for every agent through the Skills CLI at the release tag (`lean-update` pin). It reads the latest release's `core/pins.json` and CHANGELOG, detects what is installed (also for hand installs without `state.json`), runs `--update --dry-run --json`, shows a table, asks, backs up only what changes in one temp folder, runs the script, reads `--doctor --json` back and deletes the backup (#45).
+- `docs/manual-install.md` sections 6 (read-only detection command per tool) and 7 (backup snippet); a test runs every detection command with no writes.
+- `--update` prints `tool: old -> new` and installs again the tools whose pin moved (Context Mode, MCP servers, the i-have-adhd checkout), recording each command once; `--doctor --json` and `--update --dry-run --json` list `behind` (#45).
+- `--feedback-draft --feedback-kind update` drafts an "Update finding" issue with the same redaction and strict/off gate.
+- The daily green `ci-latest` run opens one `pin-bump/<date>` PR (newest stable versions at least 14 days old) and dispatches `ci.yml` on its branch; a human merges (#45). `ci.yml` gained `workflow_dispatch`.
+- CI job `real-update`: old pins in a throwaway HOME, `--update`, new versions, nothing behind, `--uninstall` leaves nothing.
 
 ### Changed
 

@@ -107,3 +107,13 @@ test('redactText: any listed home, mixed-case Windows paths, npm and AWS keys', 
   const out = redactText(`a /real/me/x b /tmp/h/y c ${winUser} npm_abcdefghijkl ${'AKIA' + 'ABCDEFGHIJKLMNOP'}`, { home: ['/tmp/h', '/real/me'], env: {}, user: '' });
   for (const leak of ['/real/me', '/tmp/h', 'JDoe', 'npm_abc', 'AKIA']) assert.ok(!out.includes(leak), `${leak} leaked: ${out}`);
 });
+
+test('--feedback-draft --feedback-kind update: update wording, same redaction, same strict gate', () => {
+  const home = tmp('lean-home-');
+  const on = JSON.parse(engine(['--home', home, '--feedback-draft', '--feedback-kind', 'update', '--failed-command', 'rtk', '--network', 'on'], { input: `rtk 1.0 at ${home}/bin` }).stdout);
+  assert.match(on.title, /^Update finding: rtk/);
+  assert.match(on.body, /## What the update found/);
+  assert.ok(!on.body.includes(home));
+  const strict = JSON.parse(engine(['--home', home, '--feedback-draft', '--feedback-kind', 'update', '--failed-command', 'rtk', '--privacy', 'strict'], { input: 'x' }).stdout);
+  assert.deepEqual(strict, { offer: false });
+});

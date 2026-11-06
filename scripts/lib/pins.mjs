@@ -17,3 +17,17 @@ export const npmSpec = (key) => `${pin(key).source}@${pin(key).version}`;
 export const skillSource = (key) => `${pin(key).source}#${pin(key).version}`;
 export const skillsCli = () => npmSpec('skills-cli');
 export const pinVersions = () => Object.fromEntries(Object.entries(PINS).filter(([, p]) => !p.ciOnly).map(([k, p]) => [k, p.version]));
+
+// Pin keys that differ from the tool name lean-agents saves in state.json options.tools.
+const PIN_TOOL = { 'playwright-mcp': 'playwright', 'gsd-core': 'gsd', 'opencode-dcp': 'dcp' };
+export const pinTool = (key) => PIN_TOOL[key] ?? key;
+// True when the saved options use this pin; the Skills CLI and the lean-update skill ride along with every install.
+export const pinInUse = (key, options) => key === 'skills-cli' || key === 'lean-update'
+  || (key === 'orca-cli' ? (options.terminals ?? []).includes('orca') : (options.tools ?? []).includes(PIN_TOOL[key] ?? key));
+
+// [{ tool, installed, pinned }] for pins in use whose saved version differs from core/pins.json now.
+export function behindPins(saved) {
+  return Object.entries(saved.pins ?? {})
+    .filter(([k, v]) => PINS[k] && !PINS[k].ciOnly && PINS[k].version !== v && pinInUse(k, saved.options))
+    .map(([tool, installed]) => ({ tool, installed, pinned: PINS[tool].version }));
+}
