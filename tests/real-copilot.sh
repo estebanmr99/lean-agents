@@ -40,13 +40,8 @@ grep -q 'copilot-instructions.md' "$HOME/rules.txt"
 copilot skill list </dev/null > "$HOME/skills.txt"
 grep -q caveman "$HOME/skills.txt"
 grep -q i-have-adhd "$HOME/skills.txt"
-# Context Mode 2 registers itself with `copilot mcp add` (upstream docs/install/copilot-cli.md), so it shows in `mcp list`.
-# Print what setup sees first, so a failure here explains itself.
-context-mode --version
-context-mode setup --list </dev/null || true
-context-mode setup --yes --agents copilot-cli --verbose </dev/null || echo "context-mode setup exit=$?"
-find "$dir" -type f | sort
-grep -q '"context-mode"' "$HOME/mcp.txt" || { echo "context-mode missing from the mcp list above" >&2; copilot mcp list --json </dev/null | grep -q '"context-mode"'; }
+# Context Mode 2 is added with `copilot mcp add` (upstream docs/install/copilot-cli.md), so it shows in `mcp list`.
+grep -q '"context-mode"' "$HOME/mcp.txt"
 
 node "$repo/scripts/lean.mjs" --doctor </dev/null
 

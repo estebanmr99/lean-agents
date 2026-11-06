@@ -30,7 +30,7 @@ export function resolvedOpenCodeConfig(text) {
 
 function checkCopilot(o, add) {
   const mcp = quiet(['copilot', 'mcp', 'list', '--json']);
-  for (const s of ['serena', 'playwright', 'playwright-extension'].filter((t) => o.tools.includes(t))) {
+  for (const s of ['serena', 'playwright', 'playwright-extension', 'context-mode'].filter((t) => o.tools.includes(t))) {
     add(`copilot mcp ${s}`, mcp.ok && mcp.out.includes(`"${s}"`) ? 'ok' : 'error', mcp.ok ? '' : 'copilot mcp list failed');
   }
   const rules = quiet(['copilot', 'instruction', 'list']);

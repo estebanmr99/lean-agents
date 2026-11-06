@@ -32,11 +32,6 @@ if ((copilot instruction list | Out-String) -notmatch 'copilot-instructions.md')
 $skills = copilot skill list | Out-String
 if ($skills -notmatch 'caveman' -or $skills -notmatch 'i-have-adhd') { throw 'Copilot does not see the skills' }
 # Context Mode 2 registers itself with `copilot mcp add` (upstream docs/install/copilot-cli.md), so it shows in `mcp list`.
-# Print what setup sees first, so a failure here explains itself.
-context-mode --version
-context-mode setup --list
-context-mode setup --yes --agents copilot-cli --verbose
-Get-ChildItem $copilot -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }
 if ((copilot mcp list --json | Out-String) -notmatch '"context-mode"') { throw 'Copilot does not see Context Mode' }
 
 & "$repo\install.ps1" -Doctor

@@ -57,10 +57,10 @@ Only after you approve the plan, and never with admin rights. `--dry-run` prints
 | Command | Why |
 | --- | --- |
 | `brew install rtk`, `uv`, `git`, `gh` or `winget install --id rtk-ai.rtk`, `astral-sh.uv`, `Git.Git`, `GitHub.cli` (`--scope user`) | missing prerequisites; `gh` only when asked |
-| `npm install -g context-mode` | Context Mode |
+| `npm install -g context-mode@2.1.4` | Context Mode |
 | `rtk init -g …` (per agent) | RTK hook or plugin |
 | `claude plugin marketplace add …`, `claude plugin install …`, `claude mcp add --scope user …` | Claude Code plugins and MCP servers |
-| `context-mode setup --yes --agents copilot-cli` | Context Mode for Copilot CLI |
+| `copilot mcp add context-mode …` (via `scripts/copilot-context-mode.mjs`) | Context Mode MCP server for Copilot CLI |
 | `npx -y skills add …` / `skills remove …` | Caveman and i-have-adhd skills |
 | `git clone --depth 1 https://github.com/ayghri/i-have-adhd …` | i-have-adhd for OpenCode |
 | `npx -y @opengsd/gsd-core@latest …` | GSD (opt-in) |

@@ -9,7 +9,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - GSD Core no longer crashes when Cursor is selected: Cursor installs with `--cursor`, and agents without a GSD installer (`vscode-copilot`) are skipped with a note (#20).
 - The test "--yes keeps every tool default for undocumented settings" no longer depends on a host proxy (#31).
 - `install.ps1` finds OpenCode 2 in `%USERPROFILE%\.opencode\bin` when it is not on PATH and says how to fix the PATH (#32).
-- Context Mode 2 on Copilot CLI: installed with `context-mode setup --yes --agents copilot-cli` (the old plugin path no longer exists upstream); Antigravity is skipped with a note because `setup --list` has no Antigravity agent. `--uninstall` runs `setup --remove` (#39).
+- Context Mode 2 on Copilot CLI: pinned `context-mode@2.1.4`, registered with `copilot mcp add` (the old plugin path no longer exists and `setup` is a no-op for Copilot); hooks and skills are left to `context-mode setup --print copilot-cli`. Antigravity is skipped with a note because `setup --list` has no Antigravity agent. `--uninstall` runs `copilot mcp remove context-mode` (#39).
 
 ### Changed
 

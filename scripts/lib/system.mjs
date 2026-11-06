@@ -74,7 +74,7 @@ export function prereqFor(tool, pm) {
     case 'rtk':
       return { bin: 'rtk', install: brew('rtk') ?? winget('rtk-ai.rtk'), manual: 'https://github.com/rtk-ai/rtk#installation' };
     case 'context-mode':
-      return { bin: 'context-mode', install: [['npm', 'install', '-g', 'context-mode']] };
+      return { bin: 'context-mode', install: [['npm', 'install', '-g', 'context-mode@2.1.4']] };
     case 'serena':
       return { bin: 'uvx', install: brew('uv') ?? winget('astral-sh.uv'), manual: 'https://docs.astral.sh/uv/getting-started/installation/' };
     case 'playwright':
