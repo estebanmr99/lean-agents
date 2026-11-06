@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { sha } from './fsops.mjs';
-import { version, quiet } from './system.mjs';
+import { version, quiet, contextModeNodeNote } from './system.mjs';
 import { adhdSkillFiles } from './adhd.mjs';
 import { proxyReport } from './network.mjs';
 import { leftovers } from './parallel.mjs';
@@ -30,14 +30,11 @@ export function resolvedOpenCodeConfig(text) {
 
 function checkCopilot(o, add) {
   const mcp = quiet(['copilot', 'mcp', 'list', '--json']);
-  for (const s of ['serena', 'playwright', 'playwright-extension'].filter((t) => o.tools.includes(t))) {
+  for (const s of ['serena', 'playwright', 'playwright-extension', 'context-mode'].filter((t) => o.tools.includes(t))) {
     add(`copilot mcp ${s}`, mcp.ok && mcp.out.includes(`"${s}"`) ? 'ok' : 'error', mcp.ok ? '' : 'copilot mcp list failed');
   }
   const rules = quiet(['copilot', 'instruction', 'list']);
   add('copilot rules loaded', rules.ok && rules.out.includes('copilot-instructions.md') ? 'ok' : 'error');
-  if (o.tools.includes('context-mode')) {
-    add('copilot plugin context-mode', quiet(['copilot', 'plugin', 'list']).out.includes('context-mode') ? 'ok' : 'error');
-  }
 }
 
 function checkCursor(o, add) {
@@ -56,19 +53,22 @@ function checkAntigravity(o, core, add) {
     add(`agy mcp ${s}`, mcp.ok && mcp.out.includes(s) ? 'ok' : 'error', mcp.ok ? '' : 'agy mcp list failed');
   }
   const plugins = quiet(['agy', 'plugin', 'list', '--json']).out;
-  for (const t of ['rtk', 'context-mode'].filter((p) => o.tools.includes(p))) {
+  for (const t of ['rtk'].filter((p) => o.tools.includes(p))) {
     add(`agy plugin ${t}`, plugins.includes(`"${t}"`) ? 'ok' : 'error');
   }
 }
 
-export function doctor({ home, state, exec }) {
+export function doctor({ home, state, exec, nodeVersion = process.versions.node }) {
   const rows = [];
   const add = (item, status, detail = '') => rows.push({ item, status, detail });
   if (!state) {
     add('lean-agents', 'missing', 'not installed (run the installer)');
   } else {
-    const o = state.options;
+    const o = { ...state.options };
+    const nodeNote = o.tools.includes('context-mode') ? contextModeNodeNote(nodeVersion) : '';
+    if (nodeNote) o.tools = o.tools.filter((t) => t !== 'context-mode');
     add('lean-agents', 'ok', `v${state.version}, agents: ${o.agents.join(', ')}, privacy: ${o.privacy}`);
+    if (nodeNote) add('context-mode', 'note', nodeNote);
     if (o.terminals?.length) add('terminals', 'ok', `integrations for ${o.terminals.join(', ')} (commands listed below; app settings are yours)`);
     const latest = [...new Map(state.files.map((f) => [f.path, f])).values()];
     for (const f of latest) {

@@ -24,7 +24,6 @@ refute grep -qE '^ *! ' "$HOME/install.txt"
 test -f "$dir/rules/lean-agents.md"
 grep -q '^model: pro$' "$dir/agents/planner.md"
 test -f "$dir/plugins/rtk/plugin.json"
-test -d "$dir/plugins/context-mode"
 test -f "$HOME/.agents/skills/caveman/SKILL.md"
 grep -q '^disable-model-invocation: false$' "$HOME/.agents/skills/i-have-adhd/SKILL.md"
 ls "$dir"/agents/gsd-* >/dev/null
@@ -36,7 +35,6 @@ grep -q serena "$HOME/mcp.txt"
 grep -q playwright "$HOME/mcp.txt"
 "$agy_bin" plugin list --json </dev/null | tee "$HOME/plugins.txt"
 grep -q '"rtk"' "$HOME/plugins.txt"
-grep -q '"context-mode"' "$HOME/plugins.txt"
 
 node "$repo/scripts/lean.mjs" --doctor </dev/null
 
@@ -46,7 +44,6 @@ refute grep -qE '^ *! ' "$HOME/uninstall.txt"
 refute test -e "$dir/rules/lean-agents.md"
 refute test -e "$dir/agents/planner.md"
 refute test -e "$dir/plugins/rtk"
-refute test -e "$dir/plugins/context-mode"
 refute test -e "$HOME/.agents/skills/caveman"
 refute compgen -G "$dir/agents/gsd-*"
 refute grep -qs serena "$dir/mcp_config.json"

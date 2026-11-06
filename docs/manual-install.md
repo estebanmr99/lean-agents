@@ -62,7 +62,7 @@ Copilot CLI and Antigravity CLI:
 | Rules | Paste `core/AGENTS.md` into `~/.copilot/copilot-instructions.md` | Copy to `~/.gemini/config/rules/` |
 | Subagents | `~/.copilot/agents/<name>.agent.md` | `~/.gemini/config/agents/<name>.md` with `subagent: true` |
 | RTK | `rtk init -g --copilot` | `rtk init -g --agent antigravity` |
-| Context Mode | `copilot plugin install mksglu/context-mode:configs/copilot-cli` | `agy plugin install https://github.com/mksglu/context-mode/tree/main/configs/antigravity-cli` |
+| Context Mode | `npm install -g context-mode@2.1.4`, then the `copilot mcp add` step from `context-mode setup --print copilot-cli` | not supported by Context Mode 2 |
 | Serena, Playwright | `mcpServers` in `~/.copilot/mcp-config.json`, with `"type": "local"` and `"tools": ["*"]` | `mcpServers` in `~/.gemini/config/mcp_config.json` |
 | Caveman | `npx skills add JuliusBrussee/caveman --skill caveman caveman-compress caveman-stats -a github-copilot -g -y` | Same with `-a antigravity-cli` |
 

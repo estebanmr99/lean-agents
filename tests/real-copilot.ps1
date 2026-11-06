@@ -31,7 +31,12 @@ if ((copilot mcp list --json | Out-String) -notmatch '"playwright"') { throw 'Co
 if ((copilot instruction list | Out-String) -notmatch 'copilot-instructions.md') { throw 'Copilot does not see the rules' }
 $skills = copilot skill list | Out-String
 if ($skills -notmatch 'caveman' -or $skills -notmatch 'i-have-adhd') { throw 'Copilot does not see the skills' }
-if ((copilot plugin list | Out-String) -notmatch 'context-mode') { throw 'Copilot does not see Context Mode' }
+# Context Mode 2 registers itself with `copilot mcp add` (upstream docs/install/copilot-cli.md), so it shows in `mcp list`.
+$cm = ((copilot mcp list --json | Out-String) | ConvertFrom-Json).mcpServers.'context-mode'
+if (-not $cm) { throw 'Copilot does not see Context Mode' }
+# The registered server file must exist, or Copilot would list a server that cannot start.
+$server = @($cm.args) | Where-Object { $_ -like '*server.mjs' } | Select-Object -First 1
+if (-not $server -or -not (Test-Path -LiteralPath $server)) { throw "Context Mode server file is missing: $server" }
 
 & "$repo\install.ps1" -Doctor
 
@@ -39,4 +44,7 @@ if ((copilot plugin list | Out-String) -notmatch 'context-mode') { throw 'Copilo
 if (Test-Path "$copilot\agents\planner.agent.md") { throw 'subagents were not removed' }
 if (Test-Path $rtkHook) { throw 'RTK hook was not removed' }
 if (Test-Path "$dir\.agents\skills\caveman") { throw 'Caveman skills were not removed' }
-if ((copilot plugin list | Out-String) -match 'context-mode') { throw 'Context Mode was not removed' }
+# Uninstall must leave a config Copilot accepts (it rejects a file without mcpServers).
+$after = copilot mcp list --json | Out-String
+if ($LASTEXITCODE -ne 0) { throw 'copilot mcp list failed after uninstall' }
+if ($after -match '"context-mode"') { throw 'Context Mode was not removed' }

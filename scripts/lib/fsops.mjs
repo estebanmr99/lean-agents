@@ -160,7 +160,7 @@ export function apply(planned, backupDir, home) {
     }
     fs.mkdirSync(path.dirname(p.path), { recursive: true });
     fs.writeFileSync(p.path, p.after);
-    entries.push({ path: p.path, kind: p.kind, created: p.before === null, backup, hash: sha(p.after), applied: p.applied });
+    entries.push({ path: p.path, kind: p.kind, created: p.before === null, backup, hash: sha(p.after), applied: p.applied, keepEmpty: p.keepEmpty });
   }
   return entries;
 }
@@ -179,7 +179,16 @@ export function undo(entries) {
       fs.writeFileSync(e.path, fs.readFileSync(e.backup, 'utf8'));
       report.push(['restored', e.path]);
     } else if (e.kind === 'json') {
-      fs.writeFileSync(e.path, revertJsonEdits(now, e.applied ?? []));
+      let text = revertJsonEdits(now, e.applied ?? []);
+      const left = parse(text, [], { allowTrailingComma: true });
+      if (e.created && left && typeof left === 'object' && !Object.keys(left).length) {
+        fs.rmSync(e.path);
+        report.push(['removed', e.path]);
+        continue;
+      }
+      // A tool that rejects a file without its container key (Copilot: "mcpServers: Required") keeps it empty.
+      for (const key of e.keepEmpty ?? []) if (getAt(text, key) === undefined) text = applyEdits(text, modify(text, key, {}, FORMAT));
+      fs.writeFileSync(e.path, text);
       report.push(['reverted our keys', e.path]);
     } else if (e.kind === 'block') {
       fs.writeFileSync(e.path, removeBlock(now));

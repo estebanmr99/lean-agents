@@ -66,7 +66,7 @@ for (const [k, ok] of Object.entries(checks)) console.log(`${ok ? 'ok  ' : 'FAIL
 if (Object.values(checks).includes(false)) process.exit(1);
 JS
 
-# Checks for docs/compatibility.md: gh and agy behind a proxy, and gh with a corporate CA.
+# Checks for docs/compatibility.md: gh behind a proxy, and gh with a corporate CA.
 gh api /zen >/dev/null
 ca_dir="$(mktemp -d)"
 : > "$ca_dir/empty.pem"
@@ -75,8 +75,7 @@ if SSL_CERT_FILE="$ca_dir/empty.pem" SSL_CERT_DIR="$ca_dir" gh api /zen >/dev/nu
 fi
 grep -i certificate "$HOME/gh-ca.txt"
 agy --version
-HTTPS_PROXY="$https_proxy" HTTP_PROXY="$http_proxy" agy plugin install https://github.com/mksglu/context-mode/tree/main/configs/antigravity-cli
-echo "gh and agy through the proxy: ok"
+echo "gh through the proxy: ok"
 
 { docker exec lean-squid cat /var/log/squid/access.log; docker logs lean-squid; } > "$HOME/squid.txt" 2>&1 || true
 grep -Eo 'CONNECT [^ ]+' "$HOME/squid.txt" | sort -u

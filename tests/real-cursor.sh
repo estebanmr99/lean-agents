@@ -19,7 +19,7 @@ unset XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 dir="$HOME/.cursor"
 
-bash "$repo/install.sh" --yes --agents cursor --tools serena,playwright,playwright-extension,caveman,i-have-adhd \
+bash "$repo/install.sh" --yes --agents cursor --tools serena,playwright,playwright-extension,caveman,i-have-adhd,gsd \
   --privacy strict --lang en --ponytail-mode off </dev/null 2>&1 | tee "$HOME/install.txt"
 refute grep -qE '^ *! ' "$HOME/install.txt"
 
@@ -27,6 +27,8 @@ grep -q '^readonly: true$' "$dir/agents/explore.md"
 grep -q '^model: inherit$' "$dir/agents/planner.md"
 test -f "$dir/hooks.json"
 grep -q rtk "$dir/hooks.json"
+# GSD (#20) adds its lifecycle hooks next to the RTK hook.
+grep -qi gsd "$dir/hooks.json"
 # The Skills CLI puts Cursor skills in ~/.agents/skills, which Cursor reads.
 test -f "$HOME/.agents/skills/caveman/SKILL.md"
 grep -q '^disable-model-invocation: false$' "$HOME/.agents/skills/i-have-adhd/SKILL.md"

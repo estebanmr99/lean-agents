@@ -58,12 +58,8 @@ export function antigravityAdapter({ home, core, profile, opts, rules, adhdComma
     commands.push({ tool: 'rtk', desc: 'RTK plugin for Antigravity', run: [['rtk', 'init', '-g', '--agent', 'antigravity']], undo: [['rtk', 'init', '-g', '--agent', 'antigravity', '--uninstall']] });
   }
   if (tools.includes('context-mode')) {
-    commands.push({
-      tool: 'context-mode',
-      desc: 'Context Mode plugin for Antigravity',
-      run: [['agy', 'plugin', 'install', 'https://github.com/mksglu/context-mode/tree/main/configs/antigravity-cli']],
-      undo: [['agy', 'plugin', 'uninstall', 'context-mode']],
-    });
+    // Context Mode 2.x dropped its Antigravity plugin and `context-mode setup --list` has no antigravity agent (2.1.4).
+    console.log('Context Mode has no Antigravity setup in v2: skipped. Check `context-mode setup --list` for support.');
   }
   if (tools.includes('caveman')) {
     commands.push(skills('caveman', 'Caveman skills for Antigravity', 'JuliusBrussee/caveman', ['caveman', 'caveman-compress', 'caveman-stats']));

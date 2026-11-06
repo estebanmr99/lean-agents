@@ -56,6 +56,13 @@ if ([version]$nodeVersion.TrimStart('v') -lt [version]'20.12.0') {
   throw "lean-agents: Node.js 20.12 or newer is required (found $nodeVersion). Update from https://nodejs.org/"
 }
 
+# The OpenCode 2 upstream script (Git Bash) installs here and only edits ~/.bashrc, so PowerShell never sees it.
+$OpenCodeBin = Join-Path $env:USERPROFILE '.opencode\bin'
+if (-not (Test-Command 'opencode') -and (Test-Path (Join-Path $OpenCodeBin 'opencode.exe'))) {
+  Write-Output "OpenCode is in $OpenCodeBin but not on your PATH. Detecting it for this run only; to fix it for good, add that folder to your user PATH."
+  $env:Path = "$env:Path;$OpenCodeBin"
+}
+
 # Use the checkout this script lives in, if any; otherwise clone or update the source folder.
 if ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot 'scripts\lean.mjs'))) {
   $Src = $PSScriptRoot

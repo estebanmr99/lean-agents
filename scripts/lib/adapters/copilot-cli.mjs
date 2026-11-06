@@ -1,10 +1,13 @@
 // GitHub Copilot CLI adapter. Paths and keys confirmed on copilot 1.0.105 in CI.
 // Copilot has no rule import, so the rendered rules go in a marked block.
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { OWNED_MARK } from '../fsops.mjs';
 import { tierFor, modelFor } from '../render.mjs';
 import { envDir } from '../system.mjs';
 import { localServer } from './opencode-v2.mjs';
+
+const CONTEXT_MODE_SCRIPT = fileURLToPath(new URL('../../copilot-context-mode.mjs', import.meta.url));
 
 const TOOLS = {
   'read-only': ['read', 'search'],
@@ -45,7 +48,7 @@ export function copilotAdapter({ home, core, profile, opts, rules, adhdCommand }
     const [command, ...args] = localServer(core, name).command;
     edits.push({ path: ['mcpServers', name], value: { type: 'local', command, args, tools: ['*'] }, mode: 'setIfAbsent' });
   }
-  if (edits.length) actions.push({ kind: 'json', path: path.join(dir, 'mcp-config.json'), edits });
+  if (edits.length) actions.push({ kind: 'json', path: path.join(dir, 'mcp-config.json'), edits, keepEmpty: [['mcpServers']] });
   if (opts.network.autoUpdate === 'off') {
     actions.push({ kind: 'json', path: path.join(dir, 'settings.json'), edits: [{ path: ['autoUpdate'], value: false, mode: 'set' }] });
   }
@@ -54,13 +57,14 @@ export function copilotAdapter({ home, core, profile, opts, rules, adhdCommand }
     commands.push({ tool: 'rtk', desc: 'RTK hook for Copilot CLI', run: [['rtk', 'init', '-g', '--copilot']], undo: [['rtk', 'init', '-g', '--copilot', '--uninstall']] });
   }
   if (tools.includes('context-mode')) {
-    // The plugin brings its own MCP server and hooks, so it is never added to mcp-config.json too.
+    // Only the MCP server (`copilot mcp add`, which writes mcp-config.json itself); the npm package comes from the prerequisite step.
     commands.push({
       tool: 'context-mode',
-      desc: 'Context Mode plugin for Copilot CLI',
-      run: [['copilot', 'plugin', 'install', 'mksglu/context-mode:configs/copilot-cli']],
-      undo: [['copilot', 'plugin', 'uninstall', 'context-mode']],
+      desc: 'Context Mode MCP server for Copilot CLI',
+      run: [['node', CONTEXT_MODE_SCRIPT]],
+      undo: [['copilot', 'mcp', 'remove', 'context-mode']],
     });
+    console.log('Context Mode hooks and skills for Copilot CLI are not installed: run `context-mode setup --print copilot-cli` and follow it.');
   }
   if (tools.includes('caveman')) {
     commands.push(skills('caveman', 'Caveman skills for Copilot CLI', 'JuliusBrussee/caveman', ['caveman', 'caveman-compress', 'caveman-stats']));

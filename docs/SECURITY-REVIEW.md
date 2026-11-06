@@ -57,10 +57,10 @@ Only after you approve the plan, and never with admin rights. `--dry-run` prints
 | Command | Why |
 | --- | --- |
 | `brew install rtk`, `uv`, `git`, `gh` or `winget install --id rtk-ai.rtk`, `astral-sh.uv`, `Git.Git`, `GitHub.cli` (`--scope user`) | missing prerequisites; `gh` only when asked |
-| `npm install -g context-mode` | Context Mode |
+| `npm install -g context-mode@2.1.4` | Context Mode |
 | `rtk init -g …` (per agent) | RTK hook or plugin |
 | `claude plugin marketplace add …`, `claude plugin install …`, `claude mcp add --scope user …` | Claude Code plugins and MCP servers |
-| `copilot plugin install …`, `agy plugin install …` | Context Mode for Copilot CLI and Antigravity |
+| `copilot mcp add context-mode …` (via `scripts/copilot-context-mode.mjs`) | Context Mode MCP server for Copilot CLI |
 | `npx -y skills add …` / `skills remove …` | Caveman and i-have-adhd skills |
 | `git clone --depth 1 https://github.com/ayghri/i-have-adhd …` | i-have-adhd for OpenCode |
 | `npx -y @opengsd/gsd-core@latest …` | GSD (opt-in) |
@@ -94,5 +94,7 @@ Each one comes from its upstream source; see the README "Credits" table for link
 | DCP | optional, OpenCode 1.x | **VERIFY** |
 | GSD, AutoSkills | opt-in only | **VERIFY** |
 | GitHub CLI | only when asked | telemetry: `GH_TELEMETRY=false` |
+
+OpenCode 2 is installed by upstream's `curl https://opencode.ai/v2/install | bash`, not by lean-agents. On Windows it downloads an npm tarball (`@opencode/cli-windows-x64`) over HTTPS and checks no checksum: the registry's `dist.integrity` is not compared. On a work PC, review the script first (real install, #32, 2026-11-05).
 
 lean-agents never asks for, stores or prints API keys, tokens or proxy passwords. Logins (`gh auth login`, `/login`, `/connect`) stay with you.

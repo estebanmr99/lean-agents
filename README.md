@@ -35,9 +35,17 @@ The same rules, cheap-by-default subagents, context-saving tools and MCP servers
 
 ## Demo: OpenCode with GitHub Copilot models
 
-1. Install OpenCode (macOS, Linux or Git Bash). On Windows, see the [OpenCode docs](https://opencode.ai/docs):
+1. Install OpenCode. macOS, Linux or Git Bash:
    ```bash
    curl -fsSL https://opencode.ai/v2/install | bash
+   ```
+   Windows PowerShell (the upstream script runs through Git Bash and only edits `~/.bashrc`, so this adds the folder to your user PATH; open a new terminal afterwards):
+   ```powershell
+   curl.exe -fsSL https://opencode.ai/v2/install -o "$env:TEMP\opencode-install.sh"
+   & "$env:ProgramFiles\Git\bin\bash.exe" -l (($env:TEMP -replace '\\','/') + '/opencode-install.sh') --no-modify-path
+   $bin = "$HOME\.opencode\bin"; $u = [Environment]::GetEnvironmentVariable('Path','User')
+   if (($u -split ';') -notcontains $bin) { [Environment]::SetEnvironmentVariable('Path', "$u;$bin", 'User') }
+   opencode --version
    ```
 2. Preview what lean-agents would change (`--yes` takes the defaults, so the preview asks nothing). macOS, Linux or Git Bash:
    ```bash

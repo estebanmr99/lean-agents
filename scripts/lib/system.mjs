@@ -74,7 +74,7 @@ export function prereqFor(tool, pm) {
     case 'rtk':
       return { bin: 'rtk', install: brew('rtk') ?? winget('rtk-ai.rtk'), manual: 'https://github.com/rtk-ai/rtk#installation' };
     case 'context-mode':
-      return { bin: 'context-mode', install: [['npm', 'install', '-g', 'context-mode']] };
+      return { bin: 'context-mode', install: [['npm', 'install', '-g', 'context-mode@2.1.4']] };
     case 'serena':
       return { bin: 'uvx', install: brew('uv') ?? winget('astral-sh.uv'), manual: 'https://docs.astral.sh/uv/getting-started/installation/' };
     case 'playwright':
@@ -150,3 +150,11 @@ export function quiet(argv, timeout = 30000) {
 }
 
 export const exists = (p) => fs.existsSync(p);
+
+// Context Mode 2.1.4 declares engines.node >=24.15.0; on older Node npm installs 1.x, or 2.x without its tools.
+const CONTEXT_MODE_NODE = [24, 15, 0];
+export function contextModeNodeNote(nodeVersion) {
+  const have = nodeVersion.split('.').map(Number);
+  const ok = CONTEXT_MODE_NODE.reduce((state, min, i) => (state !== 0 ? state : Math.sign((have[i] ?? 0) - min)), 0) >= 0;
+  return ok ? '' : `Context Mode 2 needs Node ${CONTEXT_MODE_NODE.slice(0, 2).join('.')}+, found ${nodeVersion}: skipped. Upgrade Node (or nvm install 24) and run --update.`;
+}

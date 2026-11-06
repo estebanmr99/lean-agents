@@ -25,7 +25,10 @@ if (@(Get-ChildItem -Force $dir).Count -ne 1) { throw 'piped dry run wrote outsi
 
 Write-Output '--- -NoBun turns Bun off in the plan'
 $dir = New-TempProfile
+# The Bun line only exists when Context Mode is planned, which needs Node 24.15+; fake it so Node 22 still checks the flag.
+$env:LEAN_AGENTS_NODE = '24.22.2'
 $plan = & "$repo\install.ps1" -DryRun -Yes -Agents claude -NoBun -Privacy standard -Lang en --no-exec | Out-String
+Remove-Item Env:LEAN_AGENTS_NODE
 if ($plan -notmatch 'bun: off') { throw "-NoBun did not reach the engine: $plan" }
 
 Write-Output '--- install, doctor and uninstall'

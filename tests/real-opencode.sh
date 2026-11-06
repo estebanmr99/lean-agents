@@ -27,6 +27,7 @@ import fs from 'node:fs';
 const out = fs.readFileSync(process.argv[2], 'utf8');
 const agentsOut = fs.readFileSync(process.argv[4], 'utf8');
 const { resolvedOpenCodeConfig } = await import(`${process.argv[3]}/scripts/lib/doctor.mjs`);
+const { contextModeNodeNote } = await import(`${process.argv[3]}/scripts/lib/system.mjs`);
 let cfg;
 try { cfg = resolvedOpenCodeConfig(out); } catch (e) { console.log(out); throw e; }
 const servers = cfg.mcp?.servers ?? cfg.mcp ?? {};
@@ -35,7 +36,7 @@ const checks = {
   'mcp serena': !!servers.serena,
   'mcp playwright': !!servers.playwright,
   'mcp playwright-extension': (servers['playwright-extension']?.command ?? []).includes('--extension'),
-  'mcp context-mode': !!servers['context-mode'],
+  'mcp context-mode': !!servers['context-mode'] || contextModeNodeNote(process.versions.node) !== '', // skipped on Node < 24.15
   'plan model': JSON.stringify(cfg.agents?.plan?.model ?? null).includes('claude-opus-5-5'),
   'subagents loaded': ['explore', 'research', 'review', 'debug', 'planner'].every((a) => agentsOut.includes(a)),
   'deny opencode provider': (cfg.policies ?? []).some((p) => p.resource === 'opencode' && p.effect === 'deny'),
