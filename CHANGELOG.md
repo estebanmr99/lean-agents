@@ -6,6 +6,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Changed
 
+- Secret scan covers main (#91): a push runs the gitleaks CLI (v8.30.1, SHA-256 checked) on the commits it brings in, and a weekly run scans the full history. The gitleaks action stays for pull requests; on main it scanned 0 commits because it skips merge commits.
 - `CONTRIBUTING.md` has a "Development" section (Node 22.20+, `npm ci`, `npm test`, shellcheck, privacy check, safe dry run), the adapter path (`scripts/lib/adapters/*.mjs`, not `agents/`), and a "Proposing a tool" section linked from `tools/README.md` (#71).
 - `--doctor` honors the network preset (#72, N7, N8): child commands get `DO_NOT_TRACK` and friends under telemetry off, and `mcp list` (which starts Serena and Playwright) is skipped with one `skipped` row when outbound is off. `tests/doctor-network.test.mjs`.
 - Every third-party GitHub Action is pinned to a full commit SHA with a `# vX.Y.Z` comment (#69). Dependabot (`.github/dependabot.yml`) opens weekly update PRs for npm and actions. A `lint` step fails on any new tag-only `uses:` line.
