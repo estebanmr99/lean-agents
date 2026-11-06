@@ -22,18 +22,35 @@ Found while installing on two Windows 11 work PCs behind a corporate proxy.
 | 19 — Migrate from another harness | [#34](https://github.com/estebanmr99/lean-agents/issues/34) | `--migrate <from|auto>` copies rules, agents, skills, MCP servers and prompts from VS Code Copilot, Claude Code, Cursor, OpenCode or Copilot CLI to the agents you pick; never overwrites, never copies secret values, reports hooks instead of converting them |
 | 20 — Install with an agent | [#35](https://github.com/estebanmr99/lean-agents/issues/35), [#36](https://github.com/estebanmr99/lean-agents/issues/36), [#37](https://github.com/estebanmr99/lean-agents/issues/37) | A guide and copy-paste prompt so your agent installs only what you ask; `--json` for `--dry-run` and `--doctor`; opt-in, redacted issue drafts after a failure; `gh` preselected with `--no-gh` |
 
-## Next release (on hold)
+## 0.7.0: trust what runs, then ship to npm
+
+Scope and order from the architecture checkpoint [`docs/checkpoints/0.7.0.md`](checkpoints/0.7.0.md), accepted by the owner on 2026-11-06.
+
+| Session | Issues | What changes |
+| --- | --- | --- |
+| 45 — Agent-first updates (done) | [#45](https://github.com/estebanmr99/lean-agents/issues/45) | `lean-update` skill, `--update` prints old -> new, daily pin-bump PR |
+| 58 — 1-minute README (done) | [#58](https://github.com/estebanmr99/lean-agents/issues/58) | Short README EN and ES with a support matrix, enforced in CI |
+| 59 — Architecture checkpoint | [#59](https://github.com/estebanmr99/lean-agents/issues/59) | One keep / change / spike per question; this scope |
+| 69 — CI trust | [#69](https://github.com/estebanmr99/lean-agents/issues/69), [#70](https://github.com/estebanmr99/lean-agents/issues/70), [#56](https://github.com/estebanmr99/lean-agents/issues/56) | Actions pinned by SHA, least-privilege tokens, macOS jobs fixed or trimmed, one update channel, `ci-latest` green |
+| 68 — File safety and redaction | [#68](https://github.com/estebanmr99/lean-agents/issues/68), [#67](https://github.com/estebanmr99/lean-agents/issues/67), [#74](https://github.com/estebanmr99/lean-agents/issues/74), [#72](https://github.com/estebanmr99/lean-agents/issues/72) | No symlink or out-of-home writes, more token formats redacted, child env allowlist, doctor obeys the network preset |
+| 71 — Contributor and governance docs | [#71](https://github.com/estebanmr99/lean-agents/issues/71), [#73](https://github.com/estebanmr99/lean-agents/issues/73) | Dev setup, adapter path, `SECURITY.md`, PR template, `CODEOWNERS` |
+| 79 — OpenCode 1.x safety and Orca | [#79](https://github.com/estebanmr99/lean-agents/issues/79), [#78](https://github.com/estebanmr99/lean-agents/issues/78) | Never cross OpenCode 1.x to 2.x, warn about session loss; Orca status icons on OpenCode 1.19 |
+| 64 — Pin and verify downloaded code | [#64](https://github.com/estebanmr99/lean-agents/issues/64), [#66](https://github.com/estebanmr99/lean-agents/issues/66), [#75](https://github.com/estebanmr99/lean-agents/issues/75) | Serena, Context Mode, ponytail, Warp and the Bun installer pinned and checked |
+| 50 — Pin bumps | [#50](https://github.com/estebanmr99/lean-agents/issues/50), [#51](https://github.com/estebanmr99/lean-agents/issues/51), [#52](https://github.com/estebanmr99/lean-agents/issues/52) | orca-cli, gsd-core, playwright-mcp |
+| 44 — Context Mode on Node < 24.15 | [#44](https://github.com/estebanmr99/lean-agents/issues/44) | Install Node 24 via nvm, or skip Context Mode |
+| 65 — How you get it | [#65](https://github.com/estebanmr99/lean-agents/issues/65), [#46](https://github.com/estebanmr99/lean-agents/issues/46) | Bootstraps default to the release tag; `npx lean-agents` from npm |
+| Archive done sessions | — | Finished session blocks move out of `docs/SPEC.md` |
+
+## 0.8.0
+
+- [#80](https://github.com/estebanmr99/lean-agents/issues/80): agent lifecycle (optional install, uninstall, migrate, guided major upgrades).
+- [#60](https://github.com/estebanmr99/lean-agents/issues/60): the multi-agent coordinator workflow as an opt-in playbook.
+
+## On hold
 
 | Session | Issues | What changes |
 | --- | --- | --- |
 | 9 — Showcase | — | Logo, one short GIF per use case (dry run, uninstall, all-off preset, team mode), "who it is for" in the README |
-
-Other open items: [#44](https://github.com/estebanmr99/lean-agents/issues/44) (`nvm install 24` helper), #56.
-
-### Unscheduled
-
-- [#45](https://github.com/estebanmr99/lean-agents/issues/45): update from verified pins (after session 18).
-- [#46](https://github.com/estebanmr99/lean-agents/issues/46): installable CLI on npm, any OS.
 
 ## Later: 1.0.0
 

@@ -484,11 +484,12 @@ Mark each `[x]` when merged.
 - [x] **Session 58 — 1-minute README** (0.7.0). Issue #58, PR #81. Short README EN and ES with a support matrix, "what you get" and "who it is for"; `scripts/check-readme.mjs` enforces the 1-minute rule in CI.
 - [ ] **Session 59 — Architecture checkpoint** (0.7.0). Issue #59. [`docs/checkpoints/0.7.0.md`](checkpoints/0.7.0.md): one keep / change / spike per question, and the 0.7.0 sessions below.
 
-0.7.0 sessions proposed by the checkpoint, pending the owner's pick (order and parallel groups in [`docs/checkpoints/0.7.0.md`](checkpoints/0.7.0.md) section 5):
+0.7.0 sessions from the checkpoint, accepted by the owner on 2026-11-06 (order and parallel groups in [`docs/checkpoints/0.7.0.md`](checkpoints/0.7.0.md) section 5):
 
 - [ ] **Session 69 — CI trust** (0.7.0). Issues #69, #70, #56. Actions pinned by SHA plus Dependabot, least-privilege tokens, macOS jobs fixed or trimmed, one update channel (pin-bump PR, no per-tool issues), `ci-latest` green. Sonnet.
 - [ ] **Session 68 — File safety and redaction** (0.7.0). Issues #68, #67, #74, #72. Opus plans the env allowlist, Sonnet builds.
 - [ ] **Session 71 — Contributor and governance docs** (0.7.0). Issues #71, #73. Haiku.
+- [ ] **Session 79 — OpenCode 1.x safety and Orca** (0.7.0). Issues #79, #78. Never cross OpenCode 1.x to 2.x, warn about session loss; Orca status icons on OpenCode 1.19 (`scripts/lib/terminals.mjs`). After 44 if it touches `scripts/lib/system.mjs`. Sonnet.
 - [ ] **Session 64 — Pin and verify downloaded code** (0.7.0, after 69). Issues #64, #66, #75. Sonnet.
 - [ ] **Session 50 — Pin bumps** (0.7.0, after 64). Issues #50, #51, #52. Haiku.
 - [ ] **Session 44 — Context Mode on Node < 24.15** (0.7.0, after 64). Issue #44. Sonnet.
