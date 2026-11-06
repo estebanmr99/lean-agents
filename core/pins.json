@@ -1,7 +1,7 @@
 {
   "note": "Known-good versions fetched at run time. Bump only after the real-* job in 'ci' passes with the new version; 'verified' is the day the version was checked against npm or the git tag. Never use a version published in the last 14 days.",
   "pins": {
-    "skills-cli": { "kind": "npm", "source": "skills", "version": "1.7.4", "verified": "2026-11-05", "ci": "real-skills-undo" },
+    "skills-cli": { "kind": "npm", "source": "skills", "version": "1.5.18", "verified": "2026-11-05", "ci": "real-skills-undo", "note": "Last release declaring Node >=18. 1.5.19 and later need Node >=22.20.0 and crash on Node 20 (fs/promises has no glob), so do not bump while Node 20 is supported." },
     "playwright-mcp": { "kind": "npm", "source": "@playwright/mcp", "version": "0.0.83", "verified": "2026-11-05", "ci": "real-tools" },
     "context-mode": { "kind": "npm", "source": "context-mode", "version": "2.1.4", "verified": "2026-11-05", "ci": "real-claude" },
     "codeburn": { "kind": "npm", "source": "codeburn", "version": "0.9.27", "verified": "2026-11-05", "ci": "real-tools" },

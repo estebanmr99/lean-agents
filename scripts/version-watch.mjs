@@ -28,6 +28,7 @@ function render(key, p, version) {
     `New upstream version: \`${version}\`.`,
     `Release notes: ${notesUrl(p, version)}`,
     'Do not bump to a version published in the last 14 days.',
+    ...(p.note ? [`Note: ${p.note}`] : []),
     `Run before bumping: the \`${p.ci}\` job (or its \`tests/real-*.sh\` script in a sandbox HOME).`,
     'This watch never changes pins. To bump, follow "Tool versions" in `skills/update-models/SKILL.md` and edit `core/pins.json` after the owner approves.',
     mark(version),

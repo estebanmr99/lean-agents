@@ -47,6 +47,11 @@ test('run: first newer version opens one issue, the next version comments, the s
   assert.equal(api.issues[0].comments.length, 1);
 });
 
+test('plan puts the pin note in the issue body', () => {
+  const [a] = plan({ tool: { ...pins.tool, note: 'stay on 1.x' } }, { tool: '2.0.0' }, []);
+  assert.match(a.body, /Note: stay on 1\.x/);
+});
+
 test('plan skips a pin that is current and a failed lookup', () => {
   assert.deepEqual(plan(pins, { tool: '1.0.0', skill: null }, []), []);
 });
