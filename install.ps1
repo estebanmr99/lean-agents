@@ -14,6 +14,7 @@ param(
   [switch]$NoCore,
   [switch]$NoBun,
   [switch]$NoApp,
+  [switch]$NoGh,
   [string]$Privacy,
   # $Profile is a PowerShell automatic variable, so -Profile binds through an alias.
   [Alias('Profile')][string]$ModelProfile,
@@ -96,7 +97,7 @@ if (-not $DryRun -and (Test-Path (Join-Path $rtkDir 'rtk.exe'))) {
 }
 
 $engineArgs = @()
-$switches = [ordered]@{ DryRun = '--dry-run'; Yes = '--yes'; AllTools = '--all-tools'; NoTools = '--no-tools'; NoCore = '--no-core'; NoBun = '--no-bun'; NoApp = '--no-app'; Update = '--update'; Uninstall = '--uninstall'; Doctor = '--doctor' }
+$switches = [ordered]@{ DryRun = '--dry-run'; Yes = '--yes'; AllTools = '--all-tools'; NoTools = '--no-tools'; NoCore = '--no-core'; NoBun = '--no-bun'; NoApp = '--no-app'; NoGh = '--no-gh'; Update = '--update'; Uninstall = '--uninstall'; Doctor = '--doctor' }
 foreach ($name in $switches.Keys) { if ($PSBoundParameters[$name]) { $engineArgs += $switches[$name] } }
 $lists = [ordered]@{ Agents = '--agents'; Tools = '--tools' }
 foreach ($name in $lists.Keys) { if ($PSBoundParameters[$name]) { $engineArgs += $lists[$name], ($PSBoundParameters[$name] -join ',') } }

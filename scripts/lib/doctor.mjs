@@ -6,7 +6,7 @@ import { PINS, npmSpec } from './pins.mjs';
 import { version, quiet, contextModeNodeNote } from './system.mjs';
 import { stillNeeded } from './terminals.mjs';
 import { adhdSkillFiles } from './adhd.mjs';
-import { proxyReport } from './network.mjs';
+import { proxyReport, PROXY_VARS, CA_VARS } from './network.mjs';
 import { leftovers } from './parallel.mjs';
 
 const CORE_AGENTS = ['debug', 'explore', 'planner', 'research', 'review'];
@@ -18,6 +18,22 @@ export function redact(value) {
     return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, SECRET_KEY.test(k) ? '[redacted]' : redact(v)]));
   }
   return value;
+}
+
+// Free text that may reach a public issue: home paths, the user name, proxy and CA values, emails and tokens never do.
+export function redactText(text, { home, env = process.env, user = env.USER || env.USERNAME } = {}) {
+  const esc = (v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let out = String(text);
+  const values = [...PROXY_VARS, ...CA_VARS].flatMap((n) => [env[n], env[n.toLowerCase()]]).filter((v) => v && v.length > 3);
+  for (const v of new Set(values)) out = out.replace(new RegExp(esc(v), 'g'), '<redacted>');
+  out = out.replace(/\b[a-z][a-z0-9+.-]*:\/\/[^\s/@]*@[^\s]*/gi, '<redacted-url>');
+  if (home) out = out.replace(new RegExp(esc(home).replace(/\\\\|\//g, '[\\\\/]'), 'gi'), '~');
+  out = out.replace(/(\/Users\/|\/home\/|[A-Za-z]:\\Users\\)[^\/\\\s]+/g, '$1<user>');
+  if (user && user.length > 1) out = out.replace(new RegExp(`\\b${esc(user)}\\b`, 'g'), '<user>');
+  return out
+    .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, '<email>')
+    .replace(/\b(gh[pousr]_|github_pat_|sk-|xox[bp]-)[\w-]{8,}/g, '<token>')
+    .replace(/\b(Bearer|token)\s+[\w.~+/=-]{8,}/gi, '$1 <token>');
 }
 
 // OpenCode 2 prints a JSON array of config sources ({type, path, info}); 1.x printed one object.
@@ -60,7 +76,7 @@ function checkAntigravity(o, core, add) {
   }
 }
 
-export function doctor({ home, state, exec, nodeVersion = process.versions.node }) {
+export function doctor({ home, state, exec, nodeVersion = process.versions.node, json = false }) {
   const rows = [];
   const add = (item, status, detail = '') => rows.push({ item, status, detail });
   if (!state) {
@@ -121,8 +137,10 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node 
   const left = leftovers(process.cwd());
   if (left.length) add('parallel workers', 'changed', `left in this repo: ${left.join(', ')} (merge them, then run scripts/parallel.mjs clean)`);
   for (const line of proxyReport()) add('network env', 'ok', line);
-  print(rows);
-  return !rows.some((r) => r.status === 'error' || r.status === 'missing');
+  const ok = !rows.some((r) => r.status === 'error' || r.status === 'missing');
+  if (json) process.stdout.write(`${JSON.stringify({ ok, rows }, null, 2)}\n`);
+  else print(rows);
+  return ok;
 }
 
 function checkOpenCode(o, add) {

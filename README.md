@@ -87,11 +87,19 @@ Windows PowerShell:
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -DryRun
 ```
 
-Prefer your agent to do it? Paste a prompt from [INSTALL_WITH_AGENT.md](INSTALL_WITH_AGENT.md) into Claude Code, OpenCode or Copilot CLI. Use `--lang es` to get the rules and replies in Spanish.
+Prefer your agent to do it? Paste this into Claude Code, OpenCode or Copilot CLI ([the guide](docs/install-with-an-agent.md) has the steps and `--json` output):
+
+```text
+Install lean-agents for me from https://github.com/estebanmr99/lean-agents.
+Follow docs/install-with-an-agent.md in that repo. Ask before every change.
+Never read, print or store my API keys or tokens, and never run gh auth login for me.
+```
+
+Use `--lang es` to get the rules and replies in Spanish.
 
 Always start with `--dry-run`: it shows every file and command before anything changes. Then run it again without `--dry-run`; it asks which agents, tools, privacy level, language and model profile you want.
 
-- Useful flags: `--all-tools`, `--privacy strict`, `--lang es`, `--profile vertex-gemini`, `--update`, `--uninstall`, `--doctor` (`--help` lists them all).
+- Useful flags: `--all-tools`, `--privacy strict`, `--lang es`, `--profile vertex-gemini`, `--update`, `--uninstall`, `--doctor`, `--json` (with `--dry-run` or `--doctor`, for agents) (`--help` lists them all).
 - In PowerShell the common flags are PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`. Any other flag is passed as it is, for example `-DryRun --network off`.
 - Context Mode needs Node.js 22.5 or newer. Everything else works on Node.js 20.12.
 - With Context Mode, the installer also sets up Bun by default (faster `ctx_execute`); add `--no-bun` (`-NoBun` in PowerShell) to skip it. With Antigravity, `--no-app` (`-NoApp`) skips installing the app. See the Bun row in [Install tiers](#install-tiers).
@@ -285,7 +293,7 @@ If your company pays for GitHub Copilot, the official way to use Claude as an ag
 | Opt-in tools | GSD Core, AutoSkills (CC BY-NC 4.0: non-commercial use only) | Asked one by one, never in `--all-tools` |
 | Strict privacy | No telemetry, no auto-updates, no session sharing, no providers that train on your prompts | Off, opt in with `--privacy strict` |
 | Network preset | All off (work PC), all on, or per category: telemetry, auto-updates, other outbound calls | All on; `--network off` (same as `--privacy strict`) or `--telemetry`, `--auto-update`, `--outbound` |
-| GitHub CLI (`gh`) | Installed with brew or winget at user scope; you run `gh auth login` | Asked when missing; `--gh` |
+| GitHub CLI (`gh`) | Installed with brew or winget at user scope; you run `gh auth login` | On when missing; `--no-gh` (`-NoGh` in PowerShell) skips it |
 | Bun (for Context Mode) | Faster `ctx_execute` JavaScript and TypeScript; see below | On; `--no-bun` (`-NoBun` in PowerShell) |
 
 **Bun details.**
@@ -312,7 +320,7 @@ If your company pays for GitHub Copilot, the official way to use Claude as an ag
    curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --yes --network off --auto-update on   # off, but keep auto-updates
    ```
    The per-category flags are `--telemetry on|off`, `--auto-update on|off` and `--outbound on|off`. `--network off` is the same as `--privacy strict`. In PowerShell they pass as they are, for example `-DryRun --network off`. What each category turns off per agent: [docs/privacy.md](docs/privacy.md). The choice is saved and reused by `--update`.
-4. **`gh`**: add `--gh` (or answer yes) to install GitHub CLI without admin rights, then run `gh auth login` yourself.
+4. **`gh`**: GitHub CLI is installed without admin rights when missing (`--no-gh` skips it); then run `gh auth login` yourself.
 5. **Run-time fetches.** Besides install-time commands, agents download code each time they start an MCP server or use a skill. Every one is pinned to an exact version in [core/pins.json](core/pins.json) (Playwright MCP, Context Mode, Codeburn, AutoSkills, GSD Core, DCP, the Skills CLI and the skills Caveman, i-have-adhd and orca-cli), so nothing changes under you until you update. `--doctor` reports `changed` when the installed pins differ from that file. Not pinned yet: Serena (`git+https` source), RTK and `gh` (brew or winget), the Ponytail plugin and the Claude plugin marketplaces. Use `--no-core` to leave out RTK and Context Mode when your PC allows only specific tools.
 
 In a real terminal the installer shows menus (arrow keys, space to toggle), a progress list and a summary. With `--yes`, a pipe or no terminal, it asks plain questions or none, as before.

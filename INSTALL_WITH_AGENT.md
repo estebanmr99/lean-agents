@@ -1,19 +1,5 @@
 # Install with your agent
 
-Paste this into Claude Code, OpenCode, Copilot CLI or Antigravity CLI. Your agent will ask before changing anything.
-
-```text
-Install lean-agents for me from https://github.com/estebanmr99/lean-agents.
-1. Clone it to ~/.config/lean-agents/src (Windows: %USERPROFILE%\.config\lean-agents\src).
-2. Read docs/SPEC.md section 4 (installer behavior) and section 11 (strict privacy).
-3. Detect which coding agents and tools I already have, then ask me:
-   which agents to configure, which optional tools to add, whether I want
-   strict privacy, which model profile matches my subscription, and my language.
-4. Run `bash install.sh --dry-run` with the flags from my answers (see `--help`). Show me the plan.
-5. After I approve, run it for real, then run the doctor and explain any failures.
-Never read, print or store my API keys or tokens.
-```
+The guide, the copy-paste prompt and the `--json` steps live in [docs/install-with-an-agent.md](docs/install-with-an-agent.md).
 
 On a work PC, run the review prompt in [docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md) first. It checks every file, command and network host against your company's rules.
-
-> The installer configures Claude Code, OpenCode 1.x and 2.x, and Copilot CLI on macOS, Linux and Windows, and Antigravity CLI on macOS and Linux. On Windows, use `install.ps1` instead of `bash install.sh`.
