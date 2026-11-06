@@ -15,6 +15,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Changed
 
+- MCP servers, npx tools and skills no longer fetch `@latest` or the default branch: exact versions and tags come from `core/pins.json`. Skills install with `owner/repo#<tag>` (a trailing `@<tag>` is ignored by `skills` 1.7.4 and installs HEAD). `docs/SECURITY-REVIEW.md` and the README "On a work PC" list run-time fetches as their own category (#33).
 - Docs: `docs/privacy.md` table renders again and covers Cursor, VS Code Copilot, Warp and Orca; `tests/README.md` describes `npm test` and the `real-*` scripts; the Cursor CLI install row in `docs/compatibility.md` is correct for Windows (#27).
 - Docs: the demo step 1 has a verified Windows PowerShell block for OpenCode 2 (EN, ES); `docs/SECURITY-REVIEW.md` notes the upstream script checks no tarball checksum (#32).
 
@@ -25,6 +26,9 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - Cursor behind a proxy: `network.useHttp1ForAgent: true` merged into `~/.cursor/cli-config.json`; proxy values are never written (#25).
 - "Still needed from you" list after install and in `--doctor` (Cursor login, User Rules, Orca first launch and Install CLI & Skills); `--doctor` finds Orca's hook entries, also PowerShell-encoded ones (#22, #26, #29).
 - CI jobs `real-cursor-windows` (real Cursor CLI, `agent.cmd`, Git Bash alias block) and `real-terminals-windows` (Orca user-env writes and their undo, runner env restored).
+- `core/pins.json`: the one list of known-good versions fetched at run time (Playwright MCP, Context Mode, Codeburn, AutoSkills, GSD Core, DCP, the Skills CLI, the Caveman, i-have-adhd and orca-cli skills), each with the day verified and the CI job that proves it. `state.json` records them and `--doctor` shows `changed` when they differ (#33).
+- `version-watch` workflow (daily and on demand): opens one `Update available: <item>` issue per pin with a newer upstream version, comments on the open one for each newer version, never twice for the same version, and never changes a pin (#40).
+- `update-models` skill: "Tool versions" section to list newer versions and bump pins after approval (#33).
 - `--no-core` (`-NoCore`): leaves out RTK and Context Mode so a managed PC gets only the `--tools` you list; `--update` keeps the choice (#30).
 - `docs/ROADMAP.md`: the order of the next releases, the issues each session closes, and the promotion plan.
 
