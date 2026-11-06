@@ -39,8 +39,10 @@ grep -q 'copilot-instructions.md' "$HOME/rules.txt"
 copilot skill list </dev/null > "$HOME/skills.txt"
 grep -q caveman "$HOME/skills.txt"
 grep -q i-have-adhd "$HOME/skills.txt"
-copilot plugin list </dev/null > "$HOME/plugins.txt"
-grep -q context-mode "$HOME/plugins.txt"
+# Context Mode 2 sets itself up with `context-mode setup`; it is not in `copilot plugin list`. Show where it wrote.
+context-mode setup --list </dev/null
+grep -rl context-mode "$dir" || true
+grep -rqs context-mode "$dir"
 
 node "$repo/scripts/lean.mjs" --doctor </dev/null
 
@@ -55,6 +57,5 @@ refute compgen -G "$dir/agents/gsd-*"
 refute grep -qs 'lean-agents:start' "$dir/copilot-instructions.md"
 refute grep -qs serena "$dir/mcp-config.json"
 refute grep -qs playwright-extension "$dir/mcp-config.json"
-copilot plugin list </dev/null > "$HOME/plugins-after.txt"
-refute grep -q context-mode "$HOME/plugins-after.txt"
+refute grep -rqs context-mode "$dir"
 echo "real-copilot: OK"

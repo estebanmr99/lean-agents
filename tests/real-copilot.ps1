@@ -31,7 +31,8 @@ if ((copilot mcp list --json | Out-String) -notmatch '"playwright"') { throw 'Co
 if ((copilot instruction list | Out-String) -notmatch 'copilot-instructions.md') { throw 'Copilot does not see the rules' }
 $skills = copilot skill list | Out-String
 if ($skills -notmatch 'caveman' -or $skills -notmatch 'i-have-adhd') { throw 'Copilot does not see the skills' }
-if ((copilot plugin list | Out-String) -notmatch 'context-mode') { throw 'Copilot does not see Context Mode' }
+# Context Mode 2 sets itself up with `context-mode setup`; it is not in `copilot plugin list`.
+if (-not (Get-ChildItem $copilot -Recurse -File -ErrorAction SilentlyContinue | Select-String -Pattern 'context-mode' -List)) { throw 'Context Mode setup left nothing in the Copilot folder' }
 
 & "$repo\install.ps1" -Doctor
 
@@ -39,4 +40,4 @@ if ((copilot plugin list | Out-String) -notmatch 'context-mode') { throw 'Copilo
 if (Test-Path "$copilot\agents\planner.agent.md") { throw 'subagents were not removed' }
 if (Test-Path $rtkHook) { throw 'RTK hook was not removed' }
 if (Test-Path "$dir\.agents\skills\caveman") { throw 'Caveman skills were not removed' }
-if ((copilot plugin list | Out-String) -match 'context-mode') { throw 'Context Mode was not removed' }
+if (Get-ChildItem $copilot -Recurse -File -ErrorAction SilentlyContinue | Select-String -Pattern 'context-mode' -List) { throw 'Context Mode was not removed' }

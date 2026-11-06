@@ -35,9 +35,6 @@ function checkCopilot(o, add) {
   }
   const rules = quiet(['copilot', 'instruction', 'list']);
   add('copilot rules loaded', rules.ok && rules.out.includes('copilot-instructions.md') ? 'ok' : 'error');
-  if (o.tools.includes('context-mode')) {
-    add('copilot plugin context-mode', quiet(['copilot', 'plugin', 'list']).out.includes('context-mode') ? 'ok' : 'error');
-  }
 }
 
 function checkCursor(o, add) {
@@ -56,7 +53,7 @@ function checkAntigravity(o, core, add) {
     add(`agy mcp ${s}`, mcp.ok && mcp.out.includes(s) ? 'ok' : 'error', mcp.ok ? '' : 'agy mcp list failed');
   }
   const plugins = quiet(['agy', 'plugin', 'list', '--json']).out;
-  for (const t of ['rtk', 'context-mode'].filter((p) => o.tools.includes(p))) {
+  for (const t of ['rtk'].filter((p) => o.tools.includes(p))) {
     add(`agy plugin ${t}`, plugins.includes(`"${t}"`) ? 'ok' : 'error');
   }
 }
