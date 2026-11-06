@@ -21,8 +21,8 @@ export function childEnv(network) {
   return network.telemetry === 'off' ? { DO_NOT_TRACK: '1', HOMEBREW_NO_ANALYTICS: '1', GH_TELEMETRY: 'false' } : {};
 }
 
-const PROXY_VARS = ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY'];
-const CA_VARS = ['NODE_EXTRA_CA_CERTS', 'NODE_USE_SYSTEM_CA', 'SSL_CERT_FILE', 'SSL_CERT_DIR', 'GIT_SSL_CAINFO', 'UV_SYSTEM_CERTS', 'REQUESTS_CA_BUNDLE', 'npm_config_cafile'];
+export const PROXY_VARS = ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY'];
+export const CA_VARS = ['NODE_EXTRA_CA_CERTS', 'NODE_USE_SYSTEM_CA', 'SSL_CERT_FILE', 'SSL_CERT_DIR', 'GIT_SSL_CAINFO', 'UV_SYSTEM_CERTS', 'REQUESTS_CA_BUNDLE', 'npm_config_cafile'];
 
 export const redactUrl = (v) => v.replace(/\/\/[^/\s]*@/g, '//***@');
 

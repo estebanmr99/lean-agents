@@ -87,11 +87,19 @@ Windows PowerShell:
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -DryRun
 ```
 
-¿Prefieres que lo haga tu agente? Pega un prompt de [INSTALL_WITH_AGENT.md](INSTALL_WITH_AGENT.md) en Claude Code, OpenCode o Copilot CLI. Usa `--lang es` para que las reglas y las respuestas queden en español.
+¿Prefieres que lo haga tu agente? Pega esto en Claude Code, OpenCode o Copilot CLI ([la guía](docs/install-with-an-agent.md) tiene los pasos y la salida `--json`):
+
+```text
+Instala lean-agents por mí desde https://github.com/estebanmr99/lean-agents.
+Sigue docs/install-with-an-agent.md de ese repo. Pregunta antes de cada cambio.
+Nunca leas, muestres ni guardes mis claves o tokens, y nunca corras gh auth login por mí.
+```
+
+Usa `--lang es` para que las reglas y las respuestas queden en español.
 
 Empieza siempre con `--dry-run`: muestra cada archivo y comando antes de cambiar nada. Luego córrelo otra vez sin `--dry-run`; te pregunta qué agentes, herramientas, nivel de privacidad, idioma y perfil de modelos quieres.
 
-- Opciones útiles: `--all-tools`, `--privacy strict`, `--lang es`, `--profile vertex-gemini`, `--update`, `--uninstall`, `--doctor` (`--help` las lista todas).
+- Opciones útiles: `--all-tools`, `--privacy strict`, `--lang es`, `--profile vertex-gemini`, `--update`, `--uninstall`, `--doctor`, `--json` (con `--dry-run` o `--doctor`, para agentes) (`--help` las lista todas).
 - En PowerShell las opciones comunes van en PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`. Cualquier otra opción se pasa tal cual, por ejemplo `-DryRun --network off`.
 - Context Mode necesita Node.js 22.5 o superior. Todo lo demás funciona con Node.js 20.12.
 - Con Context Mode, el instalador también instala Bun por defecto (`ctx_execute` más rápido); añade `--no-bun` (`-NoBun` en PowerShell) para omitirlo. Con Antigravity, `--no-app` (`-NoApp`) omite la instalación de la app. Ver la fila de Bun en [Niveles de instalación](#niveles-de-instalación).
@@ -285,7 +293,7 @@ Si tu empresa paga GitHub Copilot, la forma oficial de usar Claude como agente e
 | Herramientas por elección | GSD Core, AutoSkills (CC BY-NC 4.0: solo uso no comercial) | Se pregunta una por una, nunca en `--all-tools` |
 | Privacidad estricta | Sin telemetría, sin auto updates, sin compartir sesiones, sin proveedores que entrenan con tus prompts | Apagado, se activa con `--privacy strict` |
 | Preset de red | Todo apagado (PC de trabajo), todo encendido, o por categoría: telemetría, auto updates, otras salidas | Todo encendido; `--network off` (igual que `--privacy strict`) o `--telemetry`, `--auto-update`, `--outbound` |
-| GitHub CLI (`gh`) | Se instala con brew o winget sin admin; tú corres `gh auth login` | Se pregunta si falta; `--gh` |
+| GitHub CLI (`gh`) | Se instala con brew o winget sin admin; tú corres `gh auth login` | Activo si falta; `--no-gh` (`-NoGh` en PowerShell) lo omite |
 | Bun (para Context Mode) | `ctx_execute` más rápido en JavaScript y TypeScript; ver abajo | Activo; `--no-bun` (`-NoBun` en PowerShell) |
 
 **Detalles de Bun.**
@@ -312,7 +320,7 @@ Si tu empresa paga GitHub Copilot, la forma oficial de usar Claude como agente e
    curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --yes --network off --auto-update on   # apagado, pero con auto updates
    ```
    Las opciones por categoría son `--telemetry on|off`, `--auto-update on|off` y `--outbound on|off`. `--network off` es igual que `--privacy strict`. En PowerShell se pasan tal cual, por ejemplo `-DryRun --network off`. Qué apaga cada categoría por agente: [docs/privacy.md](docs/privacy.md). La elección se guarda y `--update` la reutiliza.
-4. **`gh`**: agrega `--gh` (o responde que sí) para instalar GitHub CLI sin admin; luego corre `gh auth login` tú mismo.
+4. **`gh`**: GitHub CLI se instala sin admin si falta (`--no-gh` lo omite); luego corre `gh auth login` tú mismo.
 5. **Descargas en uso.** Además de los comandos de instalación, los agentes descargan código cada vez que arrancan un servidor MCP o usan un skill. Cada uno está fijado a una versión exacta en [core/pins.json](core/pins.json) (Playwright MCP, Context Mode, Codeburn, AutoSkills, GSD Core, DCP, el Skills CLI y los skills Caveman, i-have-adhd y orca-cli), así que nada cambia sin que lo actualices. `--doctor` marca `changed` cuando los pins instalados difieren de ese archivo. Sin fijar todavía: Serena (fuente `git+https`), RTK y `gh` (brew o winget), el plugin Ponytail y los marketplaces de plugins de Claude. Usa `--no-core` para dejar fuera RTK y Context Mode si tu PC solo permite herramientas concretas.
 
 En una terminal real el instalador muestra menús (flechas, espacio para marcar), una lista de progreso y un resumen. Con `--yes`, con un pipe o sin terminal, hace preguntas simples o ninguna, como antes.

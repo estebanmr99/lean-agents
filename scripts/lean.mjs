@@ -20,8 +20,9 @@ import { projectPlan, projectStateDir } from './lib/project.mjs';
 import { gsdPlan } from './lib/gsd.mjs';
 import { MIGRATE_SOURCES, MIGRATE_TARGETS, readSource, detectSources, migratePlan, finishRows, formatTable } from './lib/migrate.mjs';
 import { adhdCommand } from './lib/adhd.mjs';
-import { contextModeNodeNote, detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPresent, which, run, quiet, exists, isolate } from './lib/system.mjs';
+import { contextModeNodeNote, gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPresent, which, run, quiet, exists, isolate } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
+import { draftIssue } from './lib/feedback.mjs';
 import { pinVersions } from './lib/pins.mjs';
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
 import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
@@ -80,6 +81,10 @@ function parseArgs(argv) {
       case '--no-app': o.app = false; break;
       case '--privacy': o.privacy = next(); fromPrivacy(o.privacy); break;
       case '--gh': o.gh = true; break;
+      case '--no-gh': o.gh = false; break;
+      case '--json': o.json = true; break;
+      case '--feedback-draft': o.command = 'feedback'; break;
+      case '--failed-command': o.failedCommand = next(); break;
       case '--network': o.networkPreset = onOff(a, next()); break;
       case '--telemetry': o.networkFlags.telemetry = onOff(a, next()); break;
       case '--auto-update': o.networkFlags.autoUpdate = onOff(a, next()); break;
@@ -124,7 +129,11 @@ const HELP = `Usage: lean-agents [options]
   --terminal warp|orca|both|none
                          Agent integrations for a terminal you already have (default: the detected ones;
                          ignored with --project)
-  --gh                   Install GitHub CLI (gh) if it is missing
+  --gh / --no-gh         Install GitHub CLI (gh) if it is missing (default: on; you run gh auth login yourself)
+  --feedback-draft       After a failed install: read the error on stdin, print a redacted issue draft as JSON
+                         ({"offer":false} when the network preset forbids it). Needs --failed-command <text>;
+                         pass --network on|off when nothing is installed yet. Files nothing.
+  --json                 With --dry-run or --doctor: print one JSON object on stdout (messages go to stderr)
   --no-app               Do not install the Antigravity app (the CLI is still installed when missing)
   --bun / --no-bun       Install Bun for Context Mode (default: on; faster JS, TypeScript)
   --project <dir>        Write the shared team files into one repository
@@ -251,7 +260,7 @@ async function choose(o, saved) {
   }
   await chooseNetwork(o, saved, p);
   await chooseUnverified(o, saved, p);
-  o.gh ??= saved?.gh ?? (!which('gh') && yesNo(await p.ask('Install GitHub CLI (gh)? You log in yourself afterwards', 'n')));
+  o.gh ??= saved?.gh ?? (!which('gh') && yesNo(await p.ask('Install GitHub CLI (gh)? You log in yourself afterwards', 'y')));
   if (o.tools.includes('context-mode') && !o.project) o.bun ??= saved?.bun ?? (bunPresent(o.home) || yesNo(await p.ask('Install Bun so Context Mode runs faster?', 'y')));
   o.lang ??= saved?.lang ?? (await p.select({ ask: 'Language for rules and replies (en/es)?', message: 'Language for rules and replies', options: [{ value: 'en', label: 'English' }, { value: 'es', label: 'Español' }], def: 'en' }));
   if (o.agents.some((a) => a.startsWith('opencode')) && !o.profile) {
@@ -359,8 +368,8 @@ function prereqCommands(o) {
   for (const t of [...o.tools, ...(o.gh ? ['gh'] : [])]) {
     const p = prereqFor(t, pm);
     if (!p || which(p.bin)) continue;
-    if (p.install) out.push({ tool: t, desc: `install ${p.bin}`, run: p.install, undo: [] });
-    else out.push({ tool: t, desc: `${p.bin} is missing: install it from ${p.manual}`, run: [], undo: [], manual: true });
+    if (p.install) out.push({ tool: t, desc: `install ${p.bin}`, run: p.install, undo: [], optional: t === 'gh' });
+    else out.push({ tool: t, desc: `${p.bin} is missing: install it from ${p.manual}`, run: [], undo: [], manual: true, optional: t === 'gh' });
   }
   if (o.agents.includes('antigravity')) {
     for (const c of antigravityPrereqs(pm, process.platform, o.home, o.app)) {
@@ -390,6 +399,19 @@ function printMigration(o, m, commands) {
   console.log('');
 }
 
+// Agents parse this instead of scraping the text plan. Paths use ~ so no home directory leaks.
+function printJson(o, planned, commands, migration) {
+  const rel = (t) => (t.startsWith(o.home + path.sep) || t === o.home ? `~${t.slice(o.home.length)}` : t);
+  const inText = (t) => t.split(o.home).join('~');
+  const plan = {
+    agents: o.agents, tools: o.tools, privacy: o.privacy, lang: o.lang, profile: o.profile ?? null, terminals: o.terminals,
+    gh: !!o.gh, bun: !!o.bun, network: o.network, migrate: migration ? migration.names : null,
+    files: planned.map((f) => ({ status: f.status, path: rel(f.path), note: f.note ?? null })),
+    commands: commands.map((c) => ({ desc: inText(c.desc), agent: c.agent ?? null, run: c.run.map((a) => a.map(inText)) })),
+  };
+  process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
+}
+
 function printPlan(o, planned, commands) {
   console.log(`\nlean-agents plan for ${o.agents.join(', ') || 'no agents'}`);
   if (o.project) console.log(`  project: ${o.project}`);
@@ -416,6 +438,7 @@ function printPlan(o, planned, commands) {
 }
 
 async function install(o) {
+  if (o.json && !o.yes) throw new Error('--json needs --yes: the menus would write questions to stdout');
   const saved = o.command === 'update' ? readState(o.home) : null;
   if (o.command === 'update' && !saved) throw new Error('nothing to update: lean-agents is not installed');
   if (o.command === 'update' && saved.options.migrateOnly) throw new Error('nothing to update: only --migrate ran here');
@@ -423,6 +446,13 @@ async function install(o) {
   const { planned, commands: agentCommands, migration } = buildPlan(o);
   if (migration && !migration.rows.length) { p.close(); console.log('Nothing to migrate: no rules, agents, skills, prompts, MCP servers or hooks found.'); return; }
   const commands = [...(o.exec ? prereqCommands(o) : []), ...agentCommands];
+  const noGit = migration ? null : gitHint(packageManager());
+  if (noGit) console.log(noGit);
+  if (o.json) {
+    if (!o.dryRun) throw new Error('--json needs --dry-run (or --doctor)');
+    p.close();
+    return printJson(o, planned, commands, migration);
+  }
   if (migration) printMigration(o, migration, o.exec ? commands : []);
   else printPlan(o, planned, commands);
   if (o.dryRun) { p.close(); console.log('Dry run: nothing was changed.'); return; }
@@ -438,7 +468,8 @@ async function install(o) {
   let failed = 0;
   if (o.exec) {
     for (const [i, c] of commands.entries()) {
-      if (c.manual) { console.log(`! ${c.desc}`); failed++; continue; }
+      // gh is on by default, so having no installer for it (no brew or winget) must not fail the run.
+      if (c.manual) { console.log(`! ${c.desc}`); if (!c.optional) failed++; continue; }
       if (c.skipIfExists && exists(c.skipIfExists)) continue;
       if (c.skipIfOutput && quiet(c.skipIfOutput.cmd).ok) continue;
       if (ui) ui.step(i + 1, commands.length, c.desc);
@@ -447,7 +478,7 @@ async function install(o) {
       if (ui) ui.result(ok || c.optional, c.desc);
       else if (!ok && !c.optional) console.log(`  ! failed: ${c.desc}. Run the command above by hand, then --doctor.`);
       // An optional step (Bun) that fails only means Context Mode runs on Node; nothing to undo.
-      if (!ok && c.optional) { console.log('! Bun install failed; Context Mode will run on Node.'); continue; }
+      if (!ok && c.optional) { console.log(c.tool === 'gh' ? '! gh install failed; install it yourself (--no-gh skips it).' : '! Bun install failed; Context Mode will run on Node.'); continue; }
       if (!ok) failed++;
       ran.push({ desc: c.desc, ok, undo: c.undo });
     }
@@ -519,15 +550,28 @@ async function uninstall(o) {
   console.log('Uninstalled. Backups are kept in ~/.config/lean-agents/backups.');
 }
 
+// The agent files the issue itself, and only after the user said yes; this only drafts.
+function feedback(o) {
+  if (!o.failedCommand) throw new Error('--feedback-draft needs --failed-command <text>');
+  const state = readState(o.home);
+  const network = { ...(o.networkPreset ? preset(o.networkPreset) : fromPrivacy(o.privacy) ?? state?.options.network ?? {}), ...o.networkFlags };
+  const versions = { 'lean-agents': JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version, node: NODE_VERSION };
+  const draft = draftIssue({ network, home: [o.home, os.homedir()], versions, command: o.failedCommand, error: fs.readFileSync(0, 'utf8') });
+  process.stdout.write(`${JSON.stringify(draft ?? { offer: false })}\n`);
+}
+
 async function main() {
   const o = parseArgs(process.argv.slice(2));
   // A repository gets files only: tools and agents stay per user.
   if (o.project && o.agents?.length && !o.migrate) throw new Error('--project writes repository files only: run --agents in a separate install');
   if (o.project) { project = o.project; if (!o.migrate) { o.agents = []; o.exec = false; } }
+  // --json keeps stdout for the one JSON object; every message goes to stderr.
+  if (o.json) console.log = console.error;
   isolate(o.home);
   shareProxy();
   if (o.command === 'help') return console.log(HELP);
-  if (o.command === 'doctor') return process.exit(doctor({ home: o.home, state: readState(o.home), exec: o.exec, nodeVersion: NODE_VERSION }) ? 0 : 1);
+  if (o.command === 'doctor') return process.exit(doctor({ home: o.home, state: readState(o.home), exec: o.exec, nodeVersion: NODE_VERSION, json: o.json }) ? 0 : 1);
+  if (o.command === 'feedback') return feedback(o);
   if (o.command === 'uninstall') return uninstall(o);
   return install(o);
 }

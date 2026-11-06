@@ -14,6 +14,7 @@ param(
   [switch]$NoCore,
   [switch]$NoBun,
   [switch]$NoApp,
+  [switch]$NoGh,
   [string]$Privacy,
   # $Profile is a PowerShell automatic variable, so -Profile binds through an alias.
   [Alias('Profile')][string]$ModelProfile,
@@ -61,7 +62,7 @@ if ([version]$nodeVersion.TrimStart('v') -lt [version]'20.12.0') {
 # The OpenCode 2 upstream script (Git Bash) installs here and only edits ~/.bashrc, so PowerShell never sees it.
 $OpenCodeBin = Join-Path $env:USERPROFILE '.opencode\bin'
 if (-not (Test-Command 'opencode') -and (Test-Path (Join-Path $OpenCodeBin 'opencode.exe'))) {
-  Write-Output "OpenCode is in $OpenCodeBin but not on your PATH. Detecting it for this run only; to fix it for good, add that folder to your user PATH."
+  Write-Warning "OpenCode is in $OpenCodeBin but not on your PATH. Detecting it for this run only; to fix it for good, add that folder to your user PATH."
   $env:Path = "$env:Path;$OpenCodeBin"
 }
 
@@ -96,7 +97,7 @@ if (-not $DryRun -and (Test-Path (Join-Path $rtkDir 'rtk.exe'))) {
 }
 
 $engineArgs = @()
-$switches = [ordered]@{ DryRun = '--dry-run'; Yes = '--yes'; AllTools = '--all-tools'; NoTools = '--no-tools'; NoCore = '--no-core'; NoBun = '--no-bun'; NoApp = '--no-app'; Update = '--update'; Uninstall = '--uninstall'; Doctor = '--doctor' }
+$switches = [ordered]@{ DryRun = '--dry-run'; Yes = '--yes'; AllTools = '--all-tools'; NoTools = '--no-tools'; NoCore = '--no-core'; NoBun = '--no-bun'; NoApp = '--no-app'; NoGh = '--no-gh'; Update = '--update'; Uninstall = '--uninstall'; Doctor = '--doctor' }
 foreach ($name in $switches.Keys) { if ($PSBoundParameters[$name]) { $engineArgs += $switches[$name] } }
 $lists = [ordered]@{ Agents = '--agents'; Tools = '--tools' }
 foreach ($name in $lists.Keys) { if ($PSBoundParameters[$name]) { $engineArgs += $lists[$name], ($PSBoundParameters[$name] -join ',') } }

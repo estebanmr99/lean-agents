@@ -217,6 +217,27 @@ jobs:
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - run: bash tests/real-migrate.sh
 
+  real-agent-install:
+    # The install-with-an-agent flow in a throwaway HOME, no login: --json output, gh by default and --no-gh
+    # (-NoGh through install.ps1 on Windows), and the redacted feedback draft with a stub gh that records its arguments.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
+      - run: npm ci
+      - run: node tests/real-agent-install.mjs
+
   real-proxy:
     # Real install through a squid proxy with direct traffic blocked, network preset all off.
     needs: changes

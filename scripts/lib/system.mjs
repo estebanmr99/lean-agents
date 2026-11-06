@@ -87,11 +87,19 @@ export function prereqFor(tool, pm) {
       return { bin: 'npx', install: null, manual: 'https://nodejs.org/' };
     case 'gh':
       return { bin: 'gh', install: brew('gh') ?? winget('GitHub.cli'), manual: 'https://cli.github.com/' };
+    case 'git':
     case 'i-have-adhd':
       return { bin: 'git', install: brew('git') ?? winget('Git.Git'), manual: 'https://git-scm.com/downloads' };
     default:
       return null;
   }
+}
+
+// One line for a missing git (team mode and the plugin installs need it); null when it is there.
+export function gitHint(pm, present = which('git')) {
+  if (present) return null;
+  const g = prereqFor('git', pm);
+  return `! git not found. ${g.install ? `Install it: ${g.install.map((a) => a.join(' ')).join(' && ')}` : `Install it from ${g.manual}`}`;
 }
 
 // Antigravity CLI and app, only when the user picked Antigravity. Only ids checked upstream (2026-11-03) run;
