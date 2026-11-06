@@ -13,10 +13,10 @@ const WARMUP = 2;
 const RUNS = 10;
 
 // Minimal MCP client: newline-delimited JSON-RPC 2.0 over the server's stdin and stdout.
-// CTX_SERVER=<start.mjs> starts the plugin entry instead of the npm bin (tests/real-bun.sh, Linux re-exec check).
-const server = process.env.CTX_SERVER
-  ? spawn(process.execPath, [process.env.CTX_SERVER], { stdio: ['pipe', 'pipe', 'pipe'] })
-  : spawn('context-mode', [], { stdio: ['pipe', 'pipe', 'pipe'], shell: process.platform === 'win32' });
+// The v2 `context-mode` bin is a CLI that exits 0, so start the server file of the global package.
+// CTX_SERVER=<start.mjs> starts the plugin entry instead (tests/real-bun.sh, Linux re-exec check).
+const globalRoot = process.env.CTX_SERVER ? '' : spawnSync('npm', ['root', '-g'], { encoding: 'utf8', shell: process.platform === 'win32' }).stdout.trim();
+const server = spawn(process.execPath, [process.env.CTX_SERVER ?? path.join(globalRoot, 'context-mode', 'server.mjs'), '--agent', 'claude-code'], { stdio: ['pipe', 'pipe', 'pipe'] });
 let stderr = '';
 server.stderr.on('data', (d) => { stderr += d; });
 const pending = new Map();
