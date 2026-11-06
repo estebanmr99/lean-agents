@@ -248,7 +248,7 @@ If your company pays for GitHub Copilot, the official way to use Claude as an ag
 
 | Tier | What | Default |
 | --- | --- | --- |
-| Minimal | Rules, tiered subagents, compaction, output limits, RTK, Context Mode | Always |
+| Minimal | Rules, tiered subagents, compaction, output limits, RTK, Context Mode | Always; `--no-core` (`-NoCore` in PowerShell) leaves out RTK and Context Mode |
 | Optional tools | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0), Codeburn | Asked one by one |
 | Opt-in tools | GSD Core, AutoSkills (CC BY-NC 4.0: non-commercial use only) | Asked one by one, never in `--all-tools` |
 | Strict privacy | No telemetry, no auto-updates, no session sharing, no providers that train on your prompts | Off, opt in with `--privacy strict` |

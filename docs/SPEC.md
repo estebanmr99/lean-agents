@@ -154,7 +154,7 @@ When piped, the script clones (or downloads a release tarball of) the repo to `~
 | `--agents claude,opencode-v2,...` | Which agents to configure. Default: auto-detect installed ones and ask. Values: `claude`, `opencode-v1`, `opencode-v2`, `copilot`, `antigravity`. |
 | `--install-agents` | Also install missing agent CLIs with their native installers. Default off. |
 | `--skip-agents` | Never install agent CLIs; only configure the ones found. |
-| `--tools rtk,context-mode,...` / `--all-tools` / `--no-tools` | Optional tool selection. |
+| `--tools rtk,context-mode,...` / `--all-tools` / `--no-tools` / `--no-core` | Optional tool selection; `--no-core` drops rtk and context-mode. |
 | `--privacy standard\|strict` | Default `standard`. `strict` applies section 11. |
 | `--profile <name>` | Model profile from `profiles/` (section 9). Default: ask, or auto-pick by detected providers. |
 | `--lang en\|es` | Language of the installed rules and of agent replies. Default `en`. |

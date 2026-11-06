@@ -269,6 +269,19 @@ test('--all-tools leaves out opt-in tools; --tools adds them', () => {
   assert.match(some, /@opengsd\/gsd-core@latest --antigravity --global/);
 });
 
+test('--no-core installs only the listed tools, and --update keeps it', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const base = ['--yes', '--no-exec', '--agents', 'opencode-v2', '--no-core', '--tools', 'playwright-extension', '--lang', 'en', '--profile', 'none'];
+  const plan = lean(home, [...base, '--dry-run']);
+  assert.match(plan, /tools: playwright-extension \|/);
+  assert.ok(!/rtk init|context-mode/.test(plan));
+  lean(home, base);
+  const servers = () => Object.keys(JSON.parse(fs.readFileSync(path.join(home, '.config', 'opencode', 'opencode.jsonc'), 'utf8')).mcp.servers);
+  assert.deepEqual(servers(), ['playwright-extension']);
+  lean(home, ['--update', '--yes', '--no-exec']);
+  assert.deepEqual(servers(), ['playwright-extension']);
+});
+
 test('GSD plans --cursor and skips agents without an installer instead of crashing', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
   const out = lean(home, ['--no-exec', '--yes', '--dry-run', '--agents', 'cursor,vscode-copilot', '--tools', 'gsd']);

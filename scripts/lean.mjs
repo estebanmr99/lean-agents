@@ -58,7 +58,7 @@ function parseArgs(argv) {
   const o = {
     command: 'install', dryRun: false, yes: false, agents: null, tools: null, privacy: null, profile: null,
     lang: null, home: os.homedir(), exec: true, adhdAlways: null, ponytailMode: null,
-    networkPreset: null, networkFlags: {}, gh: null, bun: null, terminals: null, app: true,
+    networkPreset: null, networkFlags: {}, gh: null, bun: null, terminals: null, app: true, core: true,
   };
   const list = (v) => v.split(',').map((s) => s.trim()).filter(Boolean);
   for (let i = 0; i < argv.length; i++) {
@@ -71,6 +71,7 @@ function parseArgs(argv) {
       case '--tools': o.tools = [...new Set([...MINIMAL_TOOLS, ...list(next())])]; break;
       case '--all-tools': o.tools = [...MINIMAL_TOOLS, ...OPTIONAL_TOOLS]; break;
       case '--no-tools': o.tools = []; break;
+      case '--no-core': o.core = false; break;
       case '--terminal': o.terminals = parseTerminal(next()); break;
       case '--bun': o.bun = true; break;
       case '--no-bun': o.bun = false; break;
@@ -97,6 +98,7 @@ function parseArgs(argv) {
       default: throw new Error(`unknown option ${a} (see --help)`);
     }
   }
+  if (!o.core && o.tools) o.tools = o.tools.filter((t) => !MINIMAL_TOOLS.includes(t));
   return o;
 }
 
@@ -109,6 +111,7 @@ const HELP = `Usage: lean-agents [options]
   --tools a,b            Optional tools on top of rtk and context-mode:
                          ${[...OPTIONAL_TOOLS, ...OPT_IN_TOOLS].join(', ')}
   --all-tools / --no-tools  (--all-tools leaves out ${OPT_IN_TOOLS.join(', ')})
+  --no-core              Leave out ${MINIMAL_TOOLS.join(' and ')}; install only the --tools you list
   --privacy standard|strict  Same as --network on / --network off
   --network on|off       Preset for telemetry, auto-updates and other outbound calls
   --telemetry on|off, --auto-update on|off, --outbound on|off
@@ -196,11 +199,12 @@ async function choose(o, saved) {
     throw new Error('opencode-v1 and opencode-v2 write the same config files: pick one');
   }
   if (!o.tools) {
-    o.tools = saved?.tools ?? [...MINIMAL_TOOLS];
+    o.tools = saved?.tools ?? (o.core ? [...MINIMAL_TOOLS] : []);
     if (!saved) {
       const offered = [...OPTIONAL_TOOLS, ...OPT_IN_TOOLS].filter((t) => t !== 'dcp' || o.agents.includes('opencode-v1'));
       const items = offered.map((t) => ({ value: t, label: t, hint: TOOL_INFO[t].replace(/^[^:]+: /, ''), ask: `Add ${TOOL_INFO[t]}?` }));
-      o.tools.push(...await p.multi({ message: `Optional tools (${MINIMAL_TOOLS.join(' and ')} are always included)`, items, defaults: [] }));
+      const message = o.core ? `Optional tools (${MINIMAL_TOOLS.join(' and ')} are always included)` : 'Tools (--no-core: nothing else is added)';
+      o.tools.push(...await p.multi({ message, items, defaults: [] }));
     }
   }
   const known = [...MINIMAL_TOOLS, ...OPTIONAL_TOOLS, ...OPT_IN_TOOLS];
