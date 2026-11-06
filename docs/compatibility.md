@@ -97,6 +97,35 @@ Detection (a run with `--home` looks only inside it; `orca` on Linux is the GNOM
 | Cursor CLI in Git Bash | Windows ships only `agent.cmd` and `cursor-agent.cmd`. From Git Bash the CLI runs its PowerShell hook wrapper through bash `eval`, which exits 2 and Cursor reads as deny, so every hook is blocked. `MSYSTEM= SHELL= agent.cmd` works; `unset MSYSTEM` does not. lean-agents writes both aliases in a marked `~/.bashrc` block. Real install, #23 and #28, 2026-11-05 |
 | Remove | 1. `orca agent hooks off`. 2. Skills: Orca Skills page > Delete (**VERIFY**), or `npx skills remove orca-cli orchestration computer-use -g -y` (whether it also clears the copies in agent folders such as `~/.claude/skills`: **VERIFY**). 3. OpenCode: delete Orca's `file://…/plugins/…` entry from `plugin` in `tui.json` / `tui.jsonc` and its files in `plugins/` (file name: **VERIFY**). 4. Remove the app (`brew uninstall --cask stablyai/orca/orca`, **VERIFY**). No uninstall page found upstream |
 
+## Staying on OpenCode 1.x
+
+lean-agents never installs or upgrades OpenCode: the engine only writes config for the OpenCode you already have, and `--doctor` says "OpenCode 1.x: supported; lean-agents will not upgrade it". `tests/opencode-guard.test.mjs` fails if any install, `--update`, `--migrate` or `lean-update` plan contains a command that installs or upgrades OpenCode. Moving from 1.x to 2.x is your own step.
+
+Why back up first: the session history lives in a database, `opencode.db`, and OpenCode 2 does not read your old sessions from it (owner report, 2026-11-06; **VERIFY** against the OpenCode 2 release notes). Copy it (never move it) before any major upgrade.
+
+| Item | Where | Status |
+| --- | --- | --- |
+| Data folder and `opencode.db` on macOS and Linux | `~/.local/share/opencode/opencode.db`; `OPENCODE_DB` overrides it | Docs ([troubleshooting](https://opencode.ai/docs/troubleshooting/)), 2026-11-06 |
+| Data folder on Windows | `%USERPROFILE%\.local\share\opencode` | **VERIFY**: only a user report in the upstream tracker, no docs |
+| `XDG_DATA_HOME` handling | not in the docs | **VERIFY** |
+| Exact paths on your machine | `opencode debug paths` (all paths), `opencode debug paths db` (the database) | Docs ([CLI](https://opencode.ai/docs/cli/)), 2026-11-06; `real-opencode-v1` prints the output (non-fatal) |
+| User config | `~/.config/opencode/` (`opencode.json` or `opencode.jsonc`) | Docs ([config](https://opencode.ai/docs/config/)), 2026-11-06 |
+| Version that introduced `opencode.db` | unknown (the 1.2.0 changelog says "Revert to SQLite database implementation") | **VERIFY** |
+
+Back up (macOS, Linux; close OpenCode first). This copies and removes nothing:
+
+```bash
+b="${TMPDIR:-/tmp}/opencode-backup-$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$b"
+cp -R "$(dirname "$(opencode debug paths db)")" "$b/data"   # includes opencode.db
+cp -R ~/.config/opencode "$b/config"
+echo "Backup in $b"
+```
+
+If `opencode debug paths db` does not exist on your 1.x, use `~/.local/share/opencode`. On Windows, copy the same two folders in Explorer. Keep the backup until you are sure you do not need your old sessions.
+
+A community script that downgrades 2.x back to 1.19 exists ([gist](https://gist.github.com/iarna/5d030e28c56c137f489a9d7ad12aa74a), SQL, macOS and Linux only). It is community code, use at your own risk. lean-agents has not reviewed it and never runs it.
+
 ## Verification log
 
 | Item | Source | Checked |
@@ -204,6 +233,7 @@ Detection (a run with `--home` looks only inside it; `orca` on Linux is the GNOM
 | Opt-in feedback (session 20, #36): `--feedback-draft --failed-command <text>` reads the error on stdin and prints `{title, body}` with home paths, user name, proxy and CA values, emails and tokens removed, or `{"offer":false}` when `outbound` is off (strict preset or unknown); the agent files with `gh issue list --search` then `gh issue create` only after a yes | `tests/agent-install.test.mjs`, real install, #36, 2026-11-06 | 2026-11-06 |
 | `gh` by default (session 20, #37): `gh` is preselected when missing (`--yes` installs it with brew or winget; elsewhere the plan prints https://cli.github.com/; a failed `gh` step never fails the run; the JSON field `gh` means "to install"), `--no-gh` (`-NoGh` in `install.ps1`) skips it; a missing `git` prints `! git not found` with the brew or winget command, or https://git-scm.com/downloads; lean-agents never runs `gh auth login` | `tests/agent-install.test.mjs` (stub PATH), real install, #37, 2026-11-06 | 2026-11-06 |
 | README support matrix (session 58, #58): OS cells are ✅ only where a `ci.yml` job runs the real binary on that OS (`real-claude`, `real-opencode`, `real-opencode-v1`, `real-windows`, `real-copilot`, `real-copilot-windows`, `real-antigravity`, `real-antigravity-windows`, `real-vscode`, `real-cursor`, `real-cursor-windows`); every other OS cell is **VERIFY**. Feature cells follow the tables above. `scripts/check-readme.mjs` (lint job and release workflow) fails on a hero over 80 lines, an image without alt text or over 5 MB, and EN/ES drift | `.github/workflows/ci.yml`, `tests/readme.test.mjs`, 2026-11-06 | 2026-11-06 |
+| OpenCode data folder, `opencode.db` and `opencode debug paths` (session 79, #79) | [troubleshooting](https://opencode.ai/docs/troubleshooting/), [CLI](https://opencode.ai/docs/cli/); the printed output of `opencode debug paths` is in the `real-opencode-v1` log | 2026-11-06 |
 
 ## Gemini CLI (not supported)
 
