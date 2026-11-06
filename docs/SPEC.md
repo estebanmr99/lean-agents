@@ -473,7 +473,7 @@ Mark each `[x]` when merged.
 - [x] **Session 13 — Bun for Context Mode** (PR #14). Bun installed by default at user scope when Context Mode is selected (`--no-bun` opts out), faster `ctx_execute` and TypeScript. Fixes the Playwright rule line for Claude-only installs.
 - [x] **Session 14 — 0.5.0 final check.** README audit for the demo, proxy, menus, VS Code Copilot, Cursor, `--project`, Playwright extension and Bun; CHANGELOG 0.5.0 complete; release dry run in a scratch clone. No tag.
 - [x] **Session 15 — README look and feel.** Hero, one badge row, table of contents, collapsible long sections, consistent tables in README EN and ES; a script checks links, anchors, EN/ES parity and that every shown installer command exits 0 in a dry run. 0.5.0 CHANGELOG housekeeping. No feature claims change.
-- [ ] **Session 16 — Fixes and docs from real installs** (0.5.1). Issues #20, #27, #31, #32.
+- [ ] **Session 16 — Fixes and docs from real installs** (0.5.1). Issues #20, #27, #31, #32, #39.
 - [ ] **Session 17 — Windows: Cursor CLI and Orca** (0.5.1). Issues #21, #22, #23, #25, #26, #28, #29.
 - [ ] **Session 18 — Pick only what you need, pin what runs** (0.6.0). Issues #30, #33.
 - [ ] **Session 19 — Migrate from one harness to another** (0.6.0). Issue #34.
@@ -690,12 +690,14 @@ Done when: `npm test` and `scripts/check-private.sh` pass and CI is green.
 
 ### Session 16 — Fixes and docs from real installs
 
-Branch: `session-16-fixes`. Release: 0.5.1. Each issue's body has the repro, cause and a tested fix; reproduce first, then apply the smallest fix. PR body: `Closes #20, #27, #31, #32`.
+Branch: `session-16-fixes`. Release: 0.5.1. Each issue's body has the repro, cause and a tested fix; reproduce first, then apply the smallest fix. PR body: `Closes #20, #27, #31, #32, #39`.
 
 1. **#20 GSD crash with Cursor.** Add `cursor: '--cursor'` to `FLAGS` in `scripts/lib/gsd.mjs`. Agents without a flag (`vscode-copilot`) are skipped with a note instead of crashing. Test: `--agents cursor,vscode-copilot --tools gsd` dry run plans `--cursor` and notes the skip. Proof: run GSD for Cursor in the `real-cursor` CI job (throwaway HOME).
 2. **#31 test depends on the host proxy.** Strip `HTTP(S)_PROXY`/`ALL_PROXY` from the env of that one test, as in the issue.
 3. **#27 docs.** Fix the `docs/privacy.md` table (blank line, rows for Cursor, VS Code Copilot, Warp, Orca), rewrite `tests/README.md` for `npm test` and the `tests/real-*` scripts, correct the Cursor CLI install row for Windows in `docs/compatibility.md`.
 4. **#32 OpenCode 2 on Windows.** Add the verified PowerShell block to the demo step 1 (EN, ES). `install.ps1` (or the engine on win32) finds `%USERPROFILE%\.opencode\bin\opencode.exe` when `opencode` is not on PATH and prints the PATH fix; it does not change PATH. Note in `docs/SECURITY-REVIEW.md` that the upstream script checks no tarball checksum.
+
+5. **#39 Context Mode v2 install.** Upstream removed `configs/copilot-cli` and `configs/antigravity-cli`. Copilot CLI uses `npm i -g context-mode` then `context-mode setup --yes --agents copilot-cli`; Antigravity uses `setup` if `context-mode setup --list` has it, else skips with a note. `--uninstall` undoes it. Proof: `real-copilot`, `real-antigravity` and `real-proxy` green.
 
 Done when: `npm test` passes on all three OS in CI, `scripts/check-private.sh` and `scripts/check-readme.mjs` pass, CHANGELOG `Unreleased` lists each fix with its issue number.
 
