@@ -476,7 +476,7 @@ Mark each `[x]` when merged.
 - [x] **Session 16 — Fixes and docs from real installs** (0.5.1). Issues #20, #27, #31, #32, #39.
 - [x] **Session 17 — Windows: Cursor CLI and Orca** (0.5.1). Issues #21, #22, #23, #25, #26, #28, #29.
 - [x] **Session 18 — Pick only what you need, pin what runs** (0.6.0). Issues #30, #33, #40.
-- [ ] **Session 21 — Lean CI: pinned on PRs, latest daily** (0.6.0, after session 18). Issue #42.
+- [x] **Session 21 — Lean CI: pinned on PRs, latest daily** (0.6.0, after session 18). Issue #42.
 - [x] **Session 19 — Migrate from one harness to another** (0.6.0). Issue #34.
 - [ ] **Session 20 — Install with an agent, opt-in feedback, gh by default** (0.6.0). Issues #35, #36, #37.
 
