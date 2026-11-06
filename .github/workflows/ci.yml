@@ -563,6 +563,35 @@ jobs:
       - name: Install, ask Cursor what loaded, project mode, doctor, uninstall
         run: bash tests/real-cursor.sh
 
+  real-cursor-windows:
+    # Real Cursor CLI on Windows (agent.cmd, Git Bash alias block), throwaway USERPROFILE.
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Install, ask Cursor what loaded, Git Bash alias, doctor, uninstall
+        shell: pwsh
+        run: ./tests/real-cursor.ps1
+
+  real-terminals-windows:
+    # Orca user-env writes (telemetry, loopback NO_PROXY) and their undo, throwaway USERPROFILE.
+    # The variables live in the runner's real user env, so the script restores them. npx is stubbed.
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Install, check the user env and Git Bash, uninstall, check the undo
+        shell: pwsh
+        run: ./tests/real-terminals.ps1
+
   real-vscode:
     # Real VS Code CLI and real tools, throwaway HOME, no login and no TTY.
     strategy:
