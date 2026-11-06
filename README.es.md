@@ -144,7 +144,9 @@ Empieza siempre con `--dry-run`: muestra cada archivo y comando antes de cambiar
 Si ya usas [Warp](https://www.warp.dev) u [Orca](https://github.com/stablyai/orca), lean-agents añade sus integraciones de agentes para los agentes que elegiste. Nunca instala las terminales. Busca la app (o `warp-terminal` / `orca` en el PATH), preselecciona lo que encuentra y no pregunta nada si no hay ninguna. `--terminal warp|orca|both|none` lo cambia; `none` lo desactiva.
 
 - **Warp:** el plugin de Claude Code `warp@claude-code-warp` (necesita `jq`) y el plugin de OpenCode `@warp-dot-dev/opencode-warp`.
-- **Orca:** la skill `orca-cli` para tus agentes. Orca gestiona sus propios hooks de estado (Settings > Agents, o `orca agent hooks on`); lean-agents no los toca.
+- **Orca:** la skill `orca-cli` para tus agentes. Orca gestiona sus propios hooks de estado (Settings > Agents, o `orca agent hooks on`); lean-agents no los toca, pero el primer arranque de Orca los escribe en `~/.claude/settings.json` y `~/.cursor/hooks.json`, y `--doctor` los muestra. Su Agent Session Search indexa todos los chats de agentes de la máquina y viene activado (Settings > Session History).
+- **Windows:** con el preset de red todo apagado pone `DO_NOT_TRACK=1` y `ORCA_TELEMETRY_DISABLED=1` en tu entorno de usuario (solo si no existen), y detrás de un proxy añade `localhost`, `127.0.0.1` y `::1` a `NO_PROXY` para que los hooks de estado de Orca lleguen a la app. Con Git Bash añade un bloque marcado en `~/.bashrc` (los alias de `agent` de Cursor y las mismas entradas de `NO_PROXY`). `--uninstall` quita solo lo que añadió.
+- Tras instalar imprime una lista «Todavía necesitas hacer tú» (login de Cursor, User Rules, **Install CLI & Skills** de Orca y el primer arranque); `--doctor` muestra la misma lista con lo ya hecho.
 - `--uninstall` quita lo que añadió. Con el preset de red todo apagado imprime los interruptores de telemetría (Warp `telemetry_enabled = false`, Orca `DO_NOT_TRACK=1`) y nunca edita los ajustes de las apps.
 
 Fuentes y datos de GUI sin verificar: [docs/compatibility.md](docs/compatibility.md#terminals).

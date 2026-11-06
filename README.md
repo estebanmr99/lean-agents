@@ -144,7 +144,9 @@ Always start with `--dry-run`: it shows every file and command before anything c
 If you already use [Warp](https://www.warp.dev) or [Orca](https://github.com/stablyai/orca), lean-agents adds their agent integrations for the agents you chose. It never installs the terminals. It looks for the app (or `warp-terminal` / `orca` on PATH), preselects what it finds, and asks nothing when neither is there. `--terminal warp|orca|both|none` overrides; `none` opts out.
 
 - **Warp:** the Claude Code plugin `warp@claude-code-warp` (needs `jq`) and the OpenCode plugin `@warp-dot-dev/opencode-warp`.
-- **Orca:** the `orca-cli` skill for your agents. Orca manages its own status hooks (Settings > Agents, or `orca agent hooks on`); lean-agents does not touch them.
+- **Orca:** the `orca-cli` skill for your agents. Orca manages its own status hooks (Settings > Agents, or `orca agent hooks on`); lean-agents does not touch them, but Orca's first launch writes them into `~/.claude/settings.json` and `~/.cursor/hooks.json`, and `--doctor` reports them. Its Agent Session Search indexes every agent chat on the machine and is on by default (Settings > Session History).
+- **Windows:** with the all-off preset it sets `DO_NOT_TRACK=1` and `ORCA_TELEMETRY_DISABLED=1` in your user env (only if unset), and behind a proxy it adds `localhost`, `127.0.0.1` and `::1` to `NO_PROXY` so Orca's status hooks reach the app. With Git Bash it adds a marked `~/.bashrc` block (the Cursor `agent` aliases, and the same `NO_PROXY` entries). `--uninstall` removes only what it added.
+- After an install it prints a "Still needed from you" list (Cursor login, User Rules, Orca's **Install CLI & Skills** and first launch); `--doctor` shows the same list with what is done.
 - `--uninstall` removes what it added. With the all-off network preset it prints the telemetry switches (Warp `telemetry_enabled = false`, Orca `DO_NOT_TRACK=1`) and never edits the apps' settings.
 
 Sources and unverified GUI facts: [docs/compatibility.md](docs/compatibility.md#terminals).

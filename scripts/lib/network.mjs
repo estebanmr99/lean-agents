@@ -38,6 +38,9 @@ export function shareProxy(env = process.env) {
   if ((env.HTTPS_PROXY || env.HTTP_PROXY) && env.NODE_USE_ENV_PROXY == null) env.NODE_USE_ENV_PROXY = '1';
 }
 
+// True when a proxy is configured (NO_PROXY alone is not one).
+export const hasProxy = (env = process.env) => PROXY_VARS.slice(0, 3).some((n) => env[n] || env[n.toLowerCase()]);
+
 export function proxyReport(env = process.env) {
   const lines = [];
   for (const name of PROXY_VARS) {

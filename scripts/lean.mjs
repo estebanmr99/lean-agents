@@ -24,7 +24,7 @@ import { doctor } from './lib/doctor.mjs';
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
 import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
 import { unverifiedItems, notesFile } from './lib/unverified.mjs';
-import { detectTerminals, parseTerminal, terminalCommands, terminalPrivacyNotes } from './lib/terminals.mjs';
+import { detectTerminals, parseTerminal, terminalCommands, terminalPrivacyNotes, gitBashActions, stillNeeded } from './lib/terminals.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ADAPTERS = { claude: claudeAdapter, 'opencode-v1': opencodeV1Adapter, 'opencode-v2': opencodeV2Adapter, 'copilot-cli': copilotAdapter, antigravity: antigravityAdapter };
@@ -305,7 +305,8 @@ function buildPlan(o) {
     actions.push(...r.actions);
     commands.push(...r.commands.map((c) => ({ ...c, agent })));
   }
-  commands.push(...terminalCommands({ terminals: o.terminals, agents: o.agents }));
+  commands.push(...terminalCommands({ terminals: o.terminals, agents: o.agents, network: o.network, system: o.home === REAL_HOME }));
+  actions.push(...gitBashActions({ home: o.home, terminals: o.terminals, agents: o.agents }));
   if (o.tools.includes('gsd')) {
     const r = gsdPlan(ROOT, o.home, o);
     actions.push(...r.actions);
@@ -348,7 +349,7 @@ function printPlan(o, planned, commands) {
   if (o.project) console.log(`  project: ${o.project}`);
   console.log(`  tools: ${o.tools.join(', ') || 'none'} | privacy: ${o.privacy} | lang: ${o.lang} | profile: ${o.profile ?? 'none'}`);
   if (o.terminals.length) console.log(`  terminals: ${o.terminals.join(', ')}`);
-  if (o.network.telemetry === 'off') for (const n of terminalPrivacyNotes(o.terminals)) console.log(`  ${n}`);
+  if (o.network.telemetry === 'off') for (const n of terminalPrivacyNotes(o.terminals, { orcaEnvSet: process.platform === 'win32' && o.home === REAL_HOME })) console.log(`  ${n}`);
   if (o.tools.includes('context-mode')) console.log(`  bun: ${o.bun ? `on${bunPresent(o.home) ? ' (already installed)' : ''}` : 'off'}`);
   console.log(`  network: ${CATEGORIES.map((c) => `${c} ${o.network[c]}`).join(', ')}`);
   const net = proxyReport();
@@ -422,6 +423,8 @@ async function install(o) {
   console.log(`\nDone. Backups: ${backupDir}`);
   if (o.project) return console.log('Next: review and commit these files. Each teammate runs the installer once for the tools (rtk, context-mode, ...).');
   console.log('Next: restart your agents, log in to your providers, then run --doctor.');
+  const todo = stillNeeded({ home: o.home, terminals: o.terminals, agents: o.agents });
+  if (todo.length) console.log(`Still needed from you:\n${todo.map((t) => `  - ${t.text}`).join('\n')}`);
   if (o.tools.includes('playwright-extension')) console.log(`Signed-in browser: ${EXTENSION_NOTE}`);
   if (o.gh) console.log('GitHub CLI: run `gh auth login` yourself; lean-agents never handles tokens.');
   for (const n of o.notes) console.log(`Notes saved: ${n.path}. Ask your agent to apply them, showing you each change first.`);

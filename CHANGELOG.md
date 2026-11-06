@@ -20,6 +20,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Added
 
+- Orca on Windows: `ORCA_SKILL_AGENT` covers Cursor and VS Code Copilot (#21); with the all-off preset it sets `DO_NOT_TRACK=1` and `ORCA_TELEMETRY_DISABLED=1` in the user env when absent, and behind a proxy it appends the missing `localhost`, `127.0.0.1`, `::1` to the user `NO_PROXY` (#22, #28). Undo removes only what it set.
+- Git Bash: a marked `~/.bashrc` block with the Cursor `agent` / `cursor-agent` aliases (`MSYSTEM= SHELL=`) and the loopback `NO_PROXY` entries (#23, #28).
+- Cursor behind a proxy: `network.useHttp1ForAgent: true` merged into `~/.cursor/cli-config.json`; proxy values are never written (#25).
+- "Still needed from you" list after install and in `--doctor` (Cursor login, User Rules, Orca first launch and Install CLI & Skills); `--doctor` finds Orca's hook entries, also PowerShell-encoded ones (#22, #26, #29).
 - `docs/ROADMAP.md`: the order of the next releases, the issues each session closes, and the promotion plan.
 
 ## [0.5.0] - 2026-11-04
