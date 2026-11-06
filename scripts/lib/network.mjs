@@ -44,10 +44,11 @@ const ENV_PREFIX = ['LC_', 'XDG_', 'NPM_CONFIG_', 'NODE_', 'NVM_', 'FNM_', 'VOLT
 export function allowedEnv(env = process.env, platform = process.platform) {
   const exact = new Set([...ENV_EXACT, ...PROXY_VARS, ...CA_VARS, ...(platform === 'win32' ? ENV_WINDOWS : [])].map((n) => n.toUpperCase()));
   const out = {};
+  const seen = new Set(); // Windows keeps one key per name in any case; a plain object could hold both
   for (const [name, value] of Object.entries(env)) {
     const up = name.toUpperCase();
-    if (value == null || SECRET_NAME.test(name)) continue;
-    if (exact.has(up) || ENV_PREFIX.some((p) => up.startsWith(p))) out[name] = value;
+    if (value == null || SECRET_NAME.test(name) || seen.has(up)) continue;
+    if (exact.has(up) || ENV_PREFIX.some((p) => up.startsWith(p))) { out[name] = value; seen.add(up); }
   }
   return out;
 }

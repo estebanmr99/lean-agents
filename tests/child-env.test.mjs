@@ -24,7 +24,8 @@ test('quiet: secrets stay behind, proxy, CA and strict-privacy vars get through'
   assert.equal(seen.DO_NOT_TRACK, '1');
   assert.equal(seen.HTTPS_PROXY, 'http://proxy.example:3128');
   assert.equal(seen.npm_config_cafile, '/ca.pem');
-  assert.ok(seen.PATH);
+  // Windows spells it Path.
+  assert.ok(Object.keys(seen).some((k) => k.toUpperCase() === 'PATH'));
 });
 
 test('run: the allowlist applies even without a per-command env', () => {
@@ -43,4 +44,9 @@ test('allowedEnv: names match case-insensitively; Windows names only on win32', 
 test('allowedEnv keeps git identity and curl/pip CA vars', () => {
   const kept = Object.keys(allowedEnv({ GIT_AUTHOR_NAME: 'a', GIT_AUTHOR_EMAIL: 'e', CURL_CA_BUNDLE: '/c', PIP_CERT: '/p', GIT_ASKPASS_TOKEN: 'x' }, 'linux')).sort();
   assert.deepEqual(kept, ['CURL_CA_BUNDLE', 'GIT_AUTHOR_EMAIL', 'GIT_AUTHOR_NAME', 'PIP_CERT']);
+});
+
+test('allowedEnv: one key per name, whatever the case', () => {
+  const out = allowedEnv({ PATH: 'a', Path: 'b', path: 'c', Home: 'h', HOME: 'g' }, 'linux');
+  assert.deepEqual(Object.keys(out).map((k) => k.toUpperCase()).sort(), ['HOME', 'PATH']);
 });
