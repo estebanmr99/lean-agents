@@ -62,13 +62,9 @@ case "$os" in
 esac
 grep -q '"bun": true' "$HOME/.config/lean-agents/state.json" || fail "state does not record bun"
 node "$repo/tests/bench-context-mode.mjs" check | tee "$HOME/check.txt"
-grep -q 'Performance: FAST (Bun)' "$HOME/check.txt" || fail "ctx_doctor does not report Bun"
+# Context Mode 2 (2.1.4) no longer reports its runtime in ctx_doctor and runs ctx_execute under Node even with Bun on PATH,
+# so this proves what lean-agents controls (Bun on PATH, recorded in state) plus a working TypeScript ctx_execute.
 grep -qx 'ts-ok 42' "$HOME/check.txt" || fail "TypeScript ctx_execute failed"
-if [ "$os" = linux ]; then
-  # Only the plugin entry start.mjs re-execs the server under Bun; the npm bin above keeps it on Node.
-  CTX_SERVER="$HOME/npm/lib/node_modules/context-mode/start.mjs" node "$repo/tests/bench-context-mode.mjs" check > "$HOME/plugin.txt"
-  grep -Eq 'PS: ([^ ]*/)?bun( |$)' "$HOME/plugin.txt" || fail "start.mjs does not re-exec the server under Bun"
-fi
 
 echo "--- uninstall removes the Bun it installed"
 [ "$os" = windows ] && export PATH="${PATH%:"$bunbin"}"
