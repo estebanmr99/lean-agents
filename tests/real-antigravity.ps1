@@ -6,7 +6,7 @@ $dir = Join-Path $(if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [IO.Path]::
 New-Item -ItemType Directory -Path $dir | Out-Null
 
 # The vendor installer writes to %LOCALAPPDATA%\agy\bin (the disposable runner's), before USERPROFILE moves.
-Invoke-RestMethod https://antigravity.google/cli/install.ps1 | Invoke-Expression
+& ([scriptblock]::Create((Invoke-RestMethod https://antigravity.google/cli/install.ps1)))
 $env:Path = "$env:LOCALAPPDATA\agy\bin;$env:Path"
 if (-not (Test-Path "$env:LOCALAPPDATA\agy\bin\agy.exe")) { throw 'agy.exe was not installed' }
 $agy = (Get-Command agy).Source

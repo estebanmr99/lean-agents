@@ -3,7 +3,7 @@
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot
 
-function New-TempProfile {
+function Initialize-TempProfile {
   $dir = Join-Path $env:RUNNER_TEMP ([guid]::NewGuid().ToString())
   New-Item -ItemType Directory -Path $dir | Out-Null
   $env:USERPROFILE = $dir
@@ -12,19 +12,19 @@ function New-TempProfile {
 }
 
 Write-Output '--- dry run from a file changes nothing'
-$dir = New-TempProfile
+$dir = Initialize-TempProfile
 & "$repo\install.ps1" -DryRun -Yes -Agents claude, opencode-v1 -AllTools -Privacy strict -Profile vertex-gemini -Lang en --no-exec
 if (Get-ChildItem -Force $dir) { throw 'dry run wrote to USERPROFILE' }
 
 Write-Output '--- dry run piped into a scriptblock clones the source and nothing else'
-$dir = New-TempProfile
+$dir = Initialize-TempProfile
 & ([scriptblock]::Create((Get-Content "$repo\install.ps1" -Raw))) -DryRun -Yes -Agents claude -NoTools -Privacy standard -Lang en --no-exec
 $found = @(Get-ChildItem -Force "$dir\.config\lean-agents").Name
 if (($found -join ',') -ne 'src') { throw "piped dry run wrote: $found" }
 if (@(Get-ChildItem -Force $dir).Count -ne 1) { throw 'piped dry run wrote outside .config' }
 
 Write-Output '--- -NoBun turns Bun off in the plan'
-$dir = New-TempProfile
+$dir = Initialize-TempProfile
 # The Bun line only exists when Context Mode is planned, which needs Node 24.15+; fake it so Node 22 still checks the flag.
 $env:LEAN_AGENTS_NODE = '24.22.2'
 $plan = & "$repo\install.ps1" -DryRun -Yes -Agents claude -NoBun -Privacy standard -Lang en --no-exec | Out-String
@@ -32,7 +32,7 @@ Remove-Item Env:LEAN_AGENTS_NODE
 if ($plan -notmatch 'bun: off') { throw "-NoBun did not reach the engine: $plan" }
 
 Write-Output '--- install, doctor and uninstall'
-$dir = New-TempProfile
+$dir = Initialize-TempProfile
 & "$repo\install.ps1" -Yes -Agents claude, opencode-v1 -AllTools -Privacy strict -Profile anthropic-api -Lang en --no-exec
 & "$repo\install.ps1" -Doctor --no-exec
 & "$repo\install.ps1" -Uninstall -Yes --no-exec

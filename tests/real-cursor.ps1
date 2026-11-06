@@ -6,7 +6,7 @@ $dir = Join-Path $(if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [IO.Path]::
 New-Item -ItemType Directory -Path $dir | Out-Null
 
 # The vendor installer writes to %LOCALAPPDATA%\cursor-agent (the disposable runner's), before USERPROFILE moves.
-Invoke-RestMethod 'https://cursor.com/install?win32=true' | Invoke-Expression
+& ([scriptblock]::Create((Invoke-RestMethod 'https://cursor.com/install?win32=true')))
 $agentDir = "$env:LOCALAPPDATA\cursor-agent"
 if (-not (Test-Path "$agentDir\agent.cmd")) { throw 'agent.cmd was not installed' }
 $env:Path = "$agentDir;$env:Path"

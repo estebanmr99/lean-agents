@@ -10,7 +10,7 @@ Set-Content "$dir\stub\npx.cmd" '@exit /b 0' -Encoding ascii
 
 $names = 'NO_PROXY', 'DO_NOT_TRACK', 'ORCA_TELEMETRY_DISABLED'
 function Get-UserEnv($n) { [Environment]::GetEnvironmentVariable($n, 'User') }
-function Set-UserEnv($n, $v) { [Environment]::SetEnvironmentVariable($n, $v, 'User') }
+function Write-UserEnv($n, $v) { [Environment]::SetEnvironmentVariable($n, $v, 'User') }
 function Assert-Eq($what, $got, $want) { if ($got -ne $want) { throw "$what`: expected '$want', got '$got'" } }
 $saved = @{}
 foreach ($n in $names) { $saved[$n] = Get-UserEnv $n }
@@ -32,9 +32,9 @@ try {
   $env:HTTPS_PROXY = 'http://proxy.invalid:8080'
 
   # 1. You already have a NO_PROXY and your own ORCA_TELEMETRY_DISABLED: both are kept.
-  Set-UserEnv 'NO_PROXY' 'corp.invalid,localhost'
-  Set-UserEnv 'DO_NOT_TRACK' $null
-  Set-UserEnv 'ORCA_TELEMETRY_DISABLED' '0'
+  Write-UserEnv 'NO_PROXY' 'corp.invalid,localhost'
+  Write-UserEnv 'DO_NOT_TRACK' $null
+  Write-UserEnv 'ORCA_TELEMETRY_DISABLED' '0'
   Invoke-Lean $install
   Assert-Eq 'NO_PROXY after install' (Get-UserEnv 'NO_PROXY') 'corp.invalid,localhost,127.0.0.1,::1'
   Assert-Eq 'DO_NOT_TRACK after install' (Get-UserEnv 'DO_NOT_TRACK') '1'
@@ -56,8 +56,8 @@ try {
 
   # 2. No NO_PROXY of your own: the variable is created, then removed again.
   if (-not $machineNoProxy) {
-    Set-UserEnv 'NO_PROXY' $null
-    Set-UserEnv 'ORCA_TELEMETRY_DISABLED' $null
+    Write-UserEnv 'NO_PROXY' $null
+    Write-UserEnv 'ORCA_TELEMETRY_DISABLED' $null
     Invoke-Lean $install
     Assert-Eq 'created NO_PROXY' (Get-UserEnv 'NO_PROXY') 'localhost,127.0.0.1,::1'
     Assert-Eq 'created ORCA_TELEMETRY_DISABLED' (Get-UserEnv 'ORCA_TELEMETRY_DISABLED') '1'
@@ -66,6 +66,6 @@ try {
     Assert-Eq 'ORCA_TELEMETRY_DISABLED removed' (Get-UserEnv 'ORCA_TELEMETRY_DISABLED') $null
   }
 } finally {
-  foreach ($n in $names) { Set-UserEnv $n $saved[$n] }
+  foreach ($n in $names) { Write-UserEnv $n $saved[$n] }
   $env:USERPROFILE = $saveProfile
 }
