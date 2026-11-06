@@ -133,3 +133,20 @@ test('unknown source fails, auto with nothing found exits 0', () => {
   assert.match(lean(home, ['--yes', '--no-exec', '--migrate', 'auto', '--agents', 'claude']), /Nothing to migrate/);
   assert.match(lean(home, ['--yes', '--no-exec', '--migrate', 'claude', '--agents', 'claude'], 1), /source and target are both claude/);
 });
+
+test('malformed sources do not crash, rules merge into one block, URL tokens stay out', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-migrate-bad-'));
+  fs.mkdirSync(path.join(home, '.claude', 'agents'), { recursive: true });
+  fs.symlinkSync(path.join(home, 'missing'), path.join(home, '.claude', 'agents', 'bad.md'));
+  put(home, '.claude/CLAUDE.md', 'Claude rule.\n');
+  put(home, '.config/opencode/AGENTS.md', 'Opencode rule.\n');
+  put(home, '.cursor/mcp.json', JSON.stringify({ mcpServers: { s: { command: 'x', args: '--stdio' }, t: { url: 'https://e.x/m?api_key=TOKEN-789' } } }));
+  const out = lean(home, ['--yes', '--no-exec', '--migrate', 'auto', '--agents', 'copilot-cli']);
+  const rules = fs.readFileSync(path.join(home, '.copilot', 'copilot-instructions.md'), 'utf8');
+  assert.match(rules, /Claude rule/);
+  assert.match(rules, /Opencode rule/);
+  assert.match(out, /mcp t\s+\S+\s+-\s+skipped/);
+  fs.rmSync(path.join(home, '.claude', 'agents', 'bad.md')); // snapshot() cannot read a dangling link
+  // The only copy of the token is the source file.
+  for (const [file, content] of Object.entries(snapshot(home))) if (!file.startsWith('.cursor/')) assert.ok(!content.includes('TOKEN-789'), file);
+});

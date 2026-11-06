@@ -118,7 +118,7 @@ function mcpServers(file, keyPath) {
   const out = [];
   for (const [name, s] of Object.entries(node && typeof node === 'object' ? node : {})) {
     if (!s || typeof s !== 'object' || Array.isArray(s)) continue;
-    const command = Array.isArray(s.command) ? s.command.map(String) : s.command ? [String(s.command), ...(s.args ?? []).map(String)] : [];
+    const command = Array.isArray(s.command) ? s.command.map(String) : s.command ? [String(s.command), ...(Array.isArray(s.args) ? s.args.map(String) : [])] : [];
     out.push({
       name, source: file, command, url: typeof s.url === 'string' ? s.url : undefined, transport: s.type === 'sse' ? 'sse' : 'http',
       envNames: Object.keys(s.env ?? s.environment ?? {}), headerNames: Object.keys(s.headers ?? {}),
@@ -145,6 +145,7 @@ export function readSource(from, base, scope) {
   if (l.agents) {
     for (const it of list(...l.agents)) {
       const raw = text(it.file);
+      if (raw === null) continue;
       let a;
       // shortcut: parseAgent drops text after "#" in a frontmatter value, so "fix #12" becomes "fix"; upgrade if it bites.
       try { a = parseAgent(raw); } catch { a = { body: raw.trim() }; }
@@ -158,7 +159,7 @@ export function readSource(from, base, scope) {
       if (e.isDirectory() && SAFE_NAME.test(e.name)) r.skills.push({ name: e.name, source: j(l.skills, e.name), files: skillFiles(j(l.skills, e.name)) });
     }
   }
-  if (l.prompts) for (const it of list(...l.prompts)) if (SAFE_NAME.test(it.name)) r.prompts.push({ name: it.name, source: it.file, text: text(it.file) });
+  if (l.prompts) for (const it of list(...l.prompts)) if (SAFE_NAME.test(it.name) && text(it.file) !== null) r.prompts.push({ name: it.name, source: it.file, text: text(it.file) });
   for (const [file, key] of l.mcp) r.mcp.push(...mcpServers(file, key));
   for (const [p, key] of l.hooks) {
     const files = isDir(p) ? list(p, '.json').map((x) => x.file) : isFile(p) ? [p] : [];
@@ -269,23 +270,27 @@ export function migratePlan({ sources, targets, base, scope, stateDir }) {
   };
   const noteTarget = (item, source, t, note) => rows.push({ item, source, target: t, status: 'reported', note });
 
+  // Rules from every source go into one block per target: a second block would replace the first.
+  const seenRules = new Set();
+  const allRules = sources.flatMap((x) => x.rules.map((r) => ({ ...r, from: x.from }))).filter((r) => !seenRules.has(path.resolve(r.file)) && seenRules.add(path.resolve(r.file)));
+  if (allRules.length) {
+    for (const t of targets) {
+      const T = L[t];
+      if (!T.rules) { noteTarget('rules', allRules[0].from, t, `${t} has no user rules file`); continue; }
+      const items = allRules.filter((r) => path.resolve(r.file) !== (T.rulesPath && path.resolve(T.rulesPath)));
+      if (!items.length) continue;
+      const names = [...new Set(items.map((r) => r.from))].join(', ');
+      const body = rulesText(names, items);
+      const rulesFile = j(stateDir, 'migrated-rules.md');
+      const acts = T.rules(rulesFile, body);
+      if (user && ['claude', 'opencode-v1', 'opencode-v2'].includes(t)) acts.unshift({ kind: 'file', path: rulesFile, content: body });
+      actions.push(...acts);
+      const notes = [`${items.length} file(s)`, ...(items.some((r) => r.scoped) ? ['scope (applyTo/globs) is lost: rules apply everywhere'] : [])];
+      rows.push({ item: 'rules', source: items[0].file, target: acts.at(-1).path, status: 'migrated', path: acts.at(-1).path, note: notes.join('; ') });
+    }
+  }
   for (const src of sources) {
     const from = src.from;
-    if (src.rules.length) {
-      for (const t of targets) {
-        const T = L[t];
-        if (!T.rules) { noteTarget('rules', from, t, `${t} has no user rules file`); continue; }
-        const items = src.rules.filter((r) => path.resolve(r.file) !== (T.rulesPath && path.resolve(T.rulesPath)));
-        if (!items.length) continue;
-        const body = rulesText(from, items);
-        const rulesFile = j(stateDir, `migrated-${from}-rules.md`);
-        const acts = T.rules(rulesFile, body);
-        if (user && ['claude', 'opencode-v1', 'opencode-v2'].includes(t)) acts.unshift({ kind: 'file', path: rulesFile, content: body });
-        actions.push(...acts);
-        const notes = [`${items.length} file(s)`, ...(items.some((r) => r.scoped) ? ['scope (applyTo/globs) is lost: rules apply everywhere'] : [])];
-        rows.push({ item: 'rules', source: items[0].file, target: acts.at(-1).path, status: 'migrated', path: acts.at(-1).path, note: notes.join('; ') });
-      }
-    }
     for (const a of src.agents) {
       if (!claim('agent', a.name, a.source)) continue;
       const agent = { name: a.name, description: a.description, body: a.body, tier: 'migrated', access: a.restricted ? 'read-only' : 'read-write' };
@@ -313,6 +318,7 @@ export function migratePlan({ sources, targets, base, scope, stateDir }) {
     }
     for (const s of src.mcp) {
       if (!claim('mcp', s.name, s.source)) continue;
+      if (s.url && /[?#]|\/\/[^/]*@/.test(s.url)) { rows.push({ item: `mcp ${s.name}`, source: s.source, target: '-', status: 'skipped', note: 'url has a query or credentials, which may hold a token: add it by hand' }); continue; }
       if (!SAFE_NAME.test(s.name) || (!s.url && !s.command.length)) { rows.push({ item: `mcp ${s.name}`, source: s.source, target: '-', status: 'skipped', note: 'no command or url' }); continue; }
       s.envNames.forEach((n) => env.add(n));
       s.headerNames.forEach((n) => headers.add(`${s.name}: ${n}`));
@@ -328,13 +334,14 @@ export function migratePlan({ sources, targets, base, scope, stateDir }) {
           continue;
         }
         const ref = refs[t];
+        const envNote = s.envNames.length && !ref ? `env ${s.envNames.join(', ')} not written: export it` : '';
         const vars = ref && s.envNames.length ? Object.fromEntries(s.envNames.map((n) => [n, ref(n)])) : null;
         let a = jsonByPath.get(m.file);
         if (!a) { a = { kind: 'json', path: m.file, edits: [] }; jsonByPath.set(m.file, a); actions.push(a); }
         const key = [...m.key, s.name];
         // Two targets can share a file (.mcp.json): the first server definition wins.
         if (!a.edits.some((e) => e.path.join('.') === key.join('.'))) a.edits.push({ path: key, value: m.value(s, vars), mode: 'setIfAbsent' });
-        rows.push({ item: `mcp ${s.name}`, source: s.source, target: m.file, status: 'migrated', path: m.file, key: key.join('.'), note });
+        rows.push({ item: `mcp ${s.name}`, source: s.source, target: m.file, status: 'migrated', path: m.file, key: key.join('.'), note: [note, envNote].filter(Boolean).join('; ') });
       }
     }
     for (const h of src.hooks) rows.push({ item: 'hooks', source: h.source, target: '-', status: 'reported', note: 'hooks are not migrated: formats differ, copy by hand' });
@@ -364,7 +371,7 @@ export function finishRows(rows, planned, exec) {
     if (!p) return r;
     if (p.status === 'skip') return { ...r, status: 'skipped', note: p.note };
     if (p.status === 'unchanged') return { ...r, status: 'skipped', note: 'already there' };
-    if (r.key && p.note.includes(r.key)) return { ...r, status: 'skipped', note: 'kept your existing server' };
+    if (r.key && p.keptKeys?.includes(r.key)) return { ...r, status: 'skipped', note: 'kept your existing server' };
     return r;
   });
 }

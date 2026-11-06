@@ -111,6 +111,7 @@ export function plan(actions) {
     let after;
     let note = '';
     let applied;
+    let keptKeys;
     if (a.kind === 'file') {
       if (before !== null && before !== a.content && !before.includes(OWNED_MARK) && !a.force) {
         return { ...a, before, after: before, status: 'skip', note: 'exists and is not managed by lean-agents' };
@@ -130,12 +131,13 @@ export function plan(actions) {
       const r = applyJsonEdits(before, edits);
       after = r.text;
       applied = r.applied;
+      keptKeys = r.kept.map((k) => k.path.join('.'));
       if (r.kept.length) note = `kept your values for: ${r.kept.map((k) => k.path.join('.')).join(', ')}`;
     } else if (a.kind === 'block') {
       after = setBlock(before, a.body, a.toml);
     }
     const status = before === null ? 'create' : before === after ? 'unchanged' : 'modify';
-    return { ...a, before, after, applied, status, note };
+    return { ...a, before, after, applied, status, note, keptKeys };
   });
 }
 

@@ -418,6 +418,7 @@ function printPlan(o, planned, commands) {
 async function install(o) {
   const saved = o.command === 'update' ? readState(o.home) : null;
   if (o.command === 'update' && !saved) throw new Error('nothing to update: lean-agents is not installed');
+  if (o.command === 'update' && saved.options.migrateOnly) throw new Error('nothing to update: only --migrate ran here');
   const p = await choose(o, saved?.options);
   const { planned, commands: agentCommands, migration } = buildPlan(o);
   if (migration && !migration.rows.length) { p.close(); console.log('Nothing to migrate: no rules, agents, skills, prompts, MCP servers or hooks found.'); return; }
@@ -457,7 +458,7 @@ async function install(o) {
     installedAt: previous?.installedAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     pins: pinVersions(),
-    options: o.migrate ? previous?.options ?? { agents: o.agents, tools: [], privacy: o.privacy, network: o.network, gh: false, terminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false } : { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, gh: o.gh, terminals: o.terminals, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun },
+    options: o.migrate ? previous?.options ?? { migrateOnly: true, agents: o.agents, tools: [], privacy: o.privacy, network: o.network, gh: false, terminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false } : { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, gh: o.gh, terminals: o.terminals, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun },
     files: [...(previous?.files ?? []), ...files],
     commands: [...(previous?.commands ?? []), ...ran],
   };
