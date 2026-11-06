@@ -101,6 +101,8 @@ Detection (a run with `--home` looks only inside it; `orca` on Linux is the GNOM
 
 | Item | Source | Checked |
 | --- | --- | --- |
+| `.github/dependabot.yml` keys (`version: 2`, `updates`, `package-ecosystem` npm and github-actions, `directory`, `schedule.interval: weekly`, `open-pull-requests-limit`, `commit-message.prefix`): all present in the reference. Read through a summarizing model, not raw page text: re-check the exact strings in a browser before relying on them | [Dependabot options reference](https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference) | 2026-11-06 |
+| Action SHA pins (`actions/checkout` v4.4.0, `actions/setup-node` v4.4.0, `actions/upload-artifact` v4.6.2, `charmbracelet/vhs-action` v2.1.1, `gitleaks/gitleaks-action` v2.3.9; annotated tag dereferenced to commit) | `gh api repos/<o>/<r>/git/ref/tags/<tag>` and `repos/<o>/<r>/tags`, #69 | 2026-11-06 |
 | Context Mode Claude plugin `mksglu/context-mode`, `context-mode@context-mode`; license ELv2 | [README](https://github.com/mksglu/context-mode) | 2026-10-31 |
 | Context Mode: plugin and MCP together break OpenCode tool registration | same | 2026-10-31 |
 | `skills@1.7.4` (and `1.5.18`, checked 2026-11-05): `add owner/repo#<tag>` installs that tag (orca-cli at `v1.4.99` differs from HEAD, files compared); the tree URL form works too; a trailing `@<tag>` is silently ignored and installs HEAD, although `docs/commands.md` upstream shows `@` | real install in a throwaway HOME, [vercel-labs/skills](https://github.com/vercel-labs/skills) | 2026-11-06 |
