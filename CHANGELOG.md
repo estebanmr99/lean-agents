@@ -12,6 +12,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Added
 
+- `docs/checkpoints/0.7.0.md`: first architecture checkpoint (#59). It recommends keep, change or spike on the installer's form, the script-plus-agent split, what to stop, the numbers, and the 0.7.0 scope.
 - Issue forms for bug, feature, update finding and agent support; blank issues are off and vulnerabilities point to `SECURITY.md`. The bug and update-finding forms list the fields the opt-in feedback flow fills (os, version, agents, command, error).
 - `scripts/labels.sh`: idempotent label set (`type:`, `priority:`, `area:`); it renames GitHub's default `bug`, `documentation` and `enhancement` so existing issues keep them.
 - `docs/audit-2026-11.md`: repo audit (README, security, network and privacy, repo health), and a "Before each release" checklist in `docs/SPEC.md`.

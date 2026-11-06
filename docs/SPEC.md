@@ -481,6 +481,20 @@ Mark each `[x]` when merged.
 - [x] **Session 20 — Install with an agent, opt-in feedback, gh by default** (0.6.0). Issues #35, #36, #37.
 - [x] **Session 22 — Repo audit, issue forms, labeled backlog** (0.7.0). `docs/audit-2026-11.md`, forms in `.github/ISSUE_TEMPLATE` (bug, feature, update-finding, agent-support, config), `scripts/labels.sh`, the backlog as labeled issues, "Before each release" checklist. Audit findings are filed as issues, not fixed here.
 - [x] **Session 45 — Agent-first updates** (0.7.0). Issue #45. `lean-update` skill, read-only detection table in `docs/manual-install.md`, one temp backup removed after `--doctor`, `--update` prints old -> new, `--doctor --json` lists `behind`, daily green `ci-latest` opens a pin-bump PR.
+- [x] **Session 58 — 1-minute README** (0.7.0). Issue #58, PR #81. Short README EN and ES with a support matrix, "what you get" and "who it is for"; `scripts/check-readme.mjs` enforces the 1-minute rule in CI.
+- [ ] **Session 59 — Architecture checkpoint** (0.7.0). Issue #59. [`docs/checkpoints/0.7.0.md`](checkpoints/0.7.0.md): one keep / change / spike per question, and the 0.7.0 sessions below.
+
+0.7.0 sessions from the checkpoint, accepted by the owner on 2026-11-06 (order and parallel groups in [`docs/checkpoints/0.7.0.md`](checkpoints/0.7.0.md) section 5):
+
+- [ ] **Session 69 — CI trust** (0.7.0). Issues #69, #70, #56. Actions pinned by SHA plus Dependabot, least-privilege tokens, macOS jobs fixed or trimmed, one update channel (pin-bump PR, no per-tool issues), `ci-latest` green. Sonnet.
+- [ ] **Session 68 — File safety and redaction** (0.7.0). Issues #68, #67, #74, #72. Opus plans the env allowlist, Sonnet builds.
+- [ ] **Session 71 — Contributor and governance docs** (0.7.0). Issues #71, #73. Haiku.
+- [ ] **Session 79 — OpenCode 1.x safety and Orca** (0.7.0). Issues #79, #78. Never cross OpenCode 1.x to 2.x, warn about session loss; Orca status icons on OpenCode 1.19 (`scripts/lib/terminals.mjs`). After 44 if it touches `scripts/lib/system.mjs`. Sonnet.
+- [ ] **Session 64 — Pin and verify downloaded code** (0.7.0, after 69). Issues #64, #66, #75. Sonnet.
+- [ ] **Session 50 — Pin bumps** (0.7.0, after 64). Issues #50, #51, #52. Haiku.
+- [ ] **Session 44 — Context Mode on Node < 24.15** (0.7.0, after 64). Issue #44. Sonnet.
+- [ ] **Session 65 — How you get it: release tag default, npm package** (0.7.0, after #58, 69 and 44). Issues #65, #46. Opus plans, Sonnet builds.
+- [ ] **Archive done sessions** (0.7.0, last, alone). Checkpoint Q3: move finished session blocks to `docs/sessions-done.md`, one line each stays here. Haiku.
 
 ### Session 3 — Windows + OpenCode 1.x + wider CI
 
@@ -779,5 +793,5 @@ Done when: tests parse the `--json` output and check the redacted draft against 
 - README still fits the 1-minute rule: hero within the line budget before Details, support matrix matches the CI jobs in `ci.yml` (cells without a real-binary job say VERIFY), alt text on every image.
 - Audit rerun: update `docs/audit-2026-11.md` (or the newest `docs/audit-*.md`); every medium or higher finding is fixed or has an open issue.
 - Labels triaged: no open issue without a `type:` and a `priority:` label (`bash scripts/labels.sh` first if labels are missing); p0 issues are closed or consciously deferred.
-- Architecture checkpoint (#59).
+- Architecture checkpoint (#59): write `docs/checkpoints/<version>.md`, one keep / change / spike per question. Latest: [`docs/checkpoints/0.7.0.md`](checkpoints/0.7.0.md).
 - `docs/ROADMAP.md` and `CHANGELOG.md` match what is merged.
