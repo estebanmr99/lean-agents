@@ -4,6 +4,16 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Added
+
+- Issue forms for bug, feature, update finding and agent support; blank issues are off and vulnerabilities point to `SECURITY.md`. The bug and update-finding forms list the fields the opt-in feedback flow fills (os, version, agents, command, error).
+- `scripts/labels.sh`: idempotent label set (`type:`, `priority:`, `area:`); it renames GitHub's default `bug`, `documentation` and `enhancement` so existing issues keep them.
+- `docs/audit-2026-11.md`: repo audit (README, security, network and privacy, repo health), and a "Before each release" checklist in `docs/SPEC.md`.
+
+### Changed
+
+- The daily version watch also labels its issues `type: update`.
+
 ## [0.6.0] - 2026-11-06
 
 0.5.1 was folded into this release: its fixes are listed below.

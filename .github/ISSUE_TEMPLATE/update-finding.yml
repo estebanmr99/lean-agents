@@ -1,0 +1,55 @@
+# For lean-update and agents that find a newer upstream version, a drifted pin or a failed check.
+# Fields the feedback flow fills today: os, version and agents (its `versions` map), command, error.
+# Not filled yet, an agent adds it if it knows it: preset (`--network`).
+# The daily version-watch workflow files its own issues with the labels `version-watch` and `type: update`.
+name: Update finding
+description: A pinned tool has a newer version, drifted, or broke on update
+title: "update: "
+labels: ["type: update"]
+body:
+  - type: input
+    id: tool
+    attributes:
+      label: Tool
+      placeholder: playwright-mcp
+    validations:
+      required: true
+  - type: input
+    id: pinned
+    attributes:
+      label: Pinned version
+      description: From core/pins.json or `--doctor`.
+  - type: input
+    id: latest
+    attributes:
+      label: Newer version
+      description: Where you saw it (npm, release page, tag).
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: darwin arm64 / win32 x64 / linux x64
+  - type: input
+    id: agents
+    attributes:
+      label: Agents and versions
+      placeholder: claude 2.x, opencode 2.x
+  - type: input
+    id: version
+    attributes:
+      label: lean-agents version
+  - type: dropdown
+    id: preset
+    attributes:
+      label: Network preset
+      options: [on, off, custom flags, not sure]
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      description: The check or update command you ran, if any.
+  - type: textarea
+    id: error
+    attributes:
+      label: Redacted error or notes
+      render: shell
