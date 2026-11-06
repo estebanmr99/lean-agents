@@ -178,10 +178,11 @@ export function orcaHooksFound(home) {
   });
 }
 
-// True when an Orca opt-out is already persisted (Windows real home only; the env is never read elsewhere).
-export function orcaEnvSet({ platform = process.platform, system = true, readEnv = readWindowsEnv } = {}) {
+// True when an Orca opt-out is already set (Windows real home only). Reads process.env only: on Windows
+// it carries the User and Machine vars from login, and spawning PowerShell here would touch USERPROFILE on a dry run.
+export function orcaEnvSet({ platform = process.platform, system = true, env = process.env } = {}) {
   if (platform !== 'win32' || !system) return false;
-  return ORCA_TELEMETRY_ENV.some((name) => readEnv('User', name) || readEnv('Machine', name));
+  return ORCA_TELEMETRY_ENV.some((name) => Boolean(env[name]));
 }
 
 // Printed with the all-off network preset; app settings stay the user's.
