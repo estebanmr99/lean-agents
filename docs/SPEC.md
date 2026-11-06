@@ -154,7 +154,7 @@ When piped, the script clones (or downloads a release tarball of) the repo to `~
 | `--agents claude,opencode-v2,...` | Which agents to configure. Default: auto-detect installed ones and ask. Values: `claude`, `opencode-v1`, `opencode-v2`, `copilot`, `antigravity`. |
 | `--install-agents` | Also install missing agent CLIs with their native installers. Default off. |
 | `--skip-agents` | Never install agent CLIs; only configure the ones found. |
-| `--tools rtk,context-mode,...` / `--all-tools` / `--no-tools` | Optional tool selection. |
+| `--tools rtk,context-mode,...` / `--all-tools` / `--no-tools` / `--no-core` | Optional tool selection; `--no-core` drops rtk and context-mode. |
 | `--privacy standard\|strict` | Default `standard`. `strict` applies section 11. |
 | `--profile <name>` | Model profile from `profiles/` (section 9). Default: ask, or auto-pick by detected providers. |
 | `--lang en\|es` | Language of the installed rules and of agent replies. Default `en`. |
@@ -474,7 +474,7 @@ Mark each `[x]` when merged.
 - [x] **Session 14 — 0.5.0 final check.** README audit for the demo, proxy, menus, VS Code Copilot, Cursor, `--project`, Playwright extension and Bun; CHANGELOG 0.5.0 complete; release dry run in a scratch clone. No tag.
 - [x] **Session 15 — README look and feel.** Hero, one badge row, table of contents, collapsible long sections, consistent tables in README EN and ES; a script checks links, anchors, EN/ES parity and that every shown installer command exits 0 in a dry run. 0.5.0 CHANGELOG housekeeping. No feature claims change.
 - [x] **Session 16 — Fixes and docs from real installs** (0.5.1). Issues #20, #27, #31, #32, #39.
-- [ ] **Session 17 — Windows: Cursor CLI and Orca** (0.5.1). Issues #21, #22, #23, #25, #26, #28, #29.
+- [x] **Session 17 — Windows: Cursor CLI and Orca** (0.5.1). Issues #21, #22, #23, #25, #26, #28, #29.
 - [ ] **Session 18 — Pick only what you need, pin what runs** (0.6.0). Issues #30, #33, #40.
 - [ ] **Session 19 — Migrate from one harness to another** (0.6.0). Issue #34.
 - [ ] **Session 20 — Install with an agent, opt-in feedback, gh by default** (0.6.0). Issues #35, #36, #37.

@@ -1,6 +1,7 @@
 // Renders core/ (rules, neutral subagents) and resolves model tiers from profiles/.
 import fs from 'node:fs';
 import path from 'node:path';
+import { npmSpec } from './pins.mjs';
 
 export function loadCore(root) {
   const agentsDir = path.join(root, 'core', 'agents');
@@ -10,6 +11,8 @@ export function loadCore(root) {
     .sort()
     .map((f) => parseAgent(fs.readFileSync(path.join(agentsDir, f), 'utf8')));
   const mcp = JSON.parse(fs.readFileSync(path.join(root, 'core', 'mcp.json'), 'utf8')).servers;
+  // "{pin:key}" in a command stands for source@version from core/pins.json.
+  for (const s of Object.values(mcp)) s.command = s.command.map((a) => a.replace(/^\{pin:([\w-]+)\}$/, (_, k) => npmSpec(k)));
   return { agents, mcp };
 }
 

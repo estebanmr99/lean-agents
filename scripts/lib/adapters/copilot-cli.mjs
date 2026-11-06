@@ -6,6 +6,7 @@ import { OWNED_MARK } from '../fsops.mjs';
 import { tierFor, modelFor } from '../render.mjs';
 import { envDir } from '../system.mjs';
 import { localServer } from './opencode-v2.mjs';
+import { skillSource, skillsCli } from '../pins.mjs';
 
 const CONTEXT_MODE_SCRIPT = fileURLToPath(new URL('../../copilot-context-mode.mjs', import.meta.url));
 
@@ -29,9 +30,9 @@ export function renderCopilotAgent(agent, profile) {
 export const skills = (tool, desc, repo, names) => ({
   tool,
   desc,
-  run: [['npx', '-y', 'skills', 'add', repo, '--skill', ...names, '-a', 'github-copilot', '-g', '-y']],
+  run: [['npx', '-y', skillsCli(), 'add', repo, '--skill', ...names, '-a', 'github-copilot', '-g', '-y']],
   // Without -a: `remove -a` keeps ~/.agents/skills while another detected agent may share that folder.
-  undo: [['npx', '-y', 'skills', 'remove', ...names, '-g', '-y']],
+  undo: [['npx', '-y', skillsCli(), 'remove', ...names, '-g', '-y']],
 });
 
 export function copilotAdapter({ home, core, profile, opts, rules, adhdCommand }) {
@@ -67,10 +68,10 @@ export function copilotAdapter({ home, core, profile, opts, rules, adhdCommand }
     console.log('Context Mode hooks and skills for Copilot CLI are not installed: run `context-mode setup --print copilot-cli` and follow it.');
   }
   if (tools.includes('caveman')) {
-    commands.push(skills('caveman', 'Caveman skills for Copilot CLI', 'JuliusBrussee/caveman', ['caveman', 'caveman-compress', 'caveman-stats']));
+    commands.push(skills('caveman', 'Caveman skills for Copilot CLI', skillSource('caveman'), ['caveman', 'caveman-compress', 'caveman-stats']));
   }
   if (tools.includes('i-have-adhd')) {
-    commands.push(skills('i-have-adhd', 'i-have-adhd skill for Copilot CLI', 'ayghri/i-have-adhd', ['i-have-adhd']), adhdCommand);
+    commands.push(skills('i-have-adhd', 'i-have-adhd skill for Copilot CLI', skillSource('i-have-adhd'), ['i-have-adhd']), adhdCommand);
   }
   return { actions, commands };
 }

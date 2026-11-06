@@ -248,7 +248,7 @@ Si tu empresa paga GitHub Copilot, la forma oficial de usar Claude como agente e
 
 | Nivel | Qué incluye | Por defecto |
 | --- | --- | --- |
-| Mínimo | Reglas, subagentes por costo, compactación, límites de salida, RTK, Context Mode | Siempre |
+| Mínimo | Reglas, subagentes por costo, compactación, límites de salida, RTK, Context Mode | Siempre; `--no-core` (`-NoCore` en PowerShell) deja fuera RTK y Context Mode |
 | Herramientas opcionales | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0), Codeburn | Se pregunta una por una |
 | Herramientas por elección | GSD Core, AutoSkills (CC BY-NC 4.0: solo uso no comercial) | Se pregunta una por una, nunca en `--all-tools` |
 | Privacidad estricta | Sin telemetría, sin auto updates, sin compartir sesiones, sin proveedores que entrenan con tus prompts | Apagado, se activa con `--privacy strict` |
@@ -281,6 +281,7 @@ Si tu empresa paga GitHub Copilot, la forma oficial de usar Claude como agente e
    ```
    Las opciones por categoría son `--telemetry on|off`, `--auto-update on|off` y `--outbound on|off`. `--network off` es igual que `--privacy strict`. En PowerShell se pasan tal cual, por ejemplo `-DryRun --network off`. Qué apaga cada categoría por agente: [docs/privacy.md](docs/privacy.md). La elección se guarda y `--update` la reutiliza.
 4. **`gh`**: agrega `--gh` (o responde que sí) para instalar GitHub CLI sin admin; luego corre `gh auth login` tú mismo.
+5. **Descargas en uso.** Además de los comandos de instalación, los agentes descargan código cada vez que arrancan un servidor MCP o usan un skill. Cada uno está fijado a una versión exacta en [core/pins.json](core/pins.json) (Playwright MCP, Context Mode, Codeburn, AutoSkills, GSD Core, DCP, el Skills CLI y los skills Caveman, i-have-adhd y orca-cli), así que nada cambia sin que lo actualices. `--doctor` marca `changed` cuando los pins instalados difieren de ese archivo. Sin fijar todavía: Serena (fuente `git+https`), RTK y `gh` (brew o winget), el plugin Ponytail y los marketplaces de plugins de Claude. Usa `--no-core` para dejar fuera RTK y Context Mode si tu PC solo permite herramientas concretas.
 
 En una terminal real el instalador muestra menús (flechas, espacio para marcar), una lista de progreso y un resumen. Con `--yes`, con un pipe o sin terminal, hace preguntas simples o ninguna, como antes.
 

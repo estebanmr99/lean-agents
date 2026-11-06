@@ -5,6 +5,7 @@ import path from 'node:path';
 import { configHome, envDir } from '../system.mjs';
 import { localServer } from './opencode-v2.mjs';
 import { renderCopilotAgent, skills } from './copilot-cli.mjs';
+import { skillSource } from '../pins.mjs';
 
 // Read at import, before isolate() points HOME and USERPROFILE at --home.
 const REAL_HOME = os.homedir();
@@ -37,10 +38,10 @@ export function vscodeCopilotAdapter({ home, core, profile, opts, rules, adhdCom
       actions.push({ kind: 'file', path: path.join(dir, 'agents', `${agent.name}.agent.md`), content: renderCopilotAgent(agent, profile) });
     }
     if (tools.includes('caveman')) {
-      commands.push(skills('caveman', 'Caveman skills for VS Code Copilot', 'JuliusBrussee/caveman', ['caveman', 'caveman-compress', 'caveman-stats']));
+      commands.push(skills('caveman', 'Caveman skills for VS Code Copilot', skillSource('caveman'), ['caveman', 'caveman-compress', 'caveman-stats']));
     }
     if (tools.includes('i-have-adhd')) {
-      commands.push(skills('i-have-adhd', 'i-have-adhd skill for VS Code Copilot', 'ayghri/i-have-adhd', ['i-have-adhd']), adhdCommand);
+      commands.push(skills('i-have-adhd', 'i-have-adhd skill for VS Code Copilot', skillSource('i-have-adhd'), ['i-have-adhd']), adhdCommand);
     }
   }
   const edits = vscodeServers(core, tools);

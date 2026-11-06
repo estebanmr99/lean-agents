@@ -10,19 +10,19 @@
     "playwright": {
       "description": "Browser automation for checking web UIs.",
       "upstream": "https://github.com/microsoft/playwright-mcp",
-      "command": ["npx", "-y", "@playwright/mcp@latest"],
+      "command": ["npx", "-y", "{pin:playwright-mcp}"],
       "optional": true
     },
     "playwright-extension": {
       "description": "Playwright MCP attached to the user's own signed-in Chrome or Edge through the Playwright Extension.",
       "upstream": "https://github.com/microsoft/playwright-mcp",
-      "command": ["npx", "-y", "@playwright/mcp@latest", "--extension"],
+      "command": ["npx", "-y", "{pin:playwright-mcp}", "--extension"],
       "optional": true
     },
     "context-mode": {
       "description": "Keeps large tool outputs out of the context window. Used as MCP only where its plugin is unavailable.",
       "upstream": "https://github.com/mksglu/context-mode",
-      "command": ["npx", "-y", "context-mode"],
+      "command": ["npx", "-y", "{pin:context-mode}"],
       "optional": false,
       "mcp_only_for": ["opencode-v2", "copilot-cli", "antigravity"]
     }

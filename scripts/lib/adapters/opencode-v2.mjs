@@ -7,6 +7,7 @@ import os from 'node:os';
 import { OWNED_MARK } from '../fsops.mjs';
 import { tierFor, modelFor } from '../render.mjs';
 import { configHome } from '../system.mjs';
+import { PINS, skillSource, skillsCli } from '../pins.mjs';
 
 const PERMISSIONS = {
   'read-only': ['  edit: deny', '  bash: deny'],
@@ -83,7 +84,7 @@ export function opencodeShared({ home, dir, core, profile, opts }) {
     commands.push({
       tool: 'i-have-adhd',
       desc: 'i-have-adhd checkout for OpenCode',
-      run: [['git', 'clone', '--depth', '1', 'https://github.com/ayghri/i-have-adhd', vendor]],
+      run: [['git', 'clone', '--depth', '1', '--branch', PINS['i-have-adhd'].version, 'https://github.com/ayghri/i-have-adhd', vendor]],
       undo: [['node', '-e', 'require("fs").rmSync(process.argv[1], { recursive: true, force: true })', vendor]],
       skipIfExists: vendor,
     });
@@ -98,9 +99,9 @@ export function opencodeShared({ home, dir, core, profile, opts }) {
     commands.push({
       tool: 'caveman',
       desc: 'Caveman skills for OpenCode',
-      run: [['npx', '-y', 'skills', 'add', 'JuliusBrussee/caveman', '--skill', 'caveman', 'caveman-compress', 'caveman-stats', '-a', 'opencode', '-g', '-y']],
+      run: [['npx', '-y', skillsCli(), 'add', skillSource('caveman'), '--skill', 'caveman', 'caveman-compress', 'caveman-stats', '-a', 'opencode', '-g', '-y']],
       // Without -a: `remove -a` keeps ~/.agents/skills while another detected agent may share that folder.
-      undo: [['npx', '-y', 'skills', 'remove', 'caveman', 'caveman-compress', 'caveman-stats', '-g', '-y']],
+      undo: [['npx', '-y', skillsCli(), 'remove', 'caveman', 'caveman-compress', 'caveman-stats', '-g', '-y']],
     });
   }
   return { actions, commands };

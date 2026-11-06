@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { which, quiet } from './system.mjs';
 import { hasProxy } from './network.mjs';
+import { skillSource, skillsCli } from './pins.mjs';
 
 export const TERMINALS = ['warp', 'orca'];
 export const WARP_OPENCODE_PLUGIN = '@warp-dot-dev/opencode-warp';
@@ -58,8 +59,8 @@ export function terminalCommands({ terminals, agents, network = {}, platform = p
       commands.push({
         tool: 'orca',
         desc: 'Orca skill orca-cli',
-        run: [['npx', '-y', 'skills', 'add', 'https://github.com/stablyai/orca', '--skill', 'orca-cli', '-a', ...as, '-g', '-y']],
-        undo: [['npx', '-y', 'skills', 'remove', 'orca-cli', '-g', '-y']],
+        run: [['npx', '-y', skillsCli(), 'add', skillSource('orca-cli'), '--skill', 'orca-cli', '-a', ...as, '-g', '-y']],
+        undo: [['npx', '-y', skillsCli(), 'remove', 'orca-cli', '-g', '-y']],
       });
     }
     if (platform === 'win32' && system) commands.push(...orcaWindowsCommands({ network, env, readEnv }));

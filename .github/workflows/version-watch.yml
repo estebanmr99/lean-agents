@@ -1,0 +1,23 @@
+name: version-watch
+
+on:
+  schedule:
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Open or update one issue per newer upstream version
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/version-watch.mjs

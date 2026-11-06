@@ -4,6 +4,7 @@ import { WARP_OPENCODE_V1_PLUGIN } from '../terminals.mjs';
 import path from 'node:path';
 import { configPath, localServer, opencodeShared, profileEdits } from './opencode-v2.mjs';
 import { configHome } from '../system.mjs';
+import { npmSpec } from '../pins.mjs';
 
 export function opencodeV1Adapter({ home, core, profile, opts, rulesPath }) {
   const dir = path.join(configHome(home), 'opencode');
@@ -27,7 +28,7 @@ export function opencodeV1Adapter({ home, core, profile, opts, rulesPath }) {
     commands.push({
       tool: 'context-mode',
       desc: 'Context Mode package for OpenCode',
-      run: [['npm', 'install', '-g', 'context-mode']],
+      run: [['npm', 'install', '-g', npmSpec('context-mode')]],
       undo: [['npm', 'uninstall', '-g', 'context-mode']],
       skipIfOutput: { cmd: ['npm', 'ls', '-g', 'context-mode'], ok: true },
     });
@@ -35,7 +36,7 @@ export function opencodeV1Adapter({ home, core, profile, opts, rulesPath }) {
   if (opts.terminals?.includes('warp')) edits.push({ path: ['plugin'], value: WARP_OPENCODE_V1_PLUGIN, mode: 'arrayAdd' });
   if (tools.includes('ponytail')) edits.push({ path: ['plugin'], value: '@dietrichgebert/ponytail', mode: 'arrayAdd' });
   if (tools.includes('dcp')) {
-    edits.push({ path: ['plugin'], value: '@tarquinen/opencode-dcp@latest', mode: 'arrayAdd' });
+    edits.push({ path: ['plugin'], value: npmSpec('opencode-dcp'), mode: 'arrayAdd' });
     const contextWindow = profile?.context_window ?? 200000;
     actions.push({
       kind: 'json',
