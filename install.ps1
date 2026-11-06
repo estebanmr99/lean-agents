@@ -22,6 +22,7 @@ param(
   [switch]$Uninstall,
   [switch]$Doctor,
   [string]$Project,
+  [string]$Migrate,
   # Other engine flags pass through as they are (--no-exec, --adhd-always, --ponytail-mode lite).
   [Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest
 )
@@ -102,6 +103,7 @@ foreach ($name in $lists.Keys) { if ($PSBoundParameters[$name]) { $engineArgs +=
 $values = [ordered]@{ Privacy = '--privacy'; ModelProfile = '--profile'; Lang = '--lang' }
 foreach ($name in $values.Keys) { if ($PSBoundParameters[$name]) { $engineArgs += $values[$name], $PSBoundParameters[$name] } }
 if ($Project) { $engineArgs += '--project', $Project }
+if ($Migrate) { $engineArgs += '--migrate', $Migrate }
 if ($Rest) { $engineArgs += $Rest }
 
 & node (Join-Path $Src 'scripts\lean.mjs') @engineArgs

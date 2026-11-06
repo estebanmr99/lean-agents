@@ -29,7 +29,7 @@ The same rules, cheap-by-default subagents, context-saving tools and MCP servers
 - [Quick start](#quick-start)
 - [Why](#why) · [What you get](#what-you-get)
 - [Warp and Orca](#warp-and-orca) · [Signed-in browser](#signed-in-browser-opt-in) · [VS Code Copilot and Cursor](#vs-code-copilot-and-cursor)
-- [Team mode](#team-mode---project) · [Parallel agent sessions](#parallel-agent-sessions) · [Claude through GitHub Copilot](#claude-through-github-copilot)
+- [Team mode](#team-mode---project) · [Migrate](#migrate-from-another-tool---migrate) · [Parallel agent sessions](#parallel-agent-sessions) · [Claude through GitHub Copilot](#claude-through-github-copilot)
 - [Install tiers](#install-tiers) · [On a work PC](#on-a-work-pc-proxy-network-and-security-review) · [Models that stay current](#models-that-stay-current)
 - [Safety](#safety) · [Credits](#credits) · [Roadmap](#roadmap) · [Contributing](#contributing) · [License](#license)
 
@@ -219,6 +219,38 @@ On Windows:
 - Later, `--project . --update` re-applies your saved choices, and `--project . --uninstall` removes only what lean-agents added.
 - Team mode writes files only. Each teammate still runs the installer once for the tools the rules mention (RTK, Context Mode and the rest).
 - Each teammate's state stays in their own home folder, never in the repo.
+
+</details>
+
+## Migrate from another tool (`--migrate`)
+
+<details>
+<summary>What is copied and what is not</summary>
+
+Copies the setup you already have in one tool to the agents you pick (`--agents`), for your user or, with `--project`, inside a repository. Sources: `claude`, `vscode-copilot`, `cursor`, `copilot-cli`, `opencode-v1`, `opencode-v2`, or `auto` (every one found). Paths and upstream sources: [compatibility notes](docs/compatibility.md).
+
+| Item | What happens |
+| --- | --- |
+| Rules, subagents, skills, prompts | Copied to the target's folders. Nothing is moved or overwritten: a name that already exists is skipped and listed |
+| MCP servers | Command, arguments and URL are copied. Env and header values never are: only the variable names, with a line telling you to set them |
+| Hooks | Listed only. Formats differ, so you copy them by hand |
+
+Preview first, then drop `--dry-run` to apply:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --migrate auto --agents claude --dry-run
+curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --migrate vscode-copilot --project . --agents claude,opencode-v2 --dry-run
+```
+
+On Windows:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -Migrate auto -Agents claude -DryRun
+```
+
+- The dry run prints a table: item, source, target, and whether it was migrated, skipped or only reported.
+- `--uninstall` removes only what the migration wrote.
+- Claude Code user-scope MCP servers go through `claude mcp add`, so `~/.claude.json` is never edited.
 
 </details>
 

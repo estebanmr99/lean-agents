@@ -18,6 +18,7 @@ import { vscodeCopilotAdapter } from './lib/adapters/vscode-copilot.mjs';
 import { cursorAdapter } from './lib/adapters/cursor.mjs';
 import { projectPlan, projectStateDir } from './lib/project.mjs';
 import { gsdPlan } from './lib/gsd.mjs';
+import { MIGRATE_SOURCES, MIGRATE_TARGETS, readSource, detectSources, migratePlan, finishRows, formatTable } from './lib/migrate.mjs';
 import { adhdCommand } from './lib/adhd.mjs';
 import { contextModeNodeNote, detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPresent, which, run, quiet, exists, isolate } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
@@ -88,6 +89,7 @@ function parseArgs(argv) {
       case '--home': o.home = path.resolve(next()); break;
       // realpath: the state dir is keyed by this path, and /var and /private/var are one folder on macOS.
       case '--project': o.project = fs.realpathSync(path.resolve(next())); break;
+      case '--migrate': o.migrate = next(); if (o.migrate !== 'auto' && !MIGRATE_SOURCES.includes(o.migrate)) throw new Error(`unknown --migrate source "${o.migrate}" (available: ${[...MIGRATE_SOURCES, 'auto'].join(', ')})`); break;
       case '--no-exec': o.exec = false; break;
       case '--adhd-always': o.adhdAlways = true; break;
       case '--ponytail-mode': o.ponytailMode = next(); break;
@@ -127,6 +129,9 @@ const HELP = `Usage: lean-agents [options]
   --bun / --no-bun       Install Bun for Context Mode (default: on; faster JS, TypeScript)
   --project <dir>        Write the shared team files into one repository
                          (AGENTS.md, .github/, .vscode/mcp.json, .cursor/)
+  --migrate <from|auto>  Copy rules, agents, skills, prompts and MCP servers from another harness
+                         (${MIGRATE_SOURCES.join(', ')}) to --agents. With --project, from and to the repository.
+                         Never moves or overwrites; MCP env and header values are not copied; hooks are only listed
   --adhd-always          Turn on i-have-adhd for every answer
   --ponytail-mode lite|full|ultra|off
   --update               Re-apply with your saved choices
@@ -183,8 +188,22 @@ function readState(home) {
 // LEAN_AGENTS_NODE fakes the Node version, so tests do not depend on the host.
 const NODE_VERSION = process.env.LEAN_AGENTS_NODE ?? process.versions.node;
 
+// Migration copies files only: no tools, terminals, network or model questions.
+async function chooseMigration(o, p) {
+  if (!o.agents) {
+    const found = Object.keys(detectAgents()).filter((a) => MIGRATE_TARGETS.includes(a));
+    if (!found.length) throw new Error('no target agent found on PATH: pass --agents');
+    o.agents = found;
+  }
+  for (const a of o.agents) if (!MIGRATE_TARGETS.includes(a)) throw new Error(`cannot migrate to "${a}" (available: ${MIGRATE_TARGETS.join(', ')})`);
+  if (o.agents.includes('opencode-v1') && o.agents.includes('opencode-v2')) throw new Error('opencode-v1 and opencode-v2 write the same config files: pick one');
+  Object.assign(o, { tools: [], terminals: [], network: preset('on'), privacy: 'standard', unverified: {}, notes: [], gh: false, bun: false, lang: 'en', profile: null });
+  return p;
+}
+
 async function choose(o, saved) {
   const p = await prompter(o.yes);
+  if (o.migrate) return chooseMigration(o, p);
   if (!o.agents) {
     o.agents = saved?.agents ?? [];
     if (!saved) {
@@ -295,7 +314,17 @@ async function chooseUnverified(o, saved, p) {
   }
 }
 
+function migrationPlan(o) {
+  const scope = o.project ? 'project' : 'user';
+  const base = o.project ?? o.home;
+  const names = o.migrate === 'auto' ? detectSources(base, scope, o.agents) : [o.migrate];
+  const r = migratePlan({ sources: names.map((n) => readSource(n, base, scope)), targets: o.agents, base, scope, stateDir: stateDir(o.home) });
+  const planned = plan(r.actions);
+  return { planned, commands: r.commands, migration: { ...r, rows: finishRows(r.rows, planned, o.exec), base, names } };
+}
+
 function buildPlan(o) {
+  if (o.migrate) return migrationPlan(o);
   if (o.project) {
     const r = projectPlan(ROOT, o.project, o);
     return { planned: plan(r.actions), commands: r.commands };
@@ -350,6 +379,17 @@ function prereqCommands(o) {
   return out;
 }
 
+function printMigration(o, m, commands) {
+  const rel = (p) => (p.startsWith(o.home) ? `~${p.slice(o.home.length)}` : p.startsWith(m.base) ? `.${p.slice(m.base.length)}` : p);
+  console.log(`\nlean-agents migration: ${m.names.join(', ')} -> ${o.agents.join(', ')}${o.project ? ` (project ${o.project})` : ''}`);
+  console.log(formatTable(m.rows, rel));
+  if (m.env.length) console.log(`\nSet these env vars before you start your agents (values are never copied): ${m.env.join(', ')}`);
+  if (m.headers.length) console.log(`Add these MCP headers by hand: ${m.headers.join('; ')}`);
+  if (commands.some((c) => c.run.length)) console.log('\nCommands:');
+  for (const c of commands) for (const argv of c.run) console.log(`  $ ${argv.join(' ')}`);
+  console.log('');
+}
+
 function printPlan(o, planned, commands) {
   console.log(`\nlean-agents plan for ${o.agents.join(', ') || 'no agents'}`);
   if (o.project) console.log(`  project: ${o.project}`);
@@ -378,10 +418,13 @@ function printPlan(o, planned, commands) {
 async function install(o) {
   const saved = o.command === 'update' ? readState(o.home) : null;
   if (o.command === 'update' && !saved) throw new Error('nothing to update: lean-agents is not installed');
+  if (o.command === 'update' && saved.options.migrateOnly) throw new Error('nothing to update: only --migrate ran here');
   const p = await choose(o, saved?.options);
-  const { planned, commands: agentCommands } = buildPlan(o);
+  const { planned, commands: agentCommands, migration } = buildPlan(o);
+  if (migration && !migration.rows.length) { p.close(); console.log('Nothing to migrate: no rules, agents, skills, prompts, MCP servers or hooks found.'); return; }
   const commands = [...(o.exec ? prereqCommands(o) : []), ...agentCommands];
-  printPlan(o, planned, commands);
+  if (migration) printMigration(o, migration, o.exec ? commands : []);
+  else printPlan(o, planned, commands);
   if (o.dryRun) { p.close(); console.log('Dry run: nothing was changed.'); return; }
   if (!yesNo(await p.ask('Apply these changes?', 'y'))) { p.close(); console.log('Cancelled.'); return; }
   p.close();
@@ -415,7 +458,7 @@ async function install(o) {
     installedAt: previous?.installedAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     pins: pinVersions(),
-    options: { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, gh: o.gh, terminals: o.terminals, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun },
+    options: o.migrate ? previous?.options ?? { migrateOnly: true, agents: o.agents, tools: [], privacy: o.privacy, network: o.network, gh: false, terminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false } : { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, gh: o.gh, terminals: o.terminals, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun },
     files: [...(previous?.files ?? []), ...files],
     commands: [...(previous?.commands ?? []), ...ran],
   };
@@ -479,8 +522,8 @@ async function uninstall(o) {
 async function main() {
   const o = parseArgs(process.argv.slice(2));
   // A repository gets files only: tools and agents stay per user.
-  if (o.project && o.agents?.length) throw new Error('--project writes repository files only: run --agents in a separate install');
-  if (o.project) { project = o.project; o.agents = []; o.exec = false; }
+  if (o.project && o.agents?.length && !o.migrate) throw new Error('--project writes repository files only: run --agents in a separate install');
+  if (o.project) { project = o.project; if (!o.migrate) { o.agents = []; o.exec = false; } }
   isolate(o.home);
   shareProxy();
   if (o.command === 'help') return console.log(HELP);
