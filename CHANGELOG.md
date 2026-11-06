@@ -6,6 +6,8 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Changed
 
+- Workflow tokens are least-privilege (#70, W2, W3): every `actions/checkout` sets `persist-credentials: false` and a `lint` step fails when one does not. `release.yml` builds and tests with `contents: read` and uploads `dist/`; a separate `publish` job holds `contents: write`, runs no repo code, and only downloads the artifact and runs `gh release create`. The pin-bump job pushes with the token in that step's env only.
+- macOS real-* legs (Copilot CLI, Antigravity, VS Code, Skills CLI undo) run on push to main, the daily `ci-latest` and manual runs, not on pull requests (#56): every PR run started five macOS jobs at once and some never got a runner. `test (macos-latest)` still runs on PRs.
 - Secret scan covers main (#91): a push runs the gitleaks CLI (v8.30.1, SHA-256 checked) on the commits it brings in, and a weekly run scans the full history. The gitleaks action stays for pull requests; on main it scanned 0 commits because it skips merge commits.
 - The engine never writes through symlinks or outside home and the project (#68, S8, S10, S17): `plan()` skips a symlinked target or a real parent outside the roots with a note, `apply()` throws if one slips through, `--uninstall` leaves such paths, and the `managed by lean-agents` mark counts only in a file's first 10 lines.
 - Backups and `state.json` are owner-only, `0600` files in `0700` directories (#68, S9). `--uninstall` asks "Delete backups in <dir>?" (default no; `--yes` keeps them).
