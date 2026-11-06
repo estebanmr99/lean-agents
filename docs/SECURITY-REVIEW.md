@@ -95,4 +95,6 @@ Each one comes from its upstream source; see the README "Credits" table for link
 | GSD, AutoSkills | opt-in only | **VERIFY** |
 | GitHub CLI | only when asked | telemetry: `GH_TELEMETRY=false` |
 
+OpenCode 2 is installed by upstream's `curl https://opencode.ai/v2/install | bash`, not by lean-agents. On Windows it downloads an npm tarball (`@opencode/cli-windows-x64`) over HTTPS and checks no checksum: the registry's `dist.integrity` is not compared. On a work PC, review the script first (real install, #32, 2026-11-05).
+
 lean-agents never asks for, stores or prints API keys, tokens or proxy passwords. Logins (`gh auth login`, `/login`, `/connect`) stay with you.

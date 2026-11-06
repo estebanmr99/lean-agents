@@ -35,9 +35,17 @@ Las mismas reglas, subagentes baratos por defecto, herramientas que ahorran cont
 
 ## Demo: OpenCode con modelos de GitHub Copilot
 
-1. Instala OpenCode (macOS, Linux o Git Bash). En Windows, mira la [documentación de OpenCode](https://opencode.ai/docs):
+1. Instala OpenCode. macOS, Linux o Git Bash:
    ```bash
    curl -fsSL https://opencode.ai/v2/install | bash
+   ```
+   Windows PowerShell (el script oficial corre con Git Bash y solo edita `~/.bashrc`, así que esto agrega la carpeta al PATH de tu usuario; abre una terminal nueva después):
+   ```powershell
+   curl.exe -fsSL https://opencode.ai/v2/install -o "$env:TEMP\opencode-install.sh"
+   & "$env:ProgramFiles\Git\bin\bash.exe" -l (($env:TEMP -replace '\\','/') + '/opencode-install.sh') --no-modify-path
+   $bin = "$HOME\.opencode\bin"; $u = [Environment]::GetEnvironmentVariable('Path','User')
+   if (($u -split ';') -notcontains $bin) { [Environment]::SetEnvironmentVariable('Path', "$u;$bin", 'User') }
+   opencode --version
    ```
 2. Mira qué cambiaría lean-agents (`--yes` acepta los valores por defecto, así la vista previa no pregunta). macOS, Linux o Git Bash:
    ```bash

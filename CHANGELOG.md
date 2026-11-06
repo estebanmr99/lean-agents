@@ -8,10 +8,12 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 - GSD Core no longer crashes when Cursor is selected: Cursor installs with `--cursor`, and agents without a GSD installer (`vscode-copilot`) are skipped with a note (#20).
 - The test "--yes keeps every tool default for undocumented settings" no longer depends on a host proxy (#31).
+- `install.ps1` finds OpenCode 2 in `%USERPROFILE%\.opencode\bin` when it is not on PATH and says how to fix the PATH (#32).
 
 ### Changed
 
 - Docs: `docs/privacy.md` table renders again and covers Cursor, VS Code Copilot, Warp and Orca; `tests/README.md` describes `npm test` and the `real-*` scripts; the Cursor CLI install row in `docs/compatibility.md` is correct for Windows (#27).
+- Docs: the demo step 1 has a verified Windows PowerShell block for OpenCode 2 (EN, ES); `docs/SECURITY-REVIEW.md` notes the upstream script checks no tarball checksum (#32).
 
 ### Added
 

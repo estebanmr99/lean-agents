@@ -37,6 +37,7 @@ With both `copilot-cli` and `vscode-copilot`, the shared `~/.copilot` files and 
 - Without winget, extract `rtk-x86_64-pc-windows-msvc.zip` into `%USERPROFILE%\tools\rtk`; `install.ps1` adds it to the user PATH.
 - No directory junctions are needed: the Skills CLI installs into `~/.claude/skills` and `~/.agents/skills`, and OpenCode reads `~/.agents/skills`.
 - `rtk init` writes to the OS profile folder, not `USERPROFILE`. It only matters when testing with a temp `USERPROFILE`.
+- OpenCode 2 on Windows: `opencode.ai/v2/install` runs through Git Bash, installs `opencode.exe` into `%USERPROFILE%\.opencode\bin` and only edits `~/.bashrc` / `~/.bash_profile` (`--no-modify-path` skips that), so PowerShell needs the user PATH entry added by hand. Verified on v2.2.5 (Authenticode valid). `npm i -g opencode-ai` installs 1.x, not 2.x. `install.ps1` finds that folder when `opencode` is not on PATH. Source: real install, #32, 2026-11-05.
 - The runner image has no winget; `real-winget` adds it with `Repair-WinGetPackageManager`.
 
 ## Terminals
