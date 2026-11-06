@@ -46,6 +46,8 @@ check grep -q '{env:GH_TOKEN}' "$proj/opencode.jsonc"
 check grep -q 'reviewer' "$HOME/project-agents.txt"
 check test -f "$proj/.claude/agents/reviewer.md"
 check test -f "$proj/.claude/commands/explain.md"
+# The literal ${GH_TOKEN} is what we look for.
+# shellcheck disable=SC2016
 check grep -q '\${GH_TOKEN}' "$proj/.mcp.json"
 refute grep -rq "$secret" "$proj/.claude" "$proj/.opencode" "$proj/.mcp.json" "$proj/opencode.jsonc" "$HOME/project-config.txt"
 

@@ -14,7 +14,8 @@ const SECRET = 'SECRET-VALUE-123';
 function lean(home, args, expect = 0) {
   const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args], { encoding: 'utf8' });
   assert.equal(r.status, expect, r.stderr || r.stdout);
-  return r.stdout + r.stderr;
+  // Windows prints ~\\.cursor\\...: compare with forward slashes.
+  return (r.stdout + r.stderr).replaceAll('\\', '/');
 }
 
 function snapshot(dir) {
