@@ -488,7 +488,7 @@ Mark each `[x]` when merged.
 
 - [x] **Session 69 — CI trust** (0.7.0). Issues #69, #70, #56. #69 done (PR #83); #70 and #56 done (PR #95). Actions pinned by SHA plus Dependabot, least-privilege tokens, macOS jobs fixed or trimmed, one update channel (pin-bump PR, no per-tool issues), `ci-latest` green. Sonnet.
 - [x] **Session 68 — File safety and redaction** (0.7.0). Issues #68, #67, #74, #72. (PR #94; #72 in PR #89). Opus plans the env allowlist, Sonnet builds.
-- [ ] **Session 71 — Contributor and governance docs** (0.7.0). Issues #71, #73. #71 done (PR #88), #73 open. Haiku.
+- [x] **Session 71 — Contributor and governance docs** (0.7.0). Issues #71, #73. (#71 in PR #88, #73 in this PR). Haiku.
 - [ ] **Session 79 — OpenCode 1.x safety and Orca** (0.7.0). Issues #79, #78. #79 done (PR #86), #76 done (PR #90), #78 open. Never cross OpenCode 1.x to 2.x, warn about session loss; Orca status icons on OpenCode 1.19 (`scripts/lib/terminals.mjs`). After 44 if it touches `scripts/lib/system.mjs`. Sonnet.
 - [ ] **Session 64 — Pin and verify downloaded code** (0.7.0, after 69). Issues #64, #66, #75. Sonnet.
 - [ ] **Session 50 — Pin bumps** (0.7.0, after 64). Issues #50, #51, #52. Haiku.
