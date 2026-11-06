@@ -7,6 +7,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ### Changed
 
 - `CONTRIBUTING.md` has a "Development" section (Node 22.20+, `npm ci`, `npm test`, shellcheck, privacy check, safe dry run), the adapter path (`scripts/lib/adapters/*.mjs`, not `agents/`), and a "Proposing a tool" section linked from `tools/README.md` (#71).
+- `--doctor` honors the network preset (#72, N7, N8): child commands get `DO_NOT_TRACK` and friends under telemetry off, and `mcp list` (which starts Serena and Playwright) is skipped with one `skipped` row when outbound is off. `tests/doctor-network.test.mjs`.
 - Every third-party GitHub Action is pinned to a full commit SHA with a `# vX.Y.Z` comment (#69). Dependabot (`.github/dependabot.yml`) opens weekly update PRs for npm and actions. A `lint` step fails on any new tag-only `uses:` line.
 - README is a 1-minute read (#58): positioning line, one install command, demo GIF, a support matrix (agent × macOS/Linux/Windows × rules, subagents, MCP tools × CI job; cells without a real-binary job say VERIFY), an at-a-glance list and a diagram, all above a Details divider. Everything else moved below it; README.es.md mirrors it.
 - `scripts/check-readme.mjs` also fails on a hero over 80 lines, an image without alt text or over 5 MB, and EN/ES image-count drift. It runs in the `lint` job and in the release workflow.

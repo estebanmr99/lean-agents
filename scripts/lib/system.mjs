@@ -15,9 +15,9 @@ export function which(bin) {
 // Windows .cmd shims (npm, npx) need a shell; real .exe files must not get one, or paths with spaces split.
 const useShell = (bin) => isWin && !/\.exe$/i.test(which(bin) ?? '');
 
-export function version(bin, args = ['--version']) {
+export function version(bin, args = ['--version'], env = {}) {
   if (!which(bin)) return null;
-  const r = spawnSync(bin, args, { encoding: 'utf8', shell: useShell(bin), timeout: 20000 });
+  const r = spawnSync(bin, args, { encoding: 'utf8', shell: useShell(bin), timeout: 20000, env: { ...process.env, ...env } });
   const m = `${r.stdout}${r.stderr}`.match(/(\d+)\.(\d+)\.(\d+)/);
   return m ? m[0] : 'unknown';
 }
@@ -153,8 +153,8 @@ export function run(argv, { dryRun, log, env }) {
   return r.status === 0;
 }
 
-export function quiet(argv, timeout = 30000) {
-  const r = spawnSync(argv[0], argv.slice(1), { encoding: 'utf8', shell: useShell(argv[0]), timeout });
+export function quiet(argv, timeout = 30000, env = {}) {
+  const r = spawnSync(argv[0], argv.slice(1), { encoding: 'utf8', shell: useShell(argv[0]), timeout, env: { ...process.env, ...env } });
   return { ok: r.status === 0, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
 }
 
