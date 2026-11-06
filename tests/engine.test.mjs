@@ -7,12 +7,12 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parse } from 'jsonc-parser';
-import { applyJsonEdits, revertJsonEdits } from '../scripts/lib/fsops.mjs';
+import { applyJsonEdits, revertJsonEdits, plan as planActions, apply as applyActions, undo as undoActions } from '../scripts/lib/fsops.mjs';
 import { diffModels } from '../scripts/models-refresh.mjs';
 import { releaseNotes } from '../scripts/release.mjs';
 import { prereqFor, antigravityPrereqs, bunInstall, contextModeNodeNote } from '../scripts/lib/system.mjs';
 import { doctor } from '../scripts/lib/doctor.mjs';
-import { detectTerminals } from '../scripts/lib/terminals.mjs';
+import { detectTerminals, terminalCommands, gitBashActions, stillNeeded } from '../scripts/lib/terminals.mjs';
 import { vscodeUserDir } from '../scripts/lib/adapters/vscode-copilot.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -879,6 +879,106 @@ test('terminals: all-off network prints the Warp and Orca privacy switches', () 
   const out = lean(userHome(), ['--yes', '--no-exec', '--dry-run', '--agents', 'claude', '--network', 'off', '--terminal', 'both']);
   assert.match(out, /telemetry_enabled = false/);
   assert.match(out, /DO_NOT_TRACK=1/);
+});
+
+const NO_PROXY_ENV = { HTTP_PROXY: '', HTTPS_PROXY: '', ALL_PROXY: '', NO_PROXY: '', http_proxy: '', https_proxy: '', all_proxy: '', no_proxy: '' };
+
+test('Orca on Windows: skill for Cursor and VS Code Copilot, telemetry and NO_PROXY commands only for the real home', () => {
+  const win = { terminals: ['orca'], agents: ['cursor', 'vscode-copilot'], platform: 'win32' };
+  const skill = terminalCommands({ ...win, network: {}, env: {} }).find((c) => c.desc === 'Orca skill orca-cli');
+  assert.deepEqual(skill.run[0].slice(-5), ['-a', 'cursor', 'github-copilot', '-g', '-y']);
+
+  const rd = (user, machine = null) => (scope) => (scope === 'User' ? user : machine);
+  const proxied = { HTTPS_PROXY: 'http://proxy.invalid:8080' };
+  const text = (c) => c.run.flat().join(' ');
+  const cmds = terminalCommands({ ...win, network: { telemetry: 'off' }, env: proxied, readEnv: rd('corp.invalid,localhost') });
+  const dnt = cmds.find((c) => /DO_NOT_TRACK/.test(text(c)));
+  assert.ok(dnt.skipIfOutput, 'a value you already set is never overwritten');
+  assert.match(dnt.skipIfOutput.cmd.join(' '), /'Machine'/, 'nor one set machine-wide');
+  assert.match(dnt.undo.flat().join(' '), /DO_NOT_TRACK.*\$null/);
+  assert.ok(cmds.some((c) => /ORCA_TELEMETRY_DISABLED/.test(text(c))));
+  const np = cmds.find((c) => /NO_PROXY/.test(text(c)));
+  assert.match(np.desc, /add 127\.0\.0\.1, ::1 to/, 'only the entries missing from the user value');
+  assert.doesNotMatch(np.undo.flat().join(' '), /'localhost'/, 'undo never removes what you had');
+  assert.doesNotMatch(np.undo.flat().join(' '), /'Machine'/, 'a user value existed: nothing else to drop');
+
+  // No user value: the machine value is the starting point, and undo drops the var once only that is left.
+  const fromMachine = terminalCommands({ ...win, network: {}, env: proxied, readEnv: rd(null, 'corp.invalid') }).find((c) => /NO_PROXY/.test(text(c)));
+  assert.match(text(fromMachine), /\$v=\[Environment\]::GetEnvironmentVariable\('NO_PROXY','User'\); if \(-not \$v\) \{ \$v=\[Environment\]::GetEnvironmentVariable\('NO_PROXY','Machine'\)/);
+  assert.match(fromMachine.undo.flat().join(' '), /'Machine'/);
+  // A value set only in this shell is not persisted anywhere, so it does not count as covered.
+  const sessionOnly = terminalCommands({ ...win, network: {}, env: { ...proxied, NO_PROXY: 'localhost,127.0.0.1,::1' }, readEnv: rd(null) });
+  assert.ok(sessionOnly.some((c) => /NO_PROXY/.test(text(c))));
+
+  const covered = terminalCommands({ ...win, network: {}, env: proxied, readEnv: rd('localhost,127.0.0.1,::1') });
+  assert.ok(!covered.some((c) => /NO_PROXY/.test(text(c))));
+  assert.ok(!terminalCommands({ ...win, network: {}, env: {}, readEnv: rd(null) }).some((c) => /NO_PROXY/.test(text(c))), 'no proxy, no change');
+  const cidr = terminalCommands({ ...win, network: {}, env: proxied, readEnv: rd('127.0.0.0/8') });
+  assert.match(cidr.find((c) => /NO_PROXY/.test(text(c))).desc, /localhost, 127\.0\.0\.1, ::1/, 'a CIDR does not count');
+  const away = terminalCommands({ ...win, network: { telemetry: 'off' }, env: proxied, system: false, readEnv: rd(null) });
+  assert.deepEqual(away.filter((c) => /powershell/.test(text(c))), [], '--home never touches the machine');
+  assert.deepEqual(terminalCommands({ ...win, platform: 'darwin', network: { telemetry: 'off' }, env: proxied, readEnv: rd(null) }).filter((c) => /powershell/.test(text(c))), []);
+});
+
+test('Git Bash: marked .bashrc block with the Cursor aliases and loopback NO_PROXY, undone byte for byte', () => {
+  const home = userHome();
+  const rc = path.join(home, '.bashrc');
+  const mine = '# mine\nexport FOO=1\n';
+  fs.writeFileSync(rc, mine);
+  const args = { home, terminals: ['orca'], agents: ['cursor'], platform: 'win32', env: { MSYSTEM: 'MINGW64', HTTPS_PROXY: 'http://proxy.invalid:8080' } };
+  assert.deepEqual(gitBashActions({ ...args, platform: 'linux' }), []);
+  assert.deepEqual(gitBashActions({ ...args, env: {} }), [], 'no Git Bash found');
+  const actions = gitBashActions(args);
+  const [p] = planActions(actions);
+  assert.match(p.after, /alias agent='MSYSTEM= SHELL= agent\.cmd'/);
+  assert.match(p.after, /alias cursor-agent='MSYSTEM= SHELL= cursor-agent\.cmd'/);
+  assert.match(p.after, /for h in localhost 127\.0\.0\.1 ::1; do/);
+  assert.doesNotMatch(p.after, /proxy\.invalid/, 'proxy values never reach disk');
+  const entries = applyActions([p], path.join(home, 'bk'), home);
+  assert.match(fs.readFileSync(rc, 'utf8'), /export FOO=1/);
+  // The NO_PROXY loop appends only what is missing and keeps the user's entries.
+  const body = p.after.match(/for h in[\s\S]*export NO_PROXY no_proxy/)[0];
+  const shell = spawnSync('bash', ['-c', `NO_PROXY='corp.invalid,localhost'\n${body}\necho "$NO_PROXY|$no_proxy"`], { encoding: 'utf8' });
+  if (!shell.error) assert.equal(shell.stdout.trim(), 'corp.invalid,localhost,127.0.0.1,::1|localhost,127.0.0.1,::1');
+  undoActions(entries);
+  assert.equal(fs.readFileSync(rc, 'utf8'), mine);
+  assert.deepEqual(gitBashActions({ ...args, agents: ['claude'], terminals: [] }), []);
+  assert.doesNotMatch(gitBashActions({ ...args, env: { MSYSTEM: 'MINGW64' } })[0].body, /NO_PROXY/, 'no proxy, no NO_PROXY');
+});
+
+test('Cursor behind a proxy: only useHttp1ForAgent is merged into cli-config.json and uninstall restores it', () => {
+  const home = userHome();
+  const cfg = path.join(home, '.cursor', 'cli-config.json');
+  fs.mkdirSync(path.dirname(cfg), { recursive: true });
+  const mine = '{\n  "editor": { "vimMode": true }\n}\n';
+  fs.writeFileSync(cfg, mine);
+  const base = ['--yes', '--no-exec', '--agents', 'cursor', '--tools', 'serena', '--terminal', 'none'];
+  lean(home, base, { ...process.env, ...NO_PROXY_ENV });
+  assert.equal(fs.readFileSync(cfg, 'utf8'), mine, 'no proxy, no change');
+  lean(home, base, { ...process.env, ...NO_PROXY_ENV, HTTPS_PROXY: 'http://proxy.invalid:8080' });
+  const text = fs.readFileSync(cfg, 'utf8');
+  assert.deepEqual(parse(text), { editor: { vimMode: true }, network: { useHttp1ForAgent: true } });
+  assert.doesNotMatch(text, /proxy\.invalid/);
+  lean(home, ['--uninstall', '--yes']);
+  assert.equal(fs.readFileSync(cfg, 'utf8'), mine);
+});
+
+test('Still needed from you: printed after install and by --doctor, Orca hooks found even when PowerShell-encoded', () => {
+  const home = userHome();
+  const out = lean(home, ['--yes', '--no-exec', '--agents', 'cursor', '--tools', 'serena', '--terminal', 'orca'], { ...process.env, ...NO_PROXY_ENV });
+  assert.match(out, /Still needed from you:/);
+  assert.match(out, /agent login/);
+  assert.match(out, /User Rules/);
+  assert.match(out, /Install CLI & Skills|first launch/);
+  const none = lean(userHome(), ['--yes', '--no-exec', '--agents', 'claude', '--tools', 'rtk', '--terminal', 'none'], { ...process.env, ...NO_PROXY_ENV });
+  assert.doesNotMatch(none, /Still needed/);
+
+  const hook = Buffer.from('curl http://127.0.0.1:%ORCA_AGENT_HOOK_PORT%/hook/cursor', 'utf16le').toString('base64');
+  const checks = (h) => stillNeeded({ home: h, terminals: ['orca'], agents: ['cursor'], platform: 'darwin' }).filter((t) => t.check);
+  assert.equal(checks(home)[0].check(), false);
+  fs.writeFileSync(path.join(home, '.cursor', 'hooks.json'), JSON.stringify({ hooks: { beforeShellExecution: [{ command: `powershell -EncodedCommand ${hook}` }] } }));
+  assert.equal(checks(home)[0].check(), true);
+  assert.match(lean(home, ['--doctor', '--no-exec'], { ...process.env, ...NO_PROXY_ENV }), /ok\s+still needed\s+Orca: the first launch/);
 });
 
 test('Antigravity app and CLI install only through verified ids, else print the vendor link', () => {

@@ -3,6 +3,7 @@
 import path from 'node:path';
 import { OWNED_MARK } from '../fsops.mjs';
 import { localServer } from './opencode-v2.mjs';
+import { hasProxy } from '../network.mjs';
 
 // Model IDs differ from every profile, so subagents inherit the chat model.
 export function renderCursorAgent(agent) {
@@ -43,6 +44,8 @@ export function cursorAdapter({ home, core, opts, adhdCommand }) {
   const commands = [];
   const edits = cursorServers(core, tools);
   if (edits.length) actions.push({ kind: 'json', path: path.join(dir, 'mcp.json'), edits });
+  // Proxies such as Zscaler break the agent's HTTP/2 stream (#25). Only the flag is written, never a proxy value.
+  if (hasProxy()) actions.push({ kind: 'json', path: path.join(dir, 'cli-config.json'), edits: [{ path: ['network', 'useHttp1ForAgent'], value: true, mode: 'setIfAbsent' }] });
 
   if (tools.includes('rtk')) {
     commands.push({ tool: 'rtk', desc: 'RTK hook for Cursor', run: [['rtk', 'init', '-g', '--agent', 'cursor']], undo: [['rtk', 'init', '-g', '--agent', 'cursor', '--uninstall']] });

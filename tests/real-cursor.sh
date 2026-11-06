@@ -8,9 +8,8 @@ set -euo pipefail
 refute() { if "$@"; then echo "must not succeed: $*" >&2; exit 1; fi; }
 trap 'echo "failed at line $LINENO" >&2' ERR
 
-command -v agent >/dev/null || { echo "agent (Cursor CLI) not on PATH" >&2; exit 1; }
-
-agent_bin="$(command -v agent)"
+# Windows installs only .cmd shims, so Git Bash cannot find a bare `agent` (#23).
+agent_bin="$(command -v agent || command -v agent.cmd)" || { echo "agent (Cursor CLI) not on PATH" >&2; exit 1; }
 HOME="$(mktemp -d)"
 export HOME
 export XDG_CONFIG_HOME="$HOME/.config"
@@ -50,6 +49,13 @@ refute grep -qs rtk "$dir/hooks.json"
 refute test -e "$HOME/.agents/skills/caveman"
 refute grep -qs serena "$dir/mcp.json"
 refute grep -qs playwright-extension "$dir/mcp.json"
+
+# Behind a proxy only the HTTP/1 flag is written, never the proxy value (#25).
+HTTPS_PROXY=http://proxy.invalid:8080 node "$repo/scripts/lean.mjs" --yes --agents cursor --tools serena --privacy strict --lang en </dev/null
+grep -q '"useHttp1ForAgent": true' "$dir/cli-config.json"
+refute grep -q 'proxy.invalid' "$dir/cli-config.json"
+node "$repo/scripts/lean.mjs" --uninstall --yes </dev/null
+refute test -e "$dir/cli-config.json"
 
 # Team mode: with the user config gone, Cursor can only find serena in the repo's .cursor/mcp.json.
 proj="$HOME/team-repo"

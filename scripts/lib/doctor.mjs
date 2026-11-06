@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { sha } from './fsops.mjs';
 import { version, quiet, contextModeNodeNote } from './system.mjs';
+import { stillNeeded } from './terminals.mjs';
 import { adhdSkillFiles } from './adhd.mjs';
 import { proxyReport } from './network.mjs';
 import { leftovers } from './parallel.mjs';
@@ -70,6 +71,9 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node 
     add('lean-agents', 'ok', `v${state.version}, agents: ${o.agents.join(', ')}, privacy: ${o.privacy}`);
     if (nodeNote) add('context-mode', 'note', nodeNote);
     if (o.terminals?.length) add('terminals', 'ok', `integrations for ${o.terminals.join(', ')} (commands listed below; app settings are yours)`);
+    for (const t of stillNeeded({ home, terminals: o.terminals ?? [], agents: o.agents, exec })) {
+      add('still needed', t.check?.() ? 'ok' : 'note', t.text);
+    }
     const latest = [...new Map(state.files.map((f) => [f.path, f])).values()];
     for (const f of latest) {
       const rel = f.path.startsWith(home) ? `~${f.path.slice(home.length)}` : f.path;
