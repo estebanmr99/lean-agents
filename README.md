@@ -323,8 +323,12 @@ lean-agents is glue. The heavy lifting is done by these projects; please star th
 - [x] Parallel agent sessions (`scripts/parallel.mjs`)
 - [x] Warp and Orca agent integrations for users who already have them
 - [x] Antigravity app and CLI on macOS, Linux and Windows (app loading stays VERIFY)
+- [ ] `v0.5.1`: fixes from real Windows installs behind a proxy (Cursor CLI, Orca, GSD, docs)
+- [ ] `v0.6.0`: `--no-core`, pinned MCP and skill versions, migrate from another harness, install with an agent, use-case GIFs
 - [ ] `v1.0.0`
 - Later: Codex CLI, Gemini CLI
+
+Details and linked issues: [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Contributing
 

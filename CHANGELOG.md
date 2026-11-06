@@ -4,6 +4,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Added
+
+- `docs/ROADMAP.md`: the order of the next releases, the issues each session closes, and the promotion plan.
+
 ## [0.5.0] - 2026-11-04
 
 ### Added
