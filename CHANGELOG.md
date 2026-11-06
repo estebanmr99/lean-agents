@@ -21,6 +21,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Added
 
+- `--migrate <from|auto>` (`-Migrate` on Windows): copies rules, subagents, skills, prompts and MCP servers from Claude Code, VS Code Copilot, Cursor, Copilot CLI or OpenCode 1/2 to the agents in `--agents`, at user scope or inside a repository with `--project`. Never moves or overwrites; MCP env and header values are not copied, only their names; hooks are listed, not migrated; `--dry-run` prints an item / source / target / status table. CI job `real-migrate` runs it with the real OpenCode 2 and Claude Code (#34).
 - Orca on Windows: `ORCA_SKILL_AGENT` covers Cursor and VS Code Copilot (#21); with the all-off preset it sets `DO_NOT_TRACK=1` and `ORCA_TELEMETRY_DISABLED=1` in the user env when absent, and behind a proxy it appends the missing `localhost`, `127.0.0.1`, `::1` to the user `NO_PROXY` (#22, #28). Undo removes only what it set.
 - Git Bash: a marked `~/.bashrc` block with the Cursor `agent` / `cursor-agent` aliases (`MSYSTEM= SHELL=`) and the loopback `NO_PROXY` entries (#23, #28).
 - Cursor behind a proxy: `network.useHttp1ForAgent: true` merged into `~/.cursor/cli-config.json`; proxy values are never written (#25).

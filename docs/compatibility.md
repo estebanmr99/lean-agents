@@ -261,6 +261,43 @@ The network question (`--network`, `--telemetry`, `--auto-update`, `--outbound`)
 | npm | auto-update | `update-notifier=false` | [npm config](https://docs.npmjs.com/cli/v10/using-npm/config) | 2026-11-03 |
 | uv | — | no telemetry or update-check switch documented | [uv env vars](https://docs.astral.sh/uv/reference/environment/) | 2026-11-03 |
 
+## Migration sources
+
+What `--migrate` reads (session 19, issue #34). Sources were collected by the `research` subagent on 2026-11-05 from the upstream docs named below. Cells marked **VERIFY** are not proven upstream: the path is reported as "unsupported source path" when it exists and is never read. User scope is relative to the home folder, project scope to the repository (or the folder given to `--project`). `lean-agents` never reads MCP `env` or header values, only their names, and never reads secrets.
+
+| Harness | Scope | Rules | Agents | Skills | Prompts | MCP (key) | Hooks (report only) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Claude Code | user | `~/.claude/CLAUDE.md`, `~/.claude/rules/*.md` | `~/.claude/agents` | `~/.claude/skills` | `~/.claude/commands` **VERIFY** | `~/.claude.json` (`mcpServers`) | `~/.claude/settings.json` |
+| Claude Code | project | `CLAUDE.md`, `.claude/rules/*.md` | `.claude/agents` | `.claude/skills` | `.claude/commands` | `.mcp.json` (`mcpServers`) | `.claude/settings.json` |
+| VS Code Copilot | user | none known **VERIFY** | none known **VERIFY** | `~/.copilot/skills` | `<VS Code user dir>/prompts` **VERIFY** | `<VS Code user dir>/mcp.json` **VERIFY** | `~/.copilot/hooks` |
+| VS Code Copilot | project | `.github/copilot-instructions.md`, `.github/instructions/*.instructions.md`, `AGENTS.md` | `.github/agents/*.agent.md` | `.github/skills` | `.github/prompts/*.prompt.md` | `.vscode/mcp.json` (`servers`) | `.github/hooks/*.json` |
+| Cursor | user | none (settings UI) | `~/.cursor/agents` | `~/.cursor/skills` | `~/.cursor/commands` **VERIFY** | `~/.cursor/mcp.json` (`mcpServers`) | `~/.cursor/hooks.json` |
+| Cursor | project | `.cursor/rules/*.mdc`, `AGENTS.md` | `.cursor/agents` | `.cursor/skills` | `.cursor/commands` **VERIFY** | `.cursor/mcp.json` (`mcpServers`) | `.cursor/hooks.json` |
+| OpenCode 1 and 2 | user | `~/.config/opencode/AGENTS.md` | `~/.config/opencode/agents` | `~/.config/opencode/skills` | `~/.config/opencode/commands` | `opencode.json(c)` (1.x `mcp`, 2.x `mcp.servers`) | none (plugins, not read) |
+| OpenCode 1 and 2 | project | `AGENTS.md` | `.opencode/agents` | `.opencode/skills` | `.opencode/commands` | `opencode.json(c)` in the repository root | none |
+| Copilot CLI | user | `~/.copilot/copilot-instructions.md`, `~/.copilot/instructions/*.instructions.md` | `~/.copilot/agents/*.agent.md` | `~/.copilot/skills` | none known | `~/.copilot/mcp-config.json` (`mcpServers`) | `~/.copilot/hooks` |
+| Copilot CLI | project | `.github/copilot-instructions.md`, `.github/instructions/*.instructions.md`, `AGENTS.md` | `.github/agents/*.agent.md` | `.github/skills` | `.github/prompts` **VERIFY** | `.mcp.json`, `.github/mcp.json` (`mcpServers`) | `.github/hooks` |
+
+Upstream sources, all checked 2026-11-05: Claude Code [memory](https://code.claude.com/docs/en/memory), [sub-agents](https://code.claude.com/docs/en/sub-agents), [skills](https://code.claude.com/docs/en/skills), [slash commands](https://code.claude.com/docs/en/slash-commands), [MCP](https://code.claude.com/docs/en/mcp), [hooks](https://code.claude.com/docs/en/hooks). VS Code [custom instructions](https://code.visualstudio.com/docs/copilot/customization/custom-instructions), [custom agents](https://code.visualstudio.com/docs/copilot/customization/custom-agents), [prompt files](https://code.visualstudio.com/docs/copilot/customization/prompt-files), [agent skills](https://code.visualstudio.com/docs/copilot/customization/agent-skills), [MCP servers](https://code.visualstudio.com/docs/copilot/customization/mcp-servers), [hooks](https://code.visualstudio.com/docs/copilot/customization/hooks). Cursor [rules](https://cursor.com/docs/context/rules), [subagents](https://cursor.com/docs/subagents), [skills](https://cursor.com/docs/skills), [MCP](https://cursor.com/docs/context/mcp), [hooks](https://cursor.com/docs/agent/hooks); `.cursor/commands` appears only in the 1.6 changelog. OpenCode [config](https://opencode.ai/docs/config), [rules](https://opencode.ai/docs/rules), [agents](https://opencode.ai/docs/agents), [commands](https://opencode.ai/docs/commands), [skills](https://opencode.ai/docs/skills), [MCP servers](https://opencode.ai/docs/mcp-servers), [v1 to v2 migration](https://opencode.ai/v2/docs/migrate-v1). Copilot CLI [customization how-tos](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot).
+
+What it writes, per target (user scope | `--project`):
+
+| Target | Agents | Skills, prompts | Rules | MCP |
+| --- | --- | --- | --- | --- |
+| Claude Code | `~/.claude/agents` \| `.claude/agents` | `skills/`, `commands/` | `@` import block in `~/.claude/CLAUDE.md` \| block in `CLAUDE.md` | `claude mcp add --scope user` \| `.mcp.json` |
+| OpenCode 1 and 2 | `agents/` \| `.opencode/agents` | `skills/`, `commands/` | `instructions` entry \| block in `AGENTS.md` | `mcp` (1.x) or `mcp.servers` (2.x), env as `{env:VAR}` |
+| Cursor | `~/.cursor/agents` \| `.cursor/agents` | `skills/`; prompts reported (path **VERIFY**) | none for the user \| block in `AGENTS.md` | `mcpServers`, env as `${env:VAR}` |
+| VS Code Copilot | `~/.copilot/agents` \| `.github/agents` | `skills/`; prompts only with `--project` | block in `~/.copilot/copilot-instructions.md` \| block in `AGENTS.md` | user `mcp.json` \| `.vscode/mcp.json` (`servers`) |
+| Copilot CLI | `~/.copilot/agents` \| `.github/agents` | `skills/`; prompts reported | block in `copilot-instructions.md` \| block in `AGENTS.md` | `mcp-config.json` \| `.mcp.json` (`mcpServers`) |
+
+Facts and limits:
+
+- A source agent that lists tools or permissions is written read-only, because the tool names differ per harness. Its model is not carried over.
+- Rule scopes (`applyTo`, `globs`) are dropped: migrated rules apply everywhere, and the table says so.
+- Env references: OpenCode `{env:VAR}` (documented), Claude project `.mcp.json` `${VAR}` (documented; Claude expansion is not exercised in CI), Cursor `${env:VAR}`. VS Code, Copilot CLI and Claude user scope get no env block: export the variable names printed by the dry run in the shell that starts the agent. Header values are never written; the table tells you which headers to add.
+- Real install, #34, 2026-11-05: `claude mcp add --scope user` and `claude mcp get` work with no login on Claude Code 2.1.309 in a throwaway HOME (`tests/real-migrate.sh`).
+- OpenCode 2.1.4, 2026-11-05: `opencode debug agents` lists `.opencode/agents` only when the folder is inside a git repository, and the first call after the background service starts can miss project agents; the script retries.
+
 ## Not yet verified
 
 The undocumented items below (Antigravity telemetry and auto-update, Serena config, winget persistent proxy, download hosts, DCP, GSD and AutoSkills telemetry) stay **VERIFY**. The installer does not configure them: it asks the user to paste their docs or IT notes (saved to `~/.config/lean-agents/notes/`, never applied) or keep the tool's default. When another agent already set the tool up (Serena, DCP, GSD config found), it skips the question.
@@ -284,6 +321,7 @@ The undocumented items below (Antigravity telemetry and auto-update, Serena conf
 - **VERIFY:** OpenCode stdin prompts, background runs and worktrees (feature request [anomalyco/opencode#12896](https://github.com/anomalyco/opencode/issues/12896)); `opencode run` flags on 1.x.
 - **VERIFY:** `copilot -p` and `agy -p` for workers; reports say `agy -p` hangs when stdout is not a TTY.
 - **VERIFY:** a parallel run with a real model (needs a login, out of CI).
+- **VERIFY (session 19):** every **VERIFY** cell in "Migration sources" (user-level VS Code rules, agents, prompts and `mcp.json` as migration sources; `.cursor/commands`; `~/.claude/commands`; Copilot CLI prompt files), whether VS Code and Copilot CLI expand `${env:VAR}` in `mcp.json`, and that Claude expands `${VAR}` in `.mcp.json` (documented, not run in CI).
 - **VERIFY:** the VS Code user `mcp.json` path on Windows (`%APPDATA%\Code\User`). Linux and macOS are proven by `real-vscode`.
 - **VERIFY:** the `model` value format in VS Code `.agent.md` (Copilot runtime IDs are assumed, as for Copilot CLI).
 - **VERIFY:** whether VS Code reads Copilot CLI hooks, so RTK for VS Code alone is not installed.

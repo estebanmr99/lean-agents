@@ -29,7 +29,7 @@ Las mismas reglas, subagentes baratos por defecto, herramientas que ahorran cont
 - [Inicio rápido](#inicio-rápido)
 - [Por qué](#por-qué) · [Qué incluye](#qué-incluye)
 - [Warp y Orca](#warp-y-orca) · [Navegador con tu sesión](#navegador-con-tu-sesión-opcional) · [VS Code Copilot y Cursor](#vs-code-copilot-y-cursor)
-- [Modo equipo](#modo-equipo---project) · [Sesiones de agentes en paralelo](#sesiones-de-agentes-en-paralelo) · [Claude a través de GitHub Copilot](#claude-a-través-de-github-copilot)
+- [Modo equipo](#modo-equipo---project) · [Migrar](#migrar-desde-otra-herramienta---migrate) · [Sesiones de agentes en paralelo](#sesiones-de-agentes-en-paralelo) · [Claude a través de GitHub Copilot](#claude-a-través-de-github-copilot)
 - [Niveles de instalación](#niveles-de-instalación) · [En una PC de trabajo](#en-una-pc-de-trabajo-proxy-red-y-revisión-de-seguridad) · [Modelos siempre al día](#modelos-siempre-al-día)
 - [Seguridad](#seguridad) · [Créditos](#créditos) · [Hoja de ruta](#hoja-de-ruta) · [Contribuir](#contribuir) · [Licencia](#licencia)
 
@@ -219,6 +219,38 @@ En Windows:
 - Después, `--project . --update` vuelve a aplicar tus opciones guardadas y `--project . --uninstall` quita solo lo que añadió lean-agents.
 - El modo equipo solo escribe archivos. Cada persona del equipo ejecuta el instalador una vez para las herramientas que mencionan las reglas (RTK, Context Mode y las demás).
 - El estado de cada persona se guarda en su propia carpeta de usuario, nunca en el repo.
+
+</details>
+
+## Migrar desde otra herramienta (`--migrate`)
+
+<details>
+<summary>Qué se copia y qué no</summary>
+
+Copia la configuración que ya tienes en una herramienta a los agentes que elijas (`--agents`), para tu usuario o, con `--project`, dentro de un repositorio. Orígenes: `claude`, `vscode-copilot`, `cursor`, `copilot-cli`, `opencode-v1`, `opencode-v2` o `auto` (todos los que encuentre). Rutas y fuentes oficiales: [notas de compatibilidad](docs/compatibility.md).
+
+| Elemento | Qué pasa |
+| --- | --- |
+| Reglas, subagentes, skills, prompts | Se copian a las carpetas del destino. No se mueve ni se sobrescribe nada: un nombre que ya existe se omite y se lista |
+| Servidores MCP | Se copian comando, argumentos y URL. Los valores de env y de cabeceras nunca: solo los nombres de las variables, con una línea que te dice que las definas |
+| Hooks | Solo se listan. Los formatos difieren, así que los copias a mano |
+
+Primero la vista previa; quita `--dry-run` para aplicar:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --migrate auto --agents claude --dry-run
+curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --migrate vscode-copilot --project . --agents claude,opencode-v2 --dry-run
+```
+
+En Windows:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -Migrate auto -Agents claude -DryRun
+```
+
+- La simulación imprime una tabla: elemento, origen, destino y si se migró, se omitió o solo se informó.
+- `--uninstall` quita solo lo que escribió la migración.
+- Los servidores MCP de Claude Code a nivel de usuario pasan por `claude mcp add`, así que `~/.claude.json` nunca se edita.
 
 </details>
 

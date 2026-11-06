@@ -19,6 +19,7 @@ Instructions for coding agents (Claude Code, OpenCode, Copilot CLI) that work **
 | Real OpenCode 2 check (needs `opencode` on PATH) | `bash tests/real-opencode.sh` |
 | Real OpenCode 1.x check (needs `opencode` 1.x on PATH) | `bash tests/real-opencode-v1.sh` |
 | Real Skills CLI undo check (safe locally, throwaway HOME) | `bash tests/real-skills-undo.sh claude,opencode-v2` |
+| Real `--migrate` check (needs `opencode` 2 and `claude` on PATH; OpenCode's background service needs a free port) | `bash tests/real-migrate.sh` |
 | Real Copilot CLI check (needs `copilot`, `rtk` and `uvx` on PATH) | `bash tests/real-copilot.sh` |
 | Real Antigravity check (needs `agy`, `rtk` and `uvx` on PATH) | `bash tests/real-antigravity.sh` |
 | Interactive menus in a pseudo-terminal (macOS, Linux; temp HOME, dry run) | `python3 tests/real-interactive.py` |
