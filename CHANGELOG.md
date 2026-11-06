@@ -7,6 +7,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ### Fixed
 
 - GSD Core no longer crashes when Cursor is selected: Cursor installs with `--cursor`, and agents without a GSD installer (`vscode-copilot`) are skipped with a note (#20).
+- The test "--yes keeps every tool default for undocumented settings" no longer depends on a host proxy (#31).
 
 ### Added
 

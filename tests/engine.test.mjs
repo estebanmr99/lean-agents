@@ -536,7 +536,9 @@ test('undocumented settings: asked only when relevant, kept when another agent s
 
 test('--yes keeps every tool default for undocumented settings and writes no notes', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
-  lean(home, ['--yes', '--no-exec', '--agents', 'antigravity', '--tools', 'serena,playwright', '--network', 'off', '--lang', 'en']);
+  // A host proxy adds the Windows-only winget-proxy item.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(https?|all)_proxy$/i.test(k)));
+  lean(home, ['--yes', '--no-exec', '--agents', 'antigravity', '--tools', 'serena,playwright', '--network', 'off', '--lang', 'en'], env);
   const state = JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'state.json'), 'utf8'));
   assert.deepEqual(state.options.unverified, { antigravity: 'default', serena: 'default', 'download-hosts': 'default' });
   assert.ok(!fs.existsSync(path.join(home, '.config', 'lean-agents', 'notes')));
