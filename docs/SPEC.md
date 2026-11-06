@@ -486,7 +486,7 @@ Mark each `[x]` when merged.
 
 0.7.0 sessions from the checkpoint, accepted by the owner on 2026-11-06 (order and parallel groups in [`docs/checkpoints/0.7.0.md`](checkpoints/0.7.0.md) section 5):
 
-- [x] **Session 69 — CI trust** (0.7.0). Issues #69, #70, #56. #69 done (PR #83); #70 and #56 done (PR TBD). Actions pinned by SHA plus Dependabot, least-privilege tokens, macOS jobs fixed or trimmed, one update channel (pin-bump PR, no per-tool issues), `ci-latest` green. Sonnet.
+- [x] **Session 69 — CI trust** (0.7.0). Issues #69, #70, #56. #69 done (PR #83); #70 and #56 done (PR #95). Actions pinned by SHA plus Dependabot, least-privilege tokens, macOS jobs fixed or trimmed, one update channel (pin-bump PR, no per-tool issues), `ci-latest` green. Sonnet.
 - [ ] **Session 68 — File safety and redaction** (0.7.0). Issues #68, #67, #74, #72. #72 done (PR #89). Opus plans the env allowlist, Sonnet builds.
 - [ ] **Session 71 — Contributor and governance docs** (0.7.0). Issues #71, #73. #71 done (PR #88), #73 open. Haiku.
 - [ ] **Session 79 — OpenCode 1.x safety and Orca** (0.7.0). Issues #79, #78. #79 done (PR #86), #76 done (PR #90), #78 open. Never cross OpenCode 1.x to 2.x, warn about session loss; Orca status icons on OpenCode 1.19 (`scripts/lib/terminals.mjs`). After 44 if it touches `scripts/lib/system.mjs`. Sonnet.
