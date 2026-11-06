@@ -554,6 +554,43 @@ test('--privacy strict equals --network off; --network on and the --yes default 
   assert.deepEqual(switchesFor(agents, []), none);
 });
 
+test('the research agent keeps its web tools unless outbound is off', () => {
+  const research = (flags) => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-net-'));
+    lean(home, [...NET_BASE, '--agents', 'claude,copilot-cli', ...flags]);
+    const s = snapshot(home);
+    return [s['.claude/agents/research.md'], s['.copilot/agents/research.agent.md']];
+  };
+  for (const flags of [[], ['--network', 'on'], ['--network', 'off', '--outbound', 'on'], ['--telemetry', 'off']]) {
+    const [claude, copilot] = research(flags);
+    assert.match(claude, /WebFetch, WebSearch/);
+    assert.match(copilot, /"web"/);
+  }
+  for (const flags of [['--network', 'off'], ['--privacy', 'strict'], ['--outbound', 'off']]) {
+    const [claude, copilot] = research(flags);
+    assert.doesNotMatch(claude, /WebFetch|WebSearch/);
+    assert.doesNotMatch(copilot, /"web"/);
+  }
+});
+
+test('--project drops the research agent web tools when outbound is off', () => {
+  const agent = (flags) => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+    const repo = path.join(home, 'repo');
+    fs.mkdirSync(repo);
+    lean(home, ['--yes', '--no-exec', '--project', repo, '--no-tools', '--lang', 'en', ...flags]);
+    return fs.readFileSync(path.join(repo, '.github', 'agents', 'research.agent.md'), 'utf8');
+  };
+  assert.match(agent(['--network', 'on']), /"web"/);
+  assert.doesNotMatch(agent(['--network', 'off']), /"web"/);
+});
+
+test('--network off still plans the tools you pick (privacy.md: the preset sets switches, it does not filter tools)', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-net-'));
+  const out = lean(home, ['--yes', '--no-exec', '--dry-run', '--lang', 'en', '--profile', 'anthropic-api', '--agents', 'claude', '--all-tools', '--network', 'off']);
+  for (const t of ['serena', 'codeburn', 'ponytail']) assert.match(out, new RegExp(t, 'i'));
+});
+
 test('one category flag overrides the preset', () => {
   const r = switchesFor(['claude', 'opencode-v2'], ['--network', 'off', '--auto-update', 'on']);
   assert.deepEqual(r.claude, ['DISABLE_BUG_COMMAND', 'DISABLE_ERROR_REPORTING', 'DISABLE_TELEMETRY', 'DO_NOT_TRACK']);

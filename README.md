@@ -300,7 +300,7 @@ If your company pays for GitHub Copilot, the official way to use Claude as an ag
 | Optional tools | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0), Codeburn | Asked one by one |
 | Opt-in tools | GSD Core, AutoSkills (CC BY-NC 4.0: non-commercial use only) | Asked one by one, never in `--all-tools` |
 | Strict privacy | No telemetry, no auto-updates, no session sharing, no providers that train on your prompts | Off, opt in with `--privacy strict` |
-| Network preset | All off (work PC), all on, or per category: telemetry, auto-updates, other outbound calls | All on; `--network off` (same as `--privacy strict`) or `--telemetry`, `--auto-update`, `--outbound` |
+| Network preset | All off (work PC), all on, or per category: telemetry, auto-updates, other outbound calls. Off sets switches only: install downloads and chosen tools are not blocked ([privacy.md](docs/privacy.md#what-each-preset-does-not-block)) | All on; `--network off` (same as `--privacy strict`) or `--telemetry`, `--auto-update`, `--outbound` |
 | GitHub CLI (`gh`) | Installed with brew or winget at user scope; you run `gh auth login` | On when missing; `--no-gh` (`-NoGh` in PowerShell) skips it |
 | Bun (for Context Mode) | Faster `ctx_execute` JavaScript and TypeScript; see below | On; `--no-bun` (`-NoBun` in PowerShell) |
 
