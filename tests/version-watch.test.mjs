@@ -22,9 +22,9 @@ function fakeApi() {
   const issues = [];
   return {
     issues,
-    listOpen: async () => issues.map(({ number, title, body }) => ({ number, title, body })),
+    list: async () => issues.map(({ number, title, body, state }) => ({ number, title, body, state })),
     comments: async (n) => issues[n - 1].comments,
-    create: async (title, body) => { issues.push({ number: issues.length + 1, title, body, comments: [] }); },
+    create: async (title, body) => { issues.push({ number: issues.length + 1, title, body, state: 'open', comments: [] }); },
     comment: async (n, body) => { issues[n - 1].comments.push(body); },
   };
 }
@@ -47,8 +47,20 @@ test('run: first newer version opens one issue, the next version comments, the s
   assert.equal(api.issues[0].comments.length, 1);
 });
 
-test('plan never mentions a pin that is current, and a failed lookup is skipped', () => {
+test('plan skips a pin that is current and a failed lookup', () => {
   assert.deepEqual(plan(pins, { tool: '1.0.0', skill: null }, []), []);
+});
+
+test('run: an issue the owner closed for a version is not reopened or duplicated, but the next version is reported', async () => {
+  const api = fakeApi();
+  const get = (v) => async (url) => (url.includes('registry.npmjs.org') ? { version: v } : [{ name: 'v1.0.0' }]);
+  await run({ pins, get: get('1.1.0'), api, log: () => {} });
+  api.issues[0].state = 'closed';
+  await run({ pins, get: get('1.1.0'), api, log: () => {} });
+  assert.equal(api.issues.length, 1);
+  await run({ pins, get: get('1.2.0'), api, log: () => {} });
+  assert.equal(api.issues.length, 2);
+  assert.match(api.issues[1].body, /`1\.2\.0`/);
 });
 
 test('run keeps going when one lookup fails', async () => {

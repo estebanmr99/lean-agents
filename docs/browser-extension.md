@@ -15,7 +15,7 @@ Use it with OpenCode, Copilot CLI, VS Code Copilot and Cursor. Claude Code and C
 
 1. Run the installer with the tool, for example:
    `curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --tools playwright-extension`
-   It adds `npx -y @playwright/mcp@latest --extension` as `playwright-extension` next to the headless entry.
+   It adds `npx -y @playwright/mcp@0.0.83 --extension` as `playwright-extension` next to the headless entry.
 2. Install the **Playwright Extension** yourself from the Chrome Web Store:
    https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm
    Browsers do not let a script install extensions without an admin policy, so the installer only prints the link.

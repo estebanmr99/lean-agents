@@ -208,6 +208,7 @@ async function choose(o, saved) {
       o.tools.push(...await p.multi({ message, items, defaults: [] }));
     }
   }
+  if (!o.core) o.tools = o.tools.filter((t) => !MINIMAL_TOOLS.includes(t));
   const known = [...MINIMAL_TOOLS, ...OPTIONAL_TOOLS, ...OPT_IN_TOOLS];
   const unknown = o.tools.filter((t) => !known.includes(t));
   if (unknown.length) throw new Error(`unknown tools: ${unknown.join(', ')} (available: ${known.join(', ')})`);

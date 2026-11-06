@@ -110,7 +110,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           export HOME="$(mktemp -d)"
-          npx -y skills add "$PWD" --skill setup-doctor token-audit update-models -a github-copilot -g -y
+          npx -y $(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.skillsCli()))")" add "$PWD" --skill setup-doctor token-audit update-models -a github-copilot -g -y
           for s in setup-doctor token-audit update-models; do test -f "$HOME/.agents/skills/$s/SKILL.md"; done
       - name: Every profile model exists upstream
         if: runner.os == 'Linux'
@@ -496,7 +496,7 @@ jobs:
         run: |
           if command -v bun; then echo "Bun is already on PATH; the Node-only pass would not be Node only" >&2; exit 1; fi
           start=$SECONDS
-          npm install -g context-mode --foreground-scripts > "$HOME/npm-install.txt" 2>&1 || { tail -50 "$HOME/npm-install.txt"; exit 1; }
+          npm install -g $(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('context-mode')))")" --foreground-scripts > "$HOME/npm-install.txt" 2>&1 || { tail -50 "$HOME/npm-install.txt"; exit 1; }
           took=$((SECONDS - start))
           # node-gyp prints "gyp info" only when better-sqlite3 compiles from source.
           if grep -q 'gyp info' "$HOME/npm-install.txt"; then sqlite=compiled; else sqlite=prebuilt; fi

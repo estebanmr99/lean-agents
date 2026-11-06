@@ -2,13 +2,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { sha } from './fsops.mjs';
-import { PINS } from './pins.mjs';
+import { PINS, npmSpec } from './pins.mjs';
 import { version, quiet, contextModeNodeNote } from './system.mjs';
 import { stillNeeded } from './terminals.mjs';
 import { adhdSkillFiles } from './adhd.mjs';
 import { proxyReport } from './network.mjs';
 import { leftovers } from './parallel.mjs';
-import { npmSpec } from './pins.mjs';
 
 const CORE_AGENTS = ['debug', 'explore', 'planner', 'research', 'review'];
 const SECRET_KEY = /(key|token|secret|password|auth)/i;

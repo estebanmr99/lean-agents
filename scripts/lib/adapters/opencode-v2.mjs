@@ -7,8 +7,7 @@ import os from 'node:os';
 import { OWNED_MARK } from '../fsops.mjs';
 import { tierFor, modelFor } from '../render.mjs';
 import { configHome } from '../system.mjs';
-import { skillSource, skillsCli } from '../pins.mjs';
-import { PINS } from '../pins.mjs';
+import { PINS, skillSource, skillsCli } from '../pins.mjs';
 
 const PERMISSIONS = {
   'read-only': ['  edit: deny', '  bash: deny'],

@@ -280,7 +280,10 @@ test('--no-core installs only the listed tools, and --update keeps it', () => {
   const servers = () => Object.keys(JSON.parse(fs.readFileSync(path.join(home, '.config', 'opencode', 'opencode.jsonc'), 'utf8')).mcp.servers);
   assert.deepEqual(servers(), ['playwright-extension']);
   lean(home, ['--update', '--yes', '--no-exec']);
-  assert.deepEqual(servers(), ['playwright-extension']);
+  assert.deepEqual(servers(), ['playwright-extension']);  // A core install updated with --no-core drops RTK and Context Mode from the saved tools.
+  const other = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  lean(other, ['--yes', '--no-exec', '--agents', 'opencode-v2', '--tools', 'playwright', '--lang', 'en', '--profile', 'none']);
+  assert.match(lean(other, ['--update', '--no-core', '--yes', '--no-exec', '--dry-run']), /tools: playwright \|/);
 });
 
 test('GSD plans --cursor and skips agents without an installer instead of crashing', () => {

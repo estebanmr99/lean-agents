@@ -27,23 +27,27 @@ function render(key, p, version) {
     `Confirmed to work: \`${p.version}\` (verified ${p.verified}).`,
     `New upstream version: \`${version}\`.`,
     `Release notes: ${notesUrl(p, version)}`,
+    'Do not bump to a version published in the last 14 days.',
     `Run before bumping: the \`${p.ci}\` job (or its \`tests/real-*.sh\` script in a sandbox HOME).`,
     'This watch never changes pins. To bump, follow "Tool versions" in `skills/update-models/SKILL.md` and edit `core/pins.json` after the owner approves.',
     mark(version),
   ].join('\n\n');
 }
 
-// pins: core/pins.json "pins"; latest: { key: version|null }; open: [{ number, title, body, comments: [string] }].
-export function plan(pins, latest, open) {
+// pins: core/pins.json "pins"; latest: { key: version|null }; issues: every version-watch issue, open or closed:
+// [{ number, title, state, body, comments: [string] }]. A closed issue still counts as "already reported".
+export function plan(pins, latest, issues) {
   const actions = [];
   for (const [key, p] of Object.entries(pins)) {
     const version = latest[key];
     if (!version || !isNewer(p.version, version)) continue;
     const title = `Update available: ${key}`;
-    const issue = open.find((i) => i.title === title);
+    const same = issues.filter((i) => i.title === title);
+    if (same.some((i) => [i.body, ...i.comments].some((t) => t?.includes(mark(version))))) continue;
+    const issue = same.find((i) => i.state === 'open');
     const body = render(key, p, version);
     if (!issue) actions.push({ type: 'create', key, title, body });
-    else if (![issue.body, ...issue.comments].some((t) => t?.includes(mark(version)))) actions.push({ type: 'comment', key, number: issue.number, body });
+    else actions.push({ type: 'comment', key, number: issue.number, body });
   }
   return actions;
 }
@@ -55,15 +59,15 @@ export async function latestVersion(p, get) {
   return tags.reduce((best, n) => (!best || isNewer(best, n) ? n : best), null);
 }
 
-// api: { listOpen(), comments(number), create(title, body), comment(number, body) }
+// api: { list(), comments(number), create(title, body), comment(number, body) }
 export async function run({ pins, get, api, log = console.log }) {
   const latest = {};
   for (const [key, p] of Object.entries(pins)) {
     try { latest[key] = await latestVersion(p, get); } catch (e) { log(`! ${key}: ${e.message}`); }
   }
-  const open = await api.listOpen();
-  for (const i of open) i.comments = await api.comments(i.number);
-  const actions = plan(pins, latest, open);
+  const issues = await api.list();
+  for (const i of issues) i.comments = await api.comments(i.number);
+  const actions = plan(pins, latest, issues);
   for (const a of actions) {
     if (a.type === 'create') await api.create(a.title, a.body);
     else await api.comment(a.number, a.body);
@@ -84,9 +88,9 @@ function githubApi(repo, token) {
     return r.status === 204 ? null : r.json();
   };
   return {
-    async listOpen() {
+    async list() {
       await call('POST', '/labels', { name: LABEL, color: 'ededed' });
-      return call('GET', `/issues?labels=${LABEL}&state=open&per_page=100`);
+      return call('GET', `/issues?labels=${LABEL}&state=all&per_page=100`);
     },
     async comments(number) { return (await call('GET', `/issues/${number}/comments?per_page=100`)).map((c) => c.body); },
     create: (title, body) => call('POST', '/issues', { title, body, labels: [LABEL] }),
