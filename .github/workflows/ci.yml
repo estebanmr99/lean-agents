@@ -53,6 +53,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: shellcheck
         run: shellcheck $(git ls-files '*.sh')
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
+      - run: npm ci
+      - name: README fits the 1-minute rules
+        run: node scripts/check-readme.mjs
 
   test:
     timeout-minutes: ${{ matrix.os == 'windows-latest' && 15 || 10 }}
