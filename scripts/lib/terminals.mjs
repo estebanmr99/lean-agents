@@ -178,6 +178,12 @@ export function orcaHooksFound(home) {
   });
 }
 
+// True when an Orca opt-out is already persisted (Windows real home only; the env is never read elsewhere).
+export function orcaEnvSet({ platform = process.platform, system = true, readEnv = readWindowsEnv } = {}) {
+  if (platform !== 'win32' || !system) return false;
+  return ORCA_TELEMETRY_ENV.some((name) => readEnv('User', name) || readEnv('Machine', name));
+}
+
 // Printed with the all-off network preset; app settings stay the user's.
 export function terminalPrivacyNotes(terminals, { orcaEnvSet = false } = {}) {
   const notes = [];

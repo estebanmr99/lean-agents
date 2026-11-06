@@ -30,6 +30,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 - The daily version watch also labels its issues `type: update`.
 
+### Fixed
+
+- Windows: the Orca telemetry reminder shows on a real-home run unless `DO_NOT_TRACK` or `ORCA_TELEMETRY_DISABLED` is already set in the user or machine env; it was always hidden (#76).
+
 ## [0.6.0] - 2026-11-06
 
 0.5.1 was folded into this release: its fixes are listed below.
