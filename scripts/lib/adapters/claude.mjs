@@ -12,11 +12,12 @@ const TOOLS = {
   'read-write': null,
 };
 
-export function renderClaudeAgent(agent, profile) {
+// Web tools are dropped when other outbound calls are off.
+export function renderClaudeAgent(agent, profile, web) {
   const tier = tierFor(profile, agent.name, agent.tier);
   const model = modelFor(profile, tier)?.model ?? 'inherit';
   let tools = TOOLS[agent.access];
-  if (agent.name === 'research' && tools) tools += ', WebFetch, WebSearch';
+  if (agent.name === 'research' && tools && web) tools += ', WebFetch, WebSearch';
   const lines = [
     '---',
     `# ${OWNED_MARK} (tier: ${tier})`,
@@ -42,7 +43,7 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
 
   actions.push({ kind: 'block', path: path.join(dir, 'CLAUDE.md'), body: `@${rulesPath}` });
   for (const agent of core.agents) {
-    actions.push({ kind: 'file', path: path.join(dir, 'agents', `${agent.name}.md`), content: renderClaudeAgent(agent, profile) });
+    actions.push({ kind: 'file', path: path.join(dir, 'agents', `${agent.name}.md`), content: renderClaudeAgent(agent, profile, opts.network.outbound !== 'off') });
   }
 
   const env = { BASH_MAX_OUTPUT_LENGTH: '15000', CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '80' };

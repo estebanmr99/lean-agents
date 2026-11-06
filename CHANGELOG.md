@@ -4,6 +4,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Changed
+
+- Privacy presets match `docs/privacy.md` (#63): new "What each preset does NOT block" section (install downloads, chosen tools); `--network off` or `--outbound off` drops the research agent's web tools in Claude Code, Copilot CLI and VS Code Copilot; the Orca row mentions the Windows user env var.
+
 ### Added
 
 - Issue forms for bug, feature, update finding and agent support; blank issues are off and vulnerabilities point to `SECURITY.md`. The bug and update-finding forms list the fields the opt-in feedback flow fills (os, version, agents, command, error).

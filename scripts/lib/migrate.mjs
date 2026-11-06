@@ -186,7 +186,7 @@ const TARGETS = {
   claude: (b, user) => {
     const d = j(b, '.claude');
     return {
-      agent: [j(d, 'agents'), '.md', (a) => renderClaudeAgent(a, null)], skills: j(d, 'skills'), prompts: [j(d, 'commands'), '.md'],
+      agent: [j(d, 'agents'), '.md', (a) => renderClaudeAgent(a, null, true)], skills: j(d, 'skills'), prompts: [j(d, 'commands'), '.md'],
       mcp: user ? { cli: true } : { file: j(b, '.mcp.json'), key: ['mcpServers'], value: (s, env) => (s.url ? { type: s.transport, url: s.url } : { command: s.command[0], args: s.command.slice(1), ...(env ? { env } : {}) }) },
       rules: user
         ? (rulesFile) => [{ kind: 'block', path: j(d, 'CLAUDE.md'), body: `@${rulesFile.split(path.sep).join('/')}` }]
@@ -206,7 +206,7 @@ const TARGETS = {
   'vscode-copilot': (b, user) => {
     const c = user ? envDir(b, 'COPILOT_HOME', j(b, '.copilot')) : j(b, '.github');
     return {
-      agent: [j(c, 'agents'), '.agent.md', (a) => renderCopilotAgent(a, null)], skills: j(c, 'skills'), prompts: user ? null : [j(c, 'prompts'), '.prompt.md'],
+      agent: [j(c, 'agents'), '.agent.md', (a) => renderCopilotAgent(a, null, true)], skills: j(c, 'skills'), prompts: user ? null : [j(c, 'prompts'), '.prompt.md'],
       mcp: { file: user ? j(vscodeUserDir(b), 'mcp.json') : j(b, '.vscode', 'mcp.json'), key: ['servers'], value: (s) => (s.url ? { type: s.transport, url: s.url } : { type: 'stdio', command: s.command[0], args: s.command.slice(1) }) },
       rules: (_f, body) => [{ kind: 'block', path: user ? j(c, 'copilot-instructions.md') : j(b, 'AGENTS.md'), body }],
       rulesPath: user ? j(c, 'copilot-instructions.md') : j(b, 'AGENTS.md'),
@@ -215,7 +215,7 @@ const TARGETS = {
   'copilot-cli': (b, user) => {
     const c = user ? envDir(b, 'COPILOT_HOME', j(b, '.copilot')) : j(b, '.github');
     return {
-      agent: [j(c, 'agents'), '.agent.md', (a) => renderCopilotAgent(a, null)], skills: j(c, 'skills'), prompts: null,
+      agent: [j(c, 'agents'), '.agent.md', (a) => renderCopilotAgent(a, null, true)], skills: j(c, 'skills'), prompts: null,
       mcp: { file: user ? j(c, 'mcp-config.json') : j(b, '.mcp.json'), key: ['mcpServers'], value: (s) => (s.url ? { type: s.transport, url: s.url, tools: ['*'] } : { type: 'local', command: s.command[0], args: s.command.slice(1), tools: ['*'] }) },
       rules: (_f, body) => [{ kind: 'block', path: user ? j(c, 'copilot-instructions.md') : j(b, 'AGENTS.md'), body }],
       rulesPath: user ? j(c, 'copilot-instructions.md') : j(b, 'AGENTS.md'),

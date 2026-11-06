@@ -35,7 +35,7 @@ export function vscodeCopilotAdapter({ home, core, profile, opts, rules, adhdCom
     const dir = envDir(home, 'COPILOT_HOME', path.join(home, '.copilot'));
     actions.push({ kind: 'block', path: path.join(dir, 'copilot-instructions.md'), body: rules });
     for (const agent of core.agents) {
-      actions.push({ kind: 'file', path: path.join(dir, 'agents', `${agent.name}.agent.md`), content: renderCopilotAgent(agent, profile) });
+      actions.push({ kind: 'file', path: path.join(dir, 'agents', `${agent.name}.agent.md`), content: renderCopilotAgent(agent, profile, opts.network.outbound !== 'off') });
     }
     if (tools.includes('caveman')) {
       commands.push(skills('caveman', 'Caveman skills for VS Code Copilot', skillSource('caveman'), ['caveman', 'caveman-compress', 'caveman-stats']));

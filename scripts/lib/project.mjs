@@ -27,7 +27,7 @@ export function projectPlan(root, dir, o) {
     },
   ];
   for (const agent of core.agents) {
-    actions.push({ kind: 'file', path: path.join(dir, '.github', 'agents', `${agent.name}.agent.md`), content: renderCopilotAgent(agent, profile) });
+    actions.push({ kind: 'file', path: path.join(dir, '.github', 'agents', `${agent.name}.agent.md`), content: renderCopilotAgent(agent, profile, o.network.outbound !== 'off') });
     actions.push({ kind: 'file', path: path.join(dir, '.cursor', 'agents', `${agent.name}.md`), content: renderCursorAgent(agent) });
   }
   const vscode = vscodeServers(core, o.tools);

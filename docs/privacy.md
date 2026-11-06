@@ -2,7 +2,7 @@
 
 Off by default. The installer asks one network question with three answers:
 
-- **off**: enterprise PC. Telemetry, auto-updates and other outbound calls all off. Same as `--network off` or `--privacy strict`.
+- **off**: enterprise PC. Telemetry, auto-updates, session sharing, the feedback command and built-in providers off (see [what is not blocked](#what-each-preset-does-not-block)). Same as `--network off` or `--privacy strict`.
 - **on**: personal PC. Nothing changes. Same as `--network on` or `--privacy standard`, and the default with `--yes`.
 - **choose**: ask per category.
 
@@ -21,7 +21,7 @@ The table below is the "all off" (strict) result per agent.
 
 | Agent | What changes |
 | --- | --- |
-| Claude Code | `env`: `DISABLE_AUTOUPDATER=1`, `DISABLE_TELEMETRY=1`, `DISABLE_ERROR_REPORTING=1`, `DISABLE_BUG_COMMAND=1`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`. Manual step: turn off "Help improve Claude" in your claude.ai privacy settings. |
+| Claude Code | `env`: `DISABLE_AUTOUPDATER=1`, `DISABLE_TELEMETRY=1`, `DISABLE_ERROR_REPORTING=1`, `DISABLE_BUG_COMMAND=1`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, `DO_NOT_TRACK=1`. Manual step: turn off "Help improve Claude" in your claude.ai privacy settings. |
 | OpenCode 2 | `"share": "disabled"`, `"update": "disable"`, and a policy that denies the built-in `opencode` provider unless your profile uses it. |
 | OpenCode 1 | `"share": "disabled"`, `"autoupdate": false`, `"experimental": { "openTelemetry": false }`, and `"disabled_providers": ["opencode"]` unless your profile uses that provider. |
 | Copilot CLI | `"autoUpdate": false` in `~/.copilot/settings.json`. Telemetry has no setting: start Copilot with `--disable-client-telemetry`. Strict mode prints this reminder and cannot do it for you. |
@@ -29,8 +29,18 @@ The table below is the "all off" (strict) result per agent.
 | VS Code Copilot | `telemetry.telemetryLevel: "off"` and `update.mode: "none"` in the VS Code user `settings.json`. |
 | Cursor | Nothing on disk: Privacy Mode is stored on your account. Manual step: turn it on in Cursor settings. Strict mode prints this reminder. |
 | Warp | Nothing on disk. Manual step: set `[privacy] telemetry_enabled = false` in its `settings.toml` (the free plan may need it on for AI). Strict mode prints this reminder. |
-| Orca | Nothing on disk. Manual step: set `DO_NOT_TRACK=1` where Orca starts (confirmed on Windows, #22), or turn off Settings > Privacy > Share anonymous usage data. Strict mode prints this reminder. |
+| Orca | No file is changed. On Windows, when Orca is detected, strict mode sets `DO_NOT_TRACK=1` and `ORCA_TELEMETRY_DISABLED=1` in your user environment (restart Orca; a value you already set is kept, and `--uninstall` removes only the ones it set). Elsewhere, set `DO_NOT_TRACK=1` where Orca starts, or turn off Settings > Privacy > Share anonymous usage data. Strict mode prints this reminder. |
 
 With auto-updates off, update on purpose: `opencode upgrade`, `claude update`, `copilot update`, then `install.sh --update` or `install.ps1 -Update` (see [update.md](update.md)).
 
-Strict mode never installs tools that send data without opt-in. Pick model providers whose terms do not train on your prompts.
+## What each preset does NOT block
+
+The presets set switches in the agents' configs and, while installing, `DO_NOT_TRACK=1`, `HOMEBREW_NO_ANALYTICS=1` and `GH_TELEMETRY=false`. They do not stop the downloads the install itself makes, under any preset:
+
+- `git`, `npm` and `npx` (the packages pinned in `core/pins.json`, which `npx` fetches at run time), `uvx` (Serena), `brew` or `winget`, `curl` or `irm` (the Bun installer), and the browser binaries Playwright downloads.
+- Tools you choose keep their own network behavior. Strict mode sets no switch for them. Only Claude Code gets `DO_NOT_TRACK=1` (which also covers Caveman and Skills CLI inside Claude Code), and the install commands run with it. Strict mode does not remove a tool: `--all-tools` still installs Serena, Codeburn, Ponytail and the rest. Their telemetry is either documented in [compatibility.md](compatibility.md#outbound-switches) or marked **VERIFY** in [compatibility.md](compatibility.md#not-yet-verified).
+- Claude Code, Copilot CLI, VS Code Copilot and `--project` lose the research agent's web tools (`WebFetch`, `WebSearch`, `web`) when `outbound` is off. Antigravity keeps them. lean-agents does not remove them for OpenCode (**VERIFY** what its agents inherit).
+
+Sources, hosts and dates: [compatibility.md](compatibility.md#verification-log) and [compatibility.md](compatibility.md#outbound-switches). To block the downloads, run the installer where your network or proxy policy allows only what you accept.
+
+Pick model providers whose terms do not train on your prompts.

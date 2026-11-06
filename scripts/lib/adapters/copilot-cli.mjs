@@ -16,10 +16,11 @@ const TOOLS = {
   'read-write': null,
 };
 
-export function renderCopilotAgent(agent, profile) {
+// Web tools are dropped when other outbound calls are off.
+export function renderCopilotAgent(agent, profile, web) {
   const tier = tierFor(profile, agent.name, agent.tier);
   const model = modelFor(profile, tier)?.model.replace('github-copilot/', '');
-  const tools = TOOLS[agent.access] && [...TOOLS[agent.access], ...(agent.name === 'research' ? ['web'] : [])];
+  const tools = TOOLS[agent.access] && [...TOOLS[agent.access], ...(agent.name === 'research' && web ? ['web'] : [])];
   const lines = ['---', `# ${OWNED_MARK} (tier: ${tier})`, `name: ${agent.name}`, `description: ${agent.description}`];
   if (model) lines.push(`model: ${model}`);
   if (tools) lines.push(`tools: ${JSON.stringify(tools)}`);
@@ -42,7 +43,7 @@ export function copilotAdapter({ home, core, profile, opts, rules, adhdCommand }
   const commands = [];
 
   for (const agent of core.agents) {
-    actions.push({ kind: 'file', path: path.join(dir, 'agents', `${agent.name}.agent.md`), content: renderCopilotAgent(agent, profile) });
+    actions.push({ kind: 'file', path: path.join(dir, 'agents', `${agent.name}.agent.md`), content: renderCopilotAgent(agent, profile, opts.network.outbound !== 'off') });
   }
   const edits = [];
   for (const name of ['serena', 'playwright', 'playwright-extension'].filter((t) => tools.includes(t))) {
