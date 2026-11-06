@@ -1023,3 +1023,14 @@ test('core/pins.json: every pin has version, date and a CI job that exists; no p
   assert.ok(!/@latest/.test(out), 'plan contains @latest');
   for (const line of out.split('\n').filter((l) => /skills[@ ].* add /.test(l))) assert.match(line, /skills@\d[\d.]* add \S+#v\d/, line);
 });
+
+test('--doctor reports no pin drift after install and a changed row when a recorded pin differs', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--tools', 'caveman', '--lang', 'en', '--profile', 'none']);
+  assert.match(lean(home, ['--doctor', '--no-exec']), /ok\s+pinned versions/);
+  const file = path.join(home, '.config', 'lean-agents', 'state.json');
+  const state = JSON.parse(fs.readFileSync(file, 'utf8'));
+  state.pins.caveman = 'v0.0.1';
+  fs.writeFileSync(file, JSON.stringify(state));
+  assert.match(lean(home, ['--doctor', '--no-exec']), /changed\s+pin caveman.*installed v0\.0\.1/);
+});

@@ -5,7 +5,7 @@ description: Find what is spending tokens and suggest concrete config changes, u
 
 # token-audit
 
-1. Get the last 7 days: `npx -y codeburn report -p week --format json`. Codeburn needs Node 22.13 or newer. If it fails or has no data, say so and stop. Never invent numbers.
+1. Get the last 7 days: `npx -y codeburn@0.9.27 report -p week --format json` (the version in core/pins.json). Codeburn needs Node 22.13 or newer. If it fails or has no data, say so and stop. Never invent numbers.
 2. List the top cost drivers from the data, biggest first: models, sessions, tools, large outputs. Give the real number for each.
 3. For each driver, suggest one change this repository already supports:
    - Search or read-heavy work on a strong model: route it to the `explore` subagent on the fast tier.

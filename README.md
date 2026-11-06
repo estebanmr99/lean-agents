@@ -281,6 +281,7 @@ If your company pays for GitHub Copilot, the official way to use Claude as an ag
    ```
    The per-category flags are `--telemetry on|off`, `--auto-update on|off` and `--outbound on|off`. `--network off` is the same as `--privacy strict`. In PowerShell they pass as they are, for example `-DryRun --network off`. What each category turns off per agent: [docs/privacy.md](docs/privacy.md). The choice is saved and reused by `--update`.
 4. **`gh`**: add `--gh` (or answer yes) to install GitHub CLI without admin rights, then run `gh auth login` yourself.
+5. **Run-time fetches.** Besides install-time commands, agents download code each time they start an MCP server or use a skill. Every one is pinned to an exact version in [core/pins.json](core/pins.json) (Playwright MCP, Context Mode, Codeburn, AutoSkills, GSD Core, DCP, the Skills CLI and the skills Caveman, i-have-adhd and orca-cli), so nothing changes under you until you update. `--doctor` reports `changed` when the installed pins differ from that file. Not pinned yet: Serena (`git+https` source), RTK and `gh` (brew or winget), the Ponytail plugin and the Claude plugin marketplaces. Use `--no-core` to leave out RTK and Context Mode when your PC allows only specific tools.
 
 In a real terminal the installer shows menus (arrow keys, space to toggle), a progress list and a summary. With `--yes`, a pipe or no terminal, it asks plain questions or none, as before.
 

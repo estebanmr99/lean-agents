@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { sha } from './fsops.mjs';
+import { PINS } from './pins.mjs';
 import { version, quiet, contextModeNodeNote } from './system.mjs';
 import { stillNeeded } from './terminals.mjs';
 import { adhdSkillFiles } from './adhd.mjs';
@@ -82,6 +83,10 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node 
       const same = sha(fs.readFileSync(f.path, 'utf8')) === f.hash;
       add(rel, same ? 'ok' : 'changed', same ? '' : 'edited since install (fine if on purpose)');
     }
+    // Drift: the installer pinned other versions than core/pins.json lists now (a newer lean-agents, or an edited pin).
+    const drift = Object.entries(state.pins ?? {}).filter(([k, v]) => PINS[k] && PINS[k].version !== v);
+    for (const [k, v] of drift) add(`pin ${k}`, 'changed', `installed ${v}, core/pins.json has ${PINS[k].version} (run --update)`);
+    if (state.pins && !drift.length) add('pinned versions', 'ok', `${Object.keys(state.pins).length} pins match core/pins.json`);
     for (const c of state.commands) add(c.desc, c.ok ? 'ok' : 'error', c.ok ? '' : 'failed at install time');
     if (o.tools.includes('i-have-adhd')) {
       const reset = adhdSkillFiles(home).filter((f) => fs.readFileSync(f, 'utf8').includes('disable-model-invocation: true'));

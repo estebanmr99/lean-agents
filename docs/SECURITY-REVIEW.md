@@ -61,12 +61,26 @@ Only after you approve the plan, and never with admin rights. `--dry-run` prints
 | `rtk init -g …` (per agent) | RTK hook or plugin |
 | `claude plugin marketplace add …`, `claude plugin install …`, `claude mcp add --scope user …` | Claude Code plugins and MCP servers |
 | `copilot mcp add context-mode …` (via `scripts/copilot-context-mode.mjs`) | Context Mode MCP server for Copilot CLI |
-| `npx -y skills add …` / `skills remove …` | Caveman and i-have-adhd skills |
-| `git clone --depth 1 https://github.com/ayghri/i-have-adhd …` | i-have-adhd for OpenCode |
-| `npx -y @opengsd/gsd-core@latest …` | GSD (opt-in) |
+| `npx -y skills@<pin> add owner/repo#<tag> …` / `skills@<pin> remove …` | Caveman, i-have-adhd and orca-cli skills |
+| `git clone --depth 1 --branch <tag> https://github.com/ayghri/i-have-adhd …` | i-have-adhd for OpenCode |
+| `npx -y @opengsd/gsd-core@<pin> …` | GSD (opt-in) |
 | `node scripts/adhd-skill.mjs …` | local edit of the installed i-have-adhd skill |
 
 Bootstrap only: `install.sh` / `install.ps1` may run `git clone` or `git fetch` of this repository and `npm ci --omit=dev` (packages `jsonc-parser` and `@clack/prompts`).
+
+## Run-time fetches
+
+Separate from the install-time commands above: code the agents download every time an MCP server starts or a skill is installed. Each one is pinned to an exact version or tag in `core/pins.json`, with the day verified and the CI job that proves it. `--doctor` flags a recorded pin that no longer matches the file.
+
+| Fetch | Pinned in `core/pins.json` | Not pinned |
+| --- | --- | --- |
+| `npx -y @playwright/mcp@<pin>` (also `--extension`), `npx -y context-mode@<pin>` | yes | |
+| `npx -y codeburn@<pin>`, `npx -y autoskills@<pin>`, `npx -y @opengsd/gsd-core@<pin>`, `@tarquinen/opencode-dcp@<pin>` | yes | |
+| `npx -y skills@<pin>` and the skill sources `owner/repo#<tag>` | yes | |
+| Serena (`uvx --from git+https://github.com/oraios/serena`) | | default branch |
+| RTK, `gh` (brew, winget), the Ponytail plugin, Claude plugin marketplaces | | latest from their source |
+
+A `version-watch` issue opens when upstream ships a newer version; pins change only after you approve (`skills/update-models`, section "Tool versions").
 
 ## Network hosts
 
