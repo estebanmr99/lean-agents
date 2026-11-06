@@ -7,9 +7,6 @@ import { hasProxy } from './network.mjs';
 import { skillSource, skillsCli } from './pins.mjs';
 
 export const TERMINALS = ['warp', 'orca'];
-export const WARP_OPENCODE_PLUGIN = '@warp-dot-dev/opencode-warp';
-// OpenCode 1.x needs the pin (upstream README, checked 2026-11-03).
-export const WARP_OPENCODE_V1_PLUGIN = `${WARP_OPENCODE_PLUGIN}@0.1.7`;
 // Skills CLI agent ids; VS Code Copilot reads ~/.copilot/skills like Copilot CLI.
 const ORCA_SKILL_AGENT = { claude: 'claude-code', 'opencode-v1': 'opencode', 'opencode-v2': 'opencode', 'copilot-cli': 'github-copilot', 'vscode-copilot': 'github-copilot', cursor: 'cursor', antigravity: 'antigravity-cli' };
 // Orca's hooks POST status to 127.0.0.1; Windows curl sends loopback to the proxy unless NO_PROXY lists it.

@@ -141,7 +141,7 @@ test('OpenCode 1.x gets singular keys, no Context Mode MCP, and a clean uninstal
   assert.equal(oc.agent.plan.model, 'anthropic/claude-opus-5-5');
   assert.ok(oc.mcp.serena.enabled && oc.mcp.playwright.enabled);
   assert.equal(oc.mcp['context-mode'], undefined);
-  assert.deepEqual(oc.plugin, ['context-mode', '@dietrichgebert/ponytail', npmSpec('opencode-dcp')]);
+  assert.deepEqual(oc.plugin, [npmSpec('context-mode'), npmSpec('ponytail'), npmSpec('opencode-dcp')]);
   assert.equal(oc.compaction.reserved, 40000);
   assert.equal(oc.autoupdate, false);
   assert.equal(oc.experimental.openTelemetry, false);
@@ -771,7 +771,7 @@ test('Cursor: subagents, MCP, kept user values, no global rules, full uninstall'
   const before = snapshot(home);
   const out = lean(home, ['--yes', '--no-exec', '--agents', 'cursor', '--all-tools', '--privacy', 'strict', '--lang', 'en', '--adhd-always', '--ponytail-mode', 'off']);
   assert.match(out, /rtk init -g --agent cursor/);
-  assert.match(out, /skills@\d[\d.]* add JuliusBrussee\/caveman#v[\d.]+ .* -a cursor -g/);
+  assert.match(out, /skills@\d[\d.]* add JuliusBrussee\/caveman#[0-9a-f]{40} .* -a cursor -g/);
   assert.match(out, /Privacy Mode in Cursor/);
 
   const mcp = JSON.parse(fs.readFileSync(path.join(dir, 'mcp.json'), 'utf8')).mcpServers;
@@ -917,10 +917,10 @@ test('terminals: nothing detected means no integration; --terminal adds Warp and
   const before = snapshot(home);
   const plan = lean(home, [...base, '--dry-run', '--terminal', 'both'], env);
   assert.match(plan, /claude plugin install warp@claude-code-warp/);
-  assert.match(plan, /skills@\d[\d.]* add stablyai\/orca#v[\d.]+ --skill orca-cli -a claude-code opencode -g -y/);
+  assert.match(plan, /skills@\d[\d.]* add stablyai\/orca#[0-9a-f]{40} --skill orca-cli -a claude-code opencode -g -y/);
   lean(home, [...base, '--terminal', 'warp']);
   const oc = parse(fs.readFileSync(path.join(home, '.config', 'opencode', 'opencode.jsonc'), 'utf8'), [], { allowTrailingComma: true });
-  assert.ok(oc.plugins.includes('@warp-dot-dev/opencode-warp'));
+  assert.ok(oc.plugins.includes(npmSpec('warp-opencode')));
   lean(home, ['--uninstall', '--yes']);
   const after = snapshot(home);
   for (const k of Object.keys(before)) assert.equal(after[k], before[k], `${k} restored`);
@@ -928,7 +928,7 @@ test('terminals: nothing detected means no integration; --terminal adds Warp and
   const v1 = userHome();
   lean(v1, ['--yes', '--no-exec', '--agents', 'opencode-v1', '--tools', 'rtk', '--terminal', 'warp']);
   const oc1 = parse(fs.readFileSync(path.join(v1, '.config', 'opencode', 'opencode.jsonc'), 'utf8'), [], { allowTrailingComma: true });
-  assert.ok(oc1.plugin.includes('@warp-dot-dev/opencode-warp@0.1.7'));
+  assert.ok(oc1.plugin.includes(npmSpec('warp-opencode')));
 });
 
 test('terminals: all-off network prints the Warp and Orca privacy switches', () => {
@@ -1063,7 +1063,7 @@ test('core/pins.json: every pin has version, date and a CI job that exists; no p
   const out = ['claude,opencode-v1,copilot-cli,cursor', 'opencode-v2,antigravity,vscode-copilot']
     .map((agents) => lean(home, ['--yes', '--no-exec', '--dry-run', '--agents', agents, '--tools', tools, '--terminal', 'orca'])).join('\n');
   assert.ok(!/@latest/.test(out), 'plan contains @latest');
-  for (const line of out.split('\n').filter((l) => /skills[@ ].* add /.test(l))) assert.match(line, /skills@\d[\d.]* add \S+#v\d/, line);
+  for (const line of out.split('\n').filter((l) => /skills[@ ].* add /.test(l))) assert.match(line, /skills@\d[\d.]* add (\S+#[0-9a-f]{40}|estebanmr99\/lean-agents#v\d\S*)\b/, line);
 });
 
 test('--doctor reports no pin drift after install and a changed row when a recorded pin differs', () => {

@@ -1,19 +1,24 @@
 {
   "note": "Known-good versions fetched at run time. Bump only after the real-* job in 'ci' passes with the new version; 'verified' is the day the version was checked against npm or the git tag. Never use a version published in the last 14 days. Entries with ciOnly are harness CLIs that only CI installs: users never get them from lean-agents, so they stay out of state.json and --doctor.",
   "pins": {
-    "skills-cli": { "kind": "npm", "source": "skills", "version": "1.7.4", "verified": "2026-11-06", "ci": "real-skills-undo" },
-    "playwright-mcp": { "kind": "npm", "source": "@playwright/mcp", "version": "0.0.83", "verified": "2026-11-05", "ci": "real-tools" },
-    "context-mode": { "kind": "npm", "source": "context-mode", "version": "2.1.4", "verified": "2026-11-05", "ci": "real-claude" },
-    "codeburn": { "kind": "npm", "source": "codeburn", "version": "0.9.27", "verified": "2026-11-05", "ci": "real-tools" },
-    "autoskills": { "kind": "npm", "source": "autoskills", "version": "0.4.1", "verified": "2026-11-05", "ci": "real-tools" },
-    "gsd-core": { "kind": "npm", "source": "@opengsd/gsd-core", "version": "1.18.0", "verified": "2026-11-05", "ci": "real-tools" },
-    "opencode-dcp": { "kind": "npm", "source": "@tarquinen/opencode-dcp", "version": "3.2.0", "verified": "2026-11-05", "ci": "real-opencode-v1" },
-    "caveman": { "kind": "skill", "source": "JuliusBrussee/caveman", "version": "v4.0.1", "verified": "2026-11-05", "ci": "real-claude" },
-    "i-have-adhd": { "kind": "skill", "source": "ayghri/i-have-adhd", "version": "v0.4.1", "verified": "2026-11-05", "ci": "real-tools" },
+    "skills-cli": { "kind": "npm", "source": "skills", "version": "1.7.4", "verified": "2026-11-06", "ci": "real-skills-undo", "integrity": "sha512-lHZJksE8UImNAr+LL6unqq7jERjdFw5EJasm17srycwL7rXHGdCmgu1L1ttLxUO9i3rdH+QQig+px0icHqLmRw==" },
+    "playwright-mcp": { "kind": "npm", "source": "@playwright/mcp", "version": "0.0.83", "verified": "2026-11-05", "ci": "real-tools", "integrity": "sha512-oNcl+Ae2/IAjhfPeP46BfIkSakfmprY+aOtkv5MjrQ4lPav4/yNtPhL0iq8SlIM90oApWgBDUxaNKvktazUKOg==" },
+    "context-mode": { "kind": "npm", "source": "context-mode", "version": "2.1.4", "verified": "2026-11-05", "ci": "real-claude", "integrity": "sha512-KZ/EH2gm6Pfyv+O8AZlv/FFEbKQqZI0irYRntsOXDUgoIVaeSejxskvlwlQBX1/fHWIWJIVMQ7n5RT/RsfLY0g==" },
+    "codeburn": { "kind": "npm", "source": "codeburn", "version": "0.9.27", "verified": "2026-11-05", "ci": "real-tools", "integrity": "sha512-dNCy09sYCdvrijcoOun+ZVyTbp/GYGmdBbBTe8uTSLRO8rSWqS4IEOzQdRoPRhbt7twCuSqVBjTNNl+CdTNrKQ==" },
+    "autoskills": { "kind": "npm", "source": "autoskills", "version": "0.4.1", "verified": "2026-11-05", "ci": "real-tools", "integrity": "sha512-cAFYRWMlzHbdRUUxQRcTDfhtOWnaItHH9l8Lpky+y1mFzqWMHLh/ke6JVd2Dm3Q/U43Fs3N6AvFF05wbA7r1JQ==" },
+    "gsd-core": { "kind": "npm", "source": "@opengsd/gsd-core", "version": "1.18.0", "verified": "2026-11-05", "ci": "real-tools", "integrity": "sha512-00b29mvlQMmUcR8wkvJFf/okGDWRB1kiHR4Pg921N+Q8nFwXehRhHEGAusQn+oM/p7SMGM4sAdPAbiECGaozwg==" },
+    "opencode-dcp": { "kind": "npm", "source": "@tarquinen/opencode-dcp", "version": "3.2.0", "verified": "2026-11-05", "ci": "real-opencode-v1", "integrity": "sha512-6tUjeYlbHgMx+0xfB2DiHkknC9G3U5Rk+F4FBsPqAI3vzjaMXGkgsBUNzjL0e5StsEGDmyDTbxtozg6p9mnhng==" },
+    "caveman": { "kind": "skill", "source": "JuliusBrussee/caveman", "version": "v4.0.1", "verified": "2026-11-05", "ci": "real-claude", "sha": "d262ab3882952a59312ff3537cd86d894523c5ab" },
+    "i-have-adhd": { "kind": "skill", "source": "ayghri/i-have-adhd", "version": "v0.4.1", "verified": "2026-11-05", "ci": "real-tools", "sha": "1ecea1993b7fce257ffbd686c070948b5e07eda6" },
     "lean-update": { "kind": "skill", "source": "estebanmr99/lean-agents", "version": "v0.7.0", "verified": "2026-11-06", "ci": "real-update", "note": "The skill ships in this repo, so the tag must exist before a real install works: tag v0.7.0 first, then run real-update." },
-    "orca-cli": { "kind": "skill", "source": "stablyai/orca", "version": "v1.4.99", "verified": "2026-11-05", "ci": "real-terminals" },
-    "claude-code": { "kind": "npm", "source": "@anthropic-ai/claude-code", "version": "2.1.305", "verified": "2026-11-05", "ci": "real-claude", "ciOnly": true },
-    "opencode-v1": { "kind": "npm", "source": "opencode-ai", "version": "1.19.0", "verified": "2026-11-05", "ci": "real-opencode-v1", "ciOnly": true, "note": "OpenCode 2 is not on npm; its installer script stays on latest and the jobs print its version." },
-    "copilot-cli": { "kind": "npm", "source": "@github/copilot", "version": "1.0.102", "verified": "2026-11-05", "ci": "real-copilot", "ciOnly": true }
+    "orca-cli": { "kind": "skill", "source": "stablyai/orca", "version": "v1.4.99", "verified": "2026-11-05", "ci": "real-terminals", "sha": "c36fa1895fb93c0b8989e579a1007ff233d52d6f" },
+    "claude-code": { "kind": "npm", "source": "@anthropic-ai/claude-code", "version": "2.1.305", "verified": "2026-11-05", "ci": "real-claude", "ciOnly": true, "integrity": "sha512-c47oVI7/52vfjmm/s6kcw7NpfTW9Jzm+I5WTsdnC7/vMjbxrKUslpi9/+WZ96Z3am1vhLgyCMPA9Q2Qficii+g==" },
+    "opencode-v1": { "kind": "npm", "source": "opencode-ai", "version": "1.19.0", "verified": "2026-11-05", "ci": "real-opencode-v1", "ciOnly": true, "integrity": "sha512-lddJhFwZI3GLlw8VyOo4yNwBVGeVN/mxH6ORh60h69zAXL7QhjSWY9orj10rwO2kxVnxH9dh45uDCWNuiqPb8A==", "note": "OpenCode 2 is not on npm; its installer script stays on latest and the jobs print its version." },
+    "copilot-cli": { "kind": "npm", "source": "@github/copilot", "version": "1.0.102", "verified": "2026-11-05", "ci": "real-copilot", "ciOnly": true, "integrity": "sha512-mv6cTWMhMILxg5ZDgqJ6UsnpPuySCPWOPbZVaO8lL0dpmjY3VD9ZhJr6DFcG7fhUXZv6OmvLdcRCa5MJ6hBI+Q==" },
+    "serena": { "kind": "git", "source": "oraios/serena", "version": "v2.1.0", "verified": "2026-11-06", "ci": "real-tools", "sha": "5e4f5cd173c7ff3eed37ee3f1de6c266b937c5dc" },
+    "ponytail": { "kind": "npm", "source": "@dietrichgebert/ponytail", "version": "5.3.2", "verified": "2026-11-06", "ci": "real-tools", "integrity": "sha512-AjJnMi54AXO55kXi0ISNPacLuTjb7e9V4lV2oidyxBOnVoPih8CIAmnfHgwX2VyPsDqwQhJthJ9bNu30MaHuOg==" },
+    "ponytail-plugin": { "kind": "marketplace", "source": "DietrichGebert/ponytail", "version": "v5.3.2", "verified": "2026-11-06", "ci": "real-claude", "sha": "16352ac229eb08a9598dcae48fe9f2b342567d86" },
+    "context-mode-plugin": { "kind": "marketplace", "source": "mksglu/context-mode", "version": "v2.1.4", "verified": "2026-11-06", "ci": "real-claude", "sha": "10a2e677f7605ef8f16dedb37648ead8889addee" },
+    "warp-opencode": { "kind": "npm", "source": "@warp-dot-dev/opencode-warp", "version": "0.1.7", "verified": "2026-11-06", "ci": "real-terminals", "integrity": "sha512-QB07QYqGMEDenJPNn3ttqcsiragvTPhiP7fYHigmY92qScSDCrbGFm8LakbASXoyD/YPfd8CB7GJkE3oIbA2yA==" }
   }
 }

@@ -13,17 +13,26 @@ function pin(key) {
 }
 
 export const npmSpec = (key) => `${pin(key).source}@${pin(key).version}`;
-// owner/repo#tag: `skills add` ignores a trailing @tag (installs HEAD) but honors #tag (verified skills 1.5.18 and 1.7.4).
-export const skillSource = (key) => `${pin(key).source}#${pin(key).version}`;
+// owner/repo#ref: `skills add` ignores a trailing @tag (installs HEAD) but honors #tag and #<commit sha> (verified skills 1.5.18 and 1.7.4).
+// A pin without `sha` (lean-update until its tag exists) falls back to the tag.
+export const skillSource = (key) => `${pin(key).source}#${pin(key).sha ?? pin(key).version}`;
+// `claude plugin marketplace add owner/repo#<sha>` fails (checked 2026-11-10), so marketplaces pin by tag only.
+export const marketplaceSource = (key) => `${pin(key).source}#${pin(key).version}`;
+// What `uvx --from` takes: the commit SHA, so a moved tag cannot change what runs.
+export const gitSpec = (key) => `git+https://github.com/${pin(key).source}@${pin(key).sha}`;
+// npm or git spec for a {pin:key} placeholder in core/mcp.json.
+export const pinSpec = (key) => (pin(key).kind === 'git' ? gitSpec(key) : npmSpec(key));
 export const skillsCli = () => npmSpec('skills-cli');
 export const pinVersions = () => Object.fromEntries(Object.entries(PINS).filter(([, p]) => !p.ciOnly).map(([k, p]) => [k, p.version]));
 
 // Pin keys that differ from the tool name lean-agents saves in state.json options.tools.
-const PIN_TOOL = { 'playwright-mcp': 'playwright', 'gsd-core': 'gsd', 'opencode-dcp': 'dcp' };
+const PIN_TOOL = { 'playwright-mcp': 'playwright', 'gsd-core': 'gsd', 'opencode-dcp': 'dcp', 'ponytail-plugin': 'ponytail', 'context-mode-plugin': 'context-mode' };
 export const pinTool = (key) => PIN_TOOL[key] ?? key;
 // True when the saved options use this pin; the Skills CLI and the lean-update skill ride along with every install.
 export const pinInUse = (key, options) => key === 'skills-cli' || key === 'lean-update'
-  || (key === 'orca-cli' ? (options.terminals ?? []).includes('orca') : (options.tools ?? []).includes(PIN_TOOL[key] ?? key));
+  || (key === 'orca-cli' ? (options.terminals ?? []).includes('orca')
+    : key === 'warp-opencode' ? (options.terminals ?? []).includes('warp')
+      : (options.tools ?? []).includes(PIN_TOOL[key] ?? key));
 
 // [{ tool, installed, pinned }] for pins in use whose saved version differs from core/pins.json now.
 export function behindPins(saved) {

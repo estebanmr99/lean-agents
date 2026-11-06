@@ -4,7 +4,7 @@
 //   node scripts/bump-pins.mjs <body-file>      (needs GITHUB_TOKEN for GitHub API calls)
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { isNewer, latestVersion, notesUrl } from './version-watch.mjs';
+import { isNewer, latestVersion, notesUrl, tagSha } from './version-watch.mjs';
 
 const FILE = fileURLToPath(new URL('../core/pins.json', import.meta.url));
 const STABLE = /^v?\d+\.\d+\.\d+$/;
@@ -27,11 +27,22 @@ export async function pickVersion(p, get, now, days = 14) {
   return published && old(published) ? { version: tag, date: published.slice(0, 10) } : null;
 }
 
-// Edits only the version and verified values on the pin's own line, so the file keeps its layout.
-export function applyBump(text, key, version, verified) {
-  return text.split('\n').map((l) => (l.trimStart().startsWith(`"${key}":`)
-    ? l.replace(/"version": "[^"]*"/, `"version": "${version}"`).replace(/"verified": "[^"]*"/, `"verified": "${verified}"`)
-    : l)).join('\n');
+// Edits only the version, verified, sha and integrity values on the pin's own line, so the file keeps its layout.
+export function applyBump(text, key, version, verified, extra = {}) {
+  return text.split('\n').map((l) => {
+    if (!l.trimStart().startsWith(`"${key}":`)) return l;
+    let out = l.replace(/"version": "[^"]*"/, `"version": "${version}"`).replace(/"verified": "[^"]*"/, `"verified": "${verified}"`);
+    for (const [field, value] of Object.entries(extra)) out = out.replace(new RegExp(`"${field}": "[^"]*"`), `"${field}": "${value}"`);
+    return out;
+  }).join('\n');
+}
+
+// The commit SHA (git, skill) or npm integrity a bumped pin must carry; {} for pins that have neither.
+async function checks(p, version, get) {
+  const extra = {};
+  if (p.sha) extra.sha = await tagSha(p.source, version, get);
+  if (p.integrity) extra.integrity = (await get(`https://registry.npmjs.org/${p.source.replace('/', '%2F')}/${version}`)).dist.integrity;
+  return extra;
 }
 
 export async function bump({ text, get, now = Date.now(), today = new Date(now).toISOString().slice(0, 10), log = console.log }) {
@@ -42,7 +53,7 @@ export async function bump({ text, get, now = Date.now(), today = new Date(now).
     try {
       const pick = await pickVersion(p, get, now);
       if (!pick || !isNewer(p.version, pick.version)) continue;
-      text = applyBump(text, key, pick.version, today);
+      text = applyBump(text, key, pick.version, today, await checks(p, pick.version, get));
       changes.push({ key, from: p.version, to: pick.version, ci: p.ci, notes: notesUrl(p, pick.version), published: pick.date });
     } catch (e) { log(`! ${key}: ${e.message}`); }
   }

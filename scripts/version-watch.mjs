@@ -60,6 +60,12 @@ export async function latestVersion(p, get) {
   return tags.reduce((best, n) => (!best || isNewer(best, n) ? n : best), null);
 }
 
+// Commit SHA a GitHub tag points at (annotated tags are dereferenced).
+export async function tagSha(source, tag, get) {
+  const ref = (await get(`https://api.github.com/repos/${source}/git/ref/tags/${tag}`)).object;
+  return ref.type === 'tag' ? (await get(`https://api.github.com/repos/${source}/git/tags/${ref.sha}`)).object.sha : ref.sha;
+}
+
 // api: { list(), comments(number), create(title, body), comment(number, body) }
 export async function run({ pins, get, api, log = console.log }) {
   const latest = {};

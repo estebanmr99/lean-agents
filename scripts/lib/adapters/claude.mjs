@@ -4,7 +4,7 @@ import path from 'node:path';
 import { OWNED_MARK } from '../fsops.mjs';
 import { tierFor, modelFor } from '../render.mjs';
 import { privacyOf } from '../network.mjs';
-import { skillSource, skillsCli } from '../pins.mjs';
+import { marketplaceSource, skillSource, skillsCli } from '../pins.mjs';
 
 const TOOLS = {
   'read-only': 'Read, Grep, Glob',
@@ -65,13 +65,13 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
     commands.push({ tool: 'rtk', desc: 'RTK hook for Claude Code', run: [['rtk', 'init', '-g', '--auto-patch']], undo: [['rtk', 'init', '-g', '--uninstall']] });
   }
   if (tools.includes('context-mode')) {
-    commands.push({ tool: 'context-mode', desc: 'Context Mode plugin', ...plugin('mksglu/context-mode', 'context-mode@context-mode') });
+    commands.push({ tool: 'context-mode', desc: 'Context Mode plugin', ...plugin(marketplaceSource('context-mode-plugin'), 'context-mode@context-mode') });
   }
   if (tools.includes('ponytail')) {
-    commands.push({ tool: 'ponytail', desc: 'Ponytail plugin', ...plugin('DietrichGebert/ponytail', 'ponytail@ponytail') });
+    commands.push({ tool: 'ponytail', desc: 'Ponytail plugin', ...plugin(marketplaceSource('ponytail-plugin'), 'ponytail@ponytail') });
   }
   if (tools.includes('i-have-adhd')) {
-    commands.push({ tool: 'i-have-adhd', desc: 'i-have-adhd plugin', ...plugin(skillSource('i-have-adhd'), 'i-have-adhd@i-have-adhd') }, adhdCommand);
+    commands.push({ tool: 'i-have-adhd', desc: 'i-have-adhd plugin', ...plugin(marketplaceSource('i-have-adhd'), 'i-have-adhd@i-have-adhd') }, adhdCommand);
     if (opts.adhdAlways) actions.push({ kind: 'file', path: path.join(dir, '.i-have-adhd-always'), content: '' , force: true });
   }
   for (const name of ['serena', 'playwright']) {
