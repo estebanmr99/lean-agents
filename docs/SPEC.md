@@ -480,7 +480,7 @@ Mark each `[x]` when merged.
 - [x] **Session 19 — Migrate from one harness to another** (0.6.0). Issue #34.
 - [x] **Session 20 — Install with an agent, opt-in feedback, gh by default** (0.6.0). Issues #35, #36, #37.
 - [x] **Session 22 — Repo audit, issue forms, labeled backlog** (0.7.0). `docs/audit-2026-11.md`, forms in `.github/ISSUE_TEMPLATE` (bug, feature, update-finding, agent-support, config), `scripts/labels.sh`, the backlog as labeled issues, "Before each release" checklist. Audit findings are filed as issues, not fixed here.
-- [ ] **Session 45 — Agent-first updates** (0.7.0). Issue #45. `lean-update` skill, read-only detection table in `docs/manual-install.md`, one temp backup removed after `--doctor`, `--update` prints old -> new, `--doctor --json` lists `behind`, daily green `ci-latest` opens a pin-bump PR.
+- [x] **Session 45 — Agent-first updates** (0.7.0). Issue #45. `lean-update` skill, read-only detection table in `docs/manual-install.md`, one temp backup removed after `--doctor`, `--update` prints old -> new, `--doctor --json` lists `behind`, daily green `ci-latest` opens a pin-bump PR.
 
 ### Session 3 — Windows + OpenCode 1.x + wider CI
 
