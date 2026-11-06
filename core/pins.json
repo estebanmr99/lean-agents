@@ -1,5 +1,5 @@
 {
-  "note": "Known-good versions fetched at run time. Bump only after the real-* job in 'ci' passes with the new version; 'verified' is the day the version was checked against npm or the git tag. Never use a version published in the last 14 days.",
+  "note": "Known-good versions fetched at run time. Bump only after the real-* job in 'ci' passes with the new version; 'verified' is the day the version was checked against npm or the git tag. Never use a version published in the last 14 days. Entries with ciOnly are harness CLIs that only CI installs: users never get them from lean-agents, so they stay out of state.json and --doctor.",
   "pins": {
     "skills-cli": { "kind": "npm", "source": "skills", "version": "1.5.18", "verified": "2026-11-05", "ci": "real-skills-undo", "note": "Last release declaring Node >=18. 1.5.19 and later need Node >=22.20.0 and crash on Node 20 (fs/promises has no glob), so do not bump while Node 20 is supported." },
     "playwright-mcp": { "kind": "npm", "source": "@playwright/mcp", "version": "0.0.83", "verified": "2026-11-05", "ci": "real-tools" },
@@ -10,6 +10,9 @@
     "opencode-dcp": { "kind": "npm", "source": "@tarquinen/opencode-dcp", "version": "3.2.0", "verified": "2026-11-05", "ci": "real-opencode-v1" },
     "caveman": { "kind": "skill", "source": "JuliusBrussee/caveman", "version": "v4.0.1", "verified": "2026-11-05", "ci": "real-claude" },
     "i-have-adhd": { "kind": "skill", "source": "ayghri/i-have-adhd", "version": "v0.4.1", "verified": "2026-11-05", "ci": "real-tools" },
-    "orca-cli": { "kind": "skill", "source": "stablyai/orca", "version": "v1.4.99", "verified": "2026-11-05", "ci": "real-terminals" }
+    "orca-cli": { "kind": "skill", "source": "stablyai/orca", "version": "v1.4.99", "verified": "2026-11-05", "ci": "real-terminals" },
+    "claude-code": { "kind": "npm", "source": "@anthropic-ai/claude-code", "version": "2.1.305", "verified": "2026-11-05", "ci": "real-claude", "ciOnly": true },
+    "opencode-v1": { "kind": "npm", "source": "opencode-ai", "version": "1.19.0", "verified": "2026-11-05", "ci": "real-opencode-v1", "ciOnly": true, "note": "OpenCode 2 is not on npm; its installer script stays on latest and the jobs print its version." },
+    "copilot-cli": { "kind": "npm", "source": "@github/copilot", "version": "1.0.102", "verified": "2026-11-05", "ci": "real-copilot", "ciOnly": true }
   }
 }

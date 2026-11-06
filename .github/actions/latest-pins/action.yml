@@ -1,0 +1,9 @@
+name: Latest pins
+description: Rewrite core/pins.json in this runner's checkout to the newest upstream versions. Never committed.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: node scripts/pins-latest.mjs

@@ -78,7 +78,7 @@ export async function run({ pins, get, api, log = console.log }) {
   return actions;
 }
 
-function githubApi(repo, token) {
+export function githubApi(repo, token) {
   const call = async (method, url, body) => {
     const r = await fetch(`https://api.github.com/repos/${repo}${url}`, {
       method,
