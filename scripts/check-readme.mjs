@@ -1,14 +1,18 @@
 #!/usr/bin/env node
-// Checks the READMEs: links and anchors resolve, EN and ES share one structure, and every installer
-// command shown exits 0 as a dry run in a temp HOME. Used by tests/readme.test.mjs.
+// Checks the READMEs: links and anchors resolve, the part before Details fits the 1-minute budget,
+// images have alt text and stay small, EN and ES share one structure, and every installer command
+// shown exits 0 as a dry run in a temp HOME. Used by tests/readme.test.mjs, the lint job and the release.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = fileURLToPath(new URL('..', import.meta.url));
+export const ROOT = fileURLToPath(new URL('..', import.meta.url));
 export const READMES = ['README.md', 'README.es.md'];
+export const DETAILS_MARK = '<!-- details -->';
+export const HERO_BUDGET = 80;
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
 const stripFences = (md) => md.replace(/^\s*```[\s\S]*?^\s*```/gm, '');
@@ -36,7 +40,31 @@ export function brokenLinks(file) {
       if (!known.has(anchor)) bad.push(`${file}: no anchor ${ref}`);
     }
   }
-  for (const m of md.matchAll(/<img\b[^>]*>/g)) if (!/\balt="[^"]+"/.test(m[0])) bad.push(`${file}: image without alt ${m[0].slice(0, 60)}`);
+  return bad;
+}
+
+// Every <img> and ![alt](src) in the text.
+const images = (text) => { const md = stripFences(text); return [
+  ...[...md.matchAll(/<img\b[^>]*>/g)].map((m) => ({ src: m[0].match(/\bsrc="([^"]*)"/)?.[1], alt: m[0].match(/\balt="([^"]*)"/)?.[1] })),
+  ...[...md.matchAll(/!\[([^\]]*)\]\(([^)\s]+)/g)].map((m) => ({ src: m[2], alt: m[1] })),
+]; };
+
+// Lines before the Details divider must fit the budget, so the first screen stays a 1-minute read.
+export function heroProblems(md, file) {
+  const at = md.split('\n').findIndex((l) => l.trim() === DETAILS_MARK);
+  if (at < 0) return [`${file}: no ${DETAILS_MARK} divider`];
+  return at > HERO_BUDGET ? [`${file}: ${at} lines before Details, the budget is ${HERO_BUDGET}`] : [];
+}
+
+// Images need alt text and a local file of at most 5 MB (a missing file is reported by brokenLinks).
+export function imageProblems(md, file, dir = path.join(ROOT, path.dirname(file))) {
+  const bad = [];
+  for (const { src, alt } of images(md)) {
+    if (!alt?.trim()) bad.push(`${file}: image without alt text ${src}`);
+    if (!src || /^(https?:|data:)/.test(src)) continue;
+    const dest = path.join(dir, src);
+    if (fs.existsSync(dest) && fs.statSync(dest).size > MAX_IMAGE_BYTES) bad.push(`${file}: image over 5 MB ${src}`);
+  }
   return bad;
 }
 
@@ -51,6 +79,7 @@ export function shape(file) {
     headings: headings(md).map((h) => h.level).join(''),
     tables: tables.join(','),
     fences: [...md.matchAll(/^\s*```(\w*)/gm)].map((m) => m[1]).join(','),
+    images: images(md).length,
     details: (md.match(/<details>/g) || []).length,
     links: (md.match(/\]\(/g) || []).length,
     bullets: (md.match(/^\s*[-*] /gm) || []).length,
@@ -89,7 +118,7 @@ export function dryRun(args) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   let failed = 0;
   for (const f of READMES) {
-    for (const b of brokenLinks(f)) { console.log(b); failed++; }
+    for (const b of [...brokenLinks(f), ...heroProblems(read(f), f), ...imageProblems(read(f), f)]) { console.log(b); failed++; }
     for (const args of installerArgs(f)) {
       const r = dryRun(args);
       if (r.status !== 0) { console.log(`${f}: exit ${r.status} for ${args.join(' ')} ${r.stderr}`); failed++; }

@@ -775,7 +775,8 @@ Done when: tests parse the `--json` output and check the redacted draft against 
 
 ### Before each release
 
-- README EN and ES in sync with the code and the CHANGELOG (flags, tables, Node version, pins): `node scripts/check-readme.mjs` passes and a person re-read the first screen.
+- README EN and ES in sync with the code and the CHANGELOG (flags, tables, Node version, pins). `node scripts/check-readme.mjs` is enforced by CI (the `lint` job and the release workflow); a person still re-reads the first screen.
+- README still fits the 1-minute rule: hero within the line budget before Details, support matrix matches the CI jobs in `ci.yml` (cells without a real-binary job say VERIFY), alt text on every image.
 - Audit rerun: update `docs/audit-2026-11.md` (or the newest `docs/audit-*.md`); every medium or higher finding is fixed or has an open issue.
 - Labels triaged: no open issue without a `type:` and a `priority:` label (`bash scripts/labels.sh` first if labels are missing); p0 issues are closed or consciously deferred.
 - Architecture checkpoint (#59).

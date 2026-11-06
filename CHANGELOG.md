@@ -6,6 +6,8 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Changed
 
+- README is a 1-minute read (#58): positioning line, one install command, demo GIF, a support matrix (agent × macOS/Linux/Windows × rules, subagents, MCP tools × CI job; cells without a real-binary job say VERIFY), an at-a-glance list and a diagram, all above a Details divider. Everything else moved below it; README.es.md mirrors it.
+- `scripts/check-readme.mjs` also fails on a hero over 80 lines, an image without alt text or over 5 MB, and EN/ES image-count drift. It runs in the `lint` job and in the release workflow.
 - Privacy presets match `docs/privacy.md` (#63): new "What each preset does NOT block" section (install downloads, chosen tools); `--network off` or `--outbound off` drops the research agent's web tools in Claude Code, Copilot CLI and VS Code Copilot; the Orca row mentions the Windows user env var.
 
 ### Added

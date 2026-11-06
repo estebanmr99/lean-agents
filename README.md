@@ -4,24 +4,59 @@
 
 # lean-agents
 
-**One command. Every coding agent. Fewer tokens, clearer answers.**
+**The installer for the tools that save tokens and stretch your budget while you run several coding agents at once.**
 
-The same rules, cheap-by-default subagents, context-saving tools and MCP servers for Claude Code, OpenCode 1.x and 2.x, GitHub Copilot CLI, Antigravity CLI, VS Code Copilot and Cursor, on macOS, Linux and Windows.
-
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![CI](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml)
-[![Secret scan](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml)
-![GitHub stars](https://img.shields.io/github/stars/estebanmr99/lean-agents?style=social)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![CI](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml) [![Secret scan](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml) ![GitHub stars](https://img.shields.io/github/stars/estebanmr99/lean-agents?style=social)
 
 [Leer en español](README.es.md)
 
-**▶ [Try the demo: OpenCode with GitHub Copilot models](#demo-opencode-with-github-copilot-models)** · [Quick start](#quick-start) · [What you get](#what-you-get)
-
 </div>
 
-> **Status: v0.5 preview.** The installer works for **Claude Code**, **OpenCode 1.x and 2.x**, **GitHub Copilot CLI**, **Antigravity CLI**, **VS Code Copilot** and **Cursor** on macOS, Linux and Windows. Star the repo to get notified when `v1.0.0` ships.
+It installs on top of the agents and CLIs you already use and improves how they work: `AGENTS.md` / `CLAUDE.md` rules, cheap subagents, context-saving MCP tools and privacy presets.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --dry-run
+```
+
+`--dry-run` lists every file and command first; nothing changes. Windows PowerShell and every flag: [Quick start](#quick-start).
 
 <img src="docs/assets/demo.gif" alt="install.sh --dry-run listing every file and command it would change" width="720">
+
+## Supported agents
+
+| Agent | macOS | Linux | Windows | Rules | Subagents | MCP tools | Real-binary CI job |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Claude Code | VERIFY | ✅ | VERIFY | ✅ | ✅ | ✅ | `real-claude` |
+| OpenCode 1.x | VERIFY | ✅ | ✅ | ✅ | ✅ | ✅ | `real-opencode-v1`, `real-windows` |
+| OpenCode 2.x | VERIFY | ✅ | VERIFY | ✅ | ✅ | ✅ | `real-opencode` |
+| Copilot CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `real-copilot`, `real-copilot-windows` |
+| Antigravity CLI | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ | `real-antigravity`, `real-antigravity-windows` |
+| VS Code Copilot | ✅ | ✅ | VERIFY | ⚠️ | ⚠️ | ✅ | `real-vscode` |
+| Cursor | VERIFY | ✅ | ✅ | ➖ (`--project` only) | ⚠️ | ✅ | `real-cursor`, `real-cursor-windows` |
+
+✅ a CI job runs the real binary on that OS (OS columns) or lean-agents writes it (feature columns) · ⚠️ written, load unproven · ➖ not available · VERIFY not proven yet. Per-agent files and verification dates: [docs/compatibility.md](docs/compatibility.md).
+
+## At a glance
+
+- **Rules:** one short global rule set, rendered for each agent.
+- **Cheap subagents:** exploration, research and review run on the cheapest fitting model tier.
+- **Context-saving tools:** RTK, Context Mode, Serena and Playwright MCP.
+- **Privacy presets:** `--privacy strict` or `off` for telemetry, updates and outbound calls.
+
+```mermaid
+flowchart LR
+  A["Your agents<br>Claude Code, OpenCode, Copilot CLI,<br>Antigravity, VS Code, Cursor"] --> L["lean-agents"]
+  L --> R["Rules"]
+  L --> S["Cheap subagents"]
+  L --> M["MCP tools"]
+```
+
+**Who it's for:** solo developers · teams (`--project` writes the setup into the repo) · work PCs behind a proxy ([details](#on-a-work-pc-proxy-network-and-security-review)).
+
+<!-- details -->
+## Details
+
+lean-agents works with Claude Code, OpenCode 1.x and 2.x, GitHub Copilot CLI, Antigravity CLI, VS Code Copilot and Cursor on macOS, Linux and Windows. Star the repo to get notified when `v1.0.0` ships.
 
 **Contents**
 
