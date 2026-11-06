@@ -28,7 +28,7 @@ import { leanUpdateCommands } from './lib/lean-update.mjs';
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
 import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
 import { unverifiedItems, notesFile } from './lib/unverified.mjs';
-import { detectTerminals, parseTerminal, terminalCommands, terminalPrivacyNotes, gitBashActions, stillNeeded } from './lib/terminals.mjs';
+import { detectTerminals, parseTerminal, terminalCommands, terminalPrivacyNotes, orcaEnvSet, gitBashActions, stillNeeded } from './lib/terminals.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ADAPTERS = { claude: claudeAdapter, 'opencode-v1': opencodeV1Adapter, 'opencode-v2': opencodeV2Adapter, 'copilot-cli': copilotAdapter, antigravity: antigravityAdapter };
@@ -423,7 +423,7 @@ function printPlan(o, planned, commands) {
   if (o.project) console.log(`  project: ${o.project}`);
   console.log(`  tools: ${o.tools.join(', ') || 'none'} | privacy: ${o.privacy} | lang: ${o.lang} | profile: ${o.profile ?? 'none'}`);
   if (o.terminals.length) console.log(`  terminals: ${o.terminals.join(', ')}`);
-  if (o.network.telemetry === 'off') for (const n of terminalPrivacyNotes(o.terminals, { orcaEnvSet: process.platform === 'win32' && o.home === REAL_HOME })) console.log(`  ${n}`);
+  if (o.network.telemetry === 'off') for (const n of terminalPrivacyNotes(o.terminals, { orcaEnvSet: orcaEnvSet({ system: o.home === REAL_HOME }) })) console.log(`  ${n}`);
   if (o.tools.includes('context-mode')) console.log(`  bun: ${o.bun ? `on${bunPresent(o.home) ? ' (already installed)' : ''}` : 'off'}`);
   console.log(`  network: ${CATEGORIES.map((c) => `${c} ${o.network[c]}`).join(', ')}`);
   const net = proxyReport();
