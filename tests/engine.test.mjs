@@ -332,6 +332,33 @@ test('the engine drops Context Mode on an old Node and keeps it on a new one', (
   assert.match(current, /tools: .*context-mode/);
 });
 
+test('copilot-context-mode.mjs finds the package next to the linked command, and says where it looked when it cannot', { skip: process.platform === 'win32' }, () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-cm-'));
+  const nodeDir = path.dirname(process.execPath);
+  const tools = path.join(tmp, 'tools');
+  fs.mkdirSync(tools);
+  // Only node and npm: a real global context-mode on the developer's PATH must not leak in.
+  for (const bin of ['node', 'npm']) fs.symlinkSync(path.join(nodeDir, bin), path.join(tools, bin));
+  const stub = path.join(tmp, 'stub');
+  fs.mkdirSync(stub);
+  fs.writeFileSync(path.join(stub, 'copilot'), `#!/bin/sh\nprintf '%s\\n' "$*" >> "${tmp}/calls.txt"\n`, { mode: 0o755 });
+  const run = (extra) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'copilot-context-mode.mjs')], {
+    encoding: 'utf8',
+    env: { ...process.env, HOME: tmp, NPM_CONFIG_PREFIX: path.join(tmp, 'elsewhere'), PATH: [...extra, stub, tools].join(path.delimiter) },
+  });
+  // Windows-style layout: the shim sits next to node_modules, and `npm root -g` points somewhere else.
+  const prefix = path.join(tmp, 'prefix');
+  fs.mkdirSync(path.join(prefix, 'node_modules', 'context-mode'), { recursive: true });
+  fs.writeFileSync(path.join(prefix, 'node_modules', 'context-mode', 'server.mjs'), '');
+  fs.writeFileSync(path.join(prefix, 'context-mode'), '#!/bin/sh\n', { mode: 0o755 });
+  const found = run([prefix]);
+  assert.equal(found.status, 0, found.stderr);
+  assert.match(fs.readFileSync(path.join(tmp, 'calls.txt'), 'utf8'), new RegExp(`mcp add context-mode -- .*${path.join('prefix', 'node_modules', 'context-mode', 'server.mjs').replace(/[\\/]/g, '[\\\\/]')} --agent copilot-cli`));
+  const missing = run([]);
+  assert.equal(missing.status, 1);
+  assert.match(missing.stderr, /context-mode 2 not found under npm root -g \(looked in: .*elsewhere.*\); run npm i -g context-mode@2\.1\.4/);
+});
+
 test('GSD defaults use profile models, and existing defaults survive uninstall', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
   const file = path.join(home, '.gsd', 'defaults.json');

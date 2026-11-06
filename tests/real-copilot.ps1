@@ -32,7 +32,11 @@ if ((copilot instruction list | Out-String) -notmatch 'copilot-instructions.md')
 $skills = copilot skill list | Out-String
 if ($skills -notmatch 'caveman' -or $skills -notmatch 'i-have-adhd') { throw 'Copilot does not see the skills' }
 # Context Mode 2 registers itself with `copilot mcp add` (upstream docs/install/copilot-cli.md), so it shows in `mcp list`.
-if ((copilot mcp list --json | Out-String) -notmatch '"context-mode"') { throw 'Copilot does not see Context Mode' }
+$cm = ((copilot mcp list --json | Out-String) | ConvertFrom-Json).mcpServers.'context-mode'
+if (-not $cm) { throw 'Copilot does not see Context Mode' }
+# The registered server file must exist, or Copilot would list a server that cannot start.
+$server = @($cm.args) | Where-Object { $_ -like '*server.mjs' } | Select-Object -First 1
+if (-not $server -or -not (Test-Path -LiteralPath $server)) { throw "Context Mode server file is missing: $server" }
 
 & "$repo\install.ps1" -Doctor
 
