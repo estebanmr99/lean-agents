@@ -124,7 +124,7 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
         const v = version(bin, undefined, childEnv(network));
         add(`${bin} on PATH`, v ? 'ok' : 'error', v ?? 'not found');
       }
-      if (!withMcp) add('mcp servers', 'skipped', 'network off (outbound off): `mcp list` not run');
+      if (!withMcp && ['claude', 'cursor', 'copilot-cli', 'antigravity'].some((a) => o.agents.includes(a))) add('mcp servers', 'skipped', 'network off (outbound off): `mcp list` not run');
       if (o.agents.includes('cursor') && withMcp) checkCursor(o, add, q);
       if (o.agents.includes('claude') && withMcp) {
         const mcp = q(['claude', 'mcp', 'list']);

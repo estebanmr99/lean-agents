@@ -4,10 +4,10 @@ import assert from 'node:assert/strict';
 import { doctor } from '../scripts/lib/doctor.mjs';
 import { preset } from '../scripts/lib/network.mjs';
 
-function runDoctor(network) {
+function runDoctor(network, agents = ['claude', 'copilot-cli', 'antigravity']) {
   const calls = [];
   const run = (argv, _t, env) => { calls.push({ argv, env }); return { ok: true, out: 'serena playwright' }; };
-  const state = { version: '0', commands: [], files: [], options: { agents: ['claude', 'copilot-cli', 'antigravity'], tools: ['serena', 'playwright', 'codeburn', 'autoskills'], privacy: 'standard', network } };
+  const state = { version: '0', commands: [], files: [], options: { agents, tools: ['serena', 'playwright', 'codeburn', 'autoskills'], privacy: 'standard', network } };
   let out = '';
   const write = process.stdout.write;
   process.stdout.write = (s) => { out += s; return true; };
@@ -28,5 +28,10 @@ test('on: no extra env, mcp list runs, no skipped row', () => {
   const { calls, rows } = runDoctor(preset('on'));
   assert.ok(calls.filter(isMcp).length >= 3);
   for (const c of calls) assert.deepEqual(c.env, {});
+  assert.equal(rows.some((r) => r.status === 'skipped'), false);
+});
+
+test('strict: no skipped row when no selected agent runs mcp list', () => {
+  const { rows } = runDoctor(preset('off'), ['opencode-v2']);
   assert.equal(rows.some((r) => r.status === 'skipped'), false);
 });
