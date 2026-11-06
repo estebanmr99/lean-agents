@@ -475,7 +475,7 @@ Mark each `[x]` when merged.
 - [x] **Session 15 — README look and feel.** Hero, one badge row, table of contents, collapsible long sections, consistent tables in README EN and ES; a script checks links, anchors, EN/ES parity and that every shown installer command exits 0 in a dry run. 0.5.0 CHANGELOG housekeeping. No feature claims change.
 - [ ] **Session 16 — Fixes and docs from real installs** (0.5.1). Issues #20, #27, #31, #32, #39.
 - [ ] **Session 17 — Windows: Cursor CLI and Orca** (0.5.1). Issues #21, #22, #23, #25, #26, #28, #29.
-- [ ] **Session 18 — Pick only what you need, pin what runs** (0.6.0). Issues #30, #33.
+- [ ] **Session 18 — Pick only what you need, pin what runs** (0.6.0). Issues #30, #33, #40.
 - [ ] **Session 19 — Migrate from one harness to another** (0.6.0). Issue #34.
 - [ ] **Session 20 — Install with an agent, opt-in feedback, gh by default** (0.6.0). Issues #35, #36, #37.
 
@@ -716,14 +716,16 @@ Done when: unit tests cover each item against a temp HOME, the Windows `real-cur
 
 ### Session 18 — Pick only what you need, pin what runs
 
-Branch: `session-18-core-and-pins`. Release: 0.6.0. PR body: `Closes #30, #33`.
+Branch: `session-18-core-and-pins`. Release: 0.6.0. PR body: `Closes #30, #33, #40`.
 
 1. **#30 `--no-core`** (`-NoCore`): removes `rtk` and `context-mode` from the tool list, and the menu starts empty. `--update` keeps the choice from `state.json`. Test from the issue: `--no-core --tools playwright-extension` plans only that server.
 2. **#33 pinned versions.** `core/mcp.json` uses exact versions (for example `@playwright/mcp@<current>`), checked against npm on the day. Skills installed with `npx skills add` are pinned to a tag or commit if the skills CLI supports it (**research first**); otherwise the installed commit is recorded in `state.json` and `--doctor` reports drift. `codeburn` and `autoskills` get pinned versions too.
 3. **Bumping:** extend the `update-models` skill (or add `update-tools`) to list newer versions and change them only after the user approves, like the dated model profiles.
 4. List run-time fetches as their own category in `docs/SECURITY-REVIEW.md` and in the README "On a work PC".
 
-Done when: a CI job installs with the pinned versions in a throwaway HOME and `--doctor` reports no drift; `npm test`, the privacy check and the README check pass.
+5. **#40 Daily version watch.** The pins from item 2 are the list of versions confirmed to work (date and CI run each). A scheduled workflow (daily plus `workflow_dispatch`, `GITHUB_TOKEN` with `issues: write` only) checks npm and GitHub releases; per item with a newer version it opens one `version-watch` issue `Update available: <item>`, or comments on the open one, never twice for the same version. Each lists the confirmed and new version, release notes, and the `real-*` jobs to run before bumping. It never changes pins.
+
+Done when: a CI job installs with the pinned versions in a throwaway HOME and `--doctor` reports no drift; a dispatched version-watch run opens one issue, a second adds a comment, a third does nothing; `npm test`, the privacy check and the README check pass.
 
 ### Session 19 — Migrate from one harness to another
 
