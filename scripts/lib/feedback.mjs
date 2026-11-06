@@ -1,6 +1,6 @@
 // Opt-in feedback after a failed install: a redacted issue draft the agent shows before anything is filed.
 import os from 'node:os';
-import { redactText } from './doctor.mjs';
+import { redactText } from './redact.mjs';
 
 // Filing an issue is an outbound call, so only the `outbound` category decides (strict turns it off).
 export const feedbackAllowed = (network) => network?.outbound === 'on';

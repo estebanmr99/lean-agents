@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { npmSpec } from './pins.mjs';
+import { allowedEnv } from './network.mjs';
 
 const isWin = process.platform === 'win32';
 
@@ -17,7 +18,7 @@ const useShell = (bin) => isWin && !/\.exe$/i.test(which(bin) ?? '');
 
 export function version(bin, args = ['--version'], env = {}) {
   if (!which(bin)) return null;
-  const r = spawnSync(bin, args, { encoding: 'utf8', shell: useShell(bin), timeout: 20000, env: { ...process.env, ...env } });
+  const r = spawnSync(bin, args, { encoding: 'utf8', shell: useShell(bin), timeout: 20000, env: { ...allowedEnv(), ...env } });
   const m = `${r.stdout}${r.stderr}`.match(/(\d+)\.(\d+)\.(\d+)/);
   return m ? m[0] : 'unknown';
 }
@@ -149,12 +150,12 @@ export const bunPresent = (home) => Boolean(which('bun')) || fs.existsSync(path.
 export function run(argv, { dryRun, log, env }) {
   log(`  $ ${argv.join(' ')}`);
   if (dryRun) return true;
-  const r = spawnSync(argv[0], argv.slice(1), { stdio: 'inherit', shell: useShell(argv[0]), env: env && { ...process.env, ...env } });
+  const r = spawnSync(argv[0], argv.slice(1), { stdio: 'inherit', shell: useShell(argv[0]), env: { ...allowedEnv(), ...env } });
   return r.status === 0;
 }
 
 export function quiet(argv, timeout = 30000, env = {}) {
-  const r = spawnSync(argv[0], argv.slice(1), { encoding: 'utf8', shell: useShell(argv[0]), timeout, env: { ...process.env, ...env } });
+  const r = spawnSync(argv[0], argv.slice(1), { encoding: 'utf8', shell: useShell(argv[0]), timeout, env: { ...allowedEnv(), ...env } });
   return { ok: r.status === 0, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
 }
 

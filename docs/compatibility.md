@@ -273,6 +273,26 @@ lean-agents copies each proxy variable it finds (`HTTP_PROXY`, `HTTPS_PROXY`, `A
 | Antigravity CLI | **VERIFY** | `AGY_LLM_GATEWAY_CA_CERT` (enterprise gateway, agy 1.2.15+), falls back to `SSL_CERT_FILE` | [gateway docs](https://docs.cloud.google.com/gemini/enterprise/docs/ai-developer-tools/connect-enterprise-gateway) | 2026-11-03 |
 | Playwright MCP | **VERIFY** | browser download: `NODE_EXTRA_CA_CERTS`; mirror with `PLAYWRIGHT_DOWNLOAD_HOST` | [Playwright browsers](https://playwright.dev/docs/browsers) | 2026-11-03 |
 
+## Child environment allowlist
+
+Commands lean-agents runs get `allowedEnv()` (`scripts/lib/network.mjs`), not the whole environment (session 68, #74). The list is in [privacy.md](privacy.md#what-child-commands-inherit). Checked 2026-11-06 against upstream docs:
+
+| Claim | Source | Checked |
+| --- | --- | --- |
+| npm reads `HTTP_PROXY`/`HTTPS_PROXY`/`NO_PROXY` in both cases, every `npm_config_*` variable as a config key (so `npm_config_cafile` works), `LANG`, `LC_ALL`, `NODE_OPTIONS`, `SHELL` and, on Windows, `SYSTEMROOT` and `LocalAppData` | https://docs.npmjs.com/cli/v11/using-npm/config | 2026-11-06 |
+| Node reads `NODE_EXTRA_CA_CERTS`, `NODE_USE_SYSTEM_CA`, `NODE_USE_ENV_PROXY` (only `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`), `NODE_OPTIONS`, `SSL_CERT_FILE`, `SSL_CERT_DIR`, `OPENSSL_CONF` (added to the list), `TZ` | https://nodejs.org/api/cli.html | 2026-11-06 |
+| uv reads `UV_SYSTEM_CERTS`, `SSL_CERT_FILE`, `SSL_CERT_DIR`, the proxy variables and `XDG_*`; `REQUESTS_CA_BUNDLE` is not in its reference (kept for `uvx` tools that use Python `requests`: **VERIFY**) | https://docs.astral.sh/uv/reference/environment/ | 2026-11-06 |
+| Homebrew reads lowercase `http_proxy`/`https_proxy`/`all_proxy`/`no_proxy` (`shareProxy` sets both cases) and `HOMEBREW_*`; `HOMEBREW_GITHUB_API_TOKEN` and other `*_TOKEN` names are dropped | https://docs.brew.sh/Manpage | 2026-11-06 |
+| git reads `HOME`, `PATH` and `GIT_*`; `GIT_SSL_CAINFO` is not in the env list of the page (**VERIFY**; kept because `CA_VARS` already names it) | https://git-scm.com/docs/git | 2026-11-06 |
+| Bun reads the proxy variables, `BUN_CONFIG_*` and `NODE_EXTRA_CA_CERTS` for `bun install`; `BUN_INSTALL` is not on the install page (**VERIFY**; the Bun installer script reads it) | https://bun.com/docs/runtime/networking/fetch, https://bun.com/docs/pm/cli/install | 2026-11-06 |
+| Windows: Microsoft documents `SystemRoot`, `SystemDrive`, `WINDIR`, `ALLUSERSPROFILE`, `USERPROFILE`, `APPDATA`, `LOCALAPPDATA`, `HOMEPATH`, `TEMP`, `TMP`, `PROGRAMFILES(X86)`, `COMMONPROGRAMFILES`; no page lists what a child needs, so `ComSpec`, `PATHEXT`, `ProgramData`, `ProgramW6432`, `HOMEDRIVE`, `OS`, `PROCESSOR_ARCHITECTURE`, `NUMBER_OF_PROCESSORS`, `PSModulePath`, `PUBLIC`, `COMPUTERNAME` stay on the list as common shell and installer needs (**VERIFY** in the Windows CI jobs) | https://learn.microsoft.com/en-us/windows/win32/procthread/environment-variables, https://learn.microsoft.com/en-us/windows/deployment/usmt/usmt-recognized-environment-variables | 2026-11-06 |
+| curl and pip read `CURL_CA_BUNDLE` and `PIP_CERT` for a corporate CA; both are on the CA list (added after review; **VERIFY** against the curl and pip docs) | https://curl.se/docs/sslcerts.html, https://pip.pypa.io/en/stable/topics/configuration/ | 2026-11-06 |
+| gsd (`@opengsd/gsd-core`) documents `GSD_HOME` and optional search API keys; none is needed to install, so none is passed | https://github.com/open-gsd/gsd-core/blob/next/docs/CONFIGURATION.md | 2026-11-06 |
+| `COPILOT_HOME`, `CLAUDE_CONFIG_DIR` and `OPENCODE_*` come from each agent's own docs already cited above (**VERIFY** per agent when it starts a child) | this file | 2026-11-06 |
+| A `NODE_`, `UV_`, `BUN_`, `HOMEBREW_` or `npm_config_` name that looks like a secret is dropped after the prefix match (`npm_config__authToken`, `UV_INDEX_*_PASSWORD`, `BUN_CONFIG_TOKEN`) | `tests/child-env.test.mjs` | 2026-11-06 |
+
+Caveats: `NODE_TLS_REJECT_UNAUTHORIZED` and `GIT_SSL_NO_VERIFY` pass through the `NODE_`/`GIT_` prefixes; they are the user's own choice for a corporate proxy. `scripts/lib/parallel.mjs` and `scripts/copilot-context-mode.mjs` keep the full environment on purpose: the agents they start need their API keys.
+
 ## Outbound switches
 
 The network question (`--network`, `--telemetry`, `--auto-update`, `--outbound`) sets these; see [privacy.md](privacy.md).

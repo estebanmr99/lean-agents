@@ -7,9 +7,9 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { gitHint } from '../scripts/lib/system.mjs';
-import { redactText } from '../scripts/lib/doctor.mjs';
+import { redactText } from '../scripts/lib/redact.mjs';
 import { draftIssue } from '../scripts/lib/feedback.mjs';
-import { preset } from '../scripts/lib/network.mjs';
+import { preset, proxyReport } from '../scripts/lib/network.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Built from parts so the privacy check does not flag these fake paths.
@@ -116,4 +116,58 @@ test('--feedback-draft --feedback-kind update: update wording, same redaction, s
   assert.ok(!on.body.includes(home));
   const strict = JSON.parse(engine(['--home', home, '--feedback-draft', '--feedback-kind', 'update', '--failed-command', 'rtk', '--privacy', 'strict'], { input: 'x' }).stdout);
   assert.deepEqual(strict, { offer: false });
+});
+
+// One row per audit item (S11-S14). Fake secrets are built from parts so scanners do not flag the test file.
+const join = (...p) => p.join('_');
+const PW = ['hunter', '2'.repeat(8)].join('-');
+const VAL = ['sekrit', 'value', '1234'].join('-');
+const VAL2 = ['zzz', 'key', '98765432'].join('-');
+const REDACT_ROWS = [
+  ['S11 AIza', 'key ' + 'AIza' + 'SyA1234567890abcdefghijk', 'AIza'],
+  ['S11 hf_', 'hf' + '_abcdefghijklmnop', 'hf_abc'],
+  ['S11 sk_live_', 'sk' + '_live_abcdefgh12345678', 'sk_live_abc'],
+  ['S11 sk_test_', 'sk' + '_test_abcdefgh12345678', 'sk_test_abc'],
+  ['S11 rk_live_', 'rk' + '_live_abcdefgh12345678', 'rk_live_abc'],
+  ['S11 ya29', 'ya' + '29.a0AbCdEfGhIjKl', 'ya29.a0'],
+  ['S11 JWT', 'ey' + 'Jhbgcioij9.ey' + 'Jzdwiioij9.abc_def-123', 'eyJ'],
+  ['S11 AWS secret', 'aws_secret_access_key = ' + 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY', 'wJalr'],
+  ['S12 api_key=', `${join('api', 'key')}=${PW}`, PW],
+  ['S12 password:', `${['pass', 'word'].join('')}: ${PW}`, PW],
+  ['S12 x-api-key', `${['x', 'api', 'key'].join('-')}: ${PW}`, PW],
+  ['S12 Authorization Basic', 'Authorization: Basic dXNlcjpwYXNz', 'dXNlcjpwYXNz'],
+  ['S12 Authorization Bearer', 'Authorization: Bearer abc', 'Bearer abc'],
+  ['S13 env value', `failed with ${VAL}`, VAL, { [join('MY_SERVICE', 'TOKEN')]: VAL }],
+  ['S13 env value (API key)', `using ${VAL2}`, VAL2, { [join('ANTHROPIC', 'API', 'KEY')]: VAL2 }],
+  ['S14 /root', 'cd /root/work', '/root/'],
+  ['S14 /var/folders', 'at /var/folders/ab/cdef0123/T/x.log', 'cdef0123'],
+  ['S14 /private/var', 'at /private/var/db/x', '/private/var/db'],
+  ['S14 C:/Users', ['at C:', 'Users', 'jdoe2', 'x'].join('/'), 'jdoe2'],
+  ['S14 hostname', 'on build-box-7 failed', 'build-box-7', {}, { host: 'build-box-7' }],
+];
+
+test('redactText: every audit item is scrubbed', () => {
+  for (const [name, raw, leak, env = {}, extra = {}] of REDACT_ROWS) {
+    const out = redactText(raw, { home: '/nohome', env, user: '', host: 'unused-host', ...extra });
+    assert.ok(!out.includes(leak), `${name} leaked: ${out}`);
+  }
+});
+
+test('redactText: ordinary words stay unchanged', () => {
+  for (const raw of ['tokenizer', 'the author wrote', 'password reset docs', 'sk- alone', 'tokens: ok', 'rootless install at /project/root/x', 'secret sauce']) {
+    assert.equal(redactText(raw, { home: '/nohome', env: {}, user: '', host: 'unused-host' }), raw);
+  }
+});
+
+test('proxyReport keeps the host but drops userinfo, query strings and the home path', () => {
+  const lines = proxyReport({ HTTPS_PROXY: ['http://u:p', 'proxy.example:3128/?token=abc'].join('@'), NODE_EXTRA_CA_CERTS: '/home/me/ca.pem?x=1' }, '/home/me');
+  assert.deepEqual(lines, ['HTTPS_PROXY=http://***@proxy.example:3128/?<redacted>', 'NODE_EXTRA_CA_CERTS=~/ca.pem?<redacted>']);
+});
+
+test('redaction review cases: scheme-less proxy creds, env-style names, home prefix collision', () => {
+  assert.equal(proxyReport({ HTTPS_PROXY: ['ci:pw', 'proxy.corp:3128'].join('@') }, '/nohome')[0], 'HTTPS_PROXY=***@proxy.corp:3128');
+  const o = { home: '/nohome', env: {}, user: '', host: 'unused-host' };
+  assert.equal(redactText('npm_config_prefix npm_package_version hf_hub', o), 'npm_config_prefix npm_package_version hf_hub');
+  assert.ok(!redactText(`npm_${'a'.repeat(36)}`, o).includes('npm_a'));
+  assert.equal(redactText('read /tmp/ali/proj/x', { ...o, home: '/tmp/al' }), 'read /tmp/ali/proj/x');
 });

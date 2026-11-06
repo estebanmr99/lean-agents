@@ -6,7 +6,7 @@ import { PINS, npmSpec, behindPins } from './pins.mjs';
 import { version, quiet, contextModeNodeNote } from './system.mjs';
 import { stillNeeded } from './terminals.mjs';
 import { adhdSkillFiles } from './adhd.mjs';
-import { proxyReport, PROXY_VARS, CA_VARS, childEnv, fromPrivacy } from './network.mjs';
+import { proxyReport, childEnv, fromPrivacy } from './network.mjs';
 import { leftovers } from './parallel.mjs';
 
 const CORE_AGENTS = ['debug', 'explore', 'planner', 'research', 'review'];
@@ -18,22 +18,6 @@ export function redact(value) {
     return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, SECRET_KEY.test(k) ? '[redacted]' : redact(v)]));
   }
   return value;
-}
-
-// Free text that may reach a public issue: home paths, the user name, proxy and CA values, emails and tokens never do.
-export function redactText(text, { home, env = process.env, user = env.USER || env.USERNAME } = {}) {
-  const esc = (v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  let out = String(text);
-  const values = [...PROXY_VARS, ...CA_VARS].flatMap((n) => [env[n], env[n.toLowerCase()]]).filter((v) => v && v.length > 3);
-  for (const v of new Set(values)) out = out.replace(new RegExp(esc(v), 'g'), '<redacted>');
-  out = out.replace(/\b[a-z][a-z0-9+.-]*:\/\/[^\s/@]*@[^\s]*/gi, '<redacted-url>');
-  for (const h of [home].flat().filter(Boolean)) out = out.replace(new RegExp(esc(h).replace(/\\\\|\//g, '[\\\\/]'), 'gi'), '~');
-  out = out.replace(/(\/Users\/|\/home\/|[A-Za-z]:\\Users\\)[^\/\\\s]+/gi, '$1<user>');
-  if (user && user.length > 1) out = out.replace(new RegExp(`\\b${esc(user)}\\b`, 'g'), '<user>');
-  return out
-    .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, '<email>')
-    .replace(/\b(gh[pousr]_|github_pat_|sk-|xox[bp]-|npm_|glpat-)[\w-]{8,}|\bAKIA[0-9A-Z]{12,}/g, '<token>')
-    .replace(/\b(Bearer|token)\s+[\w.~+/=-]{8,}/gi, '$1 <token>');
 }
 
 // OpenCode 2 prints a JSON array of config sources ({type, path, info}); 1.x printed one object.

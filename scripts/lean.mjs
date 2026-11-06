@@ -7,7 +7,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import tty from 'node:tty';
 import { fileURLToPath } from 'node:url';
-import { plan, apply, undo, describe } from './lib/fsops.mjs';
+import { plan, apply, undo, describe, writePrivate, privateDir, dropBackups } from './lib/fsops.mjs';
 import { loadCore, renderRules, loadProfile } from './lib/render.mjs';
 import { claudeAdapter } from './lib/adapters/claude.mjs';
 import { opencodeV1Adapter } from './lib/adapters/opencode-v1.mjs';
@@ -20,7 +20,7 @@ import { projectPlan, projectStateDir } from './lib/project.mjs';
 import { gsdPlan } from './lib/gsd.mjs';
 import { MIGRATE_SOURCES, MIGRATE_TARGETS, readSource, detectSources, migratePlan, finishRows, formatTable } from './lib/migrate.mjs';
 import { adhdCommand } from './lib/adhd.mjs';
-import { contextModeNodeNote, gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPresent, which, run, quiet, exists, isolate } from './lib/system.mjs';
+import { contextModeNodeNote, gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPresent, which, run, quiet, exists, isolate, configHome, envDir } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
 import { draftIssue } from './lib/feedback.mjs';
 import { pinVersions, behindPins, pinTool } from './lib/pins.mjs';
@@ -192,6 +192,8 @@ function stateDir(home) {
   if (project) return projectStateDir(home, project);
   return path.join(home, '.config', 'lean-agents');
 }
+// Where the engine may write: home, the project, and the config dirs envDir() accepts.
+const writeRoots = (o) => [o.home, o.project, configHome(o.home), envDir(o.home, 'COPILOT_HOME', null)].filter(Boolean);
 function readState(home) {
   const f = path.join(stateDir(home), 'state.json');
   return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null;
@@ -331,7 +333,7 @@ function migrationPlan(o) {
   const base = o.project ?? o.home;
   const names = o.migrate === 'auto' ? detectSources(base, scope, o.agents) : [o.migrate];
   const r = migratePlan({ sources: names.map((n) => readSource(n, base, scope)), targets: o.agents, base, scope, stateDir: stateDir(o.home) });
-  const planned = plan(r.actions);
+  const planned = plan(r.actions, writeRoots(o));
   return { planned, commands: r.commands, migration: { ...r, rows: finishRows(r.rows, planned, o.exec), base, names } };
 }
 
@@ -339,7 +341,7 @@ function buildPlan(o) {
   if (o.migrate) return migrationPlan(o);
   if (o.project) {
     const r = projectPlan(ROOT, o.project, o);
-    return { planned: plan(r.actions), commands: r.commands };
+    return { planned: plan(r.actions, writeRoots(o)), commands: r.commands };
   }
   const core = loadCore(ROOT);
   const rulesPath = path.join(stateDir(o.home), 'AGENTS.md');
@@ -363,7 +365,7 @@ function buildPlan(o) {
   if (o.bun && o.network.telemetry === 'off') {
     actions.push({ kind: 'block', toml: true, path: path.join(o.home, '.bunfig.toml'), body: 'telemetry = false' });
   }
-  return { planned: plan(actions), commands };
+  return { planned: plan(actions, writeRoots(o)), commands };
 }
 
 // `behind`: tools whose pinned version is newer than the installed one (--update); their installs run even when the binary is there.
@@ -472,7 +474,7 @@ async function install(o) {
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupDir = path.join(stateDir(o.home), 'backups', stamp);
-  const files = apply(planned, backupDir, o.home);
+  const files = apply(planned, backupDir, o.home, writeRoots(o));
   const ran = [];
   let failed = 0;
   if (o.exec) {
@@ -511,8 +513,8 @@ async function install(o) {
     // A command that ran again replaces its earlier record, so --uninstall undoes it once.
     commands: [...(previous?.commands ?? []).filter((c) => !ran.some((r) => r.desc === c.desc)), ...ran],
   };
-  fs.mkdirSync(stateDir(o.home), { recursive: true });
-  fs.writeFileSync(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(state, null, 2)}\n`);
+  privateDir(stateDir(o.home), stateDir(o.home));
+  writePrivate(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(state, null, 2)}\n`);
   if (failed) {
     console.log(`\n${failed} step(s) failed; see the lines marked ! above. Backups: ${backupDir}`);
     ui?.summary('Summary', [`${failed} of ${commands.length} commands failed`, `Backups: ${backupDir}`], false);
@@ -563,9 +565,17 @@ async function uninstall(o) {
       }
     }
   }
-  for (const [what, file] of undo(state.files)) console.log(`  ${what.padEnd(20)} ${file}`);
+  const report = undo(state.files, writeRoots(o));
+  for (const [what, file] of report) console.log(`  ${what.padEnd(20)} ${file}`);
+  if (report.some(([what]) => what === 'left (symlink)')) console.log('  ! Paths marked "left (symlink)" were not touched; remove our lines there by hand.');
   fs.renameSync(path.join(stateDir(o.home), 'state.json'), path.join(stateDir(o.home), `state.uninstalled-${Date.now()}.json`));
-  console.log('Uninstalled. Backups are kept in ~/.config/lean-agents/backups.');
+  // Backups are the only undo for edits we cannot revert, so they stay unless the user says yes (--yes keeps them).
+  const backups = path.join(stateDir(o.home), 'backups');
+  const q = await prompter(o.yes);
+  const drop = fs.existsSync(backups) && yesNo(await q.ask(`Delete backups in ${backups}?`, 'n'));
+  q.close();
+  if (drop) dropBackups(backups);
+  console.log(drop ? 'Uninstalled. Backups deleted.' : `Uninstalled. Backups are kept in ${backups}.`);
 }
 
 // The agent files the issue itself, and only after the user said yes; this only drafts.
