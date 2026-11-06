@@ -2,6 +2,17 @@
 
 Thanks for helping. The full design is in [docs/SPEC.md](docs/SPEC.md); read its "Non-negotiable rules" first.
 
+## Development
+
+1. Install Node 22.20 or newer.
+2. From the repo root, install dependencies: `npm ci`
+3. Run the engine tests (temp HOME, no external commands): `npm test`
+4. Lint the shell scripts: `shellcheck install.sh scripts/check-private.sh tests/*.sh`
+5. Run the privacy check: `bash scripts/check-private.sh`
+6. Try the installer without touching your real HOME: `node scripts/lean.mjs --home "$(mktemp -d)" --no-exec --yes --dry-run --agents claude,opencode-v2 --all-tools`
+
+[AGENTS.md](AGENTS.md) has the full table of commands, including the real-binary checks that CI runs.
+
 ## Ground rules
 
 - **No private data.** No personal usernames or home paths (use `~`, `$HOME`, `%USERPROFILE%`), company names or internal tools, cloud project IDs, emails, keys or tokens.
@@ -21,4 +32,19 @@ Pick a form when you open an issue (bug, feature, update finding, agent support)
 
 ## Adding an agent
 
-Open an "Agent support" issue first with links to the agent's docs for global instructions, subagents, MCP and plugins. Then add `agents/<agent>/` following [SPEC section 6](docs/SPEC.md#6-subagents-and-adapters).
+Open an "Agent support" issue first with links to the agent's docs for global instructions, subagents, MCP and plugins. Then:
+
+1. Add an adapter at `scripts/lib/adapters/<agent>.mjs`. It returns `{ actions, commands }`; use the existing adapters as the pattern (see [SPEC section 6](docs/SPEC.md#6-subagents-and-adapters)).
+2. `agents/<agent>/` holds documentation only; do not put code there.
+3. Touch the tests: `tests/engine.test.mjs` for the engine behavior and `tests/agent-install.test.mjs` for the install flow. Add a `tests/real-<agent>.sh` check and its CI job for real binaries.
+
+## Proposing a tool
+
+Third-party tools are not added on a pull request alone. The owner decides first.
+
+1. Open an issue with the tool's details in the [SPEC section 7](docs/SPEC.md#7-third-party-tools-tools-tool) format: name, upstream link, license, install command per OS, which agents it wires into, and tier (minimal, optional or opt-in).
+2. Wait for the owner to approve the tool. Only then open a pull request, which adds `tools/<tool>/README.md` and the recipe.
+3. Not accepted: Oh My OpenAgent and Graphify. The owner rejected both; see [docs/faq.md](docs/faq.md).
+
+See [tools/README.md](tools/README.md) for the tools that already exist.
+

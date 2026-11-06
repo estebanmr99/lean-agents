@@ -1,6 +1,6 @@
 # Third-party tools
 
-lean-agents installs these from upstream and never vendors them. Each one is optional except RTK and Context Mode. The exact commands per agent live in `scripts/lib/adapters/` and are listed in [docs/manual-install.md](../docs/manual-install.md).
+lean-agents installs these from upstream and never vendors them. Each one is optional except RTK and Context Mode. The exact commands per agent live in `scripts/lib/adapters/` and are listed in [docs/manual-install.md](../docs/manual-install.md). To propose a new tool, see [CONTRIBUTING.md](../CONTRIBUTING.md#proposing-a-tool).
 
 | Tool | What it does | License | Upstream |
 | --- | --- | --- | --- |
