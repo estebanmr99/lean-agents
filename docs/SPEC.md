@@ -165,7 +165,7 @@ When piped, the script clones (or downloads a release tarball of) the repo to `~
 
 ### 4.3 Flow
 
-1. **Detect** OS, arch, shell, package manager (Homebrew on macOS; winget, then Scoop, on Windows), Node (>=20), git, uv, jq, gh, and installed agents with versions (`claude --version`, `opencode --version` -> decide v1 vs v2 by major, `copilot --version`, Antigravity CLI **VERIFY binary name**).
+1. **Detect** OS, arch, shell, package manager (Homebrew on macOS; winget, then Scoop, on Windows), Node (>=22.20), git, uv, jq, gh, and installed agents with versions (`claude --version`, `opencode --version` -> decide v1 vs v2 by major, `copilot --version`, Antigravity CLI **VERIFY binary name**).
 2. **Plan**: build the full action list from flags + answers. Show it grouped by agent and tool. Ask "Apply? [y/N]" unless `--yes`.
 3. **Back up** every file it will touch into `~/.config/lean-agents/backups/<ISO timestamp>/` keeping relative paths.
 4. **Prerequisites**: install only what the selected tools need (Node for npm tools, uv for Serena, jq for some hooks). Policy: system package manager for system tools, npm only for npm-only packages, native installers for agent CLIs.

@@ -101,7 +101,7 @@ Empieza siempre con `--dry-run`: muestra cada archivo y comando antes de cambiar
 
 - Opciones útiles: `--all-tools`, `--privacy strict`, `--lang es`, `--profile vertex-gemini`, `--update`, `--uninstall`, `--doctor`, `--json` (con `--dry-run` o `--doctor`, para agentes) (`--help` las lista todas).
 - En PowerShell las opciones comunes van en PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`. Cualquier otra opción se pasa tal cual, por ejemplo `-DryRun --network off`.
-- Context Mode necesita Node.js 22.5 o superior. Todo lo demás funciona con Node.js 22.20 o superior.
+- Context Mode 2 necesita Node.js 24.15 o superior; el instalador lo omite con una versión anterior. Todo lo demás funciona con Node.js 22.20 o superior.
 - Con Context Mode, el instalador también instala Bun por defecto (`ctx_execute` más rápido); añade `--no-bun` (`-NoBun` en PowerShell) para omitirlo. Con Antigravity, `--no-app` (`-NoApp`) omite la instalación de la app. Ver la fila de Bun en [Niveles de instalación](#niveles-de-instalación).
 
 ## Por qué
