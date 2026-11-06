@@ -4,8 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { READMES, HERO_BUDGET, brokenLinks, heroProblems, imageProblems, shape, installerArgs, dryRun, slug } from '../scripts/check-readme.mjs';
-
+import { ROOT, READMES, HERO_BUDGET, brokenLinks, heroProblems, imageProblems, shape, installerArgs, dryRun, slug } from '../scripts/check-readme.mjs';
 
 test('slug follows GitHub rules', () => {
   assert.equal(slug('Team mode (`--project`)'), 'team-mode---project');
@@ -13,7 +12,7 @@ test('slug follows GitHub rules', () => {
 });
 
 for (const f of READMES) {
-  const md = fs.readFileSync(f, 'utf8');
+  const md = fs.readFileSync(path.join(ROOT, f), 'utf8');
   test(`${f}: links and anchors resolve`, () => assert.deepEqual(brokenLinks(f), []));
   test(`${f}: fits the 1-minute budget before Details`, () => assert.deepEqual(heroProblems(md, f), []));
   test(`${f}: images have alt text and stay under 5 MB`, () => assert.deepEqual(imageProblems(md, f), []));

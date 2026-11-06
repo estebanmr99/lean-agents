@@ -8,7 +8,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = fileURLToPath(new URL('..', import.meta.url));
+export const ROOT = fileURLToPath(new URL('..', import.meta.url));
 export const READMES = ['README.md', 'README.es.md'];
 export const DETAILS_MARK = '<!-- details -->';
 export const HERO_BUDGET = 80;
@@ -44,10 +44,10 @@ export function brokenLinks(file) {
 }
 
 // Every <img> and ![alt](src) in the text.
-const images = (md) => [
+const images = (text) => { const md = stripFences(text); return [
   ...[...md.matchAll(/<img\b[^>]*>/g)].map((m) => ({ src: m[0].match(/\bsrc="([^"]*)"/)?.[1], alt: m[0].match(/\balt="([^"]*)"/)?.[1] })),
   ...[...md.matchAll(/!\[([^\]]*)\]\(([^)\s]+)/g)].map((m) => ({ src: m[2], alt: m[1] })),
-];
+]; };
 
 // Lines before the Details divider must fit the budget, so the first screen stays a 1-minute read.
 export function heroProblems(md, file) {

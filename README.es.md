@@ -32,7 +32,7 @@ curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/instal
 | Copilot CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `real-copilot`, `real-copilot-windows` |
 | Antigravity CLI | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ | `real-antigravity`, `real-antigravity-windows` |
 | VS Code Copilot | ✅ | ✅ | VERIFY | ⚠️ | ⚠️ | ✅ | `real-vscode` |
-| Cursor | VERIFY | ✅ | ✅ | ➖ | ⚠️ | ✅ | `real-cursor`, `real-cursor-windows` |
+| Cursor | VERIFY | ✅ | ✅ | ➖ (solo con `--project`) | ⚠️ | ✅ | `real-cursor`, `real-cursor-windows` |
 
 ✅ un job de CI ejecuta el binario real en ese sistema (columnas de sistema) o lean-agents lo escribe (columnas de función) · ⚠️ escrito, carga sin comprobar · ➖ no disponible · VERIFY aún sin comprobar. Archivos por agente y fechas de verificación: [docs/compatibility.md](docs/compatibility.md).
 
@@ -55,6 +55,8 @@ flowchart LR
 
 <!-- details -->
 ## Detalles
+
+lean-agents funciona con Claude Code, OpenCode 1.x y 2.x, GitHub Copilot CLI, Antigravity CLI, VS Code Copilot y Cursor en macOS, Linux y Windows. Dale una estrella al repo para enterarte cuando salga `v1.0.0`.
 
 **Contenido**
 
