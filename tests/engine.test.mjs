@@ -888,25 +888,36 @@ test('Orca on Windows: skill for Cursor and VS Code Copilot, telemetry and NO_PR
   const skill = terminalCommands({ ...win, network: {}, env: {} }).find((c) => c.desc === 'Orca skill orca-cli');
   assert.deepEqual(skill.run[0].slice(-5), ['-a', 'cursor', 'github-copilot', '-g', '-y']);
 
-  const cmds = terminalCommands({ ...win, network: { telemetry: 'off' }, env: { HTTPS_PROXY: 'http://proxy.invalid:8080', NO_PROXY: 'corp.invalid,localhost' } });
+  const rd = (user, machine = null) => (scope) => (scope === 'User' ? user : machine);
+  const proxied = { HTTPS_PROXY: 'http://proxy.invalid:8080' };
   const text = (c) => c.run.flat().join(' ');
+  const cmds = terminalCommands({ ...win, network: { telemetry: 'off' }, env: proxied, readEnv: rd('corp.invalid,localhost') });
   const dnt = cmds.find((c) => /DO_NOT_TRACK/.test(text(c)));
   assert.ok(dnt.skipIfOutput, 'a value you already set is never overwritten');
+  assert.match(dnt.skipIfOutput.cmd.join(' '), /'Machine'/, 'nor one set machine-wide');
   assert.match(dnt.undo.flat().join(' '), /DO_NOT_TRACK.*\$null/);
   assert.ok(cmds.some((c) => /ORCA_TELEMETRY_DISABLED/.test(text(c))));
   const np = cmds.find((c) => /NO_PROXY/.test(text(c)));
-  assert.match(np.desc, /add 127\.0\.0\.1, ::1 to/, 'only the missing entries');
-  assert.doesNotMatch(np.run.flat().join(' '), /'localhost'/);
-  assert.match(np.undo.flat().join(' '), /'Machine'/, 'undo drops the var when only the inherited value is left');
+  assert.match(np.desc, /add 127\.0\.0\.1, ::1 to/, 'only the entries missing from the user value');
+  assert.doesNotMatch(np.undo.flat().join(' '), /'localhost'/, 'undo never removes what you had');
+  assert.doesNotMatch(np.undo.flat().join(' '), /'Machine'/, 'a user value existed: nothing else to drop');
 
-  const covered = { HTTPS_PROXY: 'http://proxy.invalid:8080', NO_PROXY: 'localhost,127.0.0.1,::1' };
-  assert.ok(!terminalCommands({ ...win, network: {}, env: covered }).some((c) => /NO_PROXY/.test(text(c))));
-  assert.ok(!terminalCommands({ ...win, network: {}, env: { NO_PROXY: '127.0.0.0/8' } }).some((c) => /NO_PROXY/.test(text(c))), 'no proxy, no change');
-  const cidr = terminalCommands({ ...win, network: {}, env: { HTTPS_PROXY: 'http://proxy.invalid:8080', NO_PROXY: '127.0.0.0/8' } });
+  // No user value: the machine value is the starting point, and undo drops the var once only that is left.
+  const fromMachine = terminalCommands({ ...win, network: {}, env: proxied, readEnv: rd(null, 'corp.invalid') }).find((c) => /NO_PROXY/.test(text(c)));
+  assert.match(text(fromMachine), /\$v=\[Environment\]::GetEnvironmentVariable\('NO_PROXY','User'\); if \(-not \$v\) \{ \$v=\[Environment\]::GetEnvironmentVariable\('NO_PROXY','Machine'\)/);
+  assert.match(fromMachine.undo.flat().join(' '), /'Machine'/);
+  // A value set only in this shell is not persisted anywhere, so it does not count as covered.
+  const sessionOnly = terminalCommands({ ...win, network: {}, env: { ...proxied, NO_PROXY: 'localhost,127.0.0.1,::1' }, readEnv: rd(null) });
+  assert.ok(sessionOnly.some((c) => /NO_PROXY/.test(text(c))));
+
+  const covered = terminalCommands({ ...win, network: {}, env: proxied, readEnv: rd('localhost,127.0.0.1,::1') });
+  assert.ok(!covered.some((c) => /NO_PROXY/.test(text(c))));
+  assert.ok(!terminalCommands({ ...win, network: {}, env: {}, readEnv: rd(null) }).some((c) => /NO_PROXY/.test(text(c))), 'no proxy, no change');
+  const cidr = terminalCommands({ ...win, network: {}, env: proxied, readEnv: rd('127.0.0.0/8') });
   assert.match(cidr.find((c) => /NO_PROXY/.test(text(c))).desc, /localhost, 127\.0\.0\.1, ::1/, 'a CIDR does not count');
-  const away = terminalCommands({ ...win, network: { telemetry: 'off' }, env: { HTTPS_PROXY: 'http://proxy.invalid:8080' }, system: false });
+  const away = terminalCommands({ ...win, network: { telemetry: 'off' }, env: proxied, system: false, readEnv: rd(null) });
   assert.deepEqual(away.filter((c) => /powershell/.test(text(c))), [], '--home never touches the machine');
-  assert.deepEqual(terminalCommands({ ...win, platform: 'darwin', network: { telemetry: 'off' }, env: covered }).filter((c) => /powershell/.test(text(c))), []);
+  assert.deepEqual(terminalCommands({ ...win, platform: 'darwin', network: { telemetry: 'off' }, env: proxied, readEnv: rd(null) }).filter((c) => /powershell/.test(text(c))), []);
 });
 
 test('Git Bash: marked .bashrc block with the Cursor aliases and loopback NO_PROXY, undone byte for byte', () => {
@@ -921,14 +932,14 @@ test('Git Bash: marked .bashrc block with the Cursor aliases and loopback NO_PRO
   const [p] = planActions(actions);
   assert.match(p.after, /alias agent='MSYSTEM= SHELL= agent\.cmd'/);
   assert.match(p.after, /alias cursor-agent='MSYSTEM= SHELL= cursor-agent\.cmd'/);
-  assert.match(p.after, /for h in localhost 127\.0\.0\.1 ::1;/);
+  assert.match(p.after, /for h in localhost 127\.0\.0\.1 ::1; do/);
   assert.doesNotMatch(p.after, /proxy\.invalid/, 'proxy values never reach disk');
   const entries = applyActions([p], path.join(home, 'bk'), home);
   assert.match(fs.readFileSync(rc, 'utf8'), /export FOO=1/);
   // The NO_PROXY loop appends only what is missing and keeps the user's entries.
-  const body = p.after.match(/for h in[^\n]*\nexport NO_PROXY/)[0];
-  const shell = spawnSync('bash', ['-c', `NO_PROXY='corp.invalid,localhost'\n${body}\necho "$NO_PROXY"`], { encoding: 'utf8' });
-  if (!shell.error) assert.equal(shell.stdout.trim(), 'corp.invalid,localhost,127.0.0.1,::1');
+  const body = p.after.match(/for h in[\s\S]*export NO_PROXY no_proxy/)[0];
+  const shell = spawnSync('bash', ['-c', `NO_PROXY='corp.invalid,localhost'\n${body}\necho "$NO_PROXY|$no_proxy"`], { encoding: 'utf8' });
+  if (!shell.error) assert.equal(shell.stdout.trim(), 'corp.invalid,localhost,127.0.0.1,::1|localhost,127.0.0.1,::1');
   undoActions(entries);
   assert.equal(fs.readFileSync(rc, 'utf8'), mine);
   assert.deepEqual(gitBashActions({ ...args, agents: ['claude'], terminals: [] }), []);

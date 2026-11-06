@@ -2,7 +2,7 @@
 // The terminal apps themselves are never installed.
 import fs from 'node:fs';
 import path from 'node:path';
-import { which } from './system.mjs';
+import { which, quiet } from './system.mjs';
 import { hasProxy } from './network.mjs';
 
 export const TERMINALS = ['warp', 'orca'];
@@ -42,7 +42,7 @@ export function parseTerminal(v) {
 // Commands only: OpenCode plugin entries go into the OpenCode adapter's own json edit, because two
 // json actions on one file would each start from the unedited text.
 // `system` is false for --home runs: Windows user env changes are real-machine only.
-export function terminalCommands({ terminals, agents, network = {}, platform = process.platform, env = process.env, system = true }) {
+export function terminalCommands({ terminals, agents, network = {}, platform = process.platform, env = process.env, system = true, readEnv = readWindowsEnv }) {
   const commands = [];
   if (terminals.includes('warp') && agents.includes('claude')) {
     commands.push({
@@ -62,12 +62,18 @@ export function terminalCommands({ terminals, agents, network = {}, platform = p
         undo: [['npx', '-y', 'skills', 'remove', 'orca-cli', '-g', '-y']],
       });
     }
-    if (platform === 'win32' && system) commands.push(...orcaWindowsCommands({ network, env }));
+    if (platform === 'win32' && system) commands.push(...orcaWindowsCommands({ network, env, readEnv }));
   }
   return commands;
 }
 
-function orcaWindowsCommands({ network, env }) {
+// One Windows env value from the User or Machine scope (null when unset); plan time only, read-only.
+function readWindowsEnv(scope, name) {
+  const r = quiet(ps(`[Console]::Out.Write([Environment]::GetEnvironmentVariable('${name}','${scope}'))`));
+  return r.ok && r.out.trim() ? r.out.trim() : null;
+}
+
+function orcaWindowsCommands({ network, env, readEnv }) {
   const commands = [];
   if (network.telemetry === 'off') {
     for (const name of ORCA_TELEMETRY_ENV) {
@@ -77,22 +83,28 @@ function orcaWindowsCommands({ network, env }) {
         run: [ps(`[Environment]::SetEnvironmentVariable('${name}','1','User')`)],
         undo: [ps(`[Environment]::SetEnvironmentVariable('${name}',$null,'User')`)],
         // A value you already set is yours: never overwritten, never undone.
-        skipIfOutput: { cmd: ps(`if (-not [Environment]::GetEnvironmentVariable('${name}','User')) { exit 1 }`) },
+        skipIfOutput: { cmd: ps(`if (-not ([Environment]::GetEnvironmentVariable('${name}','User') -or [Environment]::GetEnvironmentVariable('${name}','Machine'))) { exit 1 }`) },
       });
     }
   }
-  const proxy = hasProxy(env);
-  const current = (env.NO_PROXY ?? env.no_proxy ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-  const missing = LOOPBACK.filter((h) => !current.includes(h));
-  if (proxy && missing.length) {
-    const list = missing.map((h) => `'${h}'`).join(',');
-    commands.push({
-      tool: 'orca',
-      desc: `NO_PROXY: add ${missing.join(', ')} to your Windows user env so Orca status hooks skip the proxy (restart Orca)`,
-      // Starts from the inherited value, so entries set machine-wide are kept.
-      run: [ps(`$v=[Environment]::GetEnvironmentVariable('NO_PROXY','User'); if (-not $v) { $v=$env:NO_PROXY }; $l=@($v -split ',' | Where-Object { $_ }); foreach ($h in @(${list})) { if ($l -notcontains $h) { $l += $h } }; [Environment]::SetEnvironmentVariable('NO_PROXY', ($l -join ','), 'User')`)],
-      undo: [ps(`$l=@([Environment]::GetEnvironmentVariable('NO_PROXY','User') -split ',' | Where-Object { $_ -and @(${list}) -notcontains $_ }); $r=$l -join ','; $m=[Environment]::GetEnvironmentVariable('NO_PROXY','Machine'); [Environment]::SetEnvironmentVariable('NO_PROXY', $(if ($l.Count -and $r -ne $m) { $r } else { $null }), 'User')`)],
-    });
+  if (hasProxy(env)) {
+    // Scopes decide, not this shell: a value set only in the current session is not persisted anywhere.
+    const user = readEnv('User', 'NO_PROXY');
+    const machine = readEnv('Machine', 'NO_PROXY');
+    const have = (user ?? machine ?? '').split(',').map((x) => x.trim());
+    const missing = LOOPBACK.filter((h) => !have.includes(h));
+    if (missing.length) {
+      const list = missing.map((h) => `'${h}'`).join(',');
+      const get = (scope) => `[Environment]::GetEnvironmentVariable('NO_PROXY','${scope}')`;
+      commands.push({
+        tool: 'orca',
+        desc: `NO_PROXY: add ${missing.join(', ')} to your Windows user env so Orca status hooks skip the proxy (restart Orca)`,
+        // A user value shadows the machine one, so without a user value the machine value is the starting point.
+        run: [ps(`$v=${get('User')}; if (-not $v) { $v=${get('Machine')} }; $l=@($v -split ',' | Where-Object { $_ }); foreach ($h in @(${list})) { if ($l -notcontains $h) { $l += $h } }; [Environment]::SetEnvironmentVariable('NO_PROXY', ($l -join ','), 'User')`)],
+        // Drops only our entries. With no user value before, the var was ours: remove it once nothing but the machine value is left.
+        undo: [ps(`$l=@(${get('User')} -split ',' | Where-Object { $_ -and @(${list}) -notcontains $_ }); ${user ? '' : `$l=@($l | Where-Object { @(${get('Machine')} -split ',') -notcontains $_ }); `}[Environment]::SetEnvironmentVariable('NO_PROXY', $(if ($l.Count) { $l -join ',' } else { $null }), 'User')`)],
+      });
+    }
   }
   return commands;
 }
@@ -119,8 +131,11 @@ export function gitBashActions({ home, terminals, agents, platform = process.pla
   if (terminals.includes('orca') && hasProxy(env)) {
     lines.push(
       '# Orca status hooks call 127.0.0.1 with curl: keep loopback off the proxy.',
-      `for h in ${LOOPBACK.join(' ')}; do case ",$NO_PROXY," in *",$h,"*) ;; *) NO_PROXY="\${NO_PROXY:+$NO_PROXY,}$h" ;; esac; done`,
-      'export NO_PROXY',
+      `for h in ${LOOPBACK.join(' ')}; do`,
+      '  case ",$NO_PROXY," in *",$h,"*) ;; *) NO_PROXY="${NO_PROXY:+$NO_PROXY,}$h" ;; esac',
+      '  case ",$no_proxy," in *",$h,"*) ;; *) no_proxy="${no_proxy:+$no_proxy,}$h" ;; esac',
+      'done',
+      'export NO_PROXY no_proxy',
     );
   }
   return lines.length ? [{ kind: 'block', toml: true, path: path.join(home, '.bashrc'), body: lines.join('\n') }] : [];
@@ -154,7 +169,8 @@ const ORCA_HOOK = /[\\/]\.orca[\\/]agent-hooks|orca-agent-hook|ORCA_AGENT_HOOK/i
 export function orcaHooksFound(home) {
   return [path.join(home, '.claude', 'settings.json'), path.join(home, '.cursor', 'hooks.json')].filter((f) => {
     if (!fs.existsSync(f)) return false;
-    const text = fs.readFileSync(f, 'utf8');
+    let text;
+    try { text = fs.readFileSync(f, 'utf8'); } catch { return false; }
     // On Windows Orca writes the Cursor hook as a PowerShell -EncodedCommand (UTF-16LE base64).
     const decoded = [...text.matchAll(/-EncodedCommand\s+([A-Za-z0-9+/=]+)/gi)].map((m) => Buffer.from(m[1], 'base64').toString('utf16le'));
     return [text, ...decoded].some((t) => ORCA_HOOK.test(t));
