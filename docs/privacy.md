@@ -45,3 +45,16 @@ The presets set switches in the agents' configs and, while installing, `DO_NOT_T
 Sources, hosts and dates: [compatibility.md](compatibility.md#verification-log) and [compatibility.md](compatibility.md#outbound-switches). To block the downloads, run the installer where your network or proxy policy allows only what you accept.
 
 Pick model providers whose terms do not train on your prompts.
+
+## What child commands inherit
+
+Every install, update and `--doctor` command (`npx`, `npm -g`, `brew`, `bun`, `gsd`, version probes) gets an allowlist of your environment, not all of it, so `GH_TOKEN`, API keys and cloud credentials never reach an installer. Allowed (names match without regard to case):
+
+- Basics: `PATH`, `HOME`, `USER`, `LOGNAME`, `USERNAME`, `SHELL`, `TERM`, `COLORTERM`, `LANG`, `TZ`, `TMPDIR`, `TMP`, `TEMP`, `CI`, `COPILOT_HOME`, `CLAUDE_CONFIG_DIR`, `BUN_INSTALL`, `DO_NOT_TRACK`.
+- Proxy and CA: `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY`, `NODE_USE_ENV_PROXY`, `NODE_EXTRA_CA_CERTS`, `NODE_USE_SYSTEM_CA`, `OPENSSL_CONF`, `SSL_CERT_FILE`, `SSL_CERT_DIR`, `GIT_SSL_CAINFO`, `UV_SYSTEM_CERTS`, `REQUESTS_CA_BUNDLE`, `npm_config_cafile`, `CURL_CA_BUNDLE`, `PIP_CERT`.
+- Prefixes: `LC_`, `XDG_`, `npm_config_`, `NODE_`, `NVM_`, `FNM_`, `VOLTA_`, `HOMEBREW_`, `UV_`, `GIT_`, `BUN_`, `OPENCODE_`.
+- Windows only: `SystemRoot`, `SystemDrive`, `windir`, `ComSpec`, `PATHEXT`, `USERPROFILE`, `APPDATA`, `LOCALAPPDATA`, `ProgramData`, `ProgramFiles`, `ProgramFiles(x86)`, `ProgramW6432`, `CommonProgramFiles`, `HOMEDRIVE`, `HOMEPATH`, `OS`, `PROCESSOR_ARCHITECTURE`, `NUMBER_OF_PROCESSORS`, `PSModulePath`, `ALLUSERSPROFILE`, `PUBLIC`, `COMPUTERNAME`.
+
+Any allowed name that looks like a secret (`TOKEN`, `SECRET`, `PASSW`, `API_KEY`, `AUTH`, `CREDENTIAL`, `PRIVATE`) is dropped again (`GIT_AUTHOR_*` is kept), for example `npm_config__authToken` or `HOMEBREW_GITHUB_API_TOKEN`. lean-agents installs public packages only; a private registry still works through `.npmrc`. `scripts/parallel.mjs` workers keep your full environment, because the agents they start need their API keys. Sources: [compatibility.md](compatibility.md#child-environment-allowlist).
+
+Free text that may reach a public issue (`--feedback-draft`) goes through `scripts/lib/redact.mjs`: home paths, user and host names, proxy and CA values, values of secret-named variables, emails, key=value pairs, `Authorization` headers and common token formats are replaced before anything is shown. Backups of your config and `state.json` are owner-only (`0600`, directories `0700`), and `--uninstall` asks before deleting backups (default no; `--yes` keeps them).

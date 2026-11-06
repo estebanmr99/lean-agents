@@ -19,6 +19,46 @@ const FORMAT = { formattingOptions: { insertSpaces: true, tabSize: 2, eol: '\n' 
 export const sha = (text) => crypto.createHash('sha256').update(text).digest('hex');
 const read = (p) => (fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null);
 
+// The mark counts only in the first lines (a skill's frontmatter pushes it past line 5), so a user file that merely mentions it stays theirs.
+const OWNED_LINES = 10;
+export const hasMark = (text) => text.split('\n', OWNED_LINES).join('\n').includes(OWNED_MARK);
+
+const realRoots = (roots) => roots.filter(Boolean).map((r) => { try { return fs.realpathSync(r); } catch { return path.resolve(r); } });
+const within = (child, root) => { const rel = path.relative(root, child); return !rel.startsWith('..') && !path.isAbsolute(rel); };
+const isLink = (p) => { try { return fs.lstatSync(p).isSymbolicLink(); } catch { return false; } };
+
+// Why a target must not be written, or null. A symlinked target or a real parent outside the roots is never touched (edit by hand).
+export function unsafe(target, roots) {
+  if (isLink(target)) {
+    let real = '?';
+    try { real = fs.realpathSync(target); } catch { /* dangling link */ }
+    return `symlink to ${real}; edit by hand`;
+  }
+  if (!roots?.length) return null;
+  let dir = path.dirname(path.resolve(target));
+  for (;;) {
+    try { dir = fs.realpathSync(dir); break; } catch { /* not created yet: check the nearest existing parent */ }
+    const up = path.dirname(dir);
+    if (up === dir) break;
+    dir = up;
+  }
+  return realRoots(roots).some((r) => within(dir, r)) ? null : 'outside home and project';
+}
+
+// Backups can hold secrets from the user's config: owner-only files in owner-only dirs.
+export function writePrivate(file, text) {
+  fs.writeFileSync(file, text, { mode: 0o600 });
+  fs.chmodSync(file, 0o600);
+}
+export const dropBackups = (dir) => fs.rmSync(dir, { recursive: true, force: true });
+export function privateDir(dir, stop) {
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  for (let d = dir; ; d = path.dirname(d)) {
+    fs.chmodSync(d, 0o700);
+    if (d === stop || path.dirname(d) === d) break;
+  }
+}
+
 function getAt(text, keyPath) {
   const tree = parseTree(text);
   if (!tree) return undefined;
@@ -105,15 +145,17 @@ export function removeBlock(text) {
 }
 
 // Compute what each action would do. Pure apart from reading files.
-export function plan(actions) {
+export function plan(actions, roots = []) {
   return actions.map((a) => {
+    const blocked = unsafe(a.path, roots);
+    if (blocked) return { ...a, before: null, after: null, status: 'skip', note: blocked };
     const before = read(a.path);
     let after;
     let note = '';
     let applied;
     let keptKeys;
     if (a.kind === 'file') {
-      if (before !== null && before !== a.content && !before.includes(OWNED_MARK) && !a.force) {
+      if (before !== null && before !== a.content && !hasMark(before) && !a.force) {
         return { ...a, before, after: before, status: 'skip', note: 'exists and is not managed by lean-agents' };
       }
       after = a.content;
@@ -142,23 +184,25 @@ export function plan(actions) {
 }
 
 export function describe(planned, home) {
-  const rel = (p) => (p.startsWith(home) ? `~${p.slice(home.length)}` : p);
+  const rel = (p) => (p === home || p.startsWith(home + path.sep) ? `~${p.slice(home.length)}` : p);
   return planned
     .map((p) => `  ${p.status.padEnd(9)} ${rel(p.path)}${p.note ? `  (${p.note})` : ''}`)
     .join('\n');
 }
 
 // Write planned changes. Returns state entries for uninstall.
-export function apply(planned, backupDir, home) {
+export function apply(planned, backupDir, home, roots = [home]) {
   const entries = [];
   for (const p of planned) {
     if (p.status === 'skip' || p.status === 'unchanged') continue;
+    const blocked = unsafe(p.path, roots);
+    if (blocked) throw new Error(`refusing to write ${p.path}: ${blocked}`);
     let backup = null;
     if (p.before !== null) {
-      const rel = home && p.path.startsWith(home) ? path.relative(home, p.path) : p.path.replace(/^[A-Za-z]:/, '').replace(/^[\\/]+/, '');
+      const rel = home && (p.path === home || p.path.startsWith(home + path.sep)) ? path.relative(home, p.path) : p.path.replace(/^[A-Za-z]:/, '').replace(/^[\\/]+/, '');
       backup = path.join(backupDir, rel);
-      fs.mkdirSync(path.dirname(backup), { recursive: true });
-      fs.writeFileSync(backup, p.before);
+      privateDir(path.dirname(backup), path.dirname(backupDir));
+      writePrivate(backup, p.before);
     }
     fs.mkdirSync(path.dirname(p.path), { recursive: true });
     fs.writeFileSync(p.path, p.after);
@@ -168,9 +212,11 @@ export function apply(planned, backupDir, home) {
 }
 
 // Undo state entries. If the user edited a file after install, remove only our parts.
-export function undo(entries) {
+export function undo(entries, roots = []) {
   const report = [];
   for (const e of [...entries].reverse()) {
+    const blocked = unsafe(e.path, roots);
+    if (blocked) { report.push(['left (symlink)', e.path]); continue; }
     const now = read(e.path);
     if (now === null) continue;
     const untouched = sha(now) === e.hash;
