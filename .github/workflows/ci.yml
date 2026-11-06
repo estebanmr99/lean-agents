@@ -193,15 +193,6 @@ jobs:
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - name: Install lean-agents and check what OpenCode resolved
         run: bash tests/real-opencode.sh
-      - name: Non-default XDG_CONFIG_HOME reaches the real OpenCode
-        run: |
-          export HOME="$(mktemp -d)"
-          export XDG_CONFIG_HOME="$HOME/custom-config"
-          bash install.sh --yes --no-exec --agents opencode-v2 --privacy strict --profile anthropic-api
-          test -d "$XDG_CONFIG_HOME/opencode"
-          test ! -e "$HOME/.config/opencode"
-          opencode debug config > "$HOME/resolved.txt"
-          grep -q lean-agents "$HOME/resolved.txt"
 
   real-migrate:
     # --migrate with the real OpenCode 2 and Claude Code binaries, throwaway HOME, no login:
@@ -254,6 +245,34 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash tests/real-proxy.sh
+
+  real-opencode-xdg:
+    # Its own job: OpenCode's background service holds a fixed port and keeps the first HOME.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
+      - run: npm ci
+      - name: Install OpenCode 2
+        run: |
+          curl -fsSL https://opencode.ai/v2/install | bash
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+      - name: Non-default XDG_CONFIG_HOME reaches the real OpenCode
+        run: |
+          export HOME="$(mktemp -d)"
+          export XDG_CONFIG_HOME="$HOME/custom-config"
+          bash install.sh --yes --no-exec --agents opencode-v2 --privacy strict --profile anthropic-api
+          test -d "$XDG_CONFIG_HOME/opencode"
+          test ! -e "$HOME/.config/opencode"
+          opencode debug config > "$HOME/resolved.txt"
+          grep -q lean-agents "$HOME/resolved.txt"
 
   real-opencode-v1:
     # Real OpenCode 1.x binary, throwaway HOME: proves the 1.x keys are accepted.

@@ -15,7 +15,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Changed
 
-- CI (#42): pull requests use the pinned versions, now including the Claude Code, OpenCode 1.x and Copilot CLI npm packages (`ciOnly` pins in `core/pins.json`, not installed for users); docs-only PRs run only `lint`, `test` and the Secret scan; every job has `timeout-minutes`; macOS dropped where it added nothing; `real-opencode-xdg` folded into `real-opencode`; shellcheck and PSScriptAnalyzer cover every tracked script.
+- CI (#42): pull requests use the pinned versions, now including the Claude Code, OpenCode 1.x and Copilot CLI npm packages (`ciOnly` pins in `core/pins.json`, not installed for users); docs-only PRs run only `lint`, `test` and the Secret scan; every job has `timeout-minutes`; macOS dropped where it added nothing; shellcheck and PSScriptAnalyzer cover every tracked script.
 - MCP servers, npx tools and skills no longer fetch `@latest` or the default branch: exact versions and tags come from `core/pins.json`. Skills install with `owner/repo#<tag>` (a trailing `@<tag>` is ignored and installs HEAD). The Skills CLI is pinned to 1.5.18, the last release that runs on Node 20 (1.5.19 and later need Node 22.20+). `docs/SECURITY-REVIEW.md` and the README "On a work PC" list run-time fetches as their own category (#33).
 - Docs: `docs/privacy.md` table renders again and covers Cursor, VS Code Copilot, Warp and Orca; `tests/README.md` describes `npm test` and the `real-*` scripts; the Cursor CLI install row in `docs/compatibility.md` is correct for Windows (#27).
 - Docs: the demo step 1 has a verified Windows PowerShell block for OpenCode 2 (EN, ES); `docs/SECURITY-REVIEW.md` notes the upstream script checks no tarball checksum (#32).

@@ -735,7 +735,7 @@ Branch: `session-21-lean-ci`. Release: 0.6.0, after session 18. PR body: `Closes
 1. **Pins for harness CLIs.** `claude-code`, `opencode-v1` and `copilot-cli` are npm pins marked `"ciOnly": true` in `core/pins.json`: CI installs them with `npm install -g <pin>`, users never get them from lean-agents, so `pinVersions()` leaves them out of `state.json` and `--doctor`. The version watch covers them. OpenCode 2, Cursor and `agy` have no npm package; they stay on the latest installer and their jobs print the version.
 2. **`paths` filter.** A `changes` job skips every `real-*`, `bench-*` and `release-build` job on a PR that only touches `docs/**`, `assets/**` or `*.md`. `lint`, `test` and the Secret scan always run.
 3. **`timeout-minutes`** on every job.
-4. **Trimmed matrix.** One OS where the OS adds nothing; Windows jobs and macOS where macOS behaviour is the point stay. `real-opencode-xdg` is a step of `real-opencode`.
+4. **Trimmed matrix.** One OS where the OS adds nothing; Windows jobs and macOS where macOS behaviour is the point stay. `real-opencode-xdg` stays its own job: OpenCode 2's background service keeps the first HOME, and the port is fixed.
 5. **Gaps.** PSScriptAnalyzer and shellcheck run on every tracked `*.ps1` and `*.sh`. `--project` only exists for Cursor and VS Code Copilot (both covered); the other adapters have no project mode.
 6. **Latest daily.** `ci-latest.yml` (cron plus `workflow_dispatch`) calls `ci.yml` with `latest: true`; each real job runs `scripts/pins-latest.mjs` on its own checkout. A failure opens or comments on one `version-watch` issue "Latest versions break CI" (`scripts/ci-latest-report.mjs`), once per run.
 7. **Required checks.** `docs/branch-protection.md` has the exact `gh api` command.
