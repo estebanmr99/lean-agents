@@ -9,6 +9,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - GSD Core no longer crashes when Cursor is selected: Cursor installs with `--cursor`, and agents without a GSD installer (`vscode-copilot`) are skipped with a note (#20).
 - The test "--yes keeps every tool default for undocumented settings" no longer depends on a host proxy (#31).
 
+### Changed
+
+- Docs: `docs/privacy.md` table renders again and covers Cursor, VS Code Copilot, Warp and Orca; `tests/README.md` describes `npm test` and the `real-*` scripts; the Cursor CLI install row in `docs/compatibility.md` is correct for Windows (#27).
+
 ### Added
 
 - `docs/ROADMAP.md`: the order of the next releases, the issues each session closes, and the promotion plan.

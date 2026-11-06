@@ -24,9 +24,12 @@ The table below is the "all off" (strict) result per agent.
 | Claude Code | `env`: `DISABLE_AUTOUPDATER=1`, `DISABLE_TELEMETRY=1`, `DISABLE_ERROR_REPORTING=1`, `DISABLE_BUG_COMMAND=1`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`. Manual step: turn off "Help improve Claude" in your claude.ai privacy settings. |
 | OpenCode 2 | `"share": "disabled"`, `"update": "disable"`, and a policy that denies the built-in `opencode` provider unless your profile uses it. |
 | OpenCode 1 | `"share": "disabled"`, `"autoupdate": false`, `"experimental": { "openTelemetry": false }`, and `"disabled_providers": ["opencode"]` unless your profile uses that provider. |
-
 | Copilot CLI | `"autoUpdate": false` in `~/.copilot/settings.json`. Telemetry has no setting: start Copilot with `--disable-client-telemetry`. Strict mode prints this reminder and cannot do it for you. |
 | Antigravity CLI | Nothing on disk: telemetry is an account setting, and no auto-update setting is documented. Manual step: turn off "Enable Telemetry" in Antigravity settings. Strict mode prints this reminder. |
+| VS Code Copilot | `telemetry.telemetryLevel: "off"` and `update.mode: "none"` in the VS Code user `settings.json`. |
+| Cursor | Nothing on disk: Privacy Mode is stored on your account. Manual step: turn it on in Cursor settings. Strict mode prints this reminder. |
+| Warp | Nothing on disk. Manual step: set `[privacy] telemetry_enabled = false` in its `settings.toml` (the free plan may need it on for AI). Strict mode prints this reminder. |
+| Orca | Nothing on disk. Manual step: set `DO_NOT_TRACK=1` where Orca starts (confirmed on Windows, #22), or turn off Settings > Privacy > Share anonymous usage data. Strict mode prints this reminder. |
 
 With auto-updates off, update on purpose: `opencode upgrade`, `claude update`, `copilot update`, then `install.sh --update` or `install.ps1 -Update` (see [update.md](update.md)).
 
