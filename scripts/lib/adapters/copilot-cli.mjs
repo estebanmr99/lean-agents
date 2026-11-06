@@ -54,12 +54,13 @@ export function copilotAdapter({ home, core, profile, opts, rules, adhdCommand }
     commands.push({ tool: 'rtk', desc: 'RTK hook for Copilot CLI', run: [['rtk', 'init', '-g', '--copilot']], undo: [['rtk', 'init', '-g', '--copilot', '--uninstall']] });
   }
   if (tools.includes('context-mode')) {
-    // The plugin brings its own MCP server and hooks, so it is never added to mcp-config.json too.
+    // Context Mode 2.x sets itself up (plugin, MCP server, hooks), so it is never added to mcp-config.json too.
+    // The npm package comes from the prerequisite step; --yes is required without a TTY, else exit 2.
     commands.push({
       tool: 'context-mode',
-      desc: 'Context Mode plugin for Copilot CLI',
-      run: [['copilot', 'plugin', 'install', 'mksglu/context-mode:configs/copilot-cli']],
-      undo: [['copilot', 'plugin', 'uninstall', 'context-mode']],
+      desc: 'Context Mode setup for Copilot CLI',
+      run: [['context-mode', 'setup', '--yes', '--agents', 'copilot-cli']],
+      undo: [['context-mode', 'setup', '--remove', '--yes', '--agents', 'copilot-cli']],
     });
   }
   if (tools.includes('caveman')) {

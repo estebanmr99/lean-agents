@@ -272,6 +272,14 @@ test('GSD plans --cursor and skips agents without an installer instead of crashi
   assert.match(out, /no installer for vscode-copilot: skipped/);
 });
 
+test('Context Mode v2: Copilot CLI uses setup (and setup --remove to undo), Antigravity skips with a note', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const out = lean(home, ['--yes', '--no-exec', '--dry-run', '--agents', 'copilot-cli,antigravity', '--tools', 'context-mode', '--lang', 'en']);
+  assert.match(out, /\$ context-mode setup --yes --agents copilot-cli/);
+  assert.match(out, /no Antigravity setup in v2: skipped/);
+  assert.ok(!/plugin install/.test(out));
+});
+
 test('GSD defaults use profile models, and existing defaults survive uninstall', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
   const file = path.join(home, '.gsd', 'defaults.json');

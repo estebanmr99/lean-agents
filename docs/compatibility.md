@@ -8,7 +8,7 @@ What lean-agents configures per agent, how, and when each command or key was las
 | Subagents by tier | `~/.claude/agents/*.md` | `~/.config/opencode/agents/*.md` | `~/.config/opencode/agents/*.md` | `~/.copilot/agents/*.agent.md` | `~/.gemini/config/agents/*.md` (`subagent: true`) |
 | Primary agent models | `model` in settings (only if unset) | `agents.plan` / `agents.build` from profile | `agent.plan` / `agent.build` from profile | planned | planned |
 | RTK | `rtk init -g --auto-patch` (hook) | `rtk init -g --opencode` (plugin) | `rtk init -g --opencode` (plugin) | `rtk init -g --copilot` | `rtk init -g --agent antigravity` |
-| Context Mode | plugin `context-mode@context-mode` | MCP (`mcp.servers`) | `plugin` entry, needs Node.js 22.5+ | `copilot plugin install mksglu/context-mode:configs/copilot-cli` | `agy plugin install` from `configs/antigravity-cli` |
+| Context Mode | plugin `context-mode@context-mode` | MCP (`mcp.servers`) | `plugin` entry, needs Node.js 22.5+ | `npm i -g context-mode`, then `context-mode setup --yes --agents copilot-cli` | not supported by Context Mode 2.x (skipped with a note) |
 | Serena, Playwright | `claude mcp add --scope user` | `mcp.servers` | flat `mcp.<name>` | `~/.copilot/mcp-config.json` | `~/.gemini/config/mcp_config.json` |
 | Ponytail | plugin `ponytail@ponytail` | `plugins` entry | `plugin` entry | ➖ | ➖ |
 | i-have-adhd | plugin `i-have-adhd@i-have-adhd` + flag | vendor checkout + loader + flag | vendor checkout + loader + flag | `npx skills add … -a github-copilot -g` | `npx skills add … -a antigravity-cli -g` (partial) |
@@ -123,7 +123,8 @@ Detection (a run with `--home` looks only inside it; `orca` on Linux is the GNOM
 | `agy agents`, `agy mcp list`, `agy plugin list --json` work without login; `agy models` needs sign-in | real binary | 2026-10-30 |
 | `rtk init -g --copilot` and `--agent antigravity` work without a TTY; `--uninstall` removes them. On Copilot it also adds a block to `copilot-instructions.md` | rtk 1.1.0, real binary | 2026-10-30 |
 | `rtk init` does not read `COPILOT_HOME`: with that variable set, the RTK hook still lands in `~/.copilot` | rtk 1.1.0, real binary | 2026-10-30 |
-| Context Mode plugin routes for both agents install and uninstall without a TTY. Copilot warns that direct plugin installs are deprecated | real binaries | 2026-10-30 |
+| Context Mode 1.x plugin routes for both agents installed and uninstalled without a TTY (superseded by the Context Mode 2 row below) | real binaries | 2026-10-30 |
+| Context Mode 2.1.4 removed `configs/copilot-cli` and `configs/antigravity-cli`. Copilot CLI: `npm i -g context-mode`, then `context-mode setup --yes --agents copilot-cli` (`--yes` is required without a TTY, else exit 2); undo with `context-mode setup --remove --yes --agents copilot-cli` (**VERIFY** that `--agents` scopes `--remove`). `context-mode setup --list` on 2.1.4 lists `copilot-cli` (install `plugin`) and no Antigravity, so Antigravity is skipped with a note | upstream `docs/install/copilot-cli.md`, `context-mode setup --list`, #39 | 2026-11-05 |
 | Skills CLI ids `github-copilot`, `antigravity-cli`. `skills remove -a <agent>` reports success but keeps `~/.agents/skills` while another detected agent may share it, so the Copilot, Antigravity and OpenCode undo drops `-a`. Side effect: those skills go for every agent on the machine. On 1.7.4 the folder stays with `~/.gemini/antigravity-cli` and `~/.config/opencode`, but not in every folder mix, so `tests/real-skills-undo.sh` uses that pair. `-a claude-code` copies to `~/.claude/skills` and does not write `~/.agents/skills`, so the Claude Code undo keeps `-a` | real binary, `real-skills-undo` in CI | 2026-10-31 |
 | Codeburn: npm `codeburn` 0.9.27, repo `getagentseal/codeburn`, MIT, Node 22.13+; `report -p week --format json` | npm, real binary | 2026-10-30 |
 | AutoSkills: npm `autoskills` 0.4.1, repo `midudev/autoskills`, CC-BY-NC-4.0. Identity confirmed: npm `gitHead` is the `release: v0.4.1` commit in that repo, and autoskills.sh links it. No `--version`, doctor uses `--help` | npm, GitHub, real binary | 2026-10-30 |
@@ -254,7 +255,7 @@ The undocumented items below (Antigravity telemetry and auto-update, Serena conf
 - **VERIFY:** Antigravity loading `~/.gemini/config/rules` and `~/.agents/skills`. No list command shows them without a login, so README marks both as partial.
 - **VERIFY:** subreddit rules, whether r/opencode exists, and X handles in `docs/launch.md`. Reddit blocked the fetch.
 - **VERIFY:** `brew install copilot-cli` (README) against `brew install --cask copilot-cli` (docs). lean-agents does not use either.
-- **VERIFY:** Antigravity proxy variables (no docs; `tests/real-proxy.sh` runs `agy plugin install` through squid with direct traffic blocked) and any telemetry or auto-update switch (none documented; the CLI updates itself in the background, per [antigravity.google/cli](https://antigravity.google/cli), checked 2026-11-03).
+- **VERIFY:** Antigravity proxy variables (no docs; `tests/real-proxy.sh` no longer exercises `agy` through squid since Context Mode 2 dropped its Antigravity plugin, #39) and any telemetry or auto-update switch (none documented; the CLI updates itself in the background, per [antigravity.google/cli](https://antigravity.google/cli), checked 2026-11-03).
 - **VERIFY:** gh has no documented proxy or CA variable ([gh environment](https://cli.github.com/manual/gh_help_environment), 2026-11-03); `tests/real-proxy.sh` checks that it uses `https_proxy` and that `SSL_CERT_FILE` replaces its trust store.
 - **VERIFY:** proxy and CA handling in RTK, Context Mode, Serena, Playwright MCP and the Skills CLI beyond the variables their runtimes (Node, uv, git) read.
 - **VERIFY:** Copilot CLI `NO_PROXY` and `--disable-client-telemetry` (seen in release notes, not in the docs).
@@ -279,7 +280,7 @@ The undocumented items below (Antigravity telemetry and auto-update, Serena conf
 - **VERIFY (session 11):** `~/.agents/skills` (where the Skills CLI writes for `antigravity-cli`) is not a documented Antigravity path; `~/.gemini/config/skills` is.
 - **VERIFY (session 11):** Windows paths under `%USERPROFILE%\.gemini`, any variable that moves the Antigravity config folder, and a VS Code style `settings.json` for the app (community sources only).
 - **VERIFY (session 11):** the app's proxy, CA and auto-update behavior; the docs only cover `sandboxProxy`.
-- **VERIFY (session 11):** on Windows, `rtk init -g --agent antigravity`, the Context Mode `configs/antigravity-cli` plugin, and `agy agents`, `agy mcp list`, `agy plugin list --json` (not in the CLI reference; they work on macOS and Linux in CI).
+- **VERIFY (session 11):** on Windows, `rtk init -g --agent antigravity`, and `agy agents`, `agy mcp list`, `agy plugin list --json` (not in the CLI reference; they work on macOS and Linux in CI).
 - **VERIFY (session 11):** whether the app has a launcher command that runs headless in CI.
 - **VERIFY (session 11):** the "3-5x faster" Bun claim for `ctx_execute`; unmeasured until the `bench-context-mode` CI job runs on each OS.
 - **VERIFY (session 11):** when `better-sqlite3` compiles instead of using a prebuilt binary, per OS, and whether Context Mode on Node.js 22.5+ picks `node:sqlite` on each runner.

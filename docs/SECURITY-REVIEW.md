@@ -60,7 +60,7 @@ Only after you approve the plan, and never with admin rights. `--dry-run` prints
 | `npm install -g context-mode` | Context Mode |
 | `rtk init -g …` (per agent) | RTK hook or plugin |
 | `claude plugin marketplace add …`, `claude plugin install …`, `claude mcp add --scope user …` | Claude Code plugins and MCP servers |
-| `copilot plugin install …`, `agy plugin install …` | Context Mode for Copilot CLI and Antigravity |
+| `context-mode setup --yes --agents copilot-cli` | Context Mode for Copilot CLI |
 | `npx -y skills add …` / `skills remove …` | Caveman and i-have-adhd skills |
 | `git clone --depth 1 https://github.com/ayghri/i-have-adhd …` | i-have-adhd for OpenCode |
 | `npx -y @opengsd/gsd-core@latest …` | GSD (opt-in) |
