@@ -6,12 +6,16 @@ import pty
 import re
 import select
 import struct
+import subprocess
 import sys
 import tempfile
 import termios
 import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Context Mode 2 needs Node 24.15+; below that the engine skips it, so there is no Bun question either.
+node_version = tuple(int(n) for n in subprocess.check_output(["node", "--version"], text=True).strip().lstrip("v").split("."))
+context_mode = node_version >= (24, 15, 0)
 home = tempfile.mkdtemp(prefix="lean-tty-")
 argv = ["node", os.path.join(ROOT, "scripts", "lean.mjs"), "--home", home, "--no-exec", "--dry-run", "--agents", "claude"]
 
@@ -71,7 +75,7 @@ send(ENTER)  # keep the tool's default
 if b"GitHub CLI" in out or os.system("command -v gh >/dev/null") != 0:
     wait_for("GitHub CLI")
     send(ENTER)  # default no
-if os.system("command -v bun >/dev/null") != 0:
+if context_mode and os.system("command -v bun >/dev/null") != 0:
     wait_for("Install Bun")
     send(ENTER)  # preselected yes
 wait_for("Language")
@@ -81,9 +85,12 @@ code = finish(pid)
 text = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", out.decode(errors="replace"))
 print(text)
 assert code == 0, "installer exited with an error"
-assert "tools: rtk, context-mode, serena" in text, "serena was not picked from the menu"
+assert ("tools: rtk, context-mode, serena" if context_mode else "tools: rtk, serena") in text, "serena was not picked from the menu"
+if not context_mode:
+    assert "Context Mode 2 needs Node 24.15+, found" in text, "the Context Mode skip line is missing"
 assert "network: telemetry off, autoUpdate off, outbound off" in text, "the all-off preset was not picked"
-assert "bun: on" in text, "Bun was not preselected on"
+if context_mode:
+    assert "bun: on" in text, "Bun was not preselected on"
 assert os.listdir(home) == [], "the dry run wrote files"
 print("interactive menus: ok")
 
