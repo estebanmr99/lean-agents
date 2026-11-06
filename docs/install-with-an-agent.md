@@ -12,7 +12,7 @@ Never read, print or store my API keys or tokens, and never run gh auth login fo
 
 ## Steps the agent follows
 
-1. **Get the engine.** Clone the repo to `~/.config/lean-agents/src` (Windows: `%USERPROFILE%\.config\lean-agents\src`). Use `node scripts/lean.mjs` below; Node.js 20.12 or newer.
+1. **Get the engine.** Clone the repo to `~/.config/lean-agents/src` (Windows: `%USERPROFILE%\.config\lean-agents\src`). Use `node scripts/lean.mjs` below; Node.js 22.20 or newer.
 2. **Detect the setup.** Run `node scripts/lean.mjs --doctor --json`. It prints `{"ok": bool, "rows": [{"item", "status", "detail"}]}`; `status` is `ok`, `changed`, `note`, `error` or `missing`. `missing` on `lean-agents` means a fresh install.
 3. **Ask the user**, one question each, with the answer's flag:
    - Which agents? `--agents claude,opencode-v2,copilot-cli,antigravity,vscode-copilot,cursor`

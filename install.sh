@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # lean-agents bootstrap for macOS, Linux and Git Bash on Windows.
-# Makes sure git and Node.js 20.12+ exist, fetches lean-agents, then hands over to the
+# Makes sure git and Node.js 22.20+ exist, fetches lean-agents, then hands over to the
 # Node engine (scripts/lean.mjs), which shows the full plan before changing anything.
 #
 #   curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --dry-run
@@ -39,7 +39,7 @@ ensure_tool node node https://nodejs.org/ || true
 if have node; then
   major="$(node -p 'process.versions.node.split(".")[0]')"
   minor="$(node -p 'process.versions.node.split(".")[1]')"
-  (( major > 20 || (major == 20 && minor >= 12) )) || die "Node.js 20.12 or newer is required (found $(node --version)). Update from https://nodejs.org/"
+  (( major > 22 || (major == 22 && minor >= 20) )) || die "Node.js 22.20 or newer is required (found $(node --version)). Update from https://nodejs.org/"
 else
   die "Node.js is required for the engine. Install it and run this again."
 fi

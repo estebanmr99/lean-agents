@@ -31,9 +31,9 @@ Repeat the same prompt for each session. Each session must leave the repository 
 - Session 8 research is done (2026-11-03, Orca `v1.4.247`): `docs/compatibility.md` "Terminals". Orca's default permission mode adds no bypass flag; only Yolo adds one. Session 8 (2026-11-04): terminal integrations for users who already have Warp or Orca; the apps are never installed.
 - Testing policy: the owner does not test on their working machines. Every claim is proven in CI with throwaway HOME directories and real binaries (`tests/real-opencode.sh`).
 - Commits are authored by the owner (`git config user.name/user.email` set to their GitHub no-reply address) with a `Co-Authored-By` trailer for the agent.
-- Since session 6: Node.js 20.12+ and one more dependency, `@clack/prompts` (menus only on a real terminal). Network choices live in `scripts/lib/network.mjs` (`options.network` in `state.json`, `privacy` derived from it, so adapters can still read `opts.privacy`); undocumented settings in `scripts/lib/unverified.mjs` are never configured, only saved as user notes under `~/.config/lean-agents/notes/`.
+- Since session 6: Node.js 22.20+ (20.12+ before 0.6.0) and one more dependency, `@clack/prompts` (menus only on a real terminal). Network choices live in `scripts/lib/network.mjs` (`options.network` in `state.json`, `privacy` derived from it, so adapters can still read `opts.privacy`); undocumented settings in `scripts/lib/unverified.mjs` are never configured, only saved as user notes under `~/.config/lean-agents/notes/`.
 - Session 7 (2026-11-03): adapters `vscode-copilot` and `cursor`, `--project <dir>` team mode, `docs/claude-with-copilot.md`. Cursor user rules have no file (settings UI only). The VS Code user `mcp.json` path is proven by `code --add-mcp` in `real-vscode` (Linux, macOS); Copilot Chat ships built into VS Code; Cursor skills land in `~/.agents/skills`.
-- Order after 0.5.0 (2026-11-05): sessions 16, 17, 18, 21, 19, 20, then 9. `docs/ROADMAP.md` maps each to its issues and release. Session 9 waits because new visitors should hit the fixed Windows path first.
+- 0.6.0 (2026-11-06) holds sessions 16 to 21; 0.5.1 was folded into it, and the minimum Node is now 22.20 (breaking). The owner tags it. Next, on hold: Session 9 and issues #44, #45, #46, #56. `docs/ROADMAP.md` maps each to its issues and release.
 - Private terms are blocked by `scripts/check-private.sh` using the `PRIVATE_DENYLIST` repository secret in CI and a gitignored `.private-denylist` locally.
 
 ## 1. Product
@@ -103,7 +103,7 @@ lean-agents/
 │  └─ update-models/SKILL.md
 ├─ scripts/
 │  ├─ doctor.sh / doctor.ps1
-│  ├─ render.mjs             # renders core/ into each agent's format (Node 20+)
+│  ├─ render.mjs             # renders core/ into each agent's format (Node 22.20+)
 │  └─ check-private.sh
 ├─ docs/
 │  ├─ SPEC.md                # this file
@@ -125,7 +125,7 @@ Install target on the user's machine: `~/.config/lean-agents/` (Windows: `%USERP
 
 ## 4. Installer behavior
 
-**Architecture (decided in session 2):** `install.sh` and `install.ps1` are thin bootstraps. They make sure git and Node.js 20+ exist, fetch the repo to `~/.config/lean-agents/src`, run `npm ci --omit=dev` (one dependency: `jsonc-parser`, so JSONC comments survive merges) and hand over to `scripts/lean.mjs`. All planning, rendering, merging, backups, tool commands, uninstall and the doctor live in the Node engine, so macOS and Windows share one implementation. Adapters are in `scripts/lib/adapters/<agent>.mjs`; tool prerequisites in `scripts/lib/system.mjs`. The `agents/` and `tools/` folders hold documentation only.
+**Architecture (decided in session 2):** `install.sh` and `install.ps1` are thin bootstraps. They make sure git and Node.js 22.20+ exist, fetch the repo to `~/.config/lean-agents/src`, run `npm ci --omit=dev` (one dependency: `jsonc-parser`, so JSONC comments survive merges) and hand over to `scripts/lean.mjs`. All planning, rendering, merging, backups, tool commands, uninstall and the doctor live in the Node engine, so macOS and Windows share one implementation. Adapters are in `scripts/lib/adapters/<agent>.mjs`; tool prerequisites in `scripts/lib/system.mjs`. The `agents/` and `tools/` folders hold documentation only.
 
 Both installers implement the same flow and flags. Bash uses POSIX-friendly bash 3.2 (macOS default). PowerShell must work in 5.1.
 
@@ -165,7 +165,7 @@ When piped, the script clones (or downloads a release tarball of) the repo to `~
 
 ### 4.3 Flow
 
-1. **Detect** OS, arch, shell, package manager (Homebrew on macOS; winget, then Scoop, on Windows), Node (>=20), git, uv, jq, gh, and installed agents with versions (`claude --version`, `opencode --version` -> decide v1 vs v2 by major, `copilot --version`, Antigravity CLI **VERIFY binary name**).
+1. **Detect** OS, arch, shell, package manager (Homebrew on macOS; winget, then Scoop, on Windows), Node (>=22.20), git, uv, jq, gh, and installed agents with versions (`claude --version`, `opencode --version` -> decide v1 vs v2 by major, `copilot --version`, Antigravity CLI **VERIFY binary name**).
 2. **Plan**: build the full action list from flags + answers. Show it grouped by agent and tool. Ask "Apply? [y/N]" unless `--yes`.
 3. **Back up** every file it will touch into `~/.config/lean-agents/backups/<ISO timestamp>/` keeping relative paths.
 4. **Prerequisites**: install only what the selected tools need (Node for npm tools, uv for Serena, jq for some hooks). Policy: system package manager for system tools, npm only for npm-only packages, native installers for agent CLIs.
@@ -478,7 +478,7 @@ Mark each `[x]` when merged.
 - [x] **Session 18 — Pick only what you need, pin what runs** (0.6.0). Issues #30, #33, #40.
 - [x] **Session 21 — Lean CI: pinned on PRs, latest daily** (0.6.0, after session 18). Issue #42.
 - [x] **Session 19 — Migrate from one harness to another** (0.6.0). Issue #34.
-- [ ] **Session 20 — Install with an agent, opt-in feedback, gh by default** (0.6.0). Issues #35, #36, #37.
+- [x] **Session 20 — Install with an agent, opt-in feedback, gh by default** (0.6.0). Issues #35, #36, #37.
 
 ### Session 3 — Windows + OpenCode 1.x + wider CI
 
@@ -486,7 +486,7 @@ Branch: `session-3-windows-opencode-v1`.
 
 1. **`install.ps1`** (PowerShell 5.1 and 7), parity with `install.sh`:
    - Same flags in PascalCase (`-DryRun`, `-Yes`, `-Agents`, `-Tools`, `-AllTools`, `-NoTools`, `-Privacy`, `-Profile`, `-Lang`, `-Update`, `-Uninstall`, `-Doctor`); translate them to the engine's `--kebab-case` flags and call `node scripts/lean.mjs`.
-   - Ensure git and Node 20+ with `winget install --id Git.Git -e --scope user` / `winget install --id OpenJS.NodeJS.LTS -e --scope user` after asking; never require admin.
+   - Ensure git and Node 22.20+ with `winget install --id Git.Git -e --scope user` / `winget install --id OpenJS.NodeJS.LTS -e --scope user` after asking; never require admin.
    - Clone or update `%USERPROFILE%\.config\lean-agents\src`, run `npm ci --omit=dev`, then hand over to the engine.
    - Works when piped: `& ([scriptblock]::Create((irm <raw url>))) -DryRun`.
    - Lint with PSScriptAnalyzer in CI.

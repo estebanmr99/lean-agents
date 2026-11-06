@@ -321,7 +321,7 @@ test('--uninstall leaves Copilot mcp-config.json valid (mcpServers present) or r
 });
 
 test('Context Mode 2 is skipped below Node 24.15, with one line saying how to fix it', () => {
-  for (const v of ['20.12.0', '22.23.4', '24.14.9']) {
+  for (const v of ['22.20.0', '22.23.4', '24.14.9']) {
     assert.equal(contextModeNodeNote(v), `Context Mode 2 needs Node 24.15+, found ${v}: skipped. Upgrade Node (or nvm install 24) and run --update.`);
   }
   for (const v of ['24.15.0', '24.22.2', '25.0.0', '26.12.1']) assert.equal(contextModeNodeNote(v), '');
