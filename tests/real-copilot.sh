@@ -2,6 +2,7 @@
 # Installs lean-agents with real tools into a throwaway HOME and asks the real Copilot CLI
 # what it loaded, then uninstalls. No login and no TTY. Used by CI; safe locally.
 set -euo pipefail
+trap 'echo "failed at line $LINENO" >&2' ERR
 
 # `! cmd` never stops a set -e script, so negative checks go through this.
 refute() { if "$@"; then echo "must not succeed: $*" >&2; exit 1; fi; }
@@ -39,10 +40,13 @@ grep -q 'copilot-instructions.md' "$HOME/rules.txt"
 copilot skill list </dev/null > "$HOME/skills.txt"
 grep -q caveman "$HOME/skills.txt"
 grep -q i-have-adhd "$HOME/skills.txt"
-# Context Mode 2 sets itself up with `context-mode setup`; it is not in `copilot plugin list`. Show where it wrote.
-context-mode setup --list </dev/null
-grep -rl context-mode "$dir" || true
-grep -rqs context-mode "$dir"
+# Context Mode 2 registers itself with `copilot mcp add` (upstream docs/install/copilot-cli.md), so it shows in `mcp list`.
+# Print what setup sees first, so a failure here explains itself.
+context-mode --version
+context-mode setup --list </dev/null || true
+context-mode setup --yes --agents copilot-cli --verbose </dev/null || echo "context-mode setup exit=$?"
+find "$dir" -type f | sort
+grep -q '"context-mode"' "$HOME/mcp.txt" || { echo "context-mode missing from the mcp list above" >&2; copilot mcp list --json </dev/null | grep -q '"context-mode"'; }
 
 node "$repo/scripts/lean.mjs" --doctor </dev/null
 
@@ -57,5 +61,6 @@ refute compgen -G "$dir/agents/gsd-*"
 refute grep -qs 'lean-agents:start' "$dir/copilot-instructions.md"
 refute grep -qs serena "$dir/mcp-config.json"
 refute grep -qs playwright-extension "$dir/mcp-config.json"
-refute grep -rqs context-mode "$dir"
+copilot mcp list --json </dev/null > "$HOME/mcp-after.txt"
+refute grep -q '"context-mode"' "$HOME/mcp-after.txt"
 echo "real-copilot: OK"

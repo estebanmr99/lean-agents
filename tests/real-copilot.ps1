@@ -31,8 +31,13 @@ if ((copilot mcp list --json | Out-String) -notmatch '"playwright"') { throw 'Co
 if ((copilot instruction list | Out-String) -notmatch 'copilot-instructions.md') { throw 'Copilot does not see the rules' }
 $skills = copilot skill list | Out-String
 if ($skills -notmatch 'caveman' -or $skills -notmatch 'i-have-adhd') { throw 'Copilot does not see the skills' }
-# Context Mode 2 sets itself up with `context-mode setup`; it is not in `copilot plugin list`.
-if (-not (Get-ChildItem $copilot -Recurse -File -ErrorAction SilentlyContinue | Select-String -Pattern 'context-mode' -List)) { throw 'Context Mode setup left nothing in the Copilot folder' }
+# Context Mode 2 registers itself with `copilot mcp add` (upstream docs/install/copilot-cli.md), so it shows in `mcp list`.
+# Print what setup sees first, so a failure here explains itself.
+context-mode --version
+context-mode setup --list
+context-mode setup --yes --agents copilot-cli --verbose
+Get-ChildItem $copilot -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }
+if ((copilot mcp list --json | Out-String) -notmatch '"context-mode"') { throw 'Copilot does not see Context Mode' }
 
 & "$repo\install.ps1" -Doctor
 
@@ -40,4 +45,4 @@ if (-not (Get-ChildItem $copilot -Recurse -File -ErrorAction SilentlyContinue | 
 if (Test-Path "$copilot\agents\planner.agent.md") { throw 'subagents were not removed' }
 if (Test-Path $rtkHook) { throw 'RTK hook was not removed' }
 if (Test-Path "$dir\.agents\skills\caveman") { throw 'Caveman skills were not removed' }
-if (Get-ChildItem $copilot -Recurse -File -ErrorAction SilentlyContinue | Select-String -Pattern 'context-mode' -List) { throw 'Context Mode was not removed' }
+if ((copilot mcp list --json | Out-String) -match '"context-mode"') { throw 'Context Mode was not removed' }
