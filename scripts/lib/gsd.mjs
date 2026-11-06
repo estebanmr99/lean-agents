@@ -3,8 +3,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadProfile, modelFor } from './render.mjs';
+import { npmSpec } from './pins.mjs';
 
-const PACKAGE = '@opengsd/gsd-core@latest';
+const PACKAGE = npmSpec('gsd-core');
 const FLAGS = { claude: '--claude', 'opencode-v1': '--opencode', 'opencode-v2': '--opencode', 'copilot-cli': '--copilot', antigravity: '--antigravity', cursor: '--cursor' };
 
 export function gsdProfileName(o) {

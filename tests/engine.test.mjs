@@ -14,6 +14,7 @@ import { prereqFor, antigravityPrereqs, bunInstall, contextModeNodeNote } from '
 import { doctor } from '../scripts/lib/doctor.mjs';
 import { detectTerminals, terminalCommands, gitBashActions, stillNeeded } from '../scripts/lib/terminals.mjs';
 import { vscodeUserDir } from '../scripts/lib/adapters/vscode-copilot.mjs';
+import { npmSpec, PINS } from '../scripts/lib/pins.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ALL = ['--yes', '--no-exec', '--agents', 'claude,opencode-v2', '--all-tools', '--privacy', 'strict', '--lang', 'en', '--profile', 'vertex-gemini', '--adhd-always', '--ponytail-mode', 'lite'];
@@ -133,14 +134,14 @@ test('rules say when to use each installed tool', () => {
 test('OpenCode 1.x gets singular keys, no Context Mode MCP, and a clean uninstall', () => {
   const home = userHome();
   const before = snapshot(home);
-  assert.match(lean(home, ['--dry-run', '--yes', '--no-exec', '--agents', 'opencode-v1', '--tools', 'context-mode', '--lang', 'en']), /npm install -g context-mode/);
+  assert.match(lean(home, ['--dry-run', '--yes', '--no-exec', '--agents', 'opencode-v1', '--tools', 'context-mode', '--lang', 'en']), /npm install -g context-mode@\d/);
   const args = ['--yes', '--no-exec', '--agents', 'opencode-v1', '--all-tools', '--privacy', 'strict', '--lang', 'en', '--profile', 'anthropic-api', '--ponytail-mode', 'lite'];
   lean(home, args);
   const oc = parse(fs.readFileSync(path.join(home, '.config', 'opencode', 'opencode.jsonc'), 'utf8'), [], { allowTrailingComma: true });
   assert.equal(oc.agent.plan.model, 'anthropic/claude-opus-5-5');
   assert.ok(oc.mcp.serena.enabled && oc.mcp.playwright.enabled);
   assert.equal(oc.mcp['context-mode'], undefined);
-  assert.deepEqual(oc.plugin, ['context-mode', '@dietrichgebert/ponytail', '@tarquinen/opencode-dcp@latest']);
+  assert.deepEqual(oc.plugin, ['context-mode', '@dietrichgebert/ponytail', npmSpec('opencode-dcp')]);
   assert.equal(oc.compaction.reserved, 40000);
   assert.equal(oc.autoupdate, false);
   assert.equal(oc.experimental.openTelemetry, false);
@@ -265,8 +266,8 @@ test('--all-tools leaves out opt-in tools; --tools adds them', () => {
   assert.match(all, /tools: .*codeburn/);
   assert.ok(!/tools: .*autoskills/.test(all));
   const some = lean(home, [...NEW, '--dry-run', '--tools', 'gsd,autoskills']);
-  assert.match(some, /@opengsd\/gsd-core@latest --copilot --global/);
-  assert.match(some, /@opengsd\/gsd-core@latest --antigravity --global/);
+  assert.match(some, /@opengsd\/gsd-core@\d[\d.]* --copilot --global/);
+  assert.match(some, /@opengsd\/gsd-core@\d[\d.]* --antigravity --global/);
 });
 
 test('--no-core installs only the listed tools, and --update keeps it', () => {
@@ -285,7 +286,7 @@ test('--no-core installs only the listed tools, and --update keeps it', () => {
 test('GSD plans --cursor and skips agents without an installer instead of crashing', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
   const out = lean(home, ['--no-exec', '--yes', '--dry-run', '--agents', 'cursor,vscode-copilot', '--tools', 'gsd']);
-  assert.match(out, /@opengsd\/gsd-core@latest --cursor --global/);
+  assert.match(out, /@opengsd\/gsd-core@\d[\d.]* --cursor --global/);
   assert.match(out, /no installer for vscode-copilot: skipped/);
 });
 
@@ -728,7 +729,7 @@ test('Cursor: subagents, MCP, kept user values, no global rules, full uninstall'
   const before = snapshot(home);
   const out = lean(home, ['--yes', '--no-exec', '--agents', 'cursor', '--all-tools', '--privacy', 'strict', '--lang', 'en', '--adhd-always', '--ponytail-mode', 'off']);
   assert.match(out, /rtk init -g --agent cursor/);
-  assert.match(out, /skills add JuliusBrussee\/caveman .* -a cursor -g/);
+  assert.match(out, /skills@\d[\d.]* add JuliusBrussee\/caveman#v[\d.]+ .* -a cursor -g/);
   assert.match(out, /Privacy Mode in Cursor/);
 
   const mcp = JSON.parse(fs.readFileSync(path.join(dir, 'mcp.json'), 'utf8')).mcpServers;
@@ -769,7 +770,7 @@ test('playwright-extension: opt-in, written for agents without a browser, never 
   assert.ok(!/claude mcp add .*playwright-extension/.test(out));
   assert.ok(!out.includes('PLAYWRIGHT_MCP_EXTENSION_TOKEN'));
   const read = (...p) => parse(fs.readFileSync(path.join(...p), 'utf8'));
-  const ext = ['-y', '@playwright/mcp@latest', '--extension'];
+  const ext = ['-y', npmSpec('playwright-mcp'), '--extension'];
   assert.deepEqual(read(home, '.config', 'opencode', 'opencode.jsonc').mcp.servers['playwright-extension'].command, ['npx', ...ext]);
   assert.deepEqual(read(home, '.copilot', 'mcp-config.json').mcpServers['playwright-extension'].args, ext);
   assert.deepEqual(read(home, '.cursor', 'mcp.json').mcpServers['playwright-extension'].args, ext);
@@ -874,7 +875,7 @@ test('terminals: nothing detected means no integration; --terminal adds Warp and
   const before = snapshot(home);
   const plan = lean(home, [...base, '--dry-run', '--terminal', 'both'], env);
   assert.match(plan, /claude plugin install warp@claude-code-warp/);
-  assert.match(plan, /skills add https:\/\/github.com\/stablyai\/orca --skill orca-cli -a claude-code opencode -g -y/);
+  assert.match(plan, /skills@\d[\d.]* add stablyai\/orca#v[\d.]+ --skill orca-cli -a claude-code opencode -g -y/);
   lean(home, [...base, '--terminal', 'warp']);
   const oc = parse(fs.readFileSync(path.join(home, '.config', 'opencode', 'opencode.jsonc'), 'utf8'), [], { allowTrailingComma: true });
   assert.ok(oc.plugins.includes('@warp-dot-dev/opencode-warp'));
@@ -1006,4 +1007,19 @@ test('Antigravity app and CLI install only through verified ids, else print the 
   // The Windows CLI id has no documented scope, so it is never run; only the app (scope user) is.
   assert.ok(antigravityPrereqs(null, 'win32', home).every((c) => c.manual || c.note));
   assert.ok(!runs('winget', 'win32').some((r) => r.includes('AntigravityCLI')));
+});
+
+test('core/pins.json: every pin has version, date and a CI job that exists; no plan fetches @latest or an unpinned skill', () => {
+  const ci = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8');
+  for (const [key, p] of Object.entries(PINS)) {
+    assert.match(p.version, /^v?\d+\.\d+\.\d+$/, key);
+    assert.match(p.verified, /^\d{4}-\d{2}-\d{2}$/, key);
+    assert.ok(new RegExp(`^  ${p.ci}:`, 'm').test(ci), `${key}: no CI job ${p.ci}`);
+  }
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const tools = 'serena,playwright,playwright-extension,caveman,i-have-adhd,dcp,codeburn,gsd,autoskills,context-mode';
+  const out = ['claude,opencode-v1,copilot-cli,cursor', 'opencode-v2,antigravity,vscode-copilot']
+    .map((agents) => lean(home, ['--yes', '--no-exec', '--dry-run', '--agents', agents, '--tools', tools, '--terminal', 'orca'])).join('\n');
+  assert.ok(!/@latest/.test(out), 'plan contains @latest');
+  for (const line of out.split('\n').filter((l) => /skills[@ ].* add /.test(l))) assert.match(line, /skills@\d[\d.]* add \S+#v\d/, line);
 });

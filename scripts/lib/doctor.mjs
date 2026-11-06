@@ -7,6 +7,7 @@ import { stillNeeded } from './terminals.mjs';
 import { adhdSkillFiles } from './adhd.mjs';
 import { proxyReport } from './network.mjs';
 import { leftovers } from './parallel.mjs';
+import { npmSpec } from './pins.mjs';
 
 const CORE_AGENTS = ['debug', 'explore', 'planner', 'research', 'review'];
 const SECRET_KEY = /(key|token|secret|password|auth)/i;
@@ -109,8 +110,8 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node 
       if (o.agents.includes('copilot-cli')) checkCopilot(o, add);
       if (o.agents.includes('antigravity')) checkAntigravity(o, CORE_AGENTS, add);
       // npx may have to download, which takes longer than a local check.
-      if (o.tools.includes('codeburn')) add('codeburn runs', quiet(['npx', '-y', 'codeburn', '--version'], 120000).ok ? 'ok' : 'error');
-      if (o.tools.includes('autoskills')) add('autoskills runs', quiet(['npx', '-y', 'autoskills', '--help'], 120000).ok ? 'ok' : 'error');
+      if (o.tools.includes('codeburn')) add('codeburn runs', quiet(['npx', '-y', npmSpec('codeburn'), '--version'], 120000).ok ? 'ok' : 'error');
+      if (o.tools.includes('autoskills')) add('autoskills runs', quiet(['npx', '-y', npmSpec('autoskills'), '--help'], 120000).ok ? 'ok' : 'error');
     }
   }
   const left = leftovers(process.cwd());

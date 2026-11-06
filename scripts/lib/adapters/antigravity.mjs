@@ -3,6 +3,7 @@ import path from 'node:path';
 import { OWNED_MARK } from '../fsops.mjs';
 import { tierFor, modelFor } from '../render.mjs';
 import { localServer } from './opencode-v2.mjs';
+import { skillSource, skillsCli } from '../pins.mjs';
 
 const TOOLS = {
   'read-only': ['view_file', 'grep_search', 'find_by_name'],
@@ -33,9 +34,9 @@ export function renderAntigravityAgent(agent, profile) {
 const skills = (tool, desc, repo, names) => ({
   tool,
   desc,
-  run: [['npx', '-y', 'skills', 'add', repo, '--skill', ...names, '-a', 'antigravity-cli', '-g', '-y']],
+  run: [['npx', '-y', skillsCli(), 'add', repo, '--skill', ...names, '-a', 'antigravity-cli', '-g', '-y']],
   // Without -a: `remove -a` keeps ~/.agents/skills while another detected agent may share that folder.
-  undo: [['npx', '-y', 'skills', 'remove', ...names, '-g', '-y']],
+  undo: [['npx', '-y', skillsCli(), 'remove', ...names, '-g', '-y']],
 });
 
 export function antigravityAdapter({ home, core, profile, opts, rules, adhdCommand }) {
@@ -62,10 +63,10 @@ export function antigravityAdapter({ home, core, profile, opts, rules, adhdComma
     console.log('Context Mode has no Antigravity setup in v2: skipped. Check `context-mode setup --list` for support.');
   }
   if (tools.includes('caveman')) {
-    commands.push(skills('caveman', 'Caveman skills for Antigravity', 'JuliusBrussee/caveman', ['caveman', 'caveman-compress', 'caveman-stats']));
+    commands.push(skills('caveman', 'Caveman skills for Antigravity', skillSource('caveman'), ['caveman', 'caveman-compress', 'caveman-stats']));
   }
   if (tools.includes('i-have-adhd')) {
-    commands.push(skills('i-have-adhd', 'i-have-adhd skill for Antigravity', 'ayghri/i-have-adhd', ['i-have-adhd']), adhdCommand);
+    commands.push(skills('i-have-adhd', 'i-have-adhd skill for Antigravity', skillSource('i-have-adhd'), ['i-have-adhd']), adhdCommand);
   }
   return { actions, commands };
 }

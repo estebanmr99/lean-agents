@@ -4,6 +4,7 @@ import path from 'node:path';
 import { OWNED_MARK } from '../fsops.mjs';
 import { tierFor, modelFor } from '../render.mjs';
 import { privacyOf } from '../network.mjs';
+import { skillSource, skillsCli } from '../pins.mjs';
 
 const TOOLS = {
   'read-only': 'Read, Grep, Glob',
@@ -69,7 +70,7 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
     commands.push({ tool: 'ponytail', desc: 'Ponytail plugin', ...plugin('DietrichGebert/ponytail', 'ponytail@ponytail') });
   }
   if (tools.includes('i-have-adhd')) {
-    commands.push({ tool: 'i-have-adhd', desc: 'i-have-adhd plugin', ...plugin('ayghri/i-have-adhd', 'i-have-adhd@i-have-adhd') }, adhdCommand);
+    commands.push({ tool: 'i-have-adhd', desc: 'i-have-adhd plugin', ...plugin(skillSource('i-have-adhd'), 'i-have-adhd@i-have-adhd') }, adhdCommand);
     if (opts.adhdAlways) actions.push({ kind: 'file', path: path.join(dir, '.i-have-adhd-always'), content: '' , force: true });
   }
   for (const name of ['serena', 'playwright']) {
@@ -89,8 +90,8 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
     commands.push({
       tool: 'caveman',
       desc: 'Caveman skills for Claude Code',
-      run: [['npx', '-y', 'skills', 'add', 'JuliusBrussee/caveman', '--skill', 'caveman', 'caveman-compress', 'caveman-stats', '-a', 'claude-code', '-g', '-y']],
-      undo: [['npx', '-y', 'skills', 'remove', 'caveman', 'caveman-compress', 'caveman-stats', '-a', 'claude-code', '-g', '-y']],
+      run: [['npx', '-y', skillsCli(), 'add', skillSource('caveman'), '--skill', 'caveman', 'caveman-compress', 'caveman-stats', '-a', 'claude-code', '-g', '-y']],
+      undo: [['npx', '-y', skillsCli(), 'remove', 'caveman', 'caveman-compress', 'caveman-stats', '-a', 'claude-code', '-g', '-y']],
     });
   }
   return { actions, commands };

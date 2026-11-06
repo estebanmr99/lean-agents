@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { npmSpec } from './pins.mjs';
 
 const isWin = process.platform === 'win32';
 
@@ -74,7 +75,7 @@ export function prereqFor(tool, pm) {
     case 'rtk':
       return { bin: 'rtk', install: brew('rtk') ?? winget('rtk-ai.rtk'), manual: 'https://github.com/rtk-ai/rtk#installation' };
     case 'context-mode':
-      return { bin: 'context-mode', install: [['npm', 'install', '-g', 'context-mode@2.1.4']] };
+      return { bin: 'context-mode', install: [['npm', 'install', '-g', npmSpec('context-mode')]] };
     case 'serena':
       return { bin: 'uvx', install: brew('uv') ?? winget('astral-sh.uv'), manual: 'https://docs.astral.sh/uv/getting-started/installation/' };
     case 'playwright':

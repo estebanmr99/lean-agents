@@ -1,0 +1,15 @@
+{
+  "note": "Known-good versions fetched at run time. Bump only after the real-* job in 'ci' passes with the new version; 'verified' is the day the version was checked against npm or the git tag. Never use a version published in the last 14 days.",
+  "pins": {
+    "skills-cli": { "kind": "npm", "source": "skills", "version": "1.7.4", "verified": "2026-11-05", "ci": "real-skills-undo" },
+    "playwright-mcp": { "kind": "npm", "source": "@playwright/mcp", "version": "0.0.83", "verified": "2026-11-05", "ci": "real-tools" },
+    "context-mode": { "kind": "npm", "source": "context-mode", "version": "2.1.4", "verified": "2026-11-05", "ci": "real-claude" },
+    "codeburn": { "kind": "npm", "source": "codeburn", "version": "0.9.27", "verified": "2026-11-05", "ci": "real-tools" },
+    "autoskills": { "kind": "npm", "source": "autoskills", "version": "0.4.1", "verified": "2026-11-05", "ci": "real-tools" },
+    "gsd-core": { "kind": "npm", "source": "@opengsd/gsd-core", "version": "1.18.0", "verified": "2026-11-05", "ci": "real-tools" },
+    "opencode-dcp": { "kind": "npm", "source": "@tarquinen/opencode-dcp", "version": "3.2.0", "verified": "2026-11-05", "ci": "real-opencode-v1" },
+    "caveman": { "kind": "skill", "source": "JuliusBrussee/caveman", "version": "v4.0.1", "verified": "2026-11-05", "ci": "real-claude" },
+    "i-have-adhd": { "kind": "skill", "source": "ayghri/i-have-adhd", "version": "v0.4.1", "verified": "2026-11-05", "ci": "real-tools" },
+    "orca-cli": { "kind": "skill", "source": "stablyai/orca", "version": "v1.4.99", "verified": "2026-11-05", "ci": "real-terminals" }
+  }
+}

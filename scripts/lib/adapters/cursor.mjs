@@ -4,6 +4,7 @@ import path from 'node:path';
 import { OWNED_MARK } from '../fsops.mjs';
 import { localServer } from './opencode-v2.mjs';
 import { hasProxy } from '../network.mjs';
+import { skillSource, skillsCli } from '../pins.mjs';
 
 // Model IDs differ from every profile, so subagents inherit the chat model.
 export function renderCursorAgent(agent) {
@@ -32,9 +33,9 @@ export function cursorServers(core, tools) {
 const skills = (tool, desc, repo, names) => ({
   tool,
   desc,
-  run: [['npx', '-y', 'skills', 'add', repo, '--skill', ...names, '-a', 'cursor', '-g', '-y']],
+  run: [['npx', '-y', skillsCli(), 'add', repo, '--skill', ...names, '-a', 'cursor', '-g', '-y']],
   // Without -a: `remove -a` keeps ~/.agents/skills while another detected agent may share that folder.
-  undo: [['npx', '-y', 'skills', 'remove', ...names, '-g', '-y']],
+  undo: [['npx', '-y', skillsCli(), 'remove', ...names, '-g', '-y']],
 });
 
 export function cursorAdapter({ home, core, opts, adhdCommand }) {
@@ -51,10 +52,10 @@ export function cursorAdapter({ home, core, opts, adhdCommand }) {
     commands.push({ tool: 'rtk', desc: 'RTK hook for Cursor', run: [['rtk', 'init', '-g', '--agent', 'cursor']], undo: [['rtk', 'init', '-g', '--agent', 'cursor', '--uninstall']] });
   }
   if (tools.includes('caveman')) {
-    commands.push(skills('caveman', 'Caveman skills for Cursor', 'JuliusBrussee/caveman', ['caveman', 'caveman-compress', 'caveman-stats']));
+    commands.push(skills('caveman', 'Caveman skills for Cursor', skillSource('caveman'), ['caveman', 'caveman-compress', 'caveman-stats']));
   }
   if (tools.includes('i-have-adhd')) {
-    commands.push(skills('i-have-adhd', 'i-have-adhd skill for Cursor', 'ayghri/i-have-adhd', ['i-have-adhd']), adhdCommand);
+    commands.push(skills('i-have-adhd', 'i-have-adhd skill for Cursor', skillSource('i-have-adhd'), ['i-have-adhd']), adhdCommand);
   }
   return { actions, commands };
 }
