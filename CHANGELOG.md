@@ -42,7 +42,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
-- Context Mode MCP starts (#107): the command in `core/mcp.json` now ends with `server`, as 2.1.4 requires. A rerun replaces the old lean-agents entry (`npx -y context-mode@<version>`, any version) in OpenCode 2, Cursor and VS Code configs; an entry you edited stays as it is, and `--uninstall` removes it. `tests/real-opencode.sh` sends `initialize` to the registered command.
+- Context Mode MCP starts (#107): the command in `core/mcp.json` now ends with `server`, as 2.1.4 requires. A rerun replaces the old lean-agents entry (`npx -y context-mode@<version>`, any version) in OpenCode 2, Cursor and VS Code configs; an entry you edited stays as it is, and `--uninstall` removes the entry lean-agents wrote. `tests/real-opencode.sh` sends `initialize` to the registered command.
 - Windows: the Orca telemetry reminder shows on a real-home run unless `DO_NOT_TRACK` or `ORCA_TELEMETRY_DISABLED` is already set in the user or machine env; it was always hidden (#76).
 
 ## [0.6.0] - 2026-11-06
