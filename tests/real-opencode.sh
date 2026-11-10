@@ -54,3 +54,31 @@ console.log('compaction:', JSON.stringify(cfg.compaction ?? null));
 console.log('top-level keys:', Object.keys(cfg).sort().join(', '));
 if (failed) { console.log('--- config ---'); console.log(out.split('\n').slice(0, 150).join('\n')); console.log('--- agents ---'); console.log(agentsOut.slice(0, 4000)); process.exit(1); }
 JS
+
+# The registered Context Mode command must start an MCP server (#107): run it as written and send `initialize`.
+node --input-type=module - "$HOME/resolved.txt" "$repo" <<'JS'
+import fs from 'node:fs';
+import { spawn } from 'node:child_process';
+const { resolvedOpenCodeConfig } = await import(`${process.argv[3]}/scripts/lib/doctor.mjs`);
+const { contextModeNodeNote } = await import(`${process.argv[3]}/scripts/lib/system.mjs`);
+if (contextModeNodeNote(process.versions.node)) { console.log('skip  context-mode initialize (Node < 24.15)'); process.exit(0); }
+const cfg = resolvedOpenCodeConfig(fs.readFileSync(process.argv[2], 'utf8'));
+const [cmd, ...args] = (cfg.mcp?.servers ?? cfg.mcp)['context-mode'].command;
+const child = spawn(cmd, args, { stdio: ['pipe', 'pipe', 'inherit'] });
+const timer = setTimeout(() => { console.log('FAIL  context-mode: no initialize reply in 120s'); child.kill(); process.exit(1); }, 120000);
+let buf = '';
+child.on('exit', (code) => { console.log(`FAIL  context-mode exited (${code}) before replying to initialize`); process.exit(1); });
+child.stdout.on('data', (d) => {
+  buf += d;
+  for (const line of buf.split('\n')) {
+    let msg; try { msg = JSON.parse(line); } catch { continue; }
+    if (msg.id !== 1) continue;
+    console.log(`initialize reply: ${line}`);
+    const name = msg.result?.serverInfo?.name;
+    console.log(`${name === 'context-mode' ? 'ok    ' : 'FAIL  '} context-mode initialize serverInfo.name = ${name}`);
+    clearTimeout(timer); child.removeAllListeners('exit'); child.kill();
+    process.exit(name === 'context-mode' ? 0 : 1);
+  }
+});
+child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'lean-agents-ci', version: '0' } } }) + '\n');
+JS

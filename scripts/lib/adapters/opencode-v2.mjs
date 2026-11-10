@@ -42,6 +42,16 @@ export function localServer(core, name) {
   return { type: 'local', command, enabled: true };
 }
 
+// MCP entry edit. Context Mode entries written before it needed `server` are replaced by a rerun;
+// `legacy` is that old shape (any version, `*` is a wildcard). Anything else the user has is kept.
+export function mcpEdit(path, value) {
+  if (!JSON.stringify(value).includes('context-mode@')) return { path, value, mode: 'setIfAbsent' };
+  const old = (v) => Array.isArray(v) ? v.filter((a) => a !== 'server').map(old)
+    : typeof v === 'string' ? v.replace(/^context-mode@.+$/, 'context-mode@*')
+      : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, old(x)])) : v;
+  return { path, value, mode: 'upgradeIf', legacy: [old(value)] };
+}
+
 export function profileEdits(profile, agentsKey) {
   if (!profile) return [];
   const edits = [];
@@ -121,7 +131,7 @@ export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
   ];
 
   for (const name of ['context-mode', 'serena', 'playwright', 'playwright-extension']) {
-    if (tools.includes(name)) edits.push({ path: ['mcp', 'servers', name], value: localServer(core, name), mode: 'setIfAbsent' });
+    if (tools.includes(name)) edits.push(mcpEdit(['mcp', 'servers', name], localServer(core, name)));
   }
   if (tools.includes('ponytail')) edits.push({ path: ['plugins'], value: '@dietrichgebert/ponytail', mode: 'arrayAdd' });
   if (opts.terminals?.includes('warp')) edits.push({ path: ['plugins'], value: WARP_OPENCODE_PLUGIN, mode: 'arrayAdd' });

@@ -119,3 +119,24 @@ test('--uninstall --yes keeps the backups; dropBackups deletes them', () => {
   dropBackups(backups);
   assert.equal(fs.existsSync(backups), false);
 });
+
+test('a rerun fixes the old Context Mode entry, keeps an edited one, and uninstall removes it', () => {
+  const run = (home, mcp) => {
+    fs.mkdirSync(path.join(home, '.cursor'), { recursive: true });
+    const file = path.join(home, '.cursor', 'mcp.json');
+    fs.writeFileSync(file, mcp);
+    lean(home, ['--yes', '--no-exec', '--agents', 'cursor', '--tools', 'context-mode', '--lang', 'en']);
+    return file;
+  };
+  const entry = (args) => `{\n  "mcpServers": {\n    "context-mode": ${JSON.stringify({ command: 'npx', args })}\n  }\n}\n`;
+
+  const old = tmp();
+  const oldFile = run(old, entry(['-y', 'context-mode@2.0.1']));
+  assert.deepEqual(JSON.parse(fs.readFileSync(oldFile, 'utf8')).mcpServers['context-mode'].args.slice(-1), ['server']);
+  lean(old, ['--uninstall', '--yes']);
+  assert.equal(JSON.parse(fs.readFileSync(oldFile, 'utf8')).mcpServers?.['context-mode'], undefined);
+
+  const mine = tmp();
+  const edited = entry(['-y', 'context-mode@2.0.1', '--my-flag']);
+  assert.equal(fs.readFileSync(run(mine, edited), 'utf8'), edited);
+});
