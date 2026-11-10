@@ -80,7 +80,7 @@ Separate from the install-time commands above: code the agents download every ti
 | Serena (`uvx --from git+https://github.com/oraios/serena`) | | default branch |
 | RTK, `gh` (brew, winget), the Ponytail plugin, Claude plugin marketplaces | | latest from their source |
 
-A `version-watch` issue opens when upstream ships a newer version; pins change only after you approve (`skills/update-models`, section "Tool versions").
+A green `ci-latest` run opens one pin-bump PR when upstream ships a newer version; pins change only after you merge it (`skills/update-models`, section "Tool versions").
 
 ## Network hosts
 

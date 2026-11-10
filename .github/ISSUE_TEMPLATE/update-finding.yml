@@ -1,7 +1,7 @@
 # For lean-update and agents that find a newer upstream version, a drifted pin or a failed check.
 # Fields the feedback flow fills today: os, version and agents (its `versions` map), command, error.
 # Not filled yet, an agent adds it if it knows it: preset (`--network`).
-# The daily version-watch workflow files its own issues with the labels `version-watch` and `type: update`.
+# Upstream updates reach the repo through the pin-bump PR from `ci-latest`, not this form; file it for a finding a person or agent reports by hand.
 name: Update finding
 description: A pinned tool has a newer version, drifted, or broke on update
 title: "update: "

@@ -21,7 +21,7 @@ description: Compare the tier-to-model mapping with the models the account can u
 `core/pins.json` lists the versions lean-agents fetches at run time, each with the day it was verified and the CI job that proves it.
 
 1. For each entry, find the newest release: `npm view <source> version time --json` for `npm`, `git ls-remote --tags https://github.com/<source>` for `skill`. Skip anything published in the last 14 days.
-2. Show a table: pin, current version, newer version, release-notes link, the `ci` job to run first. An open `version-watch` issue has the same data.
+2. Show a table: pin, current version, newer version, release-notes link, the `ci` job to run first. The open pin-bump PR from `ci-latest` has the same data.
 3. Write nothing before the user approves. After approval, change only `version` and `verified` for the approved entries, and ask the user to run the listed `real-*` job (or `tests/real-*.sh` in a sandbox HOME) before merging.
 4. Also update the literal versions in docs: `skills/token-audit/SKILL.md` (codeburn) and `docs/manual-install.md`.
 5. `--update` installs the new pins; `--doctor` reports `changed` rows until it runs.
