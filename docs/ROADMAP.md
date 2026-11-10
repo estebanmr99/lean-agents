@@ -35,9 +35,12 @@ Scope and order from the architecture checkpoint [`docs/checkpoints/0.7.0.md`](c
 | 68 — File safety and redaction | [#68](https://github.com/estebanmr99/lean-agents/issues/68), [#67](https://github.com/estebanmr99/lean-agents/issues/67), [#74](https://github.com/estebanmr99/lean-agents/issues/74), [#72](https://github.com/estebanmr99/lean-agents/issues/72) | No symlink or out-of-home writes, more token formats redacted, child env allowlist, doctor obeys the network preset |
 | 71 — Contributor and governance docs | [#71](https://github.com/estebanmr99/lean-agents/issues/71), [#73](https://github.com/estebanmr99/lean-agents/issues/73) | Dev setup, adapter path, `SECURITY.md`, PR template, `CODEOWNERS` |
 | 79 — OpenCode 1.x safety and Orca | [#79](https://github.com/estebanmr99/lean-agents/issues/79), [#78](https://github.com/estebanmr99/lean-agents/issues/78) | Never cross OpenCode 1.x to 2.x, warn about session loss; Orca status icons on OpenCode 1.19 |
+| 107 — Context Mode MCP starts with server | [#107](https://github.com/estebanmr99/lean-agents/issues/107) | `core/mcp.json` registers Context Mode with the server subcommand |
+| 108 — One update channel (done) | [#108](https://github.com/estebanmr99/lean-agents/issues/108) | The pin-bump PR from `ci-latest` is the only update channel; `version-watch` workflow removed |
+| 93 — migrate owned-file check | [#93](https://github.com/estebanmr99/lean-agents/issues/93) | Owned-file check matches the mark only where it belongs |
 | 64 — Pin and verify downloaded code | [#64](https://github.com/estebanmr99/lean-agents/issues/64), [#66](https://github.com/estebanmr99/lean-agents/issues/66), [#75](https://github.com/estebanmr99/lean-agents/issues/75) | Serena, Context Mode, ponytail, Warp and the Bun installer pinned and checked |
 | 50 — Pin bumps | [#50](https://github.com/estebanmr99/lean-agents/issues/50), [#51](https://github.com/estebanmr99/lean-agents/issues/51), [#52](https://github.com/estebanmr99/lean-agents/issues/52) | orca-cli, gsd-core, playwright-mcp |
-| 44 — Context Mode on Node < 24.15 | [#44](https://github.com/estebanmr99/lean-agents/issues/44) | Install Node 24 via nvm, or skip Context Mode |
+| 44 — Context Mode on Node < 24.15 | [#44](https://github.com/estebanmr99/lean-agents/issues/44), [#104](https://github.com/estebanmr99/lean-agents/issues/104) (points 1 to 3) | Install Node 24 via nvm, or skip Context Mode; engines check, `node` field per pin, nvm Node with absolute registration |
 | 65 — How you get it | [#65](https://github.com/estebanmr99/lean-agents/issues/65), [#46](https://github.com/estebanmr99/lean-agents/issues/46) | Bootstraps default to the release tag; `npx lean-agents` from npm |
 | Archive done sessions | — | Finished session blocks move out of `docs/SPEC.md` |
 
@@ -45,6 +48,8 @@ Scope and order from the architecture checkpoint [`docs/checkpoints/0.7.0.md`](c
 
 - [#80](https://github.com/estebanmr99/lean-agents/issues/80): agent lifecycle (optional install, uninstall, migrate, guided major upgrades).
 - [#60](https://github.com/estebanmr99/lean-agents/issues/60): the multi-agent coordinator workflow as an opt-in playbook.
+- [#104](https://github.com/estebanmr99/lean-agents/issues/104) points 4 and 5: Node runtime per tool beyond the 0.7.0 engines check.
+- [#106](https://github.com/estebanmr99/lean-agents/issues/106): adopt a hand-built machine (inventory, back up, one Node, keep OpenCode 1.x sessions).
 
 ## On hold
 
@@ -54,6 +59,7 @@ Scope and order from the architecture checkpoint [`docs/checkpoints/0.7.0.md`](c
 
 ## Later: 1.0.0
 
+- [#103](https://github.com/estebanmr99/lean-agents/issues/103): harness benchmark and personal vs enterprise recommendation (later).
 - Close the **VERIFY** items in `docs/compatibility.md` that need a logged-in app (Antigravity rule and skill loading, Copilot `model` format, VS Code reading Copilot CLI hooks).
 - Codex CLI and Gemini CLI adapters.
 - Tag `v1.0.0` and run the full launch in `docs/launch.md`.

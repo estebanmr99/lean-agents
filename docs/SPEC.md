@@ -486,13 +486,16 @@ Mark each `[x]` when merged.
 
 0.7.0 sessions from the checkpoint, accepted by the owner on 2026-11-06 (order and parallel groups in [`docs/checkpoints/0.7.0.md`](checkpoints/0.7.0.md) section 5):
 
-- [x] **Session 69 — CI trust** (0.7.0). Issues #69, #70, #56. #69 done (PR #83); #70 and #56 done (PR #95). Actions pinned by SHA plus Dependabot, least-privilege tokens, macOS jobs fixed or trimmed, one update channel (pin-bump PR, no per-tool issues), `ci-latest` green. Sonnet.
+- [x] **Session 69 — CI trust** (0.7.0). Issues #69, #70, #56. #69 done (PR #83); #70 and #56 done (PR #95). Actions pinned by SHA plus Dependabot, least-privilege tokens, macOS jobs fixed or trimmed, one update channel (pin-bump PR, no per-tool issues), `ci-latest` green. One update channel and green ci-latest finished in Session 108 (#108). Sonnet.
 - [x] **Session 68 — File safety and redaction** (0.7.0). Issues #68, #67, #74, #72. (PR #94; #72 in PR #89). Opus plans the env allowlist, Sonnet builds.
 - [x] **Session 71 — Contributor and governance docs** (0.7.0). Issues #71, #73. (#71 in PR #88, #73 in this PR). Haiku.
 - [ ] **Session 79 — OpenCode 1.x safety and Orca** (0.7.0). Issues #79, #78. #79 done (PR #86), #76 done (PR #90), #78 open. Never cross OpenCode 1.x to 2.x, warn about session loss; Orca status icons on OpenCode 1.19 (`scripts/lib/terminals.mjs`). After 44 if it touches `scripts/lib/system.mjs`. Sonnet.
+- [ ] **Session 107 — Context Mode MCP starts with server** (0.7.0). Issue #107. Sonnet.
+- [x] **Session 108 — One update channel** (0.7.0). Issue #108. Haiku.
 - [ ] **Session 64 — Pin and verify downloaded code** (0.7.0, after 69). Issues #64, #66, #75. Sonnet.
-- [ ] **Session 50 — Pin bumps** (0.7.0, after 64). Issues #50, #51, #52. Haiku.
-- [ ] **Session 44 — Context Mode on Node < 24.15** (0.7.0, after 64). Issue #44. Sonnet.
+- [ ] **Session 93 — migrate owned-file check** (0.7.0). Issue #93. Sonnet.
+- [ ] **Session 50 — Pin bumps** (0.7.0, after 64). Issues #50, #51, #52. Merge the ci-latest pin-bump PR instead of hand bumps; keep opencode-v1 at 1.19.0 (work PC version); also closes #97 to #102. Haiku.
+- [ ] **Session 44 — Context Mode on Node < 24.15** (0.7.0, after 64). Issues #44 and #104 points 1 to 3 (engines check, `node` field per pin, matching nvm Node with absolute registration). Opus plans, Sonnet builds. #104 points 4 and 5 and #106 go to 0.8.0; #103 later.
 - [ ] **Session 65 — How you get it: release tag default, npm package** (0.7.0, after #58, 69 and 44). Issues #65, #46. Opus plans, Sonnet builds.
 - [ ] **Archive done sessions** (0.7.0, last, alone). Checkpoint Q3: move finished session blocks to `docs/sessions-done.md`, one line each stays here. Haiku.
 

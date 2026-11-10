@@ -6,6 +6,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Changed
 
+- One update channel (#108): the pin-bump PR from a green `ci-latest` run is the only way upstream versions reach `core/pins.json`. The `version-watch` workflow is removed, so no per-tool update issues open; `scripts/version-watch.mjs` stays because other scripts import it.
 - Workflow tokens are least-privilege (#70, W2, W3): every `actions/checkout` sets `persist-credentials: false` and a `lint` step fails when one does not. `release.yml` builds and tests with `contents: read` and uploads `dist/`; a separate `publish` job holds `contents: write`, runs no repo code, and only downloads the artifact and runs `gh release create`. The pin-bump job pushes with the token in that step's env only.
 - macOS real-* legs (Copilot CLI, Antigravity, VS Code, Skills CLI undo) run on push to main, the daily `ci-latest` and manual runs, not on pull requests (#56): every PR run started five macOS jobs at once and some never got a runner. `test (macos-latest)` still runs on PRs.
 - Governance files (#73, H5-H7): `SECURITY.md` lists supported versions (latest minor only) and a 7-day acknowledgement time; the PR template carries the CHANGELOG, README EN/ES, `docs/compatibility.md`, `npm test` and real-binary checks; `.github/CODEOWNERS` names the owner. Requiring Code Owner review is an owner setting, documented in `docs/branch-protection.md`.
