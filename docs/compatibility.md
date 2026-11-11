@@ -238,6 +238,23 @@ A community script that downgrades 2.x back to 1.19 exists ([gist](https://gist.
 | README support matrix (session 58, #58): OS cells are ✅ only where a `ci.yml` job runs the real binary on that OS (`real-claude`, `real-opencode`, `real-opencode-v1`, `real-windows`, `real-copilot`, `real-copilot-windows`, `real-antigravity`, `real-antigravity-windows`, `real-vscode`, `real-cursor`, `real-cursor-windows`); every other OS cell is **VERIFY**. Feature cells follow the tables above. `scripts/check-readme.mjs` (lint job and release workflow) fails on a hero over 80 lines, an image without alt text or over 5 MB, and EN/ES drift | `.github/workflows/ci.yml`, `tests/readme.test.mjs`, 2026-11-06 | 2026-11-06 |
 | OpenCode data folder, `opencode.db` and `opencode debug paths` (session 79, #79) | [troubleshooting](https://opencode.ai/docs/troubleshooting/), [CLI](https://opencode.ai/docs/cli/); the printed output of `opencode debug paths` is in the `real-opencode-v1` log | 2026-11-06 |
 
+## Pins and checksums
+
+Checked 2026-11-10 for Session 64 (#64, #66, #75). Every value is read from the real upstream; nothing here is guessed.
+
+| Item | Source | Checked |
+| --- | --- | --- |
+| Tag to commit SHA for serena v2.1.0, ponytail v5.3.2, context-mode v2.1.4, caveman v4.0.1, i-have-adhd v0.4.1, orca v1.4.99 | `gh api repos/<o>/<r>/git/ref/tags/<tag>` (annotated tags dereferenced) | 2026-11-06 and 2026-11-10 |
+| npm `dist.integrity` for every npm pin, including `@dietrichgebert/ponytail` 5.3.2, `@warp-dot-dev/opencode-warp` 0.1.7 and `@opencode/cli` 2.2.5 | `npm view <pkg>@<v> dist.integrity`; `scripts/verify-pins.mjs` re-checks it | 2026-11-10 |
+| `claude plugin marketplace add owner/repo#<sha>` fails; `#<tag>` works, so Claude marketplaces pin by tag. `skills add owner/repo#<sha>` works (skills 1.7.4) | Run in a throwaway HOME | 2026-11-06 |
+| `warpdotdev/claude-code-warp` has no tags or releases and uses relative plugin sources, so it cannot be pinned (latest commit seen 53ab8d63ef74d7653002444762812d2fb5639eee). **VERIFY** when upstream tags a release | GitHub API | 2026-11-06 |
+| `lean-update` pins the tag `v0.7.0` with no SHA: the tag does not exist before the release. Set `sha` when tagging | `gh api` | 2026-11-06 |
+| Bun 1.4.4 zips (linux-x64, linux-aarch64, windows-x64, windows-aarch64) and their SHA256 from the release `SHASUMS256.txt`; macOS stays on Homebrew. Linux x64 CPUs without AVX2 would need the `-baseline` zip, which is not offered. The Windows route (Expand-Archive, user PATH) is **VERIFY** until `real-bun` passes on `windows-latest` | github.com/oven-sh/bun/releases/tag/bun-v1.4.4 | 2026-11-10 |
+| OpenCode 2 is on npm as `@opencode/cli` (+ `@opencode/cli-<target>`); its installer takes `--version`. CI runs 2.2.5 (2.2.6 is under 14 days old). The installer script is pinned by SHA256 in `tests/ci-downloads.json`; the Antigravity and Cursor installers the same way, so a changed script fails CI until its hash is reviewed. What those installers then download is chosen by them. `tests/real-opencode.sh` was **not** run against 2.2.5 locally: another OpenCode service held the port. The install and `opencode --version` (v2.2.5) worked | `opencode.ai/v2/install --help`, npm registry | 2026-11-10 |
+| VS Code 1.144.0 linux-x64 tarball URL and `sha256hash` | `update.code.visualstudio.com/api/versions/1.144.0/linux-x64/stable` | 2026-11-10 |
+| `real-proxy` keeps `GH_TOKEN`: `tests/real-proxy.sh` calls `gh api /zen` twice | `grep gh tests/real-proxy.sh` | 2026-11-10 |
+| `tests/real-cursor.ps1` and `tests/real-antigravity.ps1` still run the upstream PowerShell installer from a script block (`irm`); pin them in a follow-up | Left as is: another worker edits the real-cursor/antigravity tests | 2026-11-10 |
+
 ## Gemini CLI (not supported)
 
 Checked 2026-11-03. lean-agents does not add a Gemini CLI adapter: upstream says free individual access and Google AI Pro and Ultra moved to Antigravity CLI on 2026-06-18, and Gemini CLI now serves Gemini Code Assist Standard and Enterprise. Antigravity CLI is supported instead.
