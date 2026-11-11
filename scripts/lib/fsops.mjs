@@ -66,6 +66,13 @@ function getAt(text, keyPath) {
   return node === undefined ? undefined : parse(text.slice(node.offset, node.offset + node.length));
 }
 
+// True when `current` is the old shape in `legacy` (`*` in a string is a wildcard).
+function isLegacy(current, legacy = []) {
+  const eq = (a, b) => typeof b === 'string' && typeof a === 'string' ? new RegExp(`^${b.split('*').map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*')}$`).test(a)
+    : a && b && typeof a === 'object' && typeof b === 'object' ? Object.keys(a).length === Object.keys(b).length && Object.keys(b).every((k) => eq(a[k], b[k])) : a === b;
+  return legacy.some((l) => eq(current, l));
+}
+
 // Returns { text, applied: [edit], kept: [{path, value}] }.
 export function applyJsonEdits(original, edits) {
   let text = original && original.trim() ? original : '{}\n';
@@ -84,7 +91,7 @@ export function applyJsonEdits(original, edits) {
     }
     if (current !== undefined) {
       if (JSON.stringify(current) === JSON.stringify(e.value)) continue;
-      if (e.mode !== 'set') {
+      if (e.mode !== 'set' && !(e.mode === 'upgradeIf' && isLegacy(current, e.legacy))) {
         kept.push({ path: e.path, value: current });
         continue;
       }
@@ -168,7 +175,10 @@ export function plan(actions, roots = []) {
         const depth = e.mode === 'arrayAdd' ? e.path.length : e.path.length - 1;
         const createdParents = [];
         for (let k = 1; k <= depth; k++) if (absent(e.path.slice(0, k))) createdParents.push(e.path.slice(0, k));
-        return { ...e, previous: before === null ? undefined : getAt(before, e.path), createdParents };
+        const previous = before === null ? undefined : getAt(before, e.path);
+        // An upgraded legacy entry has no user value to restore: uninstall removes it.
+        const upgraded = e.mode === 'upgradeIf' && isLegacy(previous, e.legacy);
+        return { ...e, previous: upgraded ? undefined : previous, upgraded, createdParents };
       });
       const r = applyJsonEdits(before, edits);
       after = r.text;
@@ -206,7 +216,7 @@ export function apply(planned, backupDir, home, roots = [home]) {
     }
     fs.mkdirSync(path.dirname(p.path), { recursive: true });
     fs.writeFileSync(p.path, p.after);
-    entries.push({ path: p.path, kind: p.kind, created: p.before === null, backup, hash: sha(p.after), applied: p.applied, keepEmpty: p.keepEmpty });
+    entries.push({ path: p.path, kind: p.kind, created: p.before === null, backup, hash: sha(p.after), applied: p.applied, noRestore: p.applied?.some((e) => e.upgraded), keepEmpty: p.keepEmpty });
   }
   return entries;
 }
@@ -223,7 +233,7 @@ export function undo(entries, roots = []) {
     if (untouched && e.created) {
       fs.rmSync(e.path);
       report.push(['removed', e.path]);
-    } else if (untouched && e.backup && fs.existsSync(e.backup)) {
+    } else if (untouched && e.backup && !e.noRestore && fs.existsSync(e.backup)) {
       fs.writeFileSync(e.path, fs.readFileSync(e.backup, 'utf8'));
       report.push(['restored', e.path]);
     } else if (e.kind === 'json') {

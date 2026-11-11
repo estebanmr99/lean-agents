@@ -2,7 +2,7 @@
 // so global rules are not written here; `--project` puts them in the repo's AGENTS.md.
 import path from 'node:path';
 import { OWNED_MARK } from '../fsops.mjs';
-import { localServer } from './opencode-v2.mjs';
+import { localServer, mcpEdit } from './opencode-v2.mjs';
 import { hasProxy } from '../network.mjs';
 import { skillSource, skillsCli } from '../pins.mjs';
 
@@ -26,7 +26,7 @@ export function renderCursorAgent(agent) {
 export function cursorServers(core, tools) {
   return ['serena', 'playwright', 'playwright-extension', 'context-mode'].filter((t) => tools.includes(t)).map((name) => {
     const [command, ...args] = localServer(core, name).command;
-    return { path: ['mcpServers', name], value: { command, args }, mode: 'setIfAbsent' };
+    return mcpEdit(['mcpServers', name], { command, args });
   });
 }
 

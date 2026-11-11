@@ -3,7 +3,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import { configHome, envDir } from '../system.mjs';
-import { localServer } from './opencode-v2.mjs';
+import { localServer, mcpEdit } from './opencode-v2.mjs';
 import { renderCopilotAgent, skills } from './copilot-cli.mjs';
 import { skillSource } from '../pins.mjs';
 
@@ -22,7 +22,7 @@ export function vscodeUserDir(home) {
 export function vscodeServers(core, tools) {
   return ['serena', 'playwright', 'playwright-extension', 'context-mode'].filter((t) => tools.includes(t)).map((name) => {
     const [command, ...args] = localServer(core, name).command;
-    return { path: ['servers', name], value: { type: 'stdio', command, args }, mode: 'setIfAbsent' };
+    return mcpEdit(['servers', name], { type: 'stdio', command, args });
   });
 }
 
