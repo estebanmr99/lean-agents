@@ -829,7 +829,8 @@ test('bunInstall: pinned zip, SHA256 check before extraction, undo only for what
   const linux = bunInstall('/h', '/h/state', 'linux', null, 'x64');
   assert.equal(linux.run[0].at(-1), `https://github.com/oven-sh/bun/releases/download/bun-v${version}/bun-linux-x64.zip`);
   assert.deepEqual(linux.run[1].slice(2), [linux.run[0][3], sha256['linux-x64']]);
-  assert.equal(linux.run[2][0], 'unzip');
+  assert.deepEqual(linux.run[2], ['mkdir', '-p', path.join('/h', '.bun', 'bin')]);
+  assert.equal(linux.run[3][0], 'unzip');
   assert.equal(linux.undo[0].at(-1), path.join('/h', '.bun'));
   assert.match(bunInstall('/h', '/h/state', 'linux', null, 'arm64').run[0].at(-1), /bun-linux-aarch64\.zip$/);
   const mac = bunInstall('/h', '/h/state', 'darwin', 'brew');

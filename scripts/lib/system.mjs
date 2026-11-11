@@ -15,7 +15,7 @@ export function which(bin) {
 }
 
 // Windows .cmd shims (npm, npx) need a shell; real .exe files must not get one, or paths with spaces split.
-const useShell = (bin) => isWin && !/\.exe$/i.test(which(bin) ?? '');
+const useShell = (bin) => isWin && !/\.exe$/i.test(bin) && !/\.exe$/i.test(which(bin) ?? '');
 
 export function version(bin, args = ['--version'], env = {}) {
   if (!which(bin)) return null;
@@ -155,7 +155,7 @@ export function bunInstall(home, dir, platform, pm, arch = process.arch) {
   }
   return {
     tool: 'bun', desc: `install bun ${version}`, optional: true,
-    run: [download, verify, ['unzip', '-q', '-j', '-o', zip, `${name}/bun`, '-d', path.join(bunDir, 'bin')]],
+    run: [download, verify, ['mkdir', '-p', path.join(bunDir, 'bin')], ['unzip', '-q', '-j', '-o', zip, `${name}/bun`, '-d', path.join(bunDir, 'bin')]],
     undo: [rm],
   };
 }
