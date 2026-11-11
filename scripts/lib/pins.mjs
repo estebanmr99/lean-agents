@@ -22,6 +22,8 @@ export const marketplaceSource = (key) => `${pin(key).source}#${pin(key).version
 export const gitSpec = (key) => `git+https://github.com/${pin(key).source}@${pin(key).sha}`;
 // npm or git spec for a {pin:key} placeholder in core/mcp.json.
 export const pinSpec = (key) => (pin(key).kind === 'git' ? gitSpec(key) : npmSpec(key));
+// The `engines.node` range the pinned npm version declares (">=24.15.0"), or undefined when it declares none.
+export const nodeRange = (key) => pin(key).node;
 export const bunPin = () => pin('bun');
 export const skillsCli = () => npmSpec('skills-cli');
 // `download` pins (Bun) are verified by SHA256 at install time and not tracked in state.json.

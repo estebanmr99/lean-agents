@@ -13,8 +13,9 @@ export async function verify(pins, get) {
   for (const [key, p] of Object.entries(pins)) {
     try {
       if (p.integrity) {
-        const got = (await get(`https://registry.npmjs.org/${p.source.replace('/', '%2F')}/${p.version}`)).dist.integrity;
-        if (got !== p.integrity) bad.push(`${key}: integrity ${got} != pinned ${p.integrity}`);
+        const meta = await get(`https://registry.npmjs.org/${p.source.replace('/', '%2F')}/${p.version}`);
+        if (meta.dist.integrity !== p.integrity) bad.push(`${key}: integrity ${meta.dist.integrity} != pinned ${p.integrity}`);
+        if (meta.engines?.node !== p.node) bad.push(`${key}: engines.node ${meta.engines?.node} != pinned ${p.node}`);
       }
       if (p.sha) {
         const got = await tagSha(p.source, p.version, get);

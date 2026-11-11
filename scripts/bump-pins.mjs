@@ -5,8 +5,10 @@
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isNewer, latestVersion, notesUrl, tagSha } from './version-watch.mjs';
+import { compare, minVersion } from './lib/node-runtime.mjs';
 
 const FILE = fileURLToPath(new URL('../core/pins.json', import.meta.url));
+const PKG = fileURLToPath(new URL('../package.json', import.meta.url));
 const STABLE = /^v?\d+\.\d+\.\d+$/;
 const DAY = 86400000;
 // The skill pin for this repo is bumped by the release, never by the daily run.
@@ -41,7 +43,12 @@ export function applyBump(text, key, version, verified, extra = {}) {
 async function checks(p, version, get) {
   const extra = {};
   if (p.sha) extra.sha = await tagSha(p.source, version, get);
-  if (p.integrity) extra.integrity = (await get(`https://registry.npmjs.org/${p.source.replace('/', '%2F')}/${version}`)).dist.integrity;
+  if (p.integrity) {
+    const meta = await get(`https://registry.npmjs.org/${p.source.replace('/', '%2F')}/${version}`);
+    extra.integrity = meta.dist.integrity;
+    // shortcut: only rewrites a `node` field the pin already has; a range that appears later is caught by verify-pins.
+    if (p.node !== undefined) extra.node = meta.engines?.node ?? '';
+  }
   return extra;
 }
 
@@ -54,19 +61,28 @@ export async function bump({ text, get, now = Date.now(), today = new Date(now).
     try {
       const pick = await pickVersion(p, get, now);
       if (!pick || !isNewer(p.version, pick.version)) continue;
-      text = applyBump(text, key, pick.version, today, await checks(p, pick.version, get));
-      changes.push({ key, from: p.version, to: pick.version, ci: p.ci, notes: notesUrl(p, pick.version), published: pick.date });
+      const extra = await checks(p, pick.version, get);
+      text = applyBump(text, key, pick.version, today, extra);
+      changes.push({ key, from: p.version, to: pick.version, ci: p.ci, notes: notesUrl(p, pick.version), published: pick.date, nodeFrom: p.node, nodeTo: extra.node });
     } catch (e) { log(`! ${key}: ${e.message}`); }
   }
   return { text, changes };
 }
 
+// "22.13 -> 22.15 ⚠ raised ⚠ above lean floor"; "-" for a pin that declares no range.
+const lowest = (r) => (r ? minVersion(r) : [0, 0, 0]);
+export function nodeCell(c, floor = lowest(JSON.parse(fs.readFileSync(PKG, 'utf8')).engines.node)) {
+  if (!c.nodeFrom && !c.nodeTo) return '-';
+  const flags = [compare(lowest(c.nodeTo), lowest(c.nodeFrom)) > 0 && '⚠ raised', compare(lowest(c.nodeTo), floor) > 0 && '⚠ above lean floor'].filter(Boolean);
+  return [`${c.nodeFrom || 'none'} → ${c.nodeTo || 'none'}`, ...flags].join(' ');
+}
+
 export const render = (changes) => [
   'Daily `ci-latest` was green. These pins move to the newest stable version published at least 14 days ago. The picked versions can differ from the ones `ci-latest` tested, so `ci.yml` is dispatched on this branch with the new pins. A human merges this PR.',
   '',
-  '| Pin | From | To | Published | Notes | CI job |',
-  '| --- | --- | --- | --- | --- | --- |',
-  ...changes.map((c) => `| ${c.key} | ${c.from} | ${c.to} | ${c.published} | ${c.notes} | ${c.ci} |`),
+  '| Pin | From | To | Node from → to | Published | Notes | CI job |',
+  '| --- | --- | --- | --- | --- | --- | --- |',
+  ...changes.map((c) => `| ${c.key} | ${c.from} | ${c.to} | ${nodeCell(c)} | ${c.published} | ${c.notes} | ${c.ci} |`),
   '',
   'Merge only when the `ci` job named for each pin is green for this head commit (VERIFY: the checks come from the workflow dispatch, not from a PR event).',
 ].join('\n');
