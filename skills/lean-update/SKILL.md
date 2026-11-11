@@ -7,7 +7,7 @@ description: Update a lean-agents install through its script. Use when the user 
 
 The script (`lean-agents`, `scripts/lean.mjs`) is the only thing that changes files: deterministic, tested, undone by `--uninstall`. You are the middleware: detect, ask, run it, read it back. Change nothing before the user says yes.
 
-Run the script from a clone (`node scripts/lean.mjs ...`) or without one: `curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/<tag>/install.sh | bash -s -- <flags>`. Use the latest release tag: `gh release view --repo estebanmr99/lean-agents --json tagName -q .tagName`.
+Run the script with `npx -y lean-agents@<version> <flags>` (the latest release version, below). Without npm access, use the bootstrap, which downloads that release and checks its SHA256: `curl -fsSL https://github.com/estebanmr99/lean-agents/releases/download/<tag>/install.sh | bash -s -- <flags>`. In a clone, `node scripts/lean.mjs ...` works too. Use the latest release tag: `gh release view --repo estebanmr99/lean-agents --json tagName -q .tagName`.
 
 1. **Read the release.** Fetch `core/pins.json` at that tag from `https://raw.githubusercontent.com/estebanmr99/lean-agents/<tag>/`. Then read every release between the installed lean-agents version (`version` in `state.json`; for a hand install, ask or say it is unknown and read from the oldest release you can match) and the latest: `gh release view <tag> --repo estebanmr99/lean-agents --json body -q .body`, and the matching `CHANGELOG.md` sections. A pin's `note` adds to the impact.
    - Start your answer with the **breaking changes and upgrade steps** from those notes, before any table.

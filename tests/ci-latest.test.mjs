@@ -91,7 +91,7 @@ test('ci.yml: every job has a timeout, every real job waits for the docs-only ch
   assert.ok(names.length > 20);
   for (const [, name, body] of jobs) {
     assert.match(body, /^    timeout-minutes: /m, `${name}: no timeout-minutes`);
-    if (!['changes', 'lint', 'test'].includes(name)) assert.match(body, /^    needs: changes\n    if: needs\.changes\.outputs\.code == 'true'/m, `${name}: not behind the docs-only check`);
+    if (!['changes', 'lint', 'test'].includes(name)) assert.match(body, /^    needs: (changes|\[changes, [a-z-]+\])\n    if: needs\.changes\.outputs\.code == 'true'/m, `${name}: not behind the docs-only check`);
     if (/^(real-|bench-)/.test(name) && body.includes('actions/checkout')) assert.match(body, /uses: \.\/\.github\/actions\/latest-pins/, `${name}: ignores the latest run`);
   }
 });

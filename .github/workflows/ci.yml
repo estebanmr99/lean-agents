@@ -95,8 +95,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       LEAN_AGENTS_SKILL_SOURCE: '' # engine tests assert the pinned tag form
-      LEAN_AGENTS_REPO: https://github.com/${{ github.event.pull_request.head.repo.full_name || github.repository }}
-      LEAN_AGENTS_REF: ${{ github.head_ref || github.ref_name }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -200,7 +198,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-      - run: npm ci
+      - run: npm ci --omit=dev
       - name: Build, then check notes and archives on disk
         run: |
           version="$(node -p "require('./package.json').version")"
@@ -210,6 +208,72 @@ jobs:
           grep -q "^lean-agents-$version/install.sh$" dist/tar.txt
           unzip -l "dist/lean-agents-$version.zip" > dist/zip.txt
           grep -q "lean-agents-$version/install.ps1$" dist/zip.txt
+          (cd dist && sha256sum -c SHA256SUMS)
+          for f in lean-agents-$version.tgz lean-agents-$version.tar.gz lean-agents-$version.zip install.sh install.ps1; do grep -q "  $f$" dist/SHA256SUMS; done
+          tar -tzf "dist/lean-agents-$version.tgz" > dist/tgz.txt
+          grep -q '^package/scripts/lean.mjs$' dist/tgz.txt
+          grep -q '^package/node_modules/jsonc-parser/package.json$' dist/tgz.txt
+          grep -q '^package/node_modules/@clack/prompts/package.json$' dist/tgz.txt
+          if grep -qE '^package/(tests|docs|\.github)/' dist/tgz.txt; then echo 'tests, docs or .github in the tarball'; exit 1; fi
+          npm publish --dry-run "dist/lean-agents-$version.tgz"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  package:
+    # The packed tarball from release-build, run with npx and the bootstraps against it, on all three systems. Throwaway HOME and npm folders.
+    needs: [changes, release-build]
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.20.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist
+          path: dist
+      - name: npx from the packed tarball
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          t="$RUNNER_TEMP/package-npx"
+          mkdir -p "$t/work" "$t/npm" "$t/cache" "$t/h"
+          cp "dist/lean-agents-$version.tgz" "$t/work/"
+          cd "$t/work"
+          export NPM_CONFIG_PREFIX="$t/npm" NPM_CONFIG_CACHE="$t/cache"
+          lean() { npx -y "./lean-agents-$version.tgz" "$@"; }
+          flags=(--home "$t/h" --no-exec --yes --agents claude,opencode-v2 --all-tools)
+          lean --version | grep -Fx "$version"
+          lean --dry-run "${flags[@]}"
+          test -z "$(ls -A "$t/h")"
+          lean "${flags[@]}"
+          test -n "$(ls -A "$t/h")"
+          lean --doctor --home "$t/h" --no-exec
+          lean --uninstall --yes --home "$t/h" --no-exec
+          test -z "$(find "$t/h" -type f -not -path "$t/h/.config/lean-agents/*")"
+      - name: Bootstrap install.sh against the release files
+        run: bash tests/real-bootstrap.sh dist
+      - name: Bootstrap install.ps1 on PowerShell 5.1
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./tests/real-bootstrap.ps1 -Dist dist
+      - name: Bootstrap install.ps1 on PowerShell 7
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./tests/real-bootstrap.ps1 -Dist dist
 
   real-opencode:
     # Real OpenCode 2 binary, throwaway HOME: proves the keys we write are accepted.

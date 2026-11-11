@@ -1274,3 +1274,10 @@ test('pinned OpenCode plugins: an old unversioned entry is replaced in place, a 
   lean(own.home, ['--yes', '--no-exec', '--uninstall']);
   assert.deepEqual(own.plugins(), ['@dietrichgebert/ponytail@1.2.3']);
 });
+
+test('--version prints the package.json version and writes nothing', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-version-'));
+  const out = lean(home, ['--version']);
+  assert.equal(out.trim(), JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version);
+  assert.deepEqual(fs.readdirSync(home), []);
+});

@@ -6,7 +6,7 @@ description: Check a lean-agents install and propose exact fixes. Use when the u
 # setup-doctor
 
 1. Run the doctor. It changes nothing:
-   `curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --doctor`
+   `curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --doctor`
 2. Read the table. Keep only lines marked `error`, `missing` or `changed`.
 3. For each line, say what it means in one sentence and give the exact fix:
    - `changed` on a file you did not edit, or `i-have-adhd skill`: an update reset it. Fix: run the same command with `--update`.

@@ -132,13 +132,13 @@ Both installers implement the same flow and flags. Bash uses POSIX-friendly bash
 ### 4.1 One-liners
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash
+curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash
 ```
 
 ```powershell
-irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1 | iex
+irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1 | iex
 # with flags:
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -DryRun
+& ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -DryRun
 ```
 
 PowerShell flags use PascalCase equivalents of the bash flags (`-DryRun`, `-Yes`, `-Agents`, `-Privacy`, `-Lang`, `-NoAdmin`, `-Update`, `-Uninstall`, `-Doctor`).
@@ -496,7 +496,7 @@ Mark each `[x]` when merged.
 - [x] **Session 93 — migrate owned-file check** (0.7.0). Issue #93. Sonnet. #112 done (skills 1.8 Antigravity skill path).
 - [x] **Session 50 — Pin bumps** (0.7.0, after 64). Issues #50, #51, #52. Merge the ci-latest pin-bump PR instead of hand bumps; keep opencode-v1 at 1.19.0 (work PC version); also closes #97 to #102. Haiku.
 - [x] **Session 44 — Context Mode on Node < 24.15** (0.7.0, after 64). Issues #44 and #104 points 1 to 3 (engines check, `node` field per pin, matching nvm Node with absolute registration). Opus plans, Sonnet builds. #104 points 4 and 5 and #106 go to 0.8.0; #103 later.
-- [ ] **Session 65 — How you get it: release tag default, npm package** (0.7.0, after #58, 69 and 44). Issues #65, #46. Opus plans, Sonnet builds.
+- [x] **Session 65 — How you get it: release tag default, npm package** (0.7.0, after #58, 69 and 44). Issues #65, #46. Opus plans, Sonnet builds.
 - [ ] **Archive done sessions** (0.7.0, last, alone). Checkpoint Q3: move finished session blocks to `docs/sessions-done.md`, one line each stays here. Haiku.
 
 ### Session 3 — Windows + OpenCode 1.x + wider CI

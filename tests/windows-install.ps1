@@ -16,13 +16,6 @@ $dir = Initialize-TempProfile
 & "$repo\install.ps1" -DryRun -Yes -Agents claude, opencode-v1 -AllTools -Privacy strict -Profile vertex-gemini -Lang en --no-exec
 if (Get-ChildItem -Force $dir) { throw 'dry run wrote to USERPROFILE' }
 
-Write-Output '--- dry run piped into a scriptblock clones the source and nothing else'
-$dir = Initialize-TempProfile
-& ([scriptblock]::Create((Get-Content "$repo\install.ps1" -Raw))) -DryRun -Yes -Agents claude -NoTools -Privacy standard -Lang en --no-exec
-$found = @(Get-ChildItem -Force "$dir\.config\lean-agents").Name
-if (($found -join ',') -ne 'src') { throw "piped dry run wrote: $found" }
-if (@(Get-ChildItem -Force $dir).Count -ne 1) { throw 'piped dry run wrote outside .config' }
-
 Write-Output '--- -NoBun turns Bun off in the plan'
 $dir = Initialize-TempProfile
 # The Bun line only exists when Context Mode is planned, which needs Node 24.15+; fake it so Node 22 still checks the flag.

@@ -383,6 +383,35 @@ Facts and limits:
 - Real install, #34, 2026-11-05: `claude mcp add --scope user` and `claude mcp get` work with no login on Claude Code 2.1.309 in a throwaway HOME (`tests/real-migrate.sh`).
 - OpenCode 2.1.4, 2026-11-05: `opencode debug agents` lists `.opencode/agents` only when the folder is inside a git repository, and the first call after the background service starts can miss project agents; the script retries.
 
+## npm package and release bootstrap
+
+Checked 2026-11-10 for Session 65 (#65, #46), with npm 12.2.1 and Node 26.12.1 in a throwaway HOME, npm prefix and cache.
+
+| Item | Source | Checked |
+| --- | --- | --- |
+| `npm view lean-agents` returns 404, so the name is free | local probe | 2026-11-10 |
+| `files` + `bundleDependencies: true` after `npm ci --omit=dev`: the tarball holds `scripts/`, `core/`, `profiles/`, LICENSE, READMEs and the 7 locked runtime packages (about 175 KB, 126 files); `npx ./lean-agents-<v>.tgz` runs `--version`, `--dry-run`, an install, `--doctor` and `--uninstall` with no further npm install | local probe, `package` CI job | 2026-11-10 |
+| npm 12 does not pack `npm-shrinkwrap.json` (even when listed in `files`) and `npm ci` rejects it, so it is not used; the lockfile reaches users through the bundled dependencies | local probe | 2026-11-10 |
+| Provenance: `npm publish --provenance` needs `repository.url` to match the repo (case-sensitive) | [npm docs, generating provenance](https://docs.npmjs.com/generating-provenance-statements) | 2026-11-10 |
+
+**Owner steps (never run by a session):**
+
+1. npm account with 2FA. In the repo: environment `npm` with the owner as required reviewer, and variable `NPM_PUBLISH=true`.
+2. First publish: a short-lived granular write token in the environment secret `NPM_TOKEN`, push the tag `v0.7.0`, approve the `npm` job.
+3. Then on npmjs.com package settings add a trusted publisher (repo, `release.yml`, environment `npm`), delete the secret and revoke the token.
+4. The release uploads `lean-agents-<v>.tgz`, `SHA256SUMS`, `install.sh` and `install.ps1`; the bootstrap URLs under `releases/latest/download/` work only after the first release.
+
+**VERIFY** (not proven by CI yet):
+
+- A trusted publisher can be set before the first publish (the docs imply the package must exist).
+- `npm publish <tgz> --provenance` from the tarball path.
+- `releases/latest` skips prereleases and drafts.
+- Node 24's bundled npm is 11.5.1 or newer (needed for OIDC).
+- The Windows runner `tar` extracts the tgz (`real-bootstrap.ps1` runs it in CI).
+- `npm audit signatures` for a `-g` install.
+
+Skipped for now: GitHub artifact attestations, and a "newer version" note in `--doctor` (needs the network; planned for 0.8.0).
+
 ## Not yet verified
 
 The undocumented items below (Antigravity telemetry and auto-update, Serena config, winget persistent proxy, download hosts, DCP, GSD and AutoSkills telemetry) stay **VERIFY**. The installer does not configure them: it asks the user to paste their docs or IT notes (saved to `~/.config/lean-agents/notes/`, never applied) or keep the tool's default. When another agent already set the tool up (Serena, DCP, GSD config found), it skips the question.

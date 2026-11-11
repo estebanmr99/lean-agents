@@ -1,8 +1,12 @@
 # lean-agents bootstrap for Windows (PowerShell 5.1 and 7).
-# Makes sure git and Node.js 22.20+ exist, fetches lean-agents, then hands over to the
-# Node engine (scripts/lean.mjs), which shows the full plan before changing anything.
+# Makes sure git and Node.js 22.20+ exist, downloads the latest release (npm tarball), checks it against
+# the release's SHA256SUMS, then hands over to the Node engine (scripts/lean.mjs), which shows the full
+# plan before changing anything. Node users can skip this: npx lean-agents@latest
 #
-#   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -DryRun
+#   & ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -DryRun
+#
+# Env: LEAN_AGENTS_VERSION=0.7.0 pins a release; LEAN_AGENTS_DIST=<folder or https url> reads the release
+# files from there instead (CI and mirrors; prints a warning); LEAN_AGENTS_SRC moves the install folder.
 [CmdletBinding(PositionalBinding = $false)]
 param(
   [switch]$DryRun,
@@ -30,8 +34,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$RepoUrl = if ($env:LEAN_AGENTS_REPO) { $env:LEAN_AGENTS_REPO } else { 'https://github.com/estebanmr99/lean-agents' }
-$Ref = if ($env:LEAN_AGENTS_REF) { $env:LEAN_AGENTS_REF } else { 'main' }
+$Repo = 'estebanmr99/lean-agents'
 $Src = if ($env:LEAN_AGENTS_SRC) { $env:LEAN_AGENTS_SRC } else { Join-Path $env:USERPROFILE '.config\lean-agents\src' }
 
 function Test-Command($Name) { [bool](Get-Command $Name -ErrorAction SilentlyContinue) }
@@ -66,23 +69,75 @@ if (-not (Test-Command 'opencode') -and (Test-Path (Join-Path $OpenCodeBin 'open
   $env:Path = "$env:Path;$OpenCodeBin"
 }
 
-# Use the checkout this script lives in, if any; otherwise clone or update the source folder.
+function Get-Sha256($Path) { (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLower() }
+
+# A checkout is used only when this script is a real file next to scripts\lean.mjs ($PSScriptRoot is
+# empty when piped into a scriptblock, so a scripts\lean.mjs in the current folder never runs).
+$stamp = Join-Path $Src '.lean-agents-release'
+$tmp = $null
 if ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot 'scripts\lean.mjs'))) {
   $Src = $PSScriptRoot
-} elseif (Test-Path (Join-Path $Src '.git')) {
-  git -C $Src fetch --quiet --depth 1 origin $Ref
-  Assert-Success 'git fetch'
-  git -C $Src checkout --quiet FETCH_HEAD
-  Assert-Success 'git checkout'
+  if (-not (Test-Path (Join-Path $Src 'node_modules\jsonc-parser')) -or -not (Test-Path (Join-Path $Src 'node_modules\@clack\prompts'))) {
+    npm ci --prefix $Src --omit=dev --silent --no-audit --no-fund
+    Assert-Success "npm install in $Src"
+  }
+} elseif (($DryRun -or $Doctor -or $Uninstall) -and -not $Update -and (Test-Path $stamp) -and (Test-Path (Join-Path $Src 'scripts\lean.mjs'))) {
+  # Already installed: --dry-run, --doctor and --uninstall (without --update) run it with no network.
 } else {
-  New-Item -ItemType Directory -Force -Path (Split-Path $Src) | Out-Null
-  git clone --quiet --depth 1 --branch $Ref $RepoUrl $Src
-  Assert-Success 'git clone'
-}
-
-if (-not (Test-Path (Join-Path $Src 'node_modules\jsonc-parser')) -or -not (Test-Path (Join-Path $Src 'node_modules\@clack\prompts'))) {
-  npm ci --prefix $Src --omit=dev --silent --no-audit --no-fund
-  Assert-Success "npm install in $Src"
+  # Never replace a folder that is not a lean-agents install (the old git clone has scripts\lean.mjs and goes).
+  if ((Test-Path $Src) -and -not (Test-Path (Join-Path $Src 'scripts\lean.mjs'))) {
+    throw "lean-agents: $Src exists and is not a lean-agents install. Move it away or set LEAN_AGENTS_SRC."
+  }
+  if ($env:LEAN_AGENTS_DIST) {
+    $base = $env:LEAN_AGENTS_DIST.TrimEnd('/', '\')
+    if ($base -notmatch '^https://' -and -not (Test-Path $base -PathType Container)) { throw 'lean-agents: LEAN_AGENTS_DIST must be an https URL or an existing folder.' }
+    Write-Warning "lean-agents: LEAN_AGENTS_DIST is set, so lean-agents comes from $base and not from GitHub releases."
+  } elseif ($env:LEAN_AGENTS_VERSION) {
+    $base = "https://github.com/$Repo/releases/download/v$($env:LEAN_AGENTS_VERSION.TrimStart('v'))"
+  } else {
+    $base = "https://github.com/$Repo/releases/latest/download"
+  }
+  $tmp = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString())
+  New-Item -ItemType Directory -Path $tmp | Out-Null
+  $ProgressPreference = 'SilentlyContinue'
+  function Get-ReleaseFile($Name, $Out) {
+    if ($base -match '^https://') { Invoke-WebRequest -UseBasicParsing -Uri "$base/$Name" -OutFile $Out } else { Copy-Item -LiteralPath (Join-Path $base $Name) -Destination $Out }
+  }
+  try {
+    Get-ReleaseFile 'SHA256SUMS' (Join-Path $tmp 'SHA256SUMS')
+    $line = Get-Content (Join-Path $tmp 'SHA256SUMS') | Where-Object { $_ -match '^[0-9a-f]{64}  lean-agents-[0-9A-Za-z._-]+\.tgz$' } | Select-Object -First 1
+    if (-not $line) { throw 'lean-agents: SHA256SUMS has no lean-agents tarball.' }
+    $want, $name = $line -split '  '
+    $version = $name -replace '^lean-agents-', '' -replace '\.tgz$', ''
+    if ((Test-Path $stamp) -and (Test-Path (Join-Path $Src 'scripts\lean.mjs')) -and ((Get-Content $stamp -Raw).Trim() -eq $want)) {
+      Write-Output "lean-agents v$version already installed."
+    } else {
+      Get-ReleaseFile $name (Join-Path $tmp $name)
+      $got = Get-Sha256 (Join-Path $tmp $name)
+      if ($got -ne $want) { throw "lean-agents: checksum mismatch for $name (expected $want, got $got). Nothing was installed." }
+      if ($DryRun -and -not (Test-Path $stamp)) {
+        # A dry run with nothing installed leaves the profile untouched: the engine runs from a temp folder.
+        $Src = Join-Path $tmp 'src'
+        New-Item -ItemType Directory -Path $Src | Out-Null
+        tar -xzf (Join-Path $tmp $name) -C $Src --strip-components 1
+        Assert-Success 'tar extract'
+      } else {
+        New-Item -ItemType Directory -Force -Path (Split-Path $Src) | Out-Null
+        if (Test-Path "$Src.new") { Remove-Item -Recurse -Force "$Src.new" }
+        New-Item -ItemType Directory -Path "$Src.new" | Out-Null
+        tar -xzf (Join-Path $tmp $name) -C "$Src.new" --strip-components 1
+        Assert-Success 'tar extract'
+        if (-not (Test-Path (Join-Path "$Src.new" 'scripts\lean.mjs'))) { throw "lean-agents: $name has no scripts\lean.mjs." }
+        Set-Content -Path (Join-Path "$Src.new" '.lean-agents-release') -Value $want -Encoding ascii
+        if (Test-Path $Src) { Remove-Item -Recurse -Force $Src }
+        Move-Item "$Src.new" $Src
+        Write-Output "lean-agents v$version installed in $Src"
+      }
+    }
+  } catch {
+    Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+    throw
+  }
 }
 
 # RTK from the release zip (when winget is not available) lives here. See docs/manual-install.md.
@@ -109,6 +164,7 @@ if ($Rest) { $engineArgs += $Rest }
 
 & node (Join-Path $Src 'scripts\lean.mjs') @engineArgs
 $code = $LASTEXITCODE
+if ($tmp) { Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue }
 
 # After the engine, because its uninstall still needs rtk on PATH.
 if ($Uninstall -and -not $DryRun -and $code -eq 0 -and $userPath -contains $rtkDir) {
