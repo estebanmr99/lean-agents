@@ -824,19 +824,37 @@ test('playwright-extension: opt-in, written for agents without a browser, never 
   assert.deepEqual(after, before);
 });
 
-test('bunInstall: one argv route per OS, undo only for what it installs', () => {
-  const linux = bunInstall('/h', '/h/state', 'linux', null);
-  assert.deepEqual(linux.run[0], ['curl', '-fsSL', '-o', path.join('/h/state', 'bun-install.sh'), 'https://bun.com/install']);
-  assert.deepEqual(linux.run[1].slice(0, 4), ['env', 'SHELL=/bin/sh', `BUN_INSTALL=${path.join('/h', '.bun')}`, 'bash']);
+test('bunInstall: pinned zip, SHA256 check before extraction, undo only for what it installs', () => {
+  const { version, sha256 } = PINS.bun;
+  const linux = bunInstall('/h', '/h/state', 'linux', null, 'x64');
+  assert.equal(linux.run[0].at(-1), `https://github.com/oven-sh/bun/releases/download/bun-v${version}/bun-linux-x64.zip`);
+  assert.deepEqual(linux.run[1].slice(2), [linux.run[0][3], sha256['linux-x64']]);
+  assert.equal(linux.run[2][0], 'unzip');
   assert.equal(linux.undo[0].at(-1), path.join('/h', '.bun'));
+  assert.match(bunInstall('/h', '/h/state', 'linux', null, 'arm64').run[0].at(-1), /bun-linux-aarch64\.zip$/);
   const mac = bunInstall('/h', '/h/state', 'darwin', 'brew');
   assert.deepEqual([mac.run, mac.undo], [[['brew', 'install', 'oven-sh/bun/bun']], [['brew', 'uninstall', 'bun']]]);
   assert.equal(bunInstall('/h', '/h/state', 'darwin', null), null);
-  const win = bunInstall('/h', '/h/state', 'win32', 'winget');
+  const win = bunInstall('/h', '/h/state', 'win32', 'winget', 'x64');
   assert.equal(win.run[0][0], 'curl.exe');
-  assert.ok(win.run[1].includes('-File') && win.run[1].at(-1).endsWith('bun-install.ps1'));
-  assert.ok(win.undo[0].at(-1).endsWith('uninstall.ps1'));
-  assert.deepEqual(win.env, { BUN_INSTALL: path.join('/h', '.bun') });
+  assert.equal(win.run[1][3], sha256['windows-x64']);
+  assert.match(win.run[2].at(-1), /Expand-Archive.*bun\.exe.*SetEnvironmentVariable/s);
+  assert.match(win.undo[1].at(-1), /SetEnvironmentVariable/);
+});
+
+test('verify-sha256: a mismatch deletes the file and exits 1 so the chain stops before extraction', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-sha-'));
+  const file = path.join(dir, 'bun.zip');
+  fs.writeFileSync(file, 'not bun');
+  const script = path.join(ROOT, 'scripts', 'lib', 'verify-sha256.mjs');
+  const bad = spawnSync(process.execPath, [script, file, 'a'.repeat(64)], { encoding: 'utf8' });
+  assert.equal(bad.status, 1);
+  assert.match(bad.stderr, /SHA256 mismatch/);
+  assert.ok(!fs.existsSync(file));
+  fs.writeFileSync(file, 'not bun');
+  const want = spawnSync(process.execPath, ['-e', `console.log(require('crypto').createHash('sha256').update('not bun').digest('hex'))`], { encoding: 'utf8' }).stdout.trim();
+  assert.equal(spawnSync(process.execPath, [script, file, want], { encoding: 'utf8' }).status, 0);
+  assert.ok(fs.existsSync(file));
 });
 
 test('Bun: on by default with Context Mode, --no-bun is saved and reused, --update keeps it', () => {

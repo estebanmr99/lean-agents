@@ -22,8 +22,11 @@ export const marketplaceSource = (key) => `${pin(key).source}#${pin(key).version
 export const gitSpec = (key) => `git+https://github.com/${pin(key).source}@${pin(key).sha}`;
 // npm or git spec for a {pin:key} placeholder in core/mcp.json.
 export const pinSpec = (key) => (pin(key).kind === 'git' ? gitSpec(key) : npmSpec(key));
+export const bunPin = () => pin('bun');
 export const skillsCli = () => npmSpec('skills-cli');
-export const pinVersions = () => Object.fromEntries(Object.entries(PINS).filter(([, p]) => !p.ciOnly).map(([k, p]) => [k, p.version]));
+// `download` pins (Bun) are verified by SHA256 at install time and not tracked in state.json.
+const tracked = (p) => !p.ciOnly && p.kind !== 'download';
+export const pinVersions = () => Object.fromEntries(Object.entries(PINS).filter(([, p]) => tracked(p)).map(([k, p]) => [k, p.version]));
 
 // Pin keys that differ from the tool name lean-agents saves in state.json options.tools.
 const PIN_TOOL = { 'playwright-mcp': 'playwright', 'gsd-core': 'gsd', 'opencode-dcp': 'dcp', 'ponytail-plugin': 'ponytail', 'context-mode-plugin': 'context-mode' };
@@ -37,6 +40,6 @@ export const pinInUse = (key, options) => key === 'skills-cli' || key === 'lean-
 // [{ tool, installed, pinned }] for pins in use whose saved version differs from core/pins.json now.
 export function behindPins(saved) {
   return Object.entries(saved.pins ?? {})
-    .filter(([k, v]) => PINS[k] && !PINS[k].ciOnly && PINS[k].version !== v && pinInUse(k, saved.options))
+    .filter(([k, v]) => PINS[k] && tracked(PINS[k]) && PINS[k].version !== v && pinInUse(k, saved.options))
     .map(([tool, installed]) => ({ tool, installed, pinned: PINS[tool].version }));
 }
