@@ -102,4 +102,35 @@ boot_run "$dist" "${flags[@]}"
 [[ "$rc" == 1 && "$out" == *"not a lean-agents install"* ]] || fail "foreign src: $rc $out"
 [[ "$(cat "$HOME/.config/lean-agents/src/keep")" == keep ]] || fail "foreign src was modified"
 
+echo "--- (i) a git clone in src is replaced only when clean"
+new_home
+srcdir="$HOME/.config/lean-agents/src"
+mkdir -p "$srcdir/scripts"
+echo "// old" > "$srcdir/scripts/lean.mjs"
+git -C "$srcdir" init -q
+boot_run "$dist" "${flags[@]}"
+[[ "$rc" == 1 && "$out" == *"local changes"* ]] || fail "dirty clone: $rc $out"
+[[ -d "$srcdir/.git" && "$(cat "$srcdir/scripts/lean.mjs")" == "// old" ]] || fail "dirty clone was modified"
+git -C "$srcdir" add -A
+git -C "$srcdir" -c user.name=t -c user.email=t@t commit -q -m old
+boot_run "$dist" "${flags[@]}"
+[[ "$rc" == 0 && ! -e "$srcdir/.git" && -f "$srcdir/.lean-agents-release" ]] || fail "clean clone was not replaced: $rc $out"
+
+echo "--- (j) a checkout reinstalls its dependencies when package-lock.json changes"
+new_home
+co="$work/checkout"
+mkdir -p "$co"
+cp -R "$repo/scripts" "$repo/core" "$repo/profiles" "$repo/package.json" "$repo/package-lock.json" "$repo/install.sh" "$co/"
+run_co() { rc=0; out="$(cd "$co" && bash "$co/install.sh" --dry-run "${flags[@]}" 2>&1)" || rc=$?; }
+run_co
+[[ "$rc" == 0 ]] || fail "checkout run exited $rc: $out"
+[[ "$(cat "$co/node_modules/.lean-agents-lock")" == "$(sha "$co/package-lock.json")" ]] || fail "lock stamp missing or wrong"
+touch "$co/node_modules/marker"
+run_co
+[[ "$rc" == 0 && -e "$co/node_modules/marker" ]] || fail "unchanged lockfile reinstalled: $rc $out"
+echo >> "$co/package-lock.json"
+run_co
+[[ "$rc" == 0 && ! -e "$co/node_modules/marker" ]] || fail "changed lockfile did not reinstall: $rc $out"
+[[ "$(cat "$co/node_modules/.lean-agents-lock")" == "$(sha "$co/package-lock.json")" ]] || fail "lock stamp not updated"
+
 echo "real-bootstrap: all cases passed"

@@ -394,6 +394,8 @@ Checked 2026-11-10 for Session 65 (#65, #46), with npm 12.2.1 and Node 26.12.1 i
 | npm 12 does not pack `npm-shrinkwrap.json` (even when listed in `files`) and `npm ci` rejects it, so it is not used; the lockfile reaches users through the bundled dependencies | local probe | 2026-11-10 |
 | Provenance: `npm publish --provenance` needs `repository.url` to match the repo (case-sensitive) | [npm docs, generating provenance](https://docs.npmjs.com/generating-provenance-statements) | 2026-11-10 |
 
+**Trust:** only the release download is checksum-verified. A checkout you run as a file (`bash install.sh` or `install.ps1` next to `scripts/lean.mjs`) is trusted as it is: you chose that folder. In a checkout, `npm ci --omit=dev` reruns when `package-lock.json` changes (hash in `node_modules/.lean-agents-lock`). A git clone in the install folder is replaced only when `git status` is clean.
+
 **Owner steps (never run by a session):**
 
 1. npm account with 2FA. In the repo: environment `npm` with the owner as required reviewer, and variable `NPM_PUBLISH=true`.

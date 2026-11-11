@@ -106,6 +106,39 @@ try {
   if ($rc -ne 1 -or $out -notmatch 'not a lean-agents install') { Fail "foreign src: $rc $out" }
   if ((Get-Content "$dir\.config\lean-agents\src\keep" -Raw).Trim() -ne 'keep') { Fail 'foreign src was modified' }
 
+  Write-Output '--- (i) a git clone in src is replaced only when clean'
+  New-TempProfile
+  $srcdir = "$dir\.config\lean-agents\src"
+  New-Item -ItemType Directory -Force -Path "$srcdir\scripts" | Out-Null
+  Set-Content "$srcdir\scripts\lean.mjs" '// old'
+  git -C $srcdir init -q
+  Invoke-Boot $Dist (Merge @{})
+  if ($rc -ne 1 -or $out -notmatch 'local changes') { Fail "dirty clone: $rc $out" }
+  if (-not (Test-Path "$srcdir\.git") -or (Get-Content "$srcdir\scripts\lean.mjs" -Raw).Trim() -ne '// old') { Fail 'dirty clone was modified' }
+  git -C $srcdir add -A
+  git -C $srcdir -c user.name=t -c user.email=t@t commit -q -m old
+  Invoke-Boot $Dist (Merge @{})
+  if ($rc -ne 0 -or (Test-Path "$srcdir\.git") -or -not (Test-Path "$srcdir\.lean-agents-release")) { Fail "clean clone was not replaced: $rc $out" }
+
+  Write-Output '--- (j) a checkout reinstalls its dependencies when package-lock.json changes'
+  New-TempProfile
+  $co = Join-Path $work 'checkout'
+  New-Item -ItemType Directory -Path $co | Out-Null
+  foreach ($item in 'scripts', 'core', 'profiles', 'package.json', 'package-lock.json', 'install.ps1') { Copy-Item -Recurse (Join-Path $repo $item) $co }
+  $lockStamp = "$co\node_modules\.lean-agents-lock"
+  Push-Location $co
+  try {
+    & "$co\install.ps1" -DryRun @flags | Out-Null
+    if ((Get-Content $lockStamp -Raw).Trim() -ne (Sha "$co\package-lock.json")) { Fail 'lock stamp missing or wrong' }
+    New-Item -ItemType File "$co\node_modules\marker" | Out-Null
+    & "$co\install.ps1" -DryRun @flags | Out-Null
+    if (-not (Test-Path "$co\node_modules\marker")) { Fail 'unchanged lockfile reinstalled' }
+    Add-Content "$co\package-lock.json" ''
+    & "$co\install.ps1" -DryRun @flags | Out-Null
+    if (Test-Path "$co\node_modules\marker") { Fail 'changed lockfile did not reinstall' }
+    if ((Get-Content $lockStamp -Raw).Trim() -ne (Sha "$co\package-lock.json")) { Fail 'lock stamp not updated' }
+  } finally { Pop-Location }
+
   Write-Output 'real-bootstrap: all cases passed'
 } finally {
   Remove-Item Env:LEAN_AGENTS_DIST -ErrorAction SilentlyContinue

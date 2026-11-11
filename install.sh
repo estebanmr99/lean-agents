@@ -17,6 +17,7 @@ say() { printf '%s\n' "$*"; }
 warn() { printf 'lean-agents: %s\n' "$*" >&2; }
 die() { warn "$*"; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
+sha256_of() { node -e 'const h=process.getBuiltinModule("node:crypto").createHash("sha256");h.update(process.getBuiltinModule("node:fs").readFileSync(process.argv[1]));process.stdout.write(h.digest("hex"))' "$1"; }
 
 ask() {
   # Read from the terminal even when this script is piped into bash.
@@ -64,11 +65,16 @@ run_engine() {
 
 # A checkout is used only when this script is a real file next to scripts/lean.mjs. Piped into bash,
 # BASH_SOURCE is empty, so a scripts/lean.mjs in the current directory is never run.
+# A checkout you run as a file is trusted as it is (you chose it); only the release download is checksum-verified.
 here=""
 if [[ -f "${BASH_SOURCE[0]:-}" ]] && script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"; then here="$script_dir"; fi
 if [[ -n "$here" && -f "$here/scripts/lean.mjs" ]]; then
-  if [[ ! -d "$here/node_modules/jsonc-parser" || ! -d "$here/node_modules/@clack/prompts" ]]; then
+  # node_modules/.lean-agents-lock holds the package-lock.json hash from the last npm ci, so a changed lockfile reinstalls.
+  lock=""
+  [[ -f "$here/package-lock.json" ]] && lock="$(sha256_of "$here/package-lock.json")"
+  if [[ ! -d "$here/node_modules/jsonc-parser" || ! -d "$here/node_modules/@clack/prompts" || "$(cat "$here/node_modules/.lean-agents-lock" 2>/dev/null || true)" != "$lock" ]]; then
     (cd "$here" && npm ci --omit=dev --silent --no-audit --no-fund) || die "npm install failed in $here"
+    printf '%s\n' "$lock" > "$here/node_modules/.lean-agents-lock"
   fi
   exec node "$here/scripts/lean.mjs" "$@"
 fi
@@ -83,6 +89,10 @@ fi
 # Never replace a folder that is not a lean-agents install (the old git clone has scripts/lean.mjs and goes).
 if [[ -e "$SRC" && ! -f "$SRC/scripts/lean.mjs" ]]; then
   die "$SRC exists and is not a lean-agents install. Move it away or set LEAN_AGENTS_SRC."
+fi
+# An old bootstrap clone is clean and goes; a clone with local changes is never deleted.
+if [[ -e "$SRC/.git" ]] && ! { dirty="$(git -C "$SRC" status --porcelain 2>&1)" && [[ -z "$dirty" ]]; }; then
+  die "$SRC is a git clone with local changes (or git cannot read it), so it is left alone. Commit or move it, or set LEAN_AGENTS_SRC to another folder."
 fi
 
 if [[ -n "${LEAN_AGENTS_DIST:-}" ]]; then
@@ -123,7 +133,7 @@ if [[ -f "$stamp" && -f "$SRC/scripts/lean.mjs" && "$(cat "$stamp")" == "$want" 
 fi
 
 get "$name" "$tmp/$name"
-got="$(node -e 'const h=process.getBuiltinModule("node:crypto").createHash("sha256");h.update(process.getBuiltinModule("node:fs").readFileSync(process.argv[1]));process.stdout.write(h.digest("hex"))' "$tmp/$name")"
+got="$(sha256_of "$tmp/$name")"
 [[ "$got" == "$want" ]] || die "checksum mismatch for $name (expected $want, got $got). Nothing was installed."
 
 # A dry run with nothing installed leaves HOME untouched: the engine runs from a temp folder.

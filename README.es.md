@@ -118,7 +118,7 @@ npx lean-agents@latest --dry-run
 
 El mismo comando ejecuta `--doctor`, `--update` (siempre la versión más nueva) y `--uninstall`; `npx lean-agents --version` muestra la versión. npm comprueba la integridad del paquete.
 
-Los bootstraps de abajo descargan el último release, lo comprueban con el `SHA256SUMS` del release y solo entonces lo ejecutan (`LEAN_AGENTS_VERSION=0.7.0` fija un release). Ya instalado, `--dry-run`, `--doctor` y `--uninstall` no usan la red.
+Los bootstraps de abajo descargan el último release, lo comprueban con el `SHA256SUMS` del release y solo entonces lo ejecutan (`LEAN_AGENTS_VERSION=0.7.0` fija un release). Ya instalado, `--dry-run`, `--doctor` y `--uninstall` no usan la red. Un checkout local (`bash install.sh` desde un clon) se confía tal cual; solo la descarga del release se comprueba con checksum.
 
 macOS, Linux o Git Bash:
 

@@ -73,13 +73,20 @@ function Get-Sha256($Path) { (Get-FileHash -Algorithm SHA256 -LiteralPath $Path)
 
 # A checkout is used only when this script is a real file next to scripts\lean.mjs ($PSScriptRoot is
 # empty when piped into a scriptblock, so a scripts\lean.mjs in the current folder never runs).
+# A checkout you run as a file is trusted as it is (you chose it); only the release download is checksum-verified.
 $stamp = Join-Path $Src '.lean-agents-release'
 $tmp = $null
 if ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot 'scripts\lean.mjs'))) {
   $Src = $PSScriptRoot
-  if (-not (Test-Path (Join-Path $Src 'node_modules\jsonc-parser')) -or -not (Test-Path (Join-Path $Src 'node_modules\@clack\prompts'))) {
+  # node_modules\.lean-agents-lock holds the package-lock.json hash from the last npm ci, so a changed lockfile reinstalls.
+  $lockFile = Join-Path $Src 'package-lock.json'
+  $lock = if (Test-Path $lockFile) { Get-Sha256 $lockFile } else { '' }
+  $lockStamp = Join-Path $Src 'node_modules\.lean-agents-lock'
+  $lockSeen = if (Test-Path $lockStamp) { (Get-Content $lockStamp -Raw).Trim() } else { $null }
+  if (-not (Test-Path (Join-Path $Src 'node_modules\jsonc-parser')) -or -not (Test-Path (Join-Path $Src 'node_modules\@clack\prompts')) -or $lockSeen -ne $lock) {
     npm ci --prefix $Src --omit=dev --silent --no-audit --no-fund
     Assert-Success "npm install in $Src"
+    Set-Content -Path $lockStamp -Value $lock -Encoding ascii
   }
 } elseif (($DryRun -or $Doctor -or $Uninstall) -and -not $Update -and (Test-Path $stamp) -and (Test-Path (Join-Path $Src 'scripts\lean.mjs'))) {
   # Already installed: --dry-run, --doctor and --uninstall (without --update) run it with no network.
@@ -87,6 +94,13 @@ if ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot 'scripts\lean.mjs')))
   # Never replace a folder that is not a lean-agents install (the old git clone has scripts\lean.mjs and goes).
   if ((Test-Path $Src) -and -not (Test-Path (Join-Path $Src 'scripts\lean.mjs'))) {
     throw "lean-agents: $Src exists and is not a lean-agents install. Move it away or set LEAN_AGENTS_SRC."
+  }
+  # An old bootstrap clone is clean and goes; a clone with local changes is never deleted.
+  if (Test-Path (Join-Path $Src '.git')) {
+    $dirty = git -C $Src status --porcelain 2>&1
+    if ($LASTEXITCODE -ne 0 -or $dirty) {
+      throw "lean-agents: $Src is a git clone with local changes (or git cannot read it), so it is left alone. Commit or move it, or set LEAN_AGENTS_SRC to another folder."
+    }
   }
   if ($env:LEAN_AGENTS_DIST) {
     $base = $env:LEAN_AGENTS_DIST.TrimEnd('/', '\')
