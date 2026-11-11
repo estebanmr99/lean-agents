@@ -3,7 +3,7 @@
     "serena": {
       "description": "Symbol-level code navigation so agents read less code.",
       "upstream": "https://github.com/oraios/serena",
-      "command": ["uvx", "-p", "3.13", "--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server", "--project-from-cwd"],
+      "command": ["uvx", "-p", "3.13", "--from", "{pin:serena}", "serena", "start-mcp-server", "--project-from-cwd"],
       "context": { "claude-code": "claude-code", "default": "ide" },
       "optional": true
     },

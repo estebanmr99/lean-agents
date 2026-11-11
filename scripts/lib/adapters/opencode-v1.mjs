@@ -1,6 +1,5 @@
 // OpenCode 1.x adapter (>=1.18.29). Keys checked against the 1.19.0 config schema; files
 // and commands are shared with the 2.x adapter, only config keys differ.
-import { WARP_OPENCODE_V1_PLUGIN } from '../terminals.mjs';
 import path from 'node:path';
 import { configPath, localServer, opencodeShared, profileEdits } from './opencode-v2.mjs';
 import { configHome } from '../system.mjs';
@@ -24,7 +23,7 @@ export function opencodeV1Adapter({ home, core, profile, opts, rulesPath }) {
   }
   // Context Mode is plugin-only here: plugin plus MCP breaks OpenCode tool registration.
   if (tools.includes('context-mode')) {
-    edits.push({ path: ['plugin'], value: 'context-mode', mode: 'arrayAdd' });
+    edits.push({ path: ['plugin'], value: npmSpec('context-mode'), mode: 'arrayAdd', legacy: ['context-mode'] });
     commands.push({
       tool: 'context-mode',
       desc: 'Context Mode package for OpenCode',
@@ -33,8 +32,8 @@ export function opencodeV1Adapter({ home, core, profile, opts, rulesPath }) {
       skipIfOutput: { cmd: ['npm', 'ls', '-g', 'context-mode'], ok: true },
     });
   }
-  if (opts.terminals?.includes('warp')) edits.push({ path: ['plugin'], value: WARP_OPENCODE_V1_PLUGIN, mode: 'arrayAdd' });
-  if (tools.includes('ponytail')) edits.push({ path: ['plugin'], value: '@dietrichgebert/ponytail', mode: 'arrayAdd' });
+  if (opts.terminals?.includes('warp')) edits.push({ path: ['plugin'], value: npmSpec('warp-opencode'), mode: 'arrayAdd', legacy: ['@warp-dot-dev/opencode-warp', '@warp-dot-dev/opencode-warp@0.1.7'] });
+  if (tools.includes('ponytail')) edits.push({ path: ['plugin'], value: npmSpec('ponytail'), mode: 'arrayAdd', legacy: ['@dietrichgebert/ponytail'] });
   if (tools.includes('dcp')) {
     edits.push({ path: ['plugin'], value: npmSpec('opencode-dcp'), mode: 'arrayAdd' });
     const contextWindow = profile?.context_window ?? 200000;

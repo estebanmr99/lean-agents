@@ -341,7 +341,7 @@ Si tu empresa paga GitHub Copilot, la forma oficial de usar Claude como agente e
 
 **Detalles de Bun.**
 
-- Linux: script oficial en `~/.bun` sin editar el perfil del shell. macOS: `brew install oven-sh/bun/bun`. Windows: `install.ps1` oficial (PATH de usuario, sin admin).
+- Linux: el zip fijado de la versión en `~/.bun`, con SHA256 verificado antes de extraerlo y sin editar el perfil del shell. macOS: `brew install oven-sh/bun/bun`. Windows: el mismo zip fijado (PATH de usuario, sin admin).
 - Un Bun que ya tengas se reutiliza y nunca se borra. Si la instalación falla, Context Mode corre con Node.
 - Con telemetría apagada, `~/.bunfig.toml` recibe un bloque marcado `telemetry = false`. `--uninstall` quita solo lo que instaló lean-agents.
 

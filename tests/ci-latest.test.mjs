@@ -22,7 +22,7 @@ test('bump moves a pin forward only', async () => {
 
 test('ciOnly pins stay out of state.json pins and have a CI job', () => {
   const ciOnly = Object.entries(PINS).filter(([, p]) => p.ciOnly).map(([k]) => k);
-  assert.deepEqual(ciOnly.sort(), ['claude-code', 'copilot-cli', 'opencode-v1']);
+  assert.deepEqual(ciOnly.sort(), ['claude-code', 'copilot-cli', 'opencode-v1', 'opencode-v2']);
   for (const k of ciOnly) assert.ok(!(k in pinVersions()), k);
 });
 

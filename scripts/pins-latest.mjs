@@ -3,7 +3,7 @@
 // Only the runner's copy changes; nothing is committed. Pins never move backwards. Deliberately no 14-day quarantine: the point is to see a brand-new release break before anyone bumps to it.
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { isNewer, latestVersion } from './version-watch.mjs';
+import { isNewer, latestVersion, tagSha } from './version-watch.mjs';
 
 const FILE = fileURLToPath(new URL('../core/pins.json', import.meta.url));
 
@@ -12,8 +12,17 @@ export async function bump(pins, get) {
   const moved = [];
   for (const [key, p] of Object.entries(pins)) {
     let next = null;
-    try { next = await latestVersion(p, get); } catch (e) { console.log(`! ${key}: ${e.message}`); }
-    if (next && isNewer(p.version, next)) { moved.push({ key, from: p.version, to: next }); p.version = next; }
+    if (p.kind === 'download') continue; // Bun: the sha256 map is copied by hand from SHASUMS256.txt
+    try {
+      next = await latestVersion(p, get);
+      if (next && isNewer(p.version, next)) {
+        const sha = p.sha ? await tagSha(p.source, next, get) : null;
+        const integrity = p.integrity ? (await get(`https://registry.npmjs.org/${p.source.replace('/', '%2F')}/${next}`)).dist.integrity : null;
+        moved.push({ key, from: p.version, to: next }); p.version = next;
+        if (sha) p.sha = sha;
+        if (integrity) p.integrity = integrity;
+      }
+    } catch (e) { console.log(`! ${key}: ${e.message}`); }
   }
   return moved;
 }

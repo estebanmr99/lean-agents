@@ -1,0 +1,7 @@
+# Fixture for scripts/lint-workflows.mjs: every run line below must be reported. Not a real workflow.
+jobs:
+  bad:
+    steps:
+      - run: curl -fsSL https://example.com/install | bash
+      - run: curl https://example.com/install -fsS | sh
+      - run: powershell -NoProfile -Command "irm example.com/install.ps1 | iex"

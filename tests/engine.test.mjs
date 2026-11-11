@@ -141,7 +141,7 @@ test('OpenCode 1.x gets singular keys, no Context Mode MCP, and a clean uninstal
   assert.equal(oc.agent.plan.model, 'anthropic/claude-opus-5-5');
   assert.ok(oc.mcp.serena.enabled && oc.mcp.playwright.enabled);
   assert.equal(oc.mcp['context-mode'], undefined);
-  assert.deepEqual(oc.plugin, ['context-mode', '@dietrichgebert/ponytail', npmSpec('opencode-dcp')]);
+  assert.deepEqual(oc.plugin, [npmSpec('context-mode'), npmSpec('ponytail'), npmSpec('opencode-dcp')]);
   assert.equal(oc.compaction.reserved, 40000);
   assert.equal(oc.autoupdate, false);
   assert.equal(oc.experimental.openTelemetry, false);
@@ -771,7 +771,7 @@ test('Cursor: subagents, MCP, kept user values, no global rules, full uninstall'
   const before = snapshot(home);
   const out = lean(home, ['--yes', '--no-exec', '--agents', 'cursor', '--all-tools', '--privacy', 'strict', '--lang', 'en', '--adhd-always', '--ponytail-mode', 'off']);
   assert.match(out, /rtk init -g --agent cursor/);
-  assert.match(out, /skills@\d[\d.]* add JuliusBrussee\/caveman#v[\d.]+ .* -a cursor -g/);
+  assert.match(out, /skills@\d[\d.]* add JuliusBrussee\/caveman#[0-9a-f]{40} .* -a cursor -g/);
   assert.match(out, /Privacy Mode in Cursor/);
 
   const mcp = JSON.parse(fs.readFileSync(path.join(dir, 'mcp.json'), 'utf8')).mcpServers;
@@ -824,19 +824,39 @@ test('playwright-extension: opt-in, written for agents without a browser, never 
   assert.deepEqual(after, before);
 });
 
-test('bunInstall: one argv route per OS, undo only for what it installs', () => {
-  const linux = bunInstall('/h', '/h/state', 'linux', null);
-  assert.deepEqual(linux.run[0], ['curl', '-fsSL', '-o', path.join('/h/state', 'bun-install.sh'), 'https://bun.com/install']);
-  assert.deepEqual(linux.run[1].slice(0, 4), ['env', 'SHELL=/bin/sh', `BUN_INSTALL=${path.join('/h', '.bun')}`, 'bash']);
+test('bunInstall: pinned zip, SHA256 check before extraction, undo only for what it installs', () => {
+  const { version, sha256 } = PINS.bun;
+  const linux = bunInstall('/h', '/h/state', 'linux', null, 'x64');
+  assert.equal(linux.run[0].at(-1), `https://github.com/oven-sh/bun/releases/download/bun-v${version}/bun-linux-x64.zip`);
+  assert.deepEqual(linux.run[1].slice(2), [linux.run[0][3], sha256['linux-x64']]);
+  assert.deepEqual(linux.run[2], ['mkdir', '-p', path.join('/h', '.bun', 'bin')]);
+  assert.equal(linux.run[3][0], 'unzip');
   assert.equal(linux.undo[0].at(-1), path.join('/h', '.bun'));
+  assert.match(bunInstall('/h', '/h/state', 'linux', null, 'arm64').run[0].at(-1), /bun-linux-aarch64\.zip$/);
   const mac = bunInstall('/h', '/h/state', 'darwin', 'brew');
   assert.deepEqual([mac.run, mac.undo], [[['brew', 'install', 'oven-sh/bun/bun']], [['brew', 'uninstall', 'bun']]]);
   assert.equal(bunInstall('/h', '/h/state', 'darwin', null), null);
-  const win = bunInstall('/h', '/h/state', 'win32', 'winget');
+  const win = bunInstall('/h', '/h/state', 'win32', 'winget', 'x64');
   assert.equal(win.run[0][0], 'curl.exe');
-  assert.ok(win.run[1].includes('-File') && win.run[1].at(-1).endsWith('bun-install.ps1'));
-  assert.ok(win.undo[0].at(-1).endsWith('uninstall.ps1'));
-  assert.deepEqual(win.env, { BUN_INSTALL: path.join('/h', '.bun') });
+  assert.equal(win.run[1][3], sha256['windows-x64']);
+  assert.match(win.run[2].at(-1), /Expand-Archive.*bun\.exe.*SetEnvironmentVariable/s);
+  assert.match(win.undo[1].at(-1), /SetEnvironmentVariable/);
+  assert.match(bunInstall("C:\\Users\\O'Neil", 'C:\\s', 'win32', 'winget', 'x64').run[2].at(-1), /O''Neil/);
+});
+
+test('verify-sha256: a mismatch deletes the file and exits 1 so the chain stops before extraction', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-sha-'));
+  const file = path.join(dir, 'bun.zip');
+  fs.writeFileSync(file, 'not bun');
+  const script = path.join(ROOT, 'scripts', 'lib', 'verify-sha256.mjs');
+  const bad = spawnSync(process.execPath, [script, file, 'a'.repeat(64)], { encoding: 'utf8' });
+  assert.equal(bad.status, 1);
+  assert.match(bad.stderr, /SHA256 mismatch/);
+  assert.ok(!fs.existsSync(file));
+  fs.writeFileSync(file, 'not bun');
+  const want = spawnSync(process.execPath, ['-e', `console.log(require('crypto').createHash('sha256').update('not bun').digest('hex'))`], { encoding: 'utf8' }).stdout.trim();
+  assert.equal(spawnSync(process.execPath, [script, file, want], { encoding: 'utf8' }).status, 0);
+  assert.ok(fs.existsSync(file));
 });
 
 test('Bun: on by default with Context Mode, --no-bun is saved and reused, --update keeps it', () => {
@@ -917,10 +937,10 @@ test('terminals: nothing detected means no integration; --terminal adds Warp and
   const before = snapshot(home);
   const plan = lean(home, [...base, '--dry-run', '--terminal', 'both'], env);
   assert.match(plan, /claude plugin install warp@claude-code-warp/);
-  assert.match(plan, /skills@\d[\d.]* add stablyai\/orca#v[\d.]+ --skill orca-cli -a claude-code opencode -g -y/);
+  assert.match(plan, /skills@\d[\d.]* add stablyai\/orca#[0-9a-f]{40} --skill orca-cli -a claude-code opencode -g -y/);
   lean(home, [...base, '--terminal', 'warp']);
   const oc = parse(fs.readFileSync(path.join(home, '.config', 'opencode', 'opencode.jsonc'), 'utf8'), [], { allowTrailingComma: true });
-  assert.ok(oc.plugins.includes('@warp-dot-dev/opencode-warp'));
+  assert.ok(oc.plugins.includes(npmSpec('warp-opencode')));
   lean(home, ['--uninstall', '--yes']);
   const after = snapshot(home);
   for (const k of Object.keys(before)) assert.equal(after[k], before[k], `${k} restored`);
@@ -928,7 +948,7 @@ test('terminals: nothing detected means no integration; --terminal adds Warp and
   const v1 = userHome();
   lean(v1, ['--yes', '--no-exec', '--agents', 'opencode-v1', '--tools', 'rtk', '--terminal', 'warp']);
   const oc1 = parse(fs.readFileSync(path.join(v1, '.config', 'opencode', 'opencode.jsonc'), 'utf8'), [], { allowTrailingComma: true });
-  assert.ok(oc1.plugin.includes('@warp-dot-dev/opencode-warp@0.1.7'));
+  assert.ok(oc1.plugin.includes(npmSpec('warp-opencode')));
 });
 
 test('terminals: all-off network prints the Warp and Orca privacy switches', () => {
@@ -1063,7 +1083,7 @@ test('core/pins.json: every pin has version, date and a CI job that exists; no p
   const out = ['claude,opencode-v1,copilot-cli,cursor', 'opencode-v2,antigravity,vscode-copilot']
     .map((agents) => lean(home, ['--yes', '--no-exec', '--dry-run', '--agents', agents, '--tools', tools, '--terminal', 'orca'])).join('\n');
   assert.ok(!/@latest/.test(out), 'plan contains @latest');
-  for (const line of out.split('\n').filter((l) => /skills[@ ].* add /.test(l))) assert.match(line, /skills@\d[\d.]* add \S+#v\d/, line);
+  for (const line of out.split('\n').filter((l) => /skills[@ ].* add /.test(l))) assert.match(line, /skills@\d[\d.]* add (\S+#[0-9a-f]{40}|estebanmr99\/lean-agents#v\d\S*)\b/, line);
 });
 
 test('--doctor reports no pin drift after install and a changed row when a recorded pin differs', () => {
@@ -1134,4 +1154,33 @@ test('--update installs a pinned npm tool again when it is behind, and records t
   const after = JSON.parse(fs.readFileSync(file, 'utf8'));
   const descs = after.commands.map((c) => c.desc);
   assert.equal(new Set(descs).size, descs.length, 'no command recorded twice');
+});
+
+test('pinned OpenCode plugins: an old unversioned entry is replaced in place, a user-chosen version is kept, uninstall removes the pinned entry', () => {
+  const run = (initial) => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+    const file = path.join(home, '.config', 'opencode', 'opencode.jsonc');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ plugins: initial }));
+    const args = ['--yes', '--no-exec', '--agents', 'opencode-v2', '--tools', 'ponytail', '--terminal', 'warp', '--lang', 'en', '--profile', 'none'];
+    const out = lean(home, args);
+    // A user edit after the install keeps uninstall on the per-key revert path instead of restoring the whole backup.
+    const edit = () => fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('{', '{"theme":"x",'));
+    return { home, file, out, edit, plugins: () => parse(fs.readFileSync(file, 'utf8')).plugins };
+  };
+  const ponytail = npmSpec('ponytail');
+  const warp = npmSpec('warp-opencode');
+
+  const old = run(['mine', '@dietrichgebert/ponytail', '@warp-dot-dev/opencode-warp']);
+  assert.deepEqual(old.plugins(), ['mine', ponytail, warp]);
+  old.edit();
+  lean(old.home, ['--yes', '--no-exec', '--uninstall']);
+  assert.deepEqual(old.plugins(), ['mine']);
+
+  const own = run(['@dietrichgebert/ponytail@1.2.3']);
+  assert.deepEqual(own.plugins(), ['@dietrichgebert/ponytail@1.2.3', warp]);
+  assert.match(own.out, /kept your values for: plugins/);
+  own.edit();
+  lean(own.home, ['--yes', '--no-exec', '--uninstall']);
+  assert.deepEqual(own.plugins(), ['@dietrichgebert/ponytail@1.2.3']);
 });

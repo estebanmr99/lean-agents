@@ -28,6 +28,7 @@ const out = fs.readFileSync(process.argv[2], 'utf8');
 const agentsOut = fs.readFileSync(process.argv[4], 'utf8');
 const { resolvedOpenCodeConfig } = await import(`${process.argv[3]}/scripts/lib/doctor.mjs`);
 const { contextModeNodeNote } = await import(`${process.argv[3]}/scripts/lib/system.mjs`);
+const { npmSpec } = await import(`${process.argv[3]}/scripts/lib/pins.mjs`);
 let cfg;
 try { cfg = resolvedOpenCodeConfig(out); } catch (e) { console.log(out); throw e; }
 const servers = cfg.mcp?.servers ?? cfg.mcp ?? {};
@@ -41,7 +42,7 @@ const checks = {
   'subagents loaded': ['explore', 'research', 'review', 'debug', 'planner'].every((a) => agentsOut.includes(a)),
   'deny opencode provider': (cfg.policies ?? []).some((p) => p.resource === 'opencode' && p.effect === 'deny'),
   'compaction buffer': cfg.compaction?.buffer === 40000,
-  'ponytail plugin': (cfg.plugins ?? []).includes('@dietrichgebert/ponytail'),
+  'ponytail plugin': (cfg.plugins ?? []).includes(npmSpec('ponytail')),
   'default_agent plan': cfg.default_agent === 'plan',
   'share disabled': cfg.share === 'disabled',
 };

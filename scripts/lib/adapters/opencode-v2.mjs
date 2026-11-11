@@ -1,13 +1,13 @@
 // OpenCode 2.x adapter. Uses the native 2.x keys (agents, plugins, update, policies,
 // mcp.servers), confirmed against `opencode debug config` on OpenCode 2.2 in CI.
-import { WARP_OPENCODE_PLUGIN } from '../terminals.mjs';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { OWNED_MARK } from '../fsops.mjs';
 import { tierFor, modelFor } from '../render.mjs';
 import { configHome } from '../system.mjs';
-import { PINS, skillSource, skillsCli } from '../pins.mjs';
+import { PINS, npmSpec, skillSource, skillsCli } from '../pins.mjs';
 
 const PERMISSIONS = {
   'read-only': ['  edit: deny', '  bash: deny'],
@@ -94,7 +94,9 @@ export function opencodeShared({ home, dir, core, profile, opts }) {
     commands.push({
       tool: 'i-have-adhd',
       desc: 'i-have-adhd checkout for OpenCode',
-      run: [['git', 'clone', '--depth', '1', '--branch', PINS['i-have-adhd'].version, 'https://github.com/ayghri/i-have-adhd', vendor]],
+      // The tag must still point at the pinned commit; a moved tag removes the checkout and fails the command.
+      run: [['git', 'clone', '--depth', '1', '--branch', PINS['i-have-adhd'].version, 'https://github.com/ayghri/i-have-adhd', vendor],
+        [process.execPath, fileURLToPath(new URL('../verify-commit.mjs', import.meta.url)), vendor, PINS['i-have-adhd'].sha]],
       undo: [['node', '-e', 'require("fs").rmSync(process.argv[1], { recursive: true, force: true })', vendor]],
       skipIfExists: vendor,
     });
@@ -133,8 +135,8 @@ export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
   for (const name of ['context-mode', 'serena', 'playwright', 'playwright-extension']) {
     if (tools.includes(name)) edits.push(mcpEdit(['mcp', 'servers', name], localServer(core, name)));
   }
-  if (tools.includes('ponytail')) edits.push({ path: ['plugins'], value: '@dietrichgebert/ponytail', mode: 'arrayAdd' });
-  if (opts.terminals?.includes('warp')) edits.push({ path: ['plugins'], value: WARP_OPENCODE_PLUGIN, mode: 'arrayAdd' });
+  if (tools.includes('ponytail')) edits.push({ path: ['plugins'], value: npmSpec('ponytail'), mode: 'arrayAdd', legacy: ['@dietrichgebert/ponytail'] });
+  if (opts.terminals?.includes('warp')) edits.push({ path: ['plugins'], value: npmSpec('warp-opencode'), mode: 'arrayAdd', legacy: ['@warp-dot-dev/opencode-warp'] });
   if (opts.network.outbound === 'off') edits.push({ path: ['share'], value: 'disabled', mode: 'set' });
   if (opts.network.autoUpdate === 'off') edits.push({ path: ['update'], value: 'disable', mode: 'set' });
   if (opts.network.outbound === 'off') {

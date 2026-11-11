@@ -3,7 +3,8 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { npmSpec } from './pins.mjs';
+import { fileURLToPath } from 'node:url';
+import { npmSpec, bunPin } from './pins.mjs';
 import { allowedEnv } from './network.mjs';
 
 const isWin = process.platform === 'win32';
@@ -14,7 +15,7 @@ export function which(bin) {
 }
 
 // Windows .cmd shims (npm, npx) need a shell; real .exe files must not get one, or paths with spaces split.
-const useShell = (bin) => isWin && !/\.exe$/i.test(which(bin) ?? '');
+const useShell = (bin) => isWin && !/\.exe$/i.test(bin) && !/\.exe$/i.test(which(bin) ?? '');
 
 export function version(bin, args = ['--version'], env = {}) {
   if (!which(bin)) return null;
@@ -126,22 +127,36 @@ export function antigravityPrereqs(pm, platform, home, app = true) {
 }
 
 // Bun for Context Mode (JS/TS in ctx_execute). One route per OS; the undo is recorded only when this install ran.
-// Linux: an unknown SHELL makes the upstream script skip the shell profile edit. Windows: the script adds ~\.bun\bin to the user PATH.
-export function bunInstall(home, dir, platform, pm) {
+// Linux and Windows: the pinned release zip is downloaded to a file, checked against the pinned SHA256 and only then extracted,
+// so no upstream installer script runs. Linux: no shell profile edit (the engine finds ~/.bun/bin itself). Windows: ~\.bun\bin goes on the user PATH.
+const VERIFY = fileURLToPath(new URL('./verify-sha256.mjs', import.meta.url));
+export function bunInstall(home, dir, platform, pm, arch = process.arch) {
   const bunDir = path.join(home, '.bun');
   if (platform === 'darwin') {
     return pm === 'brew' ? { tool: 'bun', desc: 'install bun', run: [['brew', 'install', 'oven-sh/bun/bun']], undo: [['brew', 'uninstall', 'bun']], optional: true } : null;
   }
+  const { version, sha256 } = bunPin();
+  const name = `bun-${platform === 'win32' ? 'windows' : 'linux'}-${arch === 'arm64' ? 'aarch64' : 'x64'}`;
+  if (!sha256[name.slice(4)]) return null;
+  const zip = path.join(dir, `${name}-${version}.zip`);
+  const download = [platform === 'win32' ? 'curl.exe' : 'curl', '-fsSL', '-o', zip, `https://github.com/oven-sh/bun/releases/download/bun-v${version}/${name}.zip`];
+  const verify = [process.execPath, VERIFY, zip, sha256[name.slice(4)]];
+  const rm = [process.execPath, '-e', 'require("fs").rmSync(process.argv[1], { recursive: true, force: true })', bunDir];
   if (platform === 'win32') {
-    const file = path.join(dir, 'bun-install.ps1');
-    const ps = ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File'];
-    return { tool: 'bun', desc: 'install bun', run: [['curl.exe', '-fsSL', '-o', file, 'https://bun.com/install.ps1'], [...ps, file]], env: { BUN_INSTALL: bunDir }, undo: [[...ps, path.join(bunDir, 'uninstall.ps1')]], optional: true };
+    const bin = path.join(bunDir, 'bin');
+    const tmp = path.join(dir, `${name}-${version}`);
+    const q = (s) => s.replace(/'/g, "''"); // PowerShell single-quote escape for a profile path like O'Neil
+    const ps = (script) => ['powershell', '-NoProfile', '-NonInteractive', '-Command', script];
+    return {
+      tool: 'bun', desc: `install bun ${version}`, optional: true,
+      run: [download, verify, ps(`Expand-Archive -Force -LiteralPath '${q(zip)}' -DestinationPath '${q(tmp)}'; New-Item -ItemType Directory -Force '${q(bin)}' | Out-Null; Move-Item -Force '${q(path.join(tmp, name, 'bun.exe'))}' '${q(path.join(bin, 'bun.exe'))}'; Remove-Item -Recurse -Force '${q(tmp)}'; $p = [string][Environment]::GetEnvironmentVariable('Path', 'User'); if (($p -split ';') -notcontains '${q(bin)}') { [Environment]::SetEnvironmentVariable('Path', ($p.TrimEnd(';') + ';${q(bin)}'), 'User') }`)],
+      undo: [rm, ps(`$p = [string][Environment]::GetEnvironmentVariable('Path', 'User'); [Environment]::SetEnvironmentVariable('Path', (($p -split ';' | Where-Object { $_ -and $_ -ne '${q(bin)}' }) -join ';'), 'User')`)],
+    };
   }
-  const file = path.join(dir, 'bun-install.sh');
   return {
-    tool: 'bun', desc: 'install bun', optional: true,
-    run: [['curl', '-fsSL', '-o', file, 'https://bun.com/install'], ['env', 'SHELL=/bin/sh', `BUN_INSTALL=${bunDir}`, 'bash', file]],
-    undo: [[process.execPath, '-e', 'require("fs").rmSync(process.argv[1], { recursive: true, force: true })', bunDir]],
+    tool: 'bun', desc: `install bun ${version}`, optional: true,
+    run: [download, verify, ['mkdir', '-p', path.join(bunDir, 'bin')], ['unzip', '-q', '-j', '-o', zip, `${name}/bun`, '-d', path.join(bunDir, 'bin')]],
+    undo: [rm],
   };
 }
 
