@@ -77,7 +77,8 @@ function isLegacy(current, legacy = []) {
 const pkgName = (v) => (typeof v === 'string' ? v.replace(/(?!^)@[^@/]*$/, '') : v);
 
 // Returns { text, applied: [edit], kept: [{path, value}] }.
-export function applyJsonEdits(original, edits) {
+// `owned`: arrayAdd edits an earlier run recorded in state.json for this file, so a past pin counts as ours.
+export function applyJsonEdits(original, edits, owned = []) {
   let text = original && original.trim() ? original : '{}\n';
   const applied = [];
   const kept = [];
@@ -87,9 +88,10 @@ export function applyJsonEdits(original, edits) {
       const list = Array.isArray(current) ? current : [];
       if (list.some((v) => JSON.stringify(v) === JSON.stringify(e.value))) continue;
       if (e.legacy) {
-        // Pinned plugin spec: an exact legacy value we wrote earlier becomes the pinned one in place; any other entry
-        // for the same package is the user's own choice, so it stays and nothing is added.
-        const old = list.findIndex((v) => e.legacy.includes(v));
+        // Pinned plugin spec: an exact legacy value, or a pin we recorded earlier, becomes the pinned one in place; any
+        // other entry for the same package is the user's own choice, so it stays and nothing is added.
+        const wrote = (v) => owned.some((o) => o.mode === 'arrayAdd' && JSON.stringify(o.path) === JSON.stringify(e.path) && o.value === v && pkgName(v) === pkgName(e.value));
+        const old = list.findIndex((v) => e.legacy.includes(v) || wrote(v));
         if (old >= 0) {
           text = applyEdits(text, modify(text, [...e.path, old], e.value, FORMAT));
           applied.push(e);
@@ -167,7 +169,8 @@ export function removeBlock(text) {
 }
 
 // Compute what each action would do. Pure apart from reading files.
-export function plan(actions, roots = []) {
+// `prior`: the `files` entries of the last state.json, to tell our earlier edits from the user's.
+export function plan(actions, roots = [], prior = []) {
   return actions.map((a) => {
     const blocked = unsafe(a.path, roots);
     if (blocked) return { ...a, before: null, after: null, status: 'skip', note: blocked };
@@ -195,7 +198,8 @@ export function plan(actions, roots = []) {
         const upgraded = e.mode === 'upgradeIf' && isLegacy(previous, e.legacy);
         return { ...e, previous: upgraded ? undefined : previous, upgraded, createdParents };
       });
-      const r = applyJsonEdits(before, edits);
+      const owned = prior.filter((f) => f.path === a.path).flatMap((f) => f.applied ?? []);
+      const r = applyJsonEdits(before, edits, owned);
       after = r.text;
       applied = r.applied;
       keptKeys = r.kept.map((k) => k.path.join('.'));

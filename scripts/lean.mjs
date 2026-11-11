@@ -341,7 +341,7 @@ function buildPlan(o) {
   if (o.migrate) return migrationPlan(o);
   if (o.project) {
     const r = projectPlan(ROOT, o.project, o);
-    return { planned: plan(r.actions, writeRoots(o)), commands: r.commands };
+    return { planned: plan(r.actions, writeRoots(o), readState(o.home)?.files), commands: r.commands };
   }
   const core = loadCore(ROOT);
   const rulesPath = path.join(stateDir(o.home), 'AGENTS.md');
@@ -365,7 +365,7 @@ function buildPlan(o) {
   if (o.bun && o.network.telemetry === 'off') {
     actions.push({ kind: 'block', toml: true, path: path.join(o.home, '.bunfig.toml'), body: 'telemetry = false' });
   }
-  return { planned: plan(actions, writeRoots(o)), commands };
+  return { planned: plan(actions, writeRoots(o), readState(o.home)?.files), commands };
 }
 
 // `behind`: tools whose pinned version is newer than the installed one (--update); their installs run even when the binary is there.
