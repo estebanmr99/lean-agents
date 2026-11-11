@@ -25,6 +25,8 @@ env:
   NODE_FOR_CONTEXT_MODE: 24
   # The lean-update skill is pinned to a release tag that does not exist before release; real-* jobs install it from the checkout.
   LEAN_AGENTS_SKILL_SOURCE: ${{ github.workspace }}
+  # ci-latest runs this file with the newest upstream: scripts/ci-download.sh then warns on a changed hash instead of failing.
+  CI_LATEST: ${{ inputs.latest }}
 
 jobs:
   # Docs-only PRs skip the real-binary jobs. lint, test and the Secret scan always run.
@@ -63,6 +65,12 @@ jobs:
       - run: npm ci
       - name: README fits the 1-minute rules
         run: node scripts/check-readme.mjs
+      - name: No download is piped into a shell
+        run: node scripts/lint-workflows.mjs
+      - name: Pins match npm and the git tags
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/verify-pins.mjs
       - name: Third-party actions are pinned to SHAs
         run: |
           if grep -rhE 'uses:[ ]+[^.][^@]+@' .github | grep -vE '@[0-9a-f]{40} # v'; then
@@ -220,7 +228,7 @@ jobs:
       - run: npm ci
       - name: Install OpenCode 2
         run: |
-          curl -fsSL https://opencode.ai/v2/install | bash
+          bash scripts/ci-install-opencode-v2.sh
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - name: Install lean-agents and check what OpenCode resolved
         run: bash tests/real-opencode.sh
@@ -245,7 +253,7 @@ jobs:
       - name: Install Claude Code and OpenCode 2
         run: |
           npm install -g "$(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('claude-code')))")"
-          curl -fsSL https://opencode.ai/v2/install | bash
+          bash scripts/ci-install-opencode-v2.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - run: bash tests/real-migrate.sh
@@ -291,15 +299,17 @@ jobs:
       - run: npm ci
       - name: Install OpenCode 2
         run: |
-          curl -fsSL https://opencode.ai/v2/install | bash
+          bash scripts/ci-install-opencode-v2.sh
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - name: Use the runner's Linuxbrew
         run: echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
       - name: Install Antigravity CLI
         run: |
-          curl -fsSL https://antigravity.google/cli/install.sh | bash
+          bash scripts/ci-download.sh antigravity-installer "$RUNNER_TEMP/agy-install"
+          bash "$RUNNER_TEMP/agy-install"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Install through the proxy only
+        # tests/real-proxy.sh calls `gh api /zen` twice (gh behind the proxy, gh with a corporate CA); gh needs a token for that.
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash tests/real-proxy.sh
@@ -322,7 +332,7 @@ jobs:
       - run: npm ci
       - name: Install OpenCode 2
         run: |
-          curl -fsSL https://opencode.ai/v2/install | bash
+          bash scripts/ci-install-opencode-v2.sh
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - name: Non-default XDG_CONFIG_HOME reaches the real OpenCode
         run: |
@@ -381,7 +391,7 @@ jobs:
       - name: Install Claude Code and OpenCode 2
         run: |
           npm install -g "$(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('claude-code')))")"
-          curl -fsSL https://opencode.ai/v2/install | bash
+          bash scripts/ci-install-opencode-v2.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - run: bash tests/real-parallel.sh
@@ -460,7 +470,7 @@ jobs:
       - run: npm ci
       - name: Install OpenCode 2
         run: |
-          curl -fsSL https://opencode.ai/v2/install | bash
+          bash scripts/ci-install-opencode-v2.sh
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - name: Use the runner's Linuxbrew
         if: runner.os == 'Linux'
@@ -576,7 +586,7 @@ jobs:
       - name: Install OpenCode 2
         if: matrix.agent == 'opencode-v2'
         run: |
-          curl -fsSL https://opencode.ai/v2/install | bash
+          bash scripts/ci-install-opencode-v2.sh
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - run: bash tests/real-terminals.sh '${{ matrix.agent }}'
 
@@ -653,7 +663,8 @@ jobs:
       - run: npm ci
       - name: Install Antigravity CLI
         run: |
-          curl -fsSL https://antigravity.google/cli/install.sh | bash
+          bash scripts/ci-download.sh antigravity-installer "$RUNNER_TEMP/agy-install"
+          bash "$RUNNER_TEMP/agy-install"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Use the runner's Linuxbrew
         if: runner.os == 'Linux'
@@ -736,9 +747,11 @@ jobs:
         run: |
           start=$SECONDS
           if [ "$RUNNER_OS" = Windows ]; then
-            powershell -NoProfile -Command "irm bun.sh/install.ps1 | iex"
+            bash scripts/ci-download.sh bun-windows-x64 "$RUNNER_TEMP/bun.zip"
+            BUN_ZIP="$(cygpath -w "$RUNNER_TEMP/bun.zip")" powershell -NoProfile -Command 'Expand-Archive -Force -LiteralPath $env:BUN_ZIP -DestinationPath "$env:RUNNER_TEMP\bunx"; New-Item -ItemType Directory -Force "$env:BUN_INSTALL\bin" | Out-Null; Move-Item -Force "$env:RUNNER_TEMP\bunx\bun-windows-x64\bun.exe" "$env:BUN_INSTALL\bin\bun.exe"'
           else
-            curl -fsSL https://bun.com/install | bash
+            bash scripts/ci-download.sh bun-linux-x64 "$RUNNER_TEMP/bun.zip"
+            unzip -q -j -o "$RUNNER_TEMP/bun.zip" bun-linux-x64/bun -d "$BUN_INSTALL/bin"
           fi
           echo "- Bun install at user scope, no TTY: $((SECONDS - start))s" >> "$GITHUB_STEP_SUMMARY"
       - name: With Bun
@@ -799,7 +812,8 @@ jobs:
       - run: npm ci
       - name: Install Cursor CLI
         run: |
-          curl https://cursor.com/install -fsS | bash
+          bash scripts/ci-download.sh cursor-installer "$RUNNER_TEMP/cursor-install"
+          bash "$RUNNER_TEMP/cursor-install"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Use the runner's Linuxbrew
         if: runner.os == 'Linux'
@@ -873,7 +887,7 @@ jobs:
       - name: Install VS Code (Linux)
         if: runner.os == 'Linux'
         run: |
-          curl -fsSL -o "$RUNNER_TEMP/code.tar.gz" 'https://update.code.visualstudio.com/latest/linux-x64/stable'
+          bash scripts/ci-download.sh vscode-linux-x64 "$RUNNER_TEMP/code.tar.gz"
           tar -xzf "$RUNNER_TEMP/code.tar.gz" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/VSCode-linux-x64/bin" >> "$GITHUB_PATH"
           echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
