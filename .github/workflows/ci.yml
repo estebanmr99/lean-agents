@@ -790,6 +790,44 @@ jobs:
       - name: Install, find, reuse, opt out, fall back, uninstall
         run: bash tests/real-bun.sh
 
+  real-tool-node:
+    # Context Mode and GSD on an nvm Node 24 while Node 22.20 leads PATH (#44, #104), plus the no-nvm skip line. Real nvm, throwaway HOME.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.20.0
+      - run: npm ci
+      - name: nvm (v0.41.0) and the shared assertions
+        if: runner.os == 'Linux'
+        run: |
+          bash scripts/ci-download.sh nvm-install-sh "$RUNNER_TEMP/nvm-install.sh"
+          NVM_INSTALLER="$RUNNER_TEMP/nvm-install.sh" bash tests/real-tool-node.sh
+      - name: Download nvm-windows
+        if: runner.os == 'Windows'
+        run: bash scripts/ci-download.sh nvm-windows-x64-setup "$RUNNER_TEMP/nvm-setup.exe"
+      - name: nvm-windows, Node 22.20 and 24, and the shared assertions
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          NVM_SETUP: ${{ runner.temp }}\nvm-setup.exe
+        run: ./tests/real-tool-node.ps1
+
   real-cursor:
     # Real Cursor CLI and real tools, throwaway HOME, no login and no TTY.
     needs: changes

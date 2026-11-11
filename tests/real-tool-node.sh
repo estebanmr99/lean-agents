@@ -6,10 +6,9 @@ set -euo pipefail
 
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 case "$(uname -s)" in Linux|Darwin) os=linux ;; *) os=windows ;; esac
-T="$(mktemp -d)"
-HOME="$T/home"
+HOME="$(mktemp -d)"
 export HOME
-mkdir -p "$HOME"
+T="$HOME"
 unset XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
 export XDG_CONFIG_HOME="$HOME/.config"
 fail() { echo "FAIL: $*" >&2; exit 1; }
