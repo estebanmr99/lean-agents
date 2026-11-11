@@ -6,14 +6,14 @@
     "context-mode": { "kind": "npm", "source": "context-mode", "version": "2.1.4", "verified": "2026-11-05", "ci": "real-claude" },
     "codeburn": { "kind": "npm", "source": "codeburn", "version": "0.9.27", "verified": "2026-11-05", "ci": "real-tools" },
     "autoskills": { "kind": "npm", "source": "autoskills", "version": "0.4.1", "verified": "2026-11-05", "ci": "real-tools" },
-    "gsd-core": { "kind": "npm", "source": "@opengsd/gsd-core", "version": "1.18.0", "verified": "2026-11-05", "ci": "real-tools" },
+    "gsd-core": { "kind": "npm", "source": "@opengsd/gsd-core", "version": "1.19.0", "verified": "2026-11-11", "ci": "real-tools" },
     "opencode-dcp": { "kind": "npm", "source": "@tarquinen/opencode-dcp", "version": "3.2.0", "verified": "2026-11-05", "ci": "real-opencode-v1" },
     "caveman": { "kind": "skill", "source": "JuliusBrussee/caveman", "version": "v4.0.1", "verified": "2026-11-05", "ci": "real-claude" },
     "i-have-adhd": { "kind": "skill", "source": "ayghri/i-have-adhd", "version": "v0.4.1", "verified": "2026-11-05", "ci": "real-tools" },
     "lean-update": { "kind": "skill", "source": "estebanmr99/lean-agents", "version": "v0.7.0", "verified": "2026-11-06", "ci": "real-update", "note": "The skill ships in this repo, so the tag must exist before a real install works: tag v0.7.0 first, then run real-update." },
     "orca-cli": { "kind": "skill", "source": "stablyai/orca", "version": "v1.4.99", "verified": "2026-11-05", "ci": "real-terminals" },
-    "claude-code": { "kind": "npm", "source": "@anthropic-ai/claude-code", "version": "2.1.305", "verified": "2026-11-05", "ci": "real-claude", "ciOnly": true },
-    "opencode-v1": { "kind": "npm", "source": "opencode-ai", "version": "1.19.0", "verified": "2026-11-05", "ci": "real-opencode-v1", "ciOnly": true, "note": "OpenCode 2 is not on npm; its installer script stays on latest and the jobs print its version." },
-    "copilot-cli": { "kind": "npm", "source": "@github/copilot", "version": "1.0.102", "verified": "2026-11-05", "ci": "real-copilot", "ciOnly": true }
+    "claude-code": { "kind": "npm", "source": "@anthropic-ai/claude-code", "version": "2.1.312", "verified": "2026-11-11", "ci": "real-claude", "ciOnly": true },
+    "opencode-v1": { "kind": "npm", "source": "opencode-ai", "version": "1.19.4", "verified": "2026-11-11", "ci": "real-opencode-v1", "ciOnly": true, "note": "OpenCode 2 is not on npm; its installer script stays on latest and the jobs print its version." },
+    "copilot-cli": { "kind": "npm", "source": "@github/copilot", "version": "1.0.104", "verified": "2026-11-11", "ci": "real-copilot", "ciOnly": true }
   }
 }
