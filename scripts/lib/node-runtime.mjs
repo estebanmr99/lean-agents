@@ -22,9 +22,12 @@ export function compare(a, b) {
 export const satisfies = (version, range) => !range || compare(version, minVersion(range)) >= 0;
 
 // nvm (macOS, Linux) or nvm-windows. `env`/`home` are passed in so tests and --home never read the real machine.
-export function findNvm({ env, home, platform }) {
+// POSIX: NVM_DIR counts only when it lies inside the target home or the target is the real home; a dev run with --home <temp>
+// must never `nvm install` into the owner's nvm, so it uses <home>/.nvm. nvm-windows is only scanned (never installed into), so NVM_HOME is always used.
+export function findNvm({ env, home, platform, realHome }) {
   const win = platform === 'win32';
-  const dir = win ? env.NVM_HOME : env.NVM_DIR || path.join(home, '.nvm');
+  const inside = env.NVM_DIR && (home === realHome || !path.relative(home, env.NVM_DIR).startsWith('..') && !path.isAbsolute(path.relative(home, env.NVM_DIR)));
+  const dir = win ? env.NVM_HOME : inside ? env.NVM_DIR : path.join(home, '.nvm');
   if (!dir || !fs.existsSync(win ? dir : path.join(dir, 'nvm.sh'))) return null;
   return { win, dir };
 }
@@ -33,7 +36,8 @@ export function findNvm({ env, home, platform }) {
 export function installedNodes(nvm) {
   const root = nvm.win ? nvm.dir : path.join(nvm.dir, 'versions', 'node');
   if (!fs.existsSync(root)) return [];
-  return fs.readdirSync(root).filter((d) => /^v\d+\.\d+\.\d+$/.test(d)).sort(compare).map((d) => nodeAt(nvm, path.join(root, d), d.slice(1)));
+  // A folder without its node binary is the rest of a failed install: not a Node to reuse.
+  return fs.readdirSync(root).filter((d) => /^v\d+\.\d+\.\d+$/.test(d)).sort(compare).map((d) => nodeAt(nvm, path.join(root, d), d.slice(1))).filter((n) => fs.existsSync(n.node));
 }
 
 export function nodeAt(nvm, dir, version) {

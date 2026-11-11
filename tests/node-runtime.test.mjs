@@ -10,7 +10,11 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'lean-node-'));
 function fakeNvm(versions, win = false) {
   const dir = tmp();
   if (!win) fs.writeFileSync(path.join(dir, 'nvm.sh'), '');
-  for (const v of versions) fs.mkdirSync(win ? path.join(dir, `v${v}`) : path.join(dir, 'versions', 'node', `v${v}`), { recursive: true });
+  for (const v of versions) {
+    const d = win ? path.join(dir, `v${v}`) : path.join(dir, 'versions', 'node', `v${v}`);
+    fs.mkdirSync(win ? d : path.join(d, 'bin'), { recursive: true });
+    fs.writeFileSync(win ? path.join(d, 'node.exe') : path.join(d, 'bin', 'node'), '');
+  }
   return { win, dir };
 }
 const pins = { 'context-mode': { node: '>=24.15.0' }, 'gsd-core': { node: '>=24.0.0' } };
@@ -22,13 +26,32 @@ test('satisfies: >= with 1 to 3 parts, a missing range accepts anything, other r
   assert.throws(() => satisfies('22.0.0', '^24'), /unsupported node range/);
 });
 
-test('findNvm: NVM_DIR or ~/.nvm needs nvm.sh; nvm-windows needs NVM_HOME; nothing otherwise', () => {
-  const { dir } = fakeNvm([]);
-  assert.deepEqual(findNvm({ env: { NVM_DIR: dir }, home: '/nope', platform: 'linux' }), { win: false, dir });
-  assert.equal(findNvm({ env: {}, home: tmp(), platform: 'linux' }), null);
+test('findNvm: POSIX NVM_DIR counts only inside the target home (or for the real home), else <home>/.nvm; nvm-windows needs NVM_HOME; nothing otherwise', () => {
+  const home = tmp();
+  const dir = path.join(home, 'nvm');
+  fs.mkdirSync(dir);
+  fs.writeFileSync(path.join(dir, 'nvm.sh'), '');
+  assert.deepEqual(findNvm({ env: { NVM_DIR: dir }, home, platform: 'linux', realHome: '/real' }), { win: false, dir });
+  assert.deepEqual(findNvm({ env: { NVM_DIR: dir }, home: tmp(), platform: 'linux', realHome: home }), null, 'outside the target home and the target is not the real home');
+  assert.deepEqual(findNvm({ env: { NVM_DIR: dir }, home: dir, platform: 'linux', realHome: dir }), { win: false, dir }, 'real home: NVM_DIR is used');
+  const h2 = tmp();
+  fs.mkdirSync(path.join(h2, '.nvm'));
+  fs.writeFileSync(path.join(h2, '.nvm', 'nvm.sh'), '');
+  assert.deepEqual(findNvm({ env: { NVM_DIR: dir }, home: h2, platform: 'linux', realHome: '/real' }), { win: false, dir: path.join(h2, '.nvm') }, 'a foreign NVM_DIR falls back to <home>/.nvm');
+  assert.equal(findNvm({ env: {}, home: tmp(), platform: 'linux', realHome: '/real' }), null);
   const w = fakeNvm([], true);
   assert.deepEqual(findNvm({ env: { NVM_HOME: w.dir }, home: '/nope', platform: 'win32' }), { win: true, dir: w.dir });
-  assert.equal(findNvm({ env: { NVM_DIR: dir }, home: '/nope', platform: 'win32' }), null);
+  assert.equal(findNvm({ env: { NVM_DIR: dir }, home, platform: 'win32' }), null);
+});
+
+test('installedNodes skips a folder without its node binary (a failed install)', () => {
+  const nvm = fakeNvm(['24.22.2']);
+  fs.mkdirSync(path.join(nvm.dir, 'versions', 'node', 'v24.30.0'), { recursive: true });
+  assert.deepEqual(installedNodes(nvm).map((n) => n.version), ['24.22.2']);
+  assert.equal(resolveToolNodes({ pins, active: '22.20.0', nvm }).toolNode.version, '24.22.2');
+  const w = fakeNvm([], true);
+  fs.mkdirSync(path.join(w.dir, 'v24.30.0'));
+  assert.deepEqual(installedNodes(w), []);
 });
 
 test('installedNodes: lowest first, POSIX and Windows layouts', () => {

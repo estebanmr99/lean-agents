@@ -17,8 +17,16 @@ export function loadCore(root) {
 }
 
 // Registers a tool's absolute `node_command` (the plugin-less form) instead of its npx command; {node} and {modules} come from the toolNode.
-export function useToolNode(core, toolNode) {
+// `nvmDir` (the nvm lean-agents may use, even when no tool needs it now) adds the absolute shapes lean-agents itself writes there to `legacy`,
+// so a rerun flips an entry either way; only those exact shapes (any digits version) are replaced, never one the user wrote.
+export function useToolNode(core, toolNode, nvm) {
   const s = core.mcp['context-mode'];
+  if (nvm && s?.node_command) {
+    const v = nvm.win ? path.join(nvm.dir, 'v{semver}') : path.join(nvm.dir, 'versions', 'node', 'v{semver}');
+    const node = nvm.win ? path.join(v, 'node.exe') : path.join(v, 'bin', 'node');
+    const cli = path.join(nvm.win ? path.join(v, 'node_modules') : path.join(v, 'lib', 'node_modules'), 'context-mode', 'cli.mjs');
+    s.legacy = [...(s.legacy ?? []), [node, cli, 'server']];
+  }
   if (!toolNode || !s?.node_command) return core;
   s.command = s.node_command.map((a) => a.replace('{node}', toolNode.node).replace(/^\{modules\}\/(.*)$/, (_, rest) => path.join(toolNode.modules, rest)));
   return core;

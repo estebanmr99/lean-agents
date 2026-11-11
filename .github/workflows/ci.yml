@@ -816,8 +816,8 @@ jobs:
       - name: nvm (v0.41.0) and the shared assertions
         if: runner.os == 'Linux'
         run: |
-          bash scripts/ci-download.sh nvm-install-sh "$RUNNER_TEMP/nvm-install.sh"
-          NVM_INSTALLER="$RUNNER_TEMP/nvm-install.sh" bash tests/real-tool-node.sh
+          bash scripts/ci-download.sh nvm-sh "$RUNNER_TEMP/nvm.sh"
+          NVM_SH="$RUNNER_TEMP/nvm.sh" bash tests/real-tool-node.sh
       - name: Download nvm-windows
         if: runner.os == 'Windows'
         run: bash scripts/ci-download.sh nvm-windows-x64-setup "$RUNNER_TEMP/nvm-setup.exe"

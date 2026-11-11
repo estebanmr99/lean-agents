@@ -253,7 +253,8 @@ async function choose(o, saved) {
   o.chosenTools = o.tools;
   // Tools whose Node range the active Node fails run on an nvm Node of their own, or are skipped with one line.
   const needs = Object.fromEntries(NODE_TOOLS.filter(([tool]) => o.tools.includes(tool)).map(([tool, pin]) => [tool, { node: nodeRange(pin) }]));
-  const nvm = findNvm({ env: process.env, home: o.home, platform: process.platform });
+  const nvm = findNvm({ env: process.env, home: o.home, platform: process.platform, realHome: REAL_HOME });
+  o.nvm = nvm;
   const resolved = resolveToolNodes({ pins: needs, active: NODE_VERSION, nvm, latest: (major) => nvmLatest(nvm, major, { run: quiet }) });
   for (const s of resolved.skipped) console.log(s.line);
   o.tools = o.tools.filter((t) => !resolved.skipped.some((s) => s.tool === t));
@@ -349,7 +350,8 @@ function buildPlan(o) {
     const r = projectPlan(ROOT, o.project, o);
     return { planned: plan(r.actions, writeRoots(o), readState(o.home)?.files), commands: r.commands };
   }
-  const core = useToolNode(loadCore(ROOT), o.toolNode);
+  o.prior = readState(o.home)?.commands ?? [];
+  const core = useToolNode(loadCore(ROOT), o.toolNode, o.nvm);
   const rulesPath = path.join(stateDir(o.home), 'AGENTS.md');
   const rules = renderRules(ROOT, o);
   const actions = [{ kind: 'file', path: rulesPath, content: rules }, ...o.notes];

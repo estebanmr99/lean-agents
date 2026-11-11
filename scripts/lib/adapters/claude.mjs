@@ -6,6 +6,8 @@ import { tierFor, modelFor } from '../render.mjs';
 import { privacyOf } from '../network.mjs';
 import { marketplaceSource, skillSource, skillsCli } from '../pins.mjs';
 
+// Also the key of its record in state.json: removing the entry replaces that record (empty undo), so --uninstall does not remove it twice.
+const CTX_MCP = 'Context Mode MCP server (user scope)';
 const TOOLS = {
   'read-only': 'Read, Grep, Glob',
   'git-read': 'Read, Grep, Glob, Bash(git diff:*), Bash(git log:*), Bash(git show:*), Bash(git status:*)',
@@ -68,12 +70,16 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
     // The plugin starts its server with the first `node` on PATH, so on an old Node it registers the absolute server instead (hooks and skills are lost).
     commands.push({
       tool: 'context-mode',
-      desc: 'Context Mode MCP server (user scope)',
+      desc: CTX_MCP,
       run: [['claude', 'mcp', 'add', '--scope', 'user', 'context-mode', '--', ...core.mcp['context-mode'].command]],
       undo: [['claude', 'mcp', 'remove', '--scope', 'user', 'context-mode']],
       skipIfOutput: { cmd: ['claude', 'mcp', 'get', 'context-mode'], ok: true },
     });
   } else if (tools.includes('context-mode')) {
+    // An earlier run on an old Node registered the absolute MCP server; the plugin runs its own, so lean-agents removes the one it added.
+    if ((opts.prior ?? []).some((c) => c.desc === CTX_MCP && c.undo?.length)) {
+      commands.push({ tool: 'context-mode', desc: CTX_MCP, run: [['claude', 'mcp', 'remove', '--scope', 'user', 'context-mode']], undo: [] });
+    }
     commands.push({ tool: 'context-mode', desc: 'Context Mode plugin', ...plugin(marketplaceSource('context-mode-plugin'), 'context-mode@context-mode') });
   }
   if (tools.includes('ponytail')) {

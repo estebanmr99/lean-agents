@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # #44, #104: Context Mode and GSD run on an nvm Node 24 while an older Node leads PATH. Real nvm, real packages, real claude, throwaway HOME.
-# CI: ubuntu (nvm from tests/ci-downloads.json, NVM_INSTALLER points at it) and windows (Git Bash; real-tool-node.ps1 installs nvm-windows first
+# CI: ubuntu (nvm.sh at v0.41.0 from tests/ci-downloads.json, SHA256-checked; NVM_SH points at it) and windows (Git Bash; real-tool-node.ps1 installs nvm-windows first
 # and exports NVM_HOME). Never run it on a machine that has its own nvm: NVM_DIR is a throwaway folder here.
 set -euo pipefail
 
@@ -33,10 +33,11 @@ export PATH="$T/stubs:$PATH"
 
 # The old Node: 22.20.0 first on PATH. On Linux nvm installs it (and makes it the default alias); on Windows the ps1 did.
 if [ "$os" = linux ]; then
-  [ -n "${NVM_INSTALLER:-}" ] || fail "NVM_INSTALLER (the pinned nvm install.sh) is not set"
+  [ -n "${NVM_SH:-}" ] || fail "NVM_SH (the pinned nvm.sh) is not set"
+  # nvm.sh is all nvm needs (it downloads Node itself); install.sh would git-fetch nvm unchecked.
   export NVM_DIR="$T/nvm"
   mkdir -p "$NVM_DIR"
-  PROFILE=/dev/null bash "$NVM_INSTALLER"
+  cp "$NVM_SH" "$NVM_DIR/nvm.sh"
   set +eu
   . "$NVM_DIR/nvm.sh" --no-use
   nvm install 22.20.0
@@ -70,7 +71,9 @@ n24="$(node24)"
 [ -n "$n24" ] || fail "no Node 24 under $versions"
 case "$(node -p process.version)" in v22.*) ;; *) fail "PATH Node changed" ;; esac
 [ "$os" != linux ] || [ "$(cat "$NVM_DIR/alias/default")" = "$default_before" ] || fail "nvm's default alias changed"
-grep -q 'context-mode' "$oc" || fail "no context-mode in the OpenCode config"
+# The seeded legacy npx entry must now be the absolute Node 24 server (the user's own Cursor entry stays below).
+oc_cmd="$(cd "$repo" && node -e "const { parse } = require('jsonc-parser'); const e = parse(require('fs').readFileSync(process.argv[1], 'utf8')).mcp.servers['context-mode']; console.log(e ? e.command.join(' ') : 'none')" "$oc")"
+case "$oc_cmd" in *v24.*cli.mjs\ server) ;; *) fail "the OpenCode entry is not the absolute Node 24 server: $oc_cmd" ;; esac
 grep -q 'my-own-ctx' "$cursor" || fail "the hand-edited Cursor entry was not kept"
 [ -e "$n24/lib/node_modules/context-mode/cli.mjs" ] || [ -e "$n24/node_modules/context-mode/cli.mjs" ] || fail "context-mode is not installed in Node 24's prefix"
 claude mcp get context-mode | tee "$T/claude-get.txt"
