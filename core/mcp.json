@@ -23,6 +23,12 @@
       "description": "Keeps large tool outputs out of the context window. Used as MCP only where its plugin is unavailable.",
       "upstream": "https://github.com/mksglu/context-mode",
       "command": ["npx", "-y", "{pin:context-mode}", "server"],
+      "node_command": ["{node}", "{modules}/context-mode/cli.mjs", "server"],
+      "legacy": [
+        ["npx", "-y", "context-mode"],
+        ["npx", "-y", "context-mode@{semver}"],
+        ["npx", "-y", "context-mode@{semver}", "server"]
+      ],
       "optional": false,
       "mcp_only_for": ["opencode-v2", "copilot-cli", "antigravity"]
     }

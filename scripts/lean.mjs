@@ -8,7 +8,7 @@ import readline from 'node:readline';
 import tty from 'node:tty';
 import { fileURLToPath } from 'node:url';
 import { plan, apply, undo, describe, writePrivate, privateDir, dropBackups } from './lib/fsops.mjs';
-import { loadCore, renderRules, loadProfile } from './lib/render.mjs';
+import { loadCore, renderRules, loadProfile, useToolNode } from './lib/render.mjs';
 import { claudeAdapter } from './lib/adapters/claude.mjs';
 import { opencodeV1Adapter } from './lib/adapters/opencode-v1.mjs';
 import { opencodeV2Adapter } from './lib/adapters/opencode-v2.mjs';
@@ -20,10 +20,11 @@ import { projectPlan, projectStateDir } from './lib/project.mjs';
 import { gsdPlan } from './lib/gsd.mjs';
 import { MIGRATE_SOURCES, MIGRATE_TARGETS, readSource, detectSources, migratePlan, finishRows, formatTable } from './lib/migrate.mjs';
 import { adhdCommand } from './lib/adhd.mjs';
-import { contextModeNodeNote, gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPresent, which, run, quiet, exists, isolate, configHome, envDir } from './lib/system.mjs';
+import { gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPresent, which, run, quiet, exists, isolate, configHome, envDir } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
 import { draftIssue } from './lib/feedback.mjs';
-import { pinVersions, behindPins, pinTool } from './lib/pins.mjs';
+import { pinVersions, behindPins, pinTool, nodeRange, npmSpec } from './lib/pins.mjs';
+import { findNvm, resolveToolNodes, nvmLatest, nvmInstallArgv, nvmEnv, toolEnv } from './lib/node-runtime.mjs';
 import { leanUpdateCommands } from './lib/lean-update.mjs';
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
 import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
@@ -201,6 +202,8 @@ function readState(home) {
 
 // LEAN_AGENTS_NODE fakes the Node version, so tests do not depend on the host.
 const NODE_VERSION = process.env.LEAN_AGENTS_NODE ?? process.versions.node;
+// [tool, pin] pairs whose pin declares an engines.node range lean-agents runs on a matching Node (wired in prereqCommands, gsd.mjs, claude.mjs and copilot-cli.mjs).
+const NODE_TOOLS = [['context-mode', 'context-mode'], ['gsd', 'gsd-core']];
 
 // Migration copies files only: no tools, terminals, network or model questions.
 async function chooseMigration(o, p) {
@@ -248,11 +251,15 @@ async function choose(o, saved) {
   if (!o.agents.includes('opencode-v1')) o.tools = o.tools.filter((t) => t !== 'dcp');
   // The saved choice keeps Context Mode, so --update installs it once Node is new enough.
   o.chosenTools = o.tools;
-  const nodeNote = o.tools.includes('context-mode') ? contextModeNodeNote(NODE_VERSION) : '';
-  if (nodeNote) {
-    console.log(nodeNote);
-    o.tools = o.tools.filter((t) => t !== 'context-mode');
-  }
+  // Tools whose Node range the active Node fails run on an nvm Node of their own, or are skipped with one line.
+  const needs = Object.fromEntries(NODE_TOOLS.filter(([tool]) => o.tools.includes(tool)).map(([tool, pin]) => [tool, { node: nodeRange(pin) }]));
+  const nvm = findNvm({ env: process.env, home: o.home, platform: process.platform, realHome: REAL_HOME });
+  o.nvm = nvm;
+  const resolved = resolveToolNodes({ pins: needs, active: NODE_VERSION, nvm, latest: (major) => nvmLatest(nvm, major, { run: quiet }) });
+  for (const s of resolved.skipped) console.log(s.line);
+  o.tools = o.tools.filter((t) => !resolved.skipped.some((s) => s.tool === t));
+  o.toolNode = resolved.toolNode && { ...resolved.toolNode, nvmDir: nvm.dir };
+  if (o.toolNode && o.agents.includes('claude') && o.tools.includes('context-mode')) console.log('Context Mode on Claude Code runs as an MCP server on its own Node: its hooks and skills (the plugin) are not installed.');
   if (o.project) o.terminals = [];
   else if (!o.terminals) {
     // Terminals are never installed, only detected; nothing found means no question.
@@ -343,7 +350,8 @@ function buildPlan(o) {
     const r = projectPlan(ROOT, o.project, o);
     return { planned: plan(r.actions, writeRoots(o), readState(o.home)?.files), commands: r.commands };
   }
-  const core = loadCore(ROOT);
+  o.prior = readState(o.home)?.commands ?? [];
+  const core = useToolNode(loadCore(ROOT), o.toolNode, o.nvm);
   const rulesPath = path.join(stateDir(o.home), 'AGENTS.md');
   const rules = renderRules(ROOT, o);
   const actions = [{ kind: 'file', path: rulesPath, content: rules }, ...o.notes];
@@ -372,7 +380,14 @@ function buildPlan(o) {
 function prereqCommands(o, behind = new Set()) {
   const pm = packageManager();
   const out = [];
+  const tn = o.toolNode;
+  if (tn?.install) out.push({ tool: 'node', desc: `install Node ${tn.install} with nvm (your default Node stays as it is)`, run: [nvmInstallArgv(tn.install)], undo: [], env: nvmEnv(tn.nvmDir) });
   for (const t of [...o.tools, ...(o.gh ? ['gh'] : [])]) {
+    if (t === 'context-mode' && tn) {
+      const prefix = ['--prefix', tn.dir];
+      out.push({ tool: t, desc: `install context-mode on Node ${tn.version}`, run: [[tn.node, tn.npmCli, 'install', '-g', ...prefix, npmSpec('context-mode')]], undo: [[tn.node, tn.npmCli, 'uninstall', '-g', ...prefix, 'context-mode']], skipIfExists: path.join(tn.modules, 'context-mode', 'package.json'), env: toolEnv(tn) });
+      continue;
+    }
     const p = prereqFor(t, pm);
     if (!p || (which(p.bin) && !behind.has(t))) continue;
     if (p.install) out.push({ tool: t, desc: `install ${p.bin}`, run: p.install, undo: [], optional: t === 'gh' });
@@ -499,7 +514,7 @@ async function install(o) {
       // An optional step (Bun) that fails only means Context Mode runs on Node; nothing to undo.
       if (!ok && c.optional) { console.log(c.tool === 'gh' ? '! gh install failed; install it yourself (--no-gh skips it).' : c.tool === 'lean-update' ? '! lean-update skill failed to install; run the command above by hand later.' : '! Bun install failed; Context Mode will run on Node.'); continue; }
       if (!ok) failed++;
-      ran.push({ desc: c.desc, ok, undo: c.undo });
+      ran.push({ desc: c.desc, ok, undo: c.undo, ...(c.env && { env: c.env }) });
     }
   }
   const previous = readState(o.home);
@@ -509,6 +524,7 @@ async function install(o) {
     updatedAt: new Date().toISOString(),
     pins: pinVersions(),
     options: o.migrate ? previous?.options ?? { migrateOnly: true, agents: o.agents, tools: [], privacy: o.privacy, network: o.network, gh: false, terminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false } : { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, gh: o.gh, terminals: o.terminals, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun },
+    ...(o.toolNode && { toolNode: { version: o.toolNode.version, installedByLean: !!o.toolNode.install || (previous?.toolNode?.version === o.toolNode.version && !!previous.toolNode.installedByLean) } }),
     files: [...(previous?.files ?? []), ...files],
     // A command that ran again replaces its earlier record, so --uninstall undoes it once.
     commands: [...(previous?.commands ?? []).filter((c) => !ran.some((r) => r.desc === c.desc)), ...ran],
@@ -558,13 +574,14 @@ async function uninstall(o) {
   if (o.exec) {
     for (const c of [...state.commands].reverse()) {
       for (const argv of c.undo ?? []) {
-        if (!run(argv, { dryRun: false, log: console.log })) {
+        if (!run(argv, { dryRun: false, log: console.log, env: c.env })) {
           console.log('  ! failed. Run the command above by hand.');
           process.exitCode = 1;
         }
       }
     }
   }
+  if (state.toolNode?.installedByLean) console.log(`Kept Node v${state.toolNode.version} (lean-agents never removes a Node); remove it with \`nvm uninstall ${state.toolNode.version}\`.`);
   const report = undo(state.files, writeRoots(o));
   for (const [what, file] of report) console.log(`  ${what.padEnd(20)} ${file}`);
   if (report.some(([what]) => what === 'left (symlink)')) console.log('  ! Paths marked "left (symlink)" were not touched; remove our lines there by hand.');

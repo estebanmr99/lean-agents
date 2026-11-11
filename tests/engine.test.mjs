@@ -10,7 +10,7 @@ import { parse } from 'jsonc-parser';
 import { applyJsonEdits, revertJsonEdits, plan as planActions, apply as applyActions, undo as undoActions } from '../scripts/lib/fsops.mjs';
 import { diffModels } from '../scripts/models-refresh.mjs';
 import { releaseNotes } from '../scripts/release.mjs';
-import { prereqFor, antigravityPrereqs, bunInstall, contextModeNodeNote } from '../scripts/lib/system.mjs';
+import { prereqFor, antigravityPrereqs, bunInstall } from '../scripts/lib/system.mjs';
 import { doctor } from '../scripts/lib/doctor.mjs';
 import { detectTerminals, terminalCommands, gitBashActions, stillNeeded } from '../scripts/lib/terminals.mjs';
 import { vscodeUserDir } from '../scripts/lib/adapters/vscode-copilot.mjs';
@@ -321,13 +321,6 @@ test('--uninstall leaves Copilot mcp-config.json valid (mcpServers present) or r
   assert.deepEqual(after.mcpServers, {});
 });
 
-test('Context Mode 2 is skipped below Node 24.15, with one line saying how to fix it', () => {
-  for (const v of ['22.20.0', '22.23.4', '24.14.9']) {
-    assert.equal(contextModeNodeNote(v), `Context Mode 2 needs Node 24.15+, found ${v}: skipped. Upgrade Node (or nvm install 24) and run --update.`);
-  }
-  for (const v of ['24.15.0', '24.22.2', '25.0.0', '26.12.1']) assert.equal(contextModeNodeNote(v), '');
-});
-
 test('--doctor reports a skipped Context Mode as a note, not an error', () => {
   const state = { version: 'test', options: { agents: ['copilot-cli'], tools: ['rtk', 'context-mode'], privacy: 'standard' }, files: [], commands: [] };
   const rows = [];
@@ -336,18 +329,115 @@ test('--doctor reports a skipped Context Mode as a note, not an error', () => {
   let ok;
   try { ok = doctor({ home: os.tmpdir(), state, exec: false, nodeVersion: '22.23.4' }); } finally { console.log = log; }
   assert.ok(ok, 'a note does not fail the doctor');
-  assert.ok(rows.some((r) => /^note\s+context-mode\s+Context Mode 2 needs Node 24\.15\+, found 22\.23\.4: skipped/.test(r)));
+  assert.ok(rows.some((r) => /^note\s+context-mode\s+context-mode needs Node >=24\.15\.0, found 22\.23\.4: skipped\. Install nvm or Node 24\.15\+, then run --update/.test(r)));
 });
 
-test('the engine drops Context Mode on an old Node and keeps it on a new one', () => {
+// A fake nvm (nvm.sh plus Node folders; nothing is executed) so no test reads or changes a real nvm.
+// It lives inside the target home: the engine ignores an NVM_DIR outside it.
+function fakeNvm(versions, home) {
+  const dir = path.join(home, 'nvm');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'nvm.sh'), '');
+  for (const v of versions) {
+    fs.mkdirSync(path.join(dir, 'versions', 'node', `v${v}`, 'bin'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'versions', 'node', `v${v}`, 'bin', 'node'), '');
+  }
+  return dir;
+}
+const oldNode = (nvm, extra = {}) => ({ ...process.env, LEAN_AGENTS_NODE: '22.20.0', NVM_DIR: nvm, ...extra });
+
+test('the engine drops Context Mode and GSD on an old Node without nvm, with the one-line reason', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
-  const plan = (node) => lean(home, ['--yes', '--no-exec', '--dry-run', '--agents', 'copilot-cli', '--tools', 'context-mode', '--lang', 'en'], { ...process.env, LEAN_AGENTS_NODE: node });
+  const plan = (node) => lean(home, ['--yes', '--no-exec', '--dry-run', '--agents', 'copilot-cli', '--tools', 'context-mode,gsd', '--lang', 'en'], { ...process.env, LEAN_AGENTS_NODE: node, NVM_DIR: path.join(home, 'no-nvm') });
   const old = plan('22.23.4');
-  assert.match(old, /Context Mode 2 needs Node 24\.15\+, found 22\.23\.4: skipped/);
-  assert.ok(!/tools: .*context-mode/.test(old));
+  assert.match(old, /context-mode needs Node >=24\.15\.0, found 22\.23\.4: skipped\. Install nvm or Node 24\.15\+, then run --update\./);
+  assert.match(old, /gsd needs Node >=24\.0\.0, found 22\.23\.4: skipped/);
+  assert.ok(!/tools: .*(context-mode|gsd)/.test(old));
   const current = plan('24.22.2');
-  assert.ok(!/needs Node 24\.15/.test(current));
+  assert.ok(!/needs Node/.test(current));
   assert.match(current, /tools: .*context-mode/);
+});
+
+test('with nvm, Context Mode is registered with an absolute Node in every agent config; reruns, user entries and --uninstall behave', { skip: process.platform === 'win32' }, () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const nvm = fakeNvm(['22.20.0', '24.22.2'], home);
+  const node = path.join(nvm, 'versions', 'node', 'v24.22.2', 'bin', 'node');
+  const cli = path.join(nvm, 'versions', 'node', 'v24.22.2', 'lib', 'node_modules', 'context-mode', 'cli.mjs');
+  const args = ['--yes', '--no-exec', '--agents', 'opencode-v2,cursor', '--tools', 'context-mode', '--lang', 'en'];
+  const cursorFile = path.join(home, '.cursor', 'mcp.json');
+  const ocFile = path.join(home, '.config', 'opencode', 'opencode.jsonc');
+  // A legacy npx entry from an earlier lean-agents is upgraded; a hand-edited Cursor entry is kept.
+  fs.mkdirSync(path.dirname(ocFile), { recursive: true });
+  fs.writeFileSync(ocFile, JSON.stringify({ mcp: { servers: { 'context-mode': { type: 'local', command: ['npx', '-y', 'context-mode@2.1.3', 'server'], enabled: true } } } }));
+  fs.mkdirSync(path.dirname(cursorFile), { recursive: true });
+  fs.writeFileSync(cursorFile, JSON.stringify({ mcpServers: { 'context-mode': { command: 'my-own-ctx', args: [] } } }));
+  const out = lean(home, args, oldNode(nvm));
+  assert.ok(!/needs Node/.test(out));
+  assert.deepEqual(JSON.parse(fs.readFileSync(ocFile, 'utf8')).mcp.servers['context-mode'].command, [node, cli, 'server']);
+  assert.equal(JSON.parse(fs.readFileSync(cursorFile, 'utf8')).mcpServers['context-mode'].command, 'my-own-ctx');
+  // A rerun changes nothing; on a new Node the entry flips back to npx.
+  const before = fs.readFileSync(ocFile, 'utf8');
+  lean(home, args, oldNode(nvm));
+  assert.equal(fs.readFileSync(ocFile, 'utf8'), before);
+  lean(home, args, { ...process.env, LEAN_AGENTS_NODE: '24.22.2', NVM_DIR: nvm });
+  assert.deepEqual(JSON.parse(fs.readFileSync(ocFile, 'utf8')).mcp.servers['context-mode'].command.slice(0, 2), ['npx', '-y']);
+  lean(home, args, oldNode(nvm));
+  lean(home, ['--uninstall', '--yes'], oldNode(nvm));
+  assert.ok(!fs.readFileSync(ocFile, 'utf8').includes('context-mode'));
+  assert.equal(JSON.parse(fs.readFileSync(cursorFile, 'utf8')).mcpServers['context-mode'].command, 'my-own-ctx');
+});
+
+test('entries the user wrote stay: context-mode@latest, and an absolute Node outside the nvm dir', { skip: process.platform === 'win32' }, () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const nvm = fakeNvm(['22.20.0', '24.22.2'], home);
+  const ocFile = path.join(home, '.config', 'opencode', 'opencode.jsonc');
+  const args = ['--yes', '--no-exec', '--agents', 'opencode-v2', '--tools', 'context-mode', '--lang', 'en'];
+  fs.mkdirSync(path.dirname(ocFile), { recursive: true });
+  for (const command of [['npx', '-y', 'context-mode@latest', 'server'], ['/other/versions/node/v24.0.0/bin/node', '/other/versions/node/v24.0.0/lib/node_modules/context-mode/cli.mjs', 'server']]) {
+    fs.writeFileSync(ocFile, JSON.stringify({ mcp: { servers: { 'context-mode': { type: 'local', command, enabled: true } } } }));
+    const out = lean(home, args, oldNode(nvm));
+    assert.match(out, /kept your values for: mcp\.servers\.context-mode/);
+    assert.deepEqual(JSON.parse(fs.readFileSync(ocFile, 'utf8')).mcp.servers['context-mode'].command, command);
+    lean(home, ['--uninstall', '--yes'], oldNode(nvm));
+    assert.deepEqual(JSON.parse(fs.readFileSync(ocFile, 'utf8')).mcp.servers['context-mode'].command, command, 'uninstall must not delete the user entry');
+  }
+});
+
+test('an NVM_DIR outside the target home is ignored, so a dev run never reaches the real nvm', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const outside = fakeNvm(['24.22.2'], fs.mkdtempSync(path.join(os.tmpdir(), 'lean-other-')));
+  const out = lean(home, ['--yes', '--no-exec', '--dry-run', '--agents', 'opencode-v2', '--tools', 'context-mode', '--lang', 'en'], oldNode(outside));
+  assert.match(out, /context-mode needs Node >=24\.15\.0, found 22\.20\.0: skipped/);
+});
+
+test('Claude: a run on a new Node removes the absolute Context Mode MCP an earlier run added, once, and adds the plugin', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const nvm = fakeNvm(['22.20.0', '24.22.2'], home);
+  const args = ['--yes', '--no-exec', '--agents', 'claude', '--tools', 'context-mode', '--lang', 'en'];
+  lean(home, args, oldNode(nvm));
+  const stateFile = path.join(home, '.config', 'lean-agents', 'state.json');
+  const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+  const record = { desc: 'Context Mode MCP server (user scope)', ok: true, undo: [['claude', 'mcp', 'remove', '--scope', 'user', 'context-mode']] };
+  state.commands = [record];
+  fs.writeFileSync(stateFile, JSON.stringify(state));
+  const plan = (rec) => { state.commands = rec; fs.writeFileSync(stateFile, JSON.stringify(state)); return lean(home, ['--yes', '--dry-run', '--agents', 'claude', '--tools', 'context-mode', '--lang', 'en'], { ...process.env, LEAN_AGENTS_NODE: '24.22.2', NVM_DIR: nvm }); };
+  const out = plan([record]);
+  assert.match(out, /claude mcp remove --scope user context-mode/);
+  assert.match(out, /Context Mode plugin/);
+  assert.ok(!/claude mcp remove --scope user context-mode/.test(plan([])), 'nothing recorded: nothing to remove');
+  assert.ok(!/claude mcp remove --scope user context-mode/.test(plan([{ ...record, undo: [] }])), 'already removed: not removed twice');
+});
+
+test('a Node that nvm has to install is planned with nvm install <major>, an unchanged default alias, and Claude gets the MCP instead of the plugin', { skip: process.platform === 'win32' }, () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const nvm = fakeNvm(['22.20.0'], home);
+  const out = lean(home, ['--yes', '--dry-run', '--agents', 'claude', '--tools', 'context-mode', '--lang', 'en'], oldNode(nvm, { LEAN_AGENTS_NVM_REMOTE: 'v24.22.2'.slice(1) }));
+  assert.match(out, /nvm install 24 &&/);
+  assert.match(out, /alias\/default/);
+  assert.match(out, /claude mcp add --scope user context-mode -- .*v24\.22\.2.*cli\.mjs server/);
+  assert.ok(!/context-mode@context-mode/.test(out));
+  assert.match(out, /hooks and skills \(the plugin\) are not installed/);
+  assert.ok(!fs.existsSync(path.join(nvm, 'versions', 'node', 'v24.22.2')), 'a dry run installs nothing');
 });
 
 test('copilot-context-mode.mjs finds the package next to the linked command, and says where it looked when it cannot', { skip: process.platform === 'win32' }, () => {

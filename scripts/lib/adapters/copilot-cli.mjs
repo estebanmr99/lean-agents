@@ -7,6 +7,7 @@ import { tierFor, modelFor } from '../render.mjs';
 import { envDir } from '../system.mjs';
 import { localServer } from './opencode-v2.mjs';
 import { skillSource, skillsCli } from '../pins.mjs';
+import { toolEnv } from '../node-runtime.mjs';
 
 const CONTEXT_MODE_SCRIPT = fileURLToPath(new URL('../../copilot-context-mode.mjs', import.meta.url));
 
@@ -63,8 +64,10 @@ export function copilotAdapter({ home, core, profile, opts, rules, adhdCommand }
     commands.push({
       tool: 'context-mode',
       desc: 'Context Mode MCP server for Copilot CLI',
-      run: [['node', CONTEXT_MODE_SCRIPT]],
+      run: [[opts.toolNode?.node ?? 'node', CONTEXT_MODE_SCRIPT]],
       undo: [['copilot', 'mcp', 'remove', 'context-mode']],
+      // The script registers process.execPath, so it must run on the tool's Node and look for the package in that Node's prefix.
+      ...(opts.toolNode && { env: { ...toolEnv(opts.toolNode), LEAN_CONTEXT_MODE_DIR: path.join(opts.toolNode.modules, 'context-mode') } }),
     });
     console.log('Context Mode hooks and skills for Copilot CLI are not installed: run `context-mode setup --print copilot-cli` and follow it.');
   }

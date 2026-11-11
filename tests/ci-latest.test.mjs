@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bump } from '../scripts/pins-latest.mjs';
-import { bump as bumpPins } from '../scripts/bump-pins.mjs';
+import { bump as bumpPins, render } from '../scripts/bump-pins.mjs';
 import { plan, run, TITLE } from '../scripts/ci-latest-report.mjs';
 import { PINS, pinVersions } from '../scripts/lib/pins.mjs';
 
@@ -30,6 +30,20 @@ test('bump skips a held pin, logs one held line, and still bumps an unheld pin',
   assert.deepEqual(logs, ['held: held 1.19.0 (owner decision)']);
   assert.equal(JSON.parse(out).pins.held.version, '1.19.0');
   assert.equal(JSON.parse(out).pins.free.version, '2.0.0');
+});
+
+test('bump fills node from the new version and the PR table flags a raised floor and one above lean floor', async () => {
+  const text = '{\n  "pins": {\n    "codeburn": { "kind": "npm", "source": "codeburn", "version": "0.9.27", "verified": "2026-11-05", "node": ">=22.13.0", "ci": "real-tools", "integrity": "sha512-old" },\n    "ctx": { "kind": "npm", "source": "ctx", "version": "2.1.4", "verified": "2026-11-05", "node": ">=24.15.0", "ci": "real-claude", "integrity": "sha512-old" }\n  }\n}';
+  const engines = { codeburn: '>=22.15.0', ctx: '>=24.15.0' };
+  const get = async (url) => {
+    if (/\/(0\.9\.28|2\.1\.7)$/.test(url)) return { dist: { integrity: 'sha512-new' }, engines: { node: engines[url.split('/').at(-2)] } };
+    return { time: url.endsWith('/codeburn') ? { '0.9.27': '2026-01-01T00:00:00Z', '0.9.28': '2026-10-01T00:00:00Z' } : { '2.1.4': '2026-01-01T00:00:00Z', '2.1.7': '2026-10-01T00:00:00Z' } };
+  };
+  const { text: out, changes } = await bumpPins({ text, get, now: Date.parse('2026-11-10T00:00:00Z'), log: () => {} });
+  assert.equal(JSON.parse(out).pins.codeburn.node, '>=22.15.0');
+  const body = render(changes);
+  assert.match(body, /\| codeburn \| 0\.9\.27 \| 0\.9\.28 \| >=22\.13\.0 → >=22\.15\.0 ⚠ raised \|/);
+  assert.match(body, /\| ctx \| 2\.1\.4 \| 2\.1\.7 \| >=24\.15\.0 → >=24\.15\.0 ⚠ above lean floor \|/);
 });
 
 test('ciOnly pins stay out of state.json pins and have a CI job', () => {

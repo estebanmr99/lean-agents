@@ -111,8 +111,9 @@ jobs:
         if: ${{ matrix.node < 24 }}
         shell: bash
         run: |
-          node scripts/lean.mjs --home "$RUNNER_TEMP/skip-check" --no-exec --dry-run --yes --agents claude --tools context-mode | tee "$RUNNER_TEMP/skip.txt"
-          grep -F 'Context Mode 2 needs Node 24.15+, found ' "$RUNNER_TEMP/skip.txt"
+          # No nvm for this check, whatever the runner image ships: an empty NVM_HOME and an NVM_DIR that does not exist.
+          NVM_HOME= NVM_DIR="$RUNNER_TEMP/no-nvm" node scripts/lean.mjs --home "$RUNNER_TEMP/skip-check" --no-exec --dry-run --yes --agents claude --tools context-mode | tee "$RUNNER_TEMP/skip.txt"
+          grep -F 'context-mode needs Node >=24.15.0, found ' "$RUNNER_TEMP/skip.txt"
       - name: PSScriptAnalyzer
         if: runner.os == 'Windows'
         shell: pwsh
@@ -432,7 +433,7 @@ jobs:
           cat "$HOME/mcp.txt"
           grep -q serena "$HOME/mcp.txt"
           grep -q playwright "$HOME/mcp.txt"
-          if ! grep -q 'Context Mode 2 needs Node' "$HOME/install.txt"; then grep -q 'plugin:context-mode' "$HOME/mcp.txt"; fi
+          if ! grep -q 'context-mode needs Node >=24.15.0' "$HOME/install.txt"; then grep -q 'plugin:context-mode' "$HOME/mcp.txt"; fi
           grep -q 'rtk hook' "$HOME/.claude/settings.json"
           test -f "$HOME/.claude/skills/caveman/SKILL.md"
           grep -q '^disable-model-invocation: false$' "$HOME"/.claude/plugins/cache/i-have-adhd/i-have-adhd/*/skills/i-have-adhd/SKILL.md
@@ -789,6 +790,44 @@ jobs:
       - run: npm ci
       - name: Install, find, reuse, opt out, fall back, uninstall
         run: bash tests/real-bun.sh
+
+  real-tool-node:
+    # Context Mode and GSD on an nvm Node 24 while Node 22.20 leads PATH (#44, #104), plus the no-nvm skip line. Real nvm, throwaway HOME.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.20.0
+      - run: npm ci
+      - name: nvm (v0.41.0) and the shared assertions
+        if: runner.os == 'Linux'
+        run: |
+          bash scripts/ci-download.sh nvm-sh "$RUNNER_TEMP/nvm.sh"
+          NVM_SH="$RUNNER_TEMP/nvm.sh" bash tests/real-tool-node.sh
+      - name: Download nvm-windows
+        if: runner.os == 'Windows'
+        run: bash scripts/ci-download.sh nvm-windows-x64-setup "$RUNNER_TEMP/nvm-setup.exe"
+      - name: nvm-windows, Node 22.20 and 24, and the shared assertions
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          NVM_SETUP: ${{ runner.temp }}\nvm-setup.exe
+        run: ./tests/real-tool-node.ps1
 
   real-cursor:
     # Real Cursor CLI and real tools, throwaway HOME, no login and no TTY.

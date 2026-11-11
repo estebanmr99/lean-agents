@@ -21,8 +21,7 @@ export function vscodeUserDir(home) {
 // `servers` entries for a VS Code mcp.json, user or workspace.
 export function vscodeServers(core, tools) {
   return ['serena', 'playwright', 'playwright-extension', 'context-mode'].filter((t) => tools.includes(t)).map((name) => {
-    const [command, ...args] = localServer(core, name).command;
-    return mcpEdit(['servers', name], { type: 'stdio', command, args });
+    return mcpEdit(['servers', name], ([command, ...args]) => ({ type: 'stdio', command, args }), localServer(core, name).command, core.mcp[name].legacy);
   });
 }
 
