@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bump } from '../scripts/pins-latest.mjs';
+import { bump as bumpPins } from '../scripts/bump-pins.mjs';
 import { plan, run, TITLE } from '../scripts/ci-latest-report.mjs';
 import { PINS, pinVersions } from '../scripts/lib/pins.mjs';
 
@@ -18,6 +19,17 @@ test('bump moves a pin forward only', async () => {
   assert.deepEqual(moved, [{ key: 'a', from: '1.0.0', to: '1.1.0' }]);
   assert.equal(pins.b.version, '2.0.0');
   assert.equal(pins.c.version, '1.0.0');
+});
+
+test('bump skips a held pin, logs one held line, and still bumps an unheld pin', async () => {
+  const text = '{\n  "pins": {\n    "held": { "kind": "npm", "source": "held-pkg", "version": "1.19.0", "hold": "owner decision" },\n    "free": { "kind": "npm", "source": "free-pkg", "version": "1.0.0" }\n  }\n}';
+  const get = async () => ({ time: { '1.19.0': '2026-01-01T00:00:00Z', '2.0.0': '2026-10-01T00:00:00Z' } });
+  const logs = [];
+  const { text: out, changes } = await bumpPins({ text, get, now: Date.parse('2026-11-10T00:00:00Z'), log: (m) => logs.push(m) });
+  assert.deepEqual(changes.map((c) => c.key), ['free']);
+  assert.deepEqual(logs, ['held: held 1.19.0 (owner decision)']);
+  assert.equal(JSON.parse(out).pins.held.version, '1.19.0');
+  assert.equal(JSON.parse(out).pins.free.version, '2.0.0');
 });
 
 test('ciOnly pins stay out of state.json pins and have a CI job', () => {
