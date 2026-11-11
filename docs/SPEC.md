@@ -493,7 +493,7 @@ Mark each `[x]` when merged.
 - [ ] **Session 107 — Context Mode MCP starts with server** (0.7.0). Issue #107. Sonnet.
 - [x] **Session 108 — One update channel** (0.7.0). Issue #108. Haiku.
 - [ ] **Session 64 — Pin and verify downloaded code** (0.7.0, after 69). Issues #64, #66, #75. Sonnet.
-- [ ] **Session 93 — migrate owned-file check** (0.7.0). Issue #93. Sonnet.
+- [x] **Session 93 — migrate owned-file check** (0.7.0). Issue #93. Sonnet. #112 done (skills 1.8 Antigravity skill path).
 - [ ] **Session 50 — Pin bumps** (0.7.0, after 64). Issues #50, #51, #52. Merge the ci-latest pin-bump PR instead of hand bumps; keep opencode-v1 at 1.19.0 (work PC version); also closes #97 to #102. Haiku.
 - [ ] **Session 44 — Context Mode on Node < 24.15** (0.7.0, after 64). Issues #44 and #104 points 1 to 3 (engines check, `node` field per pin, matching nvm Node with absolute registration). Opus plans, Sonnet builds. #104 points 4 and 5 and #106 go to 0.8.0; #103 later.
 - [ ] **Session 65 — How you get it: release tag default, npm package** (0.7.0, after #58, 69 and 44). Issues #65, #46. Opus plans, Sonnet builds.

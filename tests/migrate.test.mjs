@@ -52,6 +52,19 @@ function cursorHome() {
   return home;
 }
 
+test('migrate treats a rules file as owned only when the mark is in the first 10 lines', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-migrate-'));
+  const mark = 'managed by lean-agents';
+  put(home, 'AGENTS.md', `${'rule\n'.repeat(19)}note: ${mark}\n`);
+  assert.equal(readSource('cursor', home, 'project').rules.length, 1);
+  put(home, 'AGENTS.md', `<!-- ${mark} -->\nrule\n`);
+  assert.equal(readSource('cursor', home, 'project').rules.length, 0);
+  put(home, 'AGENTS.md', `${'rule\n'.repeat(9)}${mark}\n`);
+  assert.equal(readSource('cursor', home, 'project').rules.length, 0, 'line 10 is owned');
+  put(home, 'AGENTS.md', `${'rule\n'.repeat(10)}${mark}\n`);
+  assert.equal(readSource('cursor', home, 'project').rules.length, 1, 'line 11 is not owned');
+});
+
 test('readSource returns the neutral shape and never an env or header value', () => {
   const home = cursorHome();
   const r = readSource('cursor', home, 'user');

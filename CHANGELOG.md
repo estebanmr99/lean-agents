@@ -42,6 +42,8 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- `--migrate` treats a rules file as lean-agents' own only when `managed by lean-agents` is in its first 10 lines, the same rule as the installer; a user file that mentions it further down is migrated (#93).
+- The i-have-adhd step finds the skill where `skills` 1.8 installs it for Antigravity (`~/.gemini/config/skills/i-have-adhd`), which `ci-latest` with `skills@1.8` needs (it failed with "i-have-adhd skill not found"); the 1.7.4 paths work as before (#112).
 - Context Mode MCP starts (#107): the command in `core/mcp.json` now ends with `server`, as 2.1.4 requires. A rerun replaces the old lean-agents entry (`npx -y context-mode@<version>`, any version) in OpenCode 2, Cursor and VS Code configs; an entry you edited stays as it is, and `--uninstall` removes the entry lean-agents wrote. `tests/real-opencode.sh` sends `initialize` to the registered command.
 - Windows: the Orca telemetry reminder shows on a real-home run unless `DO_NOT_TRACK` or `ORCA_TELEMETRY_DISABLED` is already set in the user or machine env; it was always hidden (#76).
 

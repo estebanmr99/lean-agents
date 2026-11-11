@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parse } from 'jsonc-parser';
-import { OWNED_MARK, removeBlock } from './fsops.mjs';
+import { OWNED_MARK, hasMark, removeBlock } from './fsops.mjs';
 import { parseAgent } from './render.mjs';
 import { configHome, envDir } from './system.mjs';
 import { configPath, renderOpenCodeAgent } from './adapters/opencode-v2.mjs';
@@ -134,7 +134,7 @@ export function readSource(from, base, scope) {
 
   const addRule = (file, strip) => {
     const raw = text(file);
-    if (raw === null || (raw.includes(OWNED_MARK) && !raw.includes('lean-agents:start'))) return;
+    if (raw === null || (hasMark(raw) && !raw.includes('lean-agents:start'))) return;
     const { meta, body } = strip ? frontmatter(raw) : { meta: '', body: raw };
     const clean = removeBlock(body).trim();
     if (clean) r.rules.push({ file, text: clean, scoped: /^(applyTo|globs|paths):\s*\S/m.test(meta) });

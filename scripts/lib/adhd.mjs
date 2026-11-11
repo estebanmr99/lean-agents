@@ -22,5 +22,7 @@ export const setInvocable = (text, on) => text.replace(/^disable-model-invocatio
 export function adhdSkillFiles(home) {
   const cache = path.join(home, '.claude', 'plugins', 'cache', 'i-have-adhd', 'i-have-adhd');
   const versions = fs.existsSync(cache) ? fs.readdirSync(cache).map((v) => path.join(cache, v, 'skills', 'i-have-adhd', 'SKILL.md')) : [];
-  return [...versions, path.join(home, '.agents', 'skills', 'i-have-adhd', 'SKILL.md')].filter((f) => fs.existsSync(f));
+  // skills 1.7.x writes ~/.agents/skills; 1.8 writes Antigravity's copy to ~/.gemini/config/skills.
+  const shared = [['.agents', 'skills'], ['.gemini', 'config', 'skills']].map((p) => path.join(home, ...p, 'i-have-adhd', 'SKILL.md'));
+  return [...versions, ...shared].filter((f) => fs.existsSync(f));
 }
