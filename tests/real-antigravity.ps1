@@ -28,7 +28,7 @@ $cfg = "$dir\.gemini\config"
 if (-not (Test-Path "$cfg\rules\lean-agents.md")) { throw 'rules file is missing' }
 if (-not (Select-String -Path "$cfg\agents\planner.md" -Pattern '^model: pro$' -Quiet)) { throw 'subagents are missing' }
 # skills 1.7 installs Antigravity skills in .agents\skills, skills 1.8 in .gemini\config\skills (#112).
-$skills = if (Test-Path "$dir\.gemini\config\skills") { "$dir\.gemini\config\skills" } else { "$dir\.agents\skills" }
+$skills = if (Test-Path "$dir\.gemini\config\skills\i-have-adhd\SKILL.md") { "$dir\.gemini\config\skills" } else { "$dir\.agents\skills" }
 if (-not (Test-Path "$skills\caveman\SKILL.md")) { throw 'Caveman skills are missing' }
 if (-not (Select-String -Path "$skills\i-have-adhd\SKILL.md" -Pattern 'disable-model-invocation: false' -Quiet)) { throw 'i-have-adhd flag was not set' }
 # rtk ignores USERPROFILE and uses the OS profile folder, here the disposable runner's.

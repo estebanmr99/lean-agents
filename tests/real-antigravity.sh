@@ -25,8 +25,9 @@ test -f "$dir/rules/lean-agents.md"
 grep -q '^model: pro$' "$dir/agents/planner.md"
 test -f "$dir/plugins/rtk/plugin.json"
 # skills 1.7 installs Antigravity skills in ~/.agents/skills, skills 1.8 in ~/.gemini/config/skills (#112).
-skills="$HOME/.agents/skills"
-if [ -d "$HOME/.gemini/config/skills" ]; then skills="$HOME/.gemini/config/skills"; fi
+# GSD also creates ~/.gemini/config/skills, so pick the folder that holds i-have-adhd.
+skills="$HOME/.gemini/config/skills"
+if [ ! -f "$skills/i-have-adhd/SKILL.md" ]; then skills="$HOME/.agents/skills"; fi
 test -f "$skills/caveman/SKILL.md"
 grep -q '^disable-model-invocation: false$' "$skills/i-have-adhd/SKILL.md"
 ls "$dir"/agents/gsd-* >/dev/null
