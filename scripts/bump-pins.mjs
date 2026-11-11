@@ -50,6 +50,7 @@ export async function bump({ text, get, now = Date.now(), today = new Date(now).
   const changes = [];
   for (const [key, p] of Object.entries(pins)) {
     if (SKIP.has(key) || p.kind === 'download') continue;
+    if (p.hold) { log(`held: ${key} ${p.version} (${p.hold})`); continue; }
     try {
       const pick = await pickVersion(p, get, now);
       if (!pick || !isNewer(p.version, pick.version)) continue;
