@@ -30,7 +30,8 @@ function everything() {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
     const plan = lean(home, ['--dry-run', '--agents', a]);
     lean(home, ['--agents', a]);
-    return plan + files(home);
+    // state.json records each edit's `legacy` list: the old unversioned values we replace, not something we install.
+    return plan + files(home).replace(/"legacy":\s*\[[^\]]*\]/g, '');
   }).join('\n');
 }
 

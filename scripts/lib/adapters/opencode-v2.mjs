@@ -134,8 +134,8 @@ export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
   for (const name of ['context-mode', 'serena', 'playwright', 'playwright-extension']) {
     if (tools.includes(name)) edits.push(mcpEdit(['mcp', 'servers', name], localServer(core, name)));
   }
-  if (tools.includes('ponytail')) edits.push({ path: ['plugins'], value: npmSpec('ponytail'), mode: 'arrayAdd' });
-  if (opts.terminals?.includes('warp')) edits.push({ path: ['plugins'], value: npmSpec('warp-opencode'), mode: 'arrayAdd' });
+  if (tools.includes('ponytail')) edits.push({ path: ['plugins'], value: npmSpec('ponytail'), mode: 'arrayAdd', legacy: ['@dietrichgebert/ponytail'] });
+  if (opts.terminals?.includes('warp')) edits.push({ path: ['plugins'], value: npmSpec('warp-opencode'), mode: 'arrayAdd', legacy: ['@warp-dot-dev/opencode-warp'] });
   if (opts.network.outbound === 'off') edits.push({ path: ['share'], value: 'disabled', mode: 'set' });
   if (opts.network.autoUpdate === 'off') edits.push({ path: ['update'], value: 'disable', mode: 'set' });
   if (opts.network.outbound === 'off') {

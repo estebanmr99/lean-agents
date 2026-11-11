@@ -1154,3 +1154,32 @@ test('--update installs a pinned npm tool again when it is behind, and records t
   const descs = after.commands.map((c) => c.desc);
   assert.equal(new Set(descs).size, descs.length, 'no command recorded twice');
 });
+
+test('pinned OpenCode plugins: an old unversioned entry is replaced in place, a user-chosen version is kept, uninstall removes the pinned entry', () => {
+  const run = (initial) => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+    const file = path.join(home, '.config', 'opencode', 'opencode.jsonc');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ plugins: initial }));
+    const args = ['--yes', '--no-exec', '--agents', 'opencode-v2', '--tools', 'ponytail', '--terminal', 'warp', '--lang', 'en', '--profile', 'none'];
+    const out = lean(home, args);
+    // A user edit after the install keeps uninstall on the per-key revert path instead of restoring the whole backup.
+    const edit = () => fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('{', '{"theme":"x",'));
+    return { home, file, out, edit, plugins: () => parse(fs.readFileSync(file, 'utf8')).plugins };
+  };
+  const ponytail = npmSpec('ponytail');
+  const warp = npmSpec('warp-opencode');
+
+  const old = run(['mine', '@dietrichgebert/ponytail', '@warp-dot-dev/opencode-warp']);
+  assert.deepEqual(old.plugins(), ['mine', ponytail, warp]);
+  old.edit();
+  lean(old.home, ['--yes', '--no-exec', '--uninstall']);
+  assert.deepEqual(old.plugins(), ['mine']);
+
+  const own = run(['@dietrichgebert/ponytail@1.2.3']);
+  assert.deepEqual(own.plugins(), ['@dietrichgebert/ponytail@1.2.3', warp]);
+  assert.match(own.out, /kept your values for: plugins/);
+  own.edit();
+  lean(own.home, ['--yes', '--no-exec', '--uninstall']);
+  assert.deepEqual(own.plugins(), ['@dietrichgebert/ponytail@1.2.3']);
+});

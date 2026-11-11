@@ -73,6 +73,9 @@ function isLegacy(current, legacy = []) {
   return legacy.some((l) => eq(current, l));
 }
 
+// Package name of an npm plugin spec: 'pkg@1.2.3' and '@scope/pkg@1.2.3' lose the version.
+const pkgName = (v) => (typeof v === 'string' ? v.replace(/(?!^)@[^@/]*$/, '') : v);
+
 // Returns { text, applied: [edit], kept: [{path, value}] }.
 export function applyJsonEdits(original, edits) {
   let text = original && original.trim() ? original : '{}\n';
@@ -83,6 +86,18 @@ export function applyJsonEdits(original, edits) {
     if (e.mode === 'arrayAdd') {
       const list = Array.isArray(current) ? current : [];
       if (list.some((v) => JSON.stringify(v) === JSON.stringify(e.value))) continue;
+      if (e.legacy) {
+        // Pinned plugin spec: an exact legacy value we wrote earlier becomes the pinned one in place; any other entry
+        // for the same package is the user's own choice, so it stays and nothing is added.
+        const old = list.findIndex((v) => e.legacy.includes(v));
+        if (old >= 0) {
+          text = applyEdits(text, modify(text, [...e.path, old], e.value, FORMAT));
+          applied.push(e);
+          continue;
+        }
+        const own = list.find((v) => pkgName(v) === pkgName(e.value));
+        if (own !== undefined) { kept.push({ path: e.path, value: own }); continue; }
+      }
       const target = Array.isArray(current) ? [...e.path, -1] : e.path;
       const value = Array.isArray(current) ? e.value : [e.value];
       text = applyEdits(text, modify(text, target, value, { ...FORMAT, isArrayInsertion: true }));
