@@ -24,8 +24,11 @@ refute grep -qE '^ *! ' "$HOME/install.txt"
 test -f "$dir/rules/lean-agents.md"
 grep -q '^model: pro$' "$dir/agents/planner.md"
 test -f "$dir/plugins/rtk/plugin.json"
-test -f "$HOME/.agents/skills/caveman/SKILL.md"
-grep -q '^disable-model-invocation: false$' "$HOME/.agents/skills/i-have-adhd/SKILL.md"
+# skills 1.7 installs Antigravity skills in ~/.agents/skills, skills 1.8 in ~/.gemini/config/skills (#112).
+skills="$HOME/.agents/skills"
+if [ -d "$HOME/.gemini/config/skills" ]; then skills="$HOME/.gemini/config/skills"; fi
+test -f "$skills/caveman/SKILL.md"
+grep -q '^disable-model-invocation: false$' "$skills/i-have-adhd/SKILL.md"
 ls "$dir"/agents/gsd-* >/dev/null
 
 "$agy_bin" agents </dev/null | tee "$HOME/agents.txt"
@@ -44,7 +47,7 @@ refute grep -qE '^ *! ' "$HOME/uninstall.txt"
 refute test -e "$dir/rules/lean-agents.md"
 refute test -e "$dir/agents/planner.md"
 refute test -e "$dir/plugins/rtk"
-refute test -e "$HOME/.agents/skills/caveman"
+refute test -e "$skills/caveman"
 refute compgen -G "$dir/agents/gsd-*"
 refute grep -qs serena "$dir/mcp_config.json"
 echo "real-antigravity: OK"
