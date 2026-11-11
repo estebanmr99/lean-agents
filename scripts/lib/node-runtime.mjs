@@ -68,6 +68,10 @@ export function toolEnv(toolNode, penv = process.env, platform = process.platfor
   return { [key]: [toolNode.pathDir, penv[key]].filter(Boolean).join(platform === 'win32' ? ';' : ':') };
 }
 
+// nvm refuses to work while an npm prefix is set ("nvm is not compatible with the npm_config_prefix environment variable"), and users
+// and throwaway HOMEs often set one. Every nvm command runs with both spellings removed (an undefined value drops the variable from the child env).
+export const nvmEnv = (nvmDir) => ({ NVM_DIR: nvmDir, npm_config_prefix: undefined, NPM_CONFIG_PREFIX: undefined });
+
 // nvm installs the newest Node of a major and makes the first one `default`; the user's default stays as it was (none before: none after).
 export const nvmInstallArgv = (major) => ['bash', '-c',
   `had=0; [ -e "$NVM_DIR/alias/default" ] && had=1; . "$NVM_DIR/nvm.sh" --no-use && nvm install ${Number(major)} && { [ $had = 1 ] || rm -f "$NVM_DIR/alias/default"; }`];
@@ -75,7 +79,7 @@ export const nvmInstallArgv = (major) => ['bash', '-c',
 // Newest published Node of a major through nvm (network). LEAN_AGENTS_NVM_REMOTE fakes it for tests, like LEAN_AGENTS_NODE.
 export function nvmLatest(nvm, major, { env = process.env, run }) {
   if (env.LEAN_AGENTS_NVM_REMOTE) return env.LEAN_AGENTS_NVM_REMOTE;
-  const r = run(['bash', '-c', `. "$NVM_DIR/nvm.sh" --no-use && nvm version-remote ${Number(major)}`], 30000, { NVM_DIR: nvm.dir });
+  const r = run(['bash', '-c', `. "$NVM_DIR/nvm.sh" --no-use && nvm version-remote ${Number(major)}`], 30000, nvmEnv(nvm.dir));
   const v = r.ok && /v(\d+\.\d+\.\d+)\s*$/.exec(r.out.trim());
   return v ? v[1] : null;
 }

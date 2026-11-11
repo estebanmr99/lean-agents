@@ -24,7 +24,7 @@ import { gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, b
 import { doctor } from './lib/doctor.mjs';
 import { draftIssue } from './lib/feedback.mjs';
 import { pinVersions, behindPins, pinTool, nodeRange, npmSpec } from './lib/pins.mjs';
-import { findNvm, resolveToolNodes, nvmLatest, nvmInstallArgv, toolEnv } from './lib/node-runtime.mjs';
+import { findNvm, resolveToolNodes, nvmLatest, nvmInstallArgv, nvmEnv, toolEnv } from './lib/node-runtime.mjs';
 import { leanUpdateCommands } from './lib/lean-update.mjs';
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
 import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
@@ -381,7 +381,7 @@ function prereqCommands(o, behind = new Set()) {
   const pm = packageManager();
   const out = [];
   const tn = o.toolNode;
-  if (tn?.install) out.push({ tool: 'node', desc: `install Node ${tn.install} with nvm (your default Node stays as it is)`, run: [nvmInstallArgv(tn.install)], undo: [], env: { NVM_DIR: tn.nvmDir } });
+  if (tn?.install) out.push({ tool: 'node', desc: `install Node ${tn.install} with nvm (your default Node stays as it is)`, run: [nvmInstallArgv(tn.install)], undo: [], env: nvmEnv(tn.nvmDir) });
   for (const t of [...o.tools, ...(o.gh ? ['gh'] : [])]) {
     if (t === 'context-mode' && tn) {
       const prefix = ['--prefix', tn.dir];

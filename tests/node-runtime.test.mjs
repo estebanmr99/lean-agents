@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { satisfies, minVersion, findNvm, installedNodes, resolveToolNodes, nodeSkipLine } from '../scripts/lib/node-runtime.mjs';
+import { satisfies, minVersion, findNvm, installedNodes, resolveToolNodes, nodeSkipLine, nvmEnv, nvmLatest } from '../scripts/lib/node-runtime.mjs';
+import { run as runCommand, quiet } from '../scripts/lib/system.mjs';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'lean-node-'));
 // A fake nvm tree with the given Node versions; no real nvm or Node is involved.
@@ -87,4 +88,27 @@ test('resolveToolNodes: no nvm skips each tool with the one-line reason; nvm-win
   assert.equal(r.skipped[0].line, 'context-mode needs Node >=24.15.0, found 22.20.0: skipped. Install nvm or Node 24.15+, then run --update.');
   assert.equal(nodeSkipLine('context-mode', '>=24.15.0', '22.20.0'), r.skipped[0].line);
   assert.equal(resolveToolNodes({ pins, active: '22.20.0', nvm: fakeNvm(['24.11.0'], true), latest: () => '24.22.2' }).toolNode, null);
+});
+
+// A stand-in for nvm that refuses an npm prefix exactly like the real one.
+const refusingNvm = () => {
+  const dir = tmp();
+  fs.writeFileSync(path.join(dir, 'nvm.sh'), 'if [ -n "$npm_config_prefix$NPM_CONFIG_PREFIX" ]; then echo "nvm is not compatible with the npm_config_prefix environment variable" >&2; return 1; fi\nnvm() { echo v24.22.2; }\n');
+  return { win: false, dir };
+};
+
+test('nvm commands run without npm_config_prefix and NPM_CONFIG_PREFIX, even when the user has them set', { skip: process.platform === 'win32' }, () => {
+  assert.deepEqual(nvmEnv('/x'), { NVM_DIR: '/x', npm_config_prefix: undefined, NPM_CONFIG_PREFIX: undefined });
+  const saved = { a: process.env.npm_config_prefix, b: process.env.NPM_CONFIG_PREFIX };
+  Object.assign(process.env, { npm_config_prefix: '/some/prefix', NPM_CONFIG_PREFIX: '/some/prefix' });
+  try {
+    const nvm = refusingNvm();
+    assert.equal(nvmLatest(nvm, 24, { env: {}, run: quiet }), '24.22.2');
+    // The planned install command carries the same env through run().
+    const lines = [];
+    assert.ok(runCommand(['bash', '-c', '. "$NVM_DIR/nvm.sh" --no-use && nvm version-remote 24'], { dryRun: false, log: (l) => lines.push(l), env: nvmEnv(nvm.dir) }));
+    assert.equal(runCommand(['bash', '-c', '. "$NVM_DIR/nvm.sh" --no-use'], { dryRun: false, log: () => {}, env: { NVM_DIR: nvm.dir } }), false, 'control: with the prefix still set the stand-in refuses');
+  } finally {
+    for (const [k, v] of [['npm_config_prefix', saved.a], ['NPM_CONFIG_PREFIX', saved.b]]) if (v === undefined) delete process.env[k]; else process.env[k] = v;
+  }
 });

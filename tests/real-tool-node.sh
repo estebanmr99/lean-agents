@@ -17,7 +17,8 @@ home="$HOME"
 if [ "$os" = windows ]; then
   # Node, npm and PowerShell need Windows paths.
   home="$(cygpath -w "$HOME")"
-  export USERPROFILE="$home" npm_config_prefix="$(cygpath -w "$T")\\npm" npm_config_cache="$(cygpath -w "$T")\\cache"
+  win_t="$(cygpath -w "$T")"
+  export USERPROFILE="$home" npm_config_prefix="$win_t\\npm" npm_config_cache="$win_t\\cache"
   export PATH="$T/npm:$PATH"
 else
   export npm_config_prefix="$T/npm" npm_config_cache="$T/cache"
@@ -38,12 +39,19 @@ if [ "$os" = linux ]; then
   export NVM_DIR="$T/nvm"
   mkdir -p "$NVM_DIR"
   cp "$NVM_SH" "$NVM_DIR/nvm.sh"
-  set +eu
-  . "$NVM_DIR/nvm.sh" --no-use
-  nvm install 22.20.0
-  set -eu
+  # nvm refuses to run with an npm prefix in the environment (this script sets one for its throwaway HOME), so only this subshell drops it.
+  # The engine must cope with the prefix itself: it is still set for every lean.mjs run below.
+  (
+    unset npm_config_prefix NPM_CONFIG_PREFIX
+    set +eu
+    # shellcheck source=/dev/null
+    . "$NVM_DIR/nvm.sh" --no-use
+    nvm install 22.20.0
+  )
   export PATH="$NVM_DIR/versions/node/v22.20.0/bin:$PATH"
-  default_before="$(cat "$NVM_DIR/alias/default")"
+  # A fresh NVM_DIR may have no default alias, so "none" is a valid value to compare.
+  default_alias() { cat "$NVM_DIR/alias/default" 2>/dev/null || echo none; }
+  default_before="$(default_alias)"
   versions="$NVM_DIR/versions/node"
 else
   [ -n "${NVM_HOME:-}" ] || fail "NVM_HOME (set by real-tool-node.ps1) is not set"
@@ -58,7 +66,8 @@ lean() { node "$repo/scripts/lean.mjs" --home "$home" --yes --no-gh --no-bun "$@
 install_all() { lean --agents cursor,opencode-v2,claude --tools context-mode,gsd --profile none --lang en --privacy standard; }
 oc="$HOME/.config/opencode/opencode.jsonc"
 cursor="$HOME/.cursor/mcp.json"
-node24() { ls -d "$versions"/v24.* 2>/dev/null | head -1; }
+node24() { local d; for d in "$versions"/v24.*; do if [ -e "$d" ]; then echo "$d"; return; fi; done; }
+count_nodes() { find "$versions" -mindepth 1 -maxdepth 1 | wc -l; }
 
 # A context-mode entry an earlier lean-agents wrote (npx) must be upgraded; one the user edited must stay.
 mkdir -p "$(dirname "$oc")" "$(dirname "$cursor")"
@@ -70,7 +79,7 @@ install_all
 n24="$(node24)"
 [ -n "$n24" ] || fail "no Node 24 under $versions"
 case "$(node -p process.version)" in v22.*) ;; *) fail "PATH Node changed" ;; esac
-[ "$os" != linux ] || [ "$(cat "$NVM_DIR/alias/default")" = "$default_before" ] || fail "nvm's default alias changed"
+[ "$os" != linux ] || [ "$(default_alias)" = "$default_before" ] || fail "nvm's default alias changed"
 # The seeded legacy npx entry must now be the absolute Node 24 server (the user's own Cursor entry stays below).
 oc_cmd="$(cd "$repo" && node -e "const { parse } = require('jsonc-parser'); const e = parse(require('fs').readFileSync(process.argv[1], 'utf8')).mcp.servers['context-mode']; console.log(e ? e.command.join(' ') : 'none')" "$oc")"
 case "$oc_cmd" in *v24.*cli.mjs\ server) ;; *) fail "the OpenCode entry is not the absolute Node 24 server: $oc_cmd" ;; esac
@@ -113,16 +122,16 @@ JS
 
 echo "--- a rerun changes nothing and installs no second Node"
 before="$(cat "$oc" "$cursor")"
-count="$(ls "$versions" | wc -l)"
+count="$(count_nodes)"
 install_all
 [ "$(cat "$oc" "$cursor")" = "$before" ] || fail "a rerun changed the configs"
-[ "$(ls "$versions" | wc -l)" = "$count" ] || fail "a rerun installed another Node"
+[ "$(count_nodes)" = "$count" ] || fail "a rerun installed another Node"
 
 echo "--- --uninstall removes the entries and the prefixed package; Node 24 stays"
 lean --uninstall
 grep -q 'context-mode' "$oc" && fail "the OpenCode entry is still there"
 grep -q 'my-own-ctx' "$cursor" || fail "uninstall removed the hand-edited Cursor entry"
-[ ! -e "$n24/lib/node_modules/context-mode" ] && [ ! -e "$n24/node_modules/context-mode" ] || fail "the prefixed context-mode package is still installed"
+if [ -e "$n24/lib/node_modules/context-mode" ] || [ -e "$n24/node_modules/context-mode" ]; then fail "the prefixed context-mode package is still installed"; fi
 [ -d "$n24" ] || fail "uninstall removed Node 24"
 if claude mcp get context-mode >/dev/null 2>&1; then fail "claude still has the context-mode entry"; fi
 

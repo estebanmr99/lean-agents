@@ -111,8 +111,9 @@ jobs:
         if: ${{ matrix.node < 24 }}
         shell: bash
         run: |
-          node scripts/lean.mjs --home "$RUNNER_TEMP/skip-check" --no-exec --dry-run --yes --agents claude --tools context-mode | tee "$RUNNER_TEMP/skip.txt"
-          grep -F 'Context Mode 2 needs Node 24.15+, found ' "$RUNNER_TEMP/skip.txt"
+          # No nvm for this check, whatever the runner image ships: an empty NVM_HOME and an NVM_DIR that does not exist.
+          NVM_HOME= NVM_DIR="$RUNNER_TEMP/no-nvm" node scripts/lean.mjs --home "$RUNNER_TEMP/skip-check" --no-exec --dry-run --yes --agents claude --tools context-mode | tee "$RUNNER_TEMP/skip.txt"
+          grep -F 'context-mode needs Node >=24.15.0, found ' "$RUNNER_TEMP/skip.txt"
       - name: PSScriptAnalyzer
         if: runner.os == 'Windows'
         shell: pwsh

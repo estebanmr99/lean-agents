@@ -358,7 +358,7 @@ test('the engine drops Context Mode and GSD on an old Node without nvm, with the
   assert.match(current, /tools: .*context-mode/);
 });
 
-test('with nvm, Context Mode is registered with an absolute Node in every agent config; reruns, user entries and --uninstall behave', () => {
+test('with nvm, Context Mode is registered with an absolute Node in every agent config; reruns, user entries and --uninstall behave', { skip: process.platform === 'win32' }, () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
   const nvm = fakeNvm(['22.20.0', '24.22.2'], home);
   const node = path.join(nvm, 'versions', 'node', 'v24.22.2', 'bin', 'node');
@@ -387,7 +387,7 @@ test('with nvm, Context Mode is registered with an absolute Node in every agent 
   assert.equal(JSON.parse(fs.readFileSync(cursorFile, 'utf8')).mcpServers['context-mode'].command, 'my-own-ctx');
 });
 
-test('entries the user wrote stay: context-mode@latest, and an absolute Node outside the nvm dir', () => {
+test('entries the user wrote stay: context-mode@latest, and an absolute Node outside the nvm dir', { skip: process.platform === 'win32' }, () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
   const nvm = fakeNvm(['22.20.0', '24.22.2'], home);
   const ocFile = path.join(home, '.config', 'opencode', 'opencode.jsonc');
@@ -428,7 +428,7 @@ test('Claude: a run on a new Node removes the absolute Context Mode MCP an earli
   assert.ok(!/claude mcp remove --scope user context-mode/.test(plan([{ ...record, undo: [] }])), 'already removed: not removed twice');
 });
 
-test('a Node that nvm has to install is planned with nvm install <major>, an unchanged default alias, and Claude gets the MCP instead of the plugin', () => {
+test('a Node that nvm has to install is planned with nvm install <major>, an unchanged default alias, and Claude gets the MCP instead of the plugin', { skip: process.platform === 'win32' }, () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
   const nvm = fakeNvm(['22.20.0'], home);
   const out = lean(home, ['--yes', '--dry-run', '--agents', 'claude', '--tools', 'context-mode', '--lang', 'en'], oldNode(nvm, { LEAN_AGENTS_NVM_REMOTE: 'v24.22.2'.slice(1) }));
