@@ -208,7 +208,10 @@ export function plan(actions, roots = [], prior = []) {
       after = setBlock(before, a.body, a.toml);
     }
     const status = before === null ? 'create' : before === after ? 'unchanged' : 'modify';
-    return { ...a, before, after, applied, status, note, keptKeys };
+    // A file lean-agents created and nobody edited since holds nothing of the user's: a rerun needs no backup of it.
+    const mine = prior.filter((f) => f.path === a.path);
+    const noBackup = before !== null && mine.some((f) => f.created) && sha(before) === mine.at(-1).hash;
+    return { ...a, before, after, applied, status, note, keptKeys, noBackup };
   });
 }
 
@@ -227,7 +230,7 @@ export function apply(planned, backupDir, home, roots = [home]) {
     const blocked = unsafe(p.path, roots);
     if (blocked) throw new Error(`refusing to write ${p.path}: ${blocked}`);
     let backup = null;
-    if (p.before !== null) {
+    if (p.before !== null && !p.noBackup) {
       const rel = home && (p.path === home || p.path.startsWith(home + path.sep)) ? path.relative(home, p.path) : p.path.replace(/^[A-Za-z]:/, '').replace(/^[\\/]+/, '');
       backup = path.join(backupDir, rel);
       privateDir(path.dirname(backup), path.dirname(backupDir));

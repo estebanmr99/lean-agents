@@ -36,6 +36,16 @@ test('a pin we wrote moves to the new pin, one entry, uninstall removes it', () 
   assert.ok(!fs.existsSync(t.file) || !JSON.parse(fs.readFileSync(t.file, 'utf8')).plugin?.includes('@scope/pkg@2.0.0'));
 });
 
+test('a rerun leaves no backup of a file we created; a file the user edited still gets one', () => {
+  const t = setup();
+  t.run('@scope/pkg@1.0.0', 'a');
+  t.run('@scope/pkg@2.0.0', 'b');
+  assert.ok(!fs.existsSync(path.join(t.home, 'backups', 'b')));
+  fs.writeFileSync(t.file, JSON.stringify({ plugin: ['@scope/pkg@2.0.0'], mine: 1 }));
+  t.run('@scope/pkg@3.0.0', 'c');
+  assert.ok(fs.existsSync(path.join(t.home, 'backups', 'c')));
+});
+
 test('a version the user typed stays, even next to our state', () => {
   const t = setup('{ "plugin": ["@scope/pkg@9.9.9", "other"] }\n');
   const planned = t.run('@scope/pkg@2.0.0', 'a');
