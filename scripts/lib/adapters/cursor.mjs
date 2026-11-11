@@ -25,8 +25,7 @@ export function renderCursorAgent(agent) {
 // `mcpServers` entries for a Cursor mcp.json, user or project.
 export function cursorServers(core, tools) {
   return ['serena', 'playwright', 'playwright-extension', 'context-mode'].filter((t) => tools.includes(t)).map((name) => {
-    const [command, ...args] = localServer(core, name).command;
-    return mcpEdit(['mcpServers', name], { command, args });
+    return mcpEdit(['mcpServers', name], ([command, ...args]) => ({ command, args }), localServer(core, name).command, core.mcp[name].legacy);
   });
 }
 

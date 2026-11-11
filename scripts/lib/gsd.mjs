@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadProfile, modelFor } from './render.mjs';
 import { npmSpec } from './pins.mjs';
+import { toolEnv } from './node-runtime.mjs';
 
 const PACKAGE = npmSpec('gsd-core');
 const FLAGS = { claude: '--claude', 'opencode-v1': '--opencode', 'opencode-v2': '--opencode', 'copilot-cli': '--copilot', antigravity: '--antigravity', cursor: '--cursor' };
@@ -17,11 +18,15 @@ export function gsdProfileName(o) {
 
 export function gsdPlan(root, home, o) {
   for (const a of o.agents.filter((x) => !FLAGS[x])) console.log(`GSD Core has no installer for ${a}: skipped.`);
+  // On its own Node, npx runs from that Node and PATH leads with it, so the hooks GSD writes name this Node (they use process.execPath).
+  const tn = o.toolNode;
+  const npx = tn ? [tn.node, tn.npxCli] : ['npx'];
   const commands = [...new Set(o.agents.map((a) => FLAGS[a]).filter(Boolean))].map((flag) => ({
     tool: 'gsd',
     desc: `GSD Core (${flag.slice(2)})`,
-    run: [['npx', '-y', PACKAGE, flag, '--global']],
-    undo: [['npx', '-y', PACKAGE, flag, '--global', '--uninstall']],
+    run: [[...npx, '-y', PACKAGE, flag, '--global']],
+    undo: [[...npx, '-y', PACKAGE, flag, '--global', '--uninstall']],
+    ...(tn && { env: toolEnv(tn) }),
   }));
   const name = gsdProfileName(o);
   const file = name && path.join(root, 'profiles', name, 'gsd-defaults.json');

@@ -176,10 +176,3 @@ export function quiet(argv, timeout = 30000, env = {}) {
 
 export const exists = (p) => fs.existsSync(p);
 
-// Context Mode 2.1.4 declares engines.node >=24.15.0; on older Node npm installs 1.x, or 2.x without its tools.
-const CONTEXT_MODE_NODE = [24, 15, 0];
-export function contextModeNodeNote(nodeVersion) {
-  const have = nodeVersion.split('.').map(Number);
-  const ok = CONTEXT_MODE_NODE.reduce((state, min, i) => (state !== 0 ? state : Math.sign((have[i] ?? 0) - min)), 0) >= 0;
-  return ok ? '' : `Context Mode 2 needs Node ${CONTEXT_MODE_NODE.slice(0, 2).join('.')}+, found ${nodeVersion}: skipped. Upgrade Node (or nvm install 24) and run --update.`;
-}

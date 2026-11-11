@@ -27,8 +27,8 @@ import fs from 'node:fs';
 const out = fs.readFileSync(process.argv[2], 'utf8');
 const agentsOut = fs.readFileSync(process.argv[4], 'utf8');
 const { resolvedOpenCodeConfig } = await import(`${process.argv[3]}/scripts/lib/doctor.mjs`);
-const { contextModeNodeNote } = await import(`${process.argv[3]}/scripts/lib/system.mjs`);
-const { npmSpec } = await import(`${process.argv[3]}/scripts/lib/pins.mjs`);
+const { satisfies } = await import(`${process.argv[3]}/scripts/lib/node-runtime.mjs`);
+const { npmSpec, nodeRange } = await import(`${process.argv[3]}/scripts/lib/pins.mjs`);
 let cfg;
 try { cfg = resolvedOpenCodeConfig(out); } catch (e) { console.log(out); throw e; }
 const servers = cfg.mcp?.servers ?? cfg.mcp ?? {};
@@ -37,7 +37,7 @@ const checks = {
   'mcp serena': !!servers.serena,
   'mcp playwright': !!servers.playwright,
   'mcp playwright-extension': (servers['playwright-extension']?.command ?? []).includes('--extension'),
-  'mcp context-mode': !!servers['context-mode'] || contextModeNodeNote(process.versions.node) !== '', // skipped on Node < 24.15
+  'mcp context-mode': !!servers['context-mode'] || !satisfies(process.versions.node, nodeRange('context-mode')), // skipped on a Node below the pin's range
   'plan model': JSON.stringify(cfg.agents?.plan?.model ?? null).includes('claude-opus-5-5'),
   'subagents loaded': ['explore', 'research', 'review', 'debug', 'planner'].every((a) => agentsOut.includes(a)),
   'deny opencode provider': (cfg.policies ?? []).some((p) => p.resource === 'opencode' && p.effect === 'deny'),
@@ -61,8 +61,9 @@ node --input-type=module - "$HOME/resolved.txt" "$repo" <<'JS'
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 const { resolvedOpenCodeConfig } = await import(`${process.argv[3]}/scripts/lib/doctor.mjs`);
-const { contextModeNodeNote } = await import(`${process.argv[3]}/scripts/lib/system.mjs`);
-if (contextModeNodeNote(process.versions.node)) { console.log('skip  context-mode initialize (Node < 24.15)'); process.exit(0); }
+const { satisfies } = await import(`${process.argv[3]}/scripts/lib/node-runtime.mjs`);
+const { nodeRange } = await import(`${process.argv[3]}/scripts/lib/pins.mjs`);
+if (!satisfies(process.versions.node, nodeRange('context-mode'))) { console.log('skip  context-mode initialize (Node below the pin range)'); process.exit(0); }
 const cfg = resolvedOpenCodeConfig(fs.readFileSync(process.argv[2], 'utf8'));
 const entry = (cfg.mcp?.servers ?? cfg.mcp)?.['context-mode'];
 if (!entry) { console.log('FAIL  context-mode is not registered'); process.exit(1); }

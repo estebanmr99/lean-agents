@@ -42,14 +42,12 @@ export function localServer(core, name) {
   return { type: 'local', command, enabled: true };
 }
 
-// MCP entry edit. Context Mode entries written before it needed `server` are replaced by a rerun;
-// `legacy` is that old shape (any version, `*` is a wildcard). Anything else the user has is kept.
-export function mcpEdit(path, value) {
-  if (!JSON.stringify(value).includes('context-mode@')) return { path, value, mode: 'setIfAbsent' };
-  const old = (v) => Array.isArray(v) ? v.filter((a) => a !== 'server').map(old)
-    : typeof v === 'string' ? v.replace(/^context-mode@.+$/, 'context-mode@*')
-      : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, old(x)])) : v;
-  return { path, value, mode: 'upgradeIf', legacy: [old(value)] };
+// MCP entry edit. `shape` turns a command array into this agent's entry. A server with `legacy` commands in core/mcp.json
+// (Context Mode: other versions, with or without `server`, npx or an nvm Node; `*` is a wildcard) has those entries replaced
+// by a rerun, so the npx and absolute forms flip either way. Anything else the user has is kept.
+export function mcpEdit(path, shape, command, legacy) {
+  const value = shape(command);
+  return legacy ? { path, value, mode: 'upgradeIf', legacy: legacy.map(shape) } : { path, value, mode: 'setIfAbsent' };
 }
 
 export function profileEdits(profile, agentsKey) {
@@ -133,7 +131,7 @@ export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
   ];
 
   for (const name of ['context-mode', 'serena', 'playwright', 'playwright-extension']) {
-    if (tools.includes(name)) edits.push(mcpEdit(['mcp', 'servers', name], localServer(core, name)));
+    if (tools.includes(name)) edits.push(mcpEdit(['mcp', 'servers', name], (command) => ({ type: 'local', command, enabled: true }), localServer(core, name).command, core.mcp[name].legacy));
   }
   if (tools.includes('ponytail')) edits.push({ path: ['plugins'], value: npmSpec('ponytail'), mode: 'arrayAdd', legacy: ['@dietrichgebert/ponytail'] });
   if (opts.terminals?.includes('warp')) edits.push({ path: ['plugins'], value: npmSpec('warp-opencode'), mode: 'arrayAdd', legacy: ['@warp-dot-dev/opencode-warp'] });

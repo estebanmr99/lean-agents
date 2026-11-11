@@ -64,7 +64,16 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
   if (tools.includes('rtk')) {
     commands.push({ tool: 'rtk', desc: 'RTK hook for Claude Code', run: [['rtk', 'init', '-g', '--auto-patch']], undo: [['rtk', 'init', '-g', '--uninstall']] });
   }
-  if (tools.includes('context-mode')) {
+  if (tools.includes('context-mode') && opts.toolNode) {
+    // The plugin starts its server with the first `node` on PATH, so on an old Node it registers the absolute server instead (hooks and skills are lost).
+    commands.push({
+      tool: 'context-mode',
+      desc: 'Context Mode MCP server (user scope)',
+      run: [['claude', 'mcp', 'add', '--scope', 'user', 'context-mode', '--', ...core.mcp['context-mode'].command]],
+      undo: [['claude', 'mcp', 'remove', '--scope', 'user', 'context-mode']],
+      skipIfOutput: { cmd: ['claude', 'mcp', 'get', 'context-mode'], ok: true },
+    });
+  } else if (tools.includes('context-mode')) {
     commands.push({ tool: 'context-mode', desc: 'Context Mode plugin', ...plugin(marketplaceSource('context-mode-plugin'), 'context-mode@context-mode') });
   }
   if (tools.includes('ponytail')) {

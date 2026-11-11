@@ -55,5 +55,23 @@ export function resolveToolNodes({ pins, active, nvm, latest }) {
   if (have) return { toolNode: have, tools: failing.map(([k]) => k), skipped: [] };
   const version = nvm && !nvm.win && latest?.(floor[0]);
   if (version && satisfies(version, range)) return { toolNode: { ...nodeAt(nvm, path.join(nvm.dir, 'versions', 'node', `v${version}`), version), install: floor[0] }, tools: failing.map(([k]) => k), skipped: [] };
-  return { toolNode: null, skipped: failing.map(([k, p]) => ({ key: k, line: nodeSkipLine(k, p.node, active) })) };
+  return { toolNode: null, skipped: failing.map(([k, p]) => ({ tool: k, line: nodeSkipLine(k, p.node, active) })) };
+}
+
+// `env` for a command that must find this Node first: its folder leads PATH (npm starts package bins with the first `node` on PATH).
+export function toolEnv(toolNode, penv = process.env, platform = process.platform) {
+  const key = platform === 'win32' ? Object.keys(penv).find((k) => k.toUpperCase() === 'PATH') ?? 'Path' : 'PATH';
+  return { [key]: [toolNode.pathDir, penv[key]].filter(Boolean).join(platform === 'win32' ? ';' : ':') };
+}
+
+// nvm installs the newest Node of a major and makes the first one `default`; the user's default stays as it was (none before: none after).
+export const nvmInstallArgv = (major) => ['bash', '-c',
+  `had=0; [ -e "$NVM_DIR/alias/default" ] && had=1; . "$NVM_DIR/nvm.sh" --no-use && nvm install ${Number(major)} && { [ $had = 1 ] || rm -f "$NVM_DIR/alias/default"; }`];
+
+// Newest published Node of a major through nvm (network). LEAN_AGENTS_NVM_REMOTE fakes it for tests, like LEAN_AGENTS_NODE.
+export function nvmLatest(nvm, major, { env = process.env, run }) {
+  if (env.LEAN_AGENTS_NVM_REMOTE) return env.LEAN_AGENTS_NVM_REMOTE;
+  const r = run(['bash', '-c', `. "$NVM_DIR/nvm.sh" --no-use && nvm version-remote ${Number(major)}`], 30000, { NVM_DIR: nvm.dir });
+  const v = r.ok && /v(\d+\.\d+\.\d+)\s*$/.exec(r.out.trim());
+  return v ? v[1] : null;
 }

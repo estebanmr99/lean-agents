@@ -16,6 +16,14 @@ export function loadCore(root) {
   return { agents, mcp };
 }
 
+// Registers a tool's absolute `node_command` (the plugin-less form) instead of its npx command; {node} and {modules} come from the toolNode.
+export function useToolNode(core, toolNode) {
+  const s = core.mcp['context-mode'];
+  if (!toolNode || !s?.node_command) return core;
+  s.command = s.node_command.map((a) => a.replace('{node}', toolNode.node).replace(/^\{modules\}\/(.*)$/, (_, rest) => path.join(toolNode.modules, rest)));
+  return core;
+}
+
 export function parseAgent(text) {
   const m = text.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!m) throw new Error('agent file needs YAML frontmatter');

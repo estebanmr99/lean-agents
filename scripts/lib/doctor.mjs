@@ -2,8 +2,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { sha } from './fsops.mjs';
-import { PINS, npmSpec, behindPins } from './pins.mjs';
-import { version, quiet, contextModeNodeNote } from './system.mjs';
+import { PINS, npmSpec, behindPins, nodeRange } from './pins.mjs';
+import { version, quiet } from './system.mjs';
+import { satisfies, nodeSkipLine } from './node-runtime.mjs';
 import { stillNeeded } from './terminals.mjs';
 import { adhdSkillFiles } from './adhd.mjs';
 import { proxyReport, childEnv, fromPrivacy } from './network.mjs';
@@ -71,7 +72,8 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
     const q = (argv, timeout) => run(argv, timeout, childEnv(network));
     // `mcp list` starts every server (Serena through uvx git, Playwright), which is outbound traffic.
     const withMcp = network.outbound !== 'off';
-    const nodeNote = o.tools.includes('context-mode') ? contextModeNodeNote(nodeVersion) : '';
+    // A saved toolNode means Context Mode runs on its own Node, so the active one does not matter.
+    const nodeNote = o.tools.includes('context-mode') && !state.toolNode && !satisfies(nodeVersion, nodeRange('context-mode')) ? nodeSkipLine('context-mode', nodeRange('context-mode'), nodeVersion) : '';
     if (nodeNote) o.tools = o.tools.filter((t) => t !== 'context-mode');
     add('lean-agents', 'ok', `v${state.version}, agents: ${o.agents.join(', ')}, privacy: ${o.privacy}`);
     if (nodeNote) add('context-mode', 'note', nodeNote);
