@@ -13,7 +13,7 @@ import termios
 import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Context Mode 2 needs Node 24.15+; below that the engine skips it, so there is no Bun question either.
+# Context Mode 2 needs Node 24.15+; below that the engine skips it (no nvm here), so there is no Bun question either.
 node_version = tuple(int(n) for n in subprocess.check_output(["node", "--version"], text=True).strip().lstrip("v").split("."))
 context_mode = node_version >= (24, 15, 0)
 home = tempfile.mkdtemp(prefix="lean-tty-")
@@ -21,7 +21,8 @@ argv = ["node", os.path.join(ROOT, "scripts", "lean.mjs"), "--home", home, "--no
 
 pid, fd = pty.fork()
 if pid == 0:
-    os.execvp(argv[0], argv)
+    # No nvm, whatever the machine has: a missing NVM_DIR and an empty NVM_HOME, so an old Node always means the skip line.
+    os.execvpe(argv[0], argv, {**os.environ, "NVM_DIR": os.path.join(home, "no-nvm"), "NVM_HOME": ""})
 fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 100, 0, 0))
 
 out = b""
@@ -87,7 +88,7 @@ print(text)
 assert code == 0, "installer exited with an error"
 assert ("tools: rtk, context-mode, serena" if context_mode else "tools: rtk, serena") in text, "serena was not picked from the menu"
 if not context_mode:
-    assert "Context Mode 2 needs Node 24.15+, found" in text, "the Context Mode skip line is missing"
+    assert "context-mode needs Node >=24.15.0, found" in text, "the Context Mode skip line is missing"
 assert "network: telemetry off, autoUpdate off, outbound off" in text, "the all-off preset was not picked"
 if context_mode:
     assert "bun: on" in text, "Bun was not preselected on"
@@ -97,7 +98,8 @@ print("interactive menus: ok")
 # A terminal with no size makes clack hang, so the installer must fall back to plain questions.
 pid, fd = pty.fork()
 if pid == 0:
-    os.execvp(argv[0], argv)
+    # No nvm, whatever the machine has: a missing NVM_DIR and an empty NVM_HOME, so an old Node always means the skip line.
+    os.execvpe(argv[0], argv, {**os.environ, "NVM_DIR": os.path.join(home, "no-nvm"), "NVM_HOME": ""})
 out = b""
 wait_for(r"Add Serena MCP.*\[n\]")
 os.kill(pid, 15)
@@ -109,7 +111,8 @@ home = tempfile.mkdtemp(prefix="lean-tty-")
 argv = ["node", os.path.join(ROOT, "scripts", "lean.mjs"), "--home", home, "--no-exec", "--agents", "claude", "--no-tools", "--network", "on", "--lang", "en"]
 pid, fd = pty.fork()
 if pid == 0:
-    os.execvp(argv[0], argv)
+    # No nvm, whatever the machine has: a missing NVM_DIR and an empty NVM_HOME, so an old Node always means the skip line.
+    os.execvpe(argv[0], argv, {**os.environ, "NVM_DIR": os.path.join(home, "no-nvm"), "NVM_HOME": ""})
 fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 100, 0, 0))
 out = b""
 if os.system("command -v gh >/dev/null") != 0:
@@ -131,7 +134,8 @@ with open(notes_src, "w") as f:
 argv = ["node", os.path.join(ROOT, "scripts", "lean.mjs"), "--home", home, "--no-exec", "--agents", "claude", "--tools", "serena", "--network", "on", "--lang", "en", "--no-bun"]
 pid, fd = pty.fork()
 if pid == 0:
-    os.execvp(argv[0], argv)
+    # No nvm, whatever the machine has: a missing NVM_DIR and an empty NVM_HOME, so an old Node always means the skip line.
+    os.execvpe(argv[0], argv, {**os.environ, "NVM_DIR": os.path.join(home, "no-nvm"), "NVM_HOME": ""})
 fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 100, 0, 0))
 out = b""
 wait_for("Serena config")

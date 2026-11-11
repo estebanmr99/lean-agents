@@ -433,7 +433,7 @@ jobs:
           cat "$HOME/mcp.txt"
           grep -q serena "$HOME/mcp.txt"
           grep -q playwright "$HOME/mcp.txt"
-          if ! grep -q 'Context Mode 2 needs Node' "$HOME/install.txt"; then grep -q 'plugin:context-mode' "$HOME/mcp.txt"; fi
+          if ! grep -q 'context-mode needs Node >=24.15.0' "$HOME/install.txt"; then grep -q 'plugin:context-mode' "$HOME/mcp.txt"; fi
           grep -q 'rtk hook' "$HOME/.claude/settings.json"
           test -f "$HOME/.claude/skills/caveman/SKILL.md"
           grep -q '^disable-model-invocation: false$' "$HOME"/.claude/plugins/cache/i-have-adhd/i-have-adhd/*/skills/i-have-adhd/SKILL.md

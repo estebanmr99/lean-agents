@@ -60,7 +60,10 @@ fi
 case "$(node -p process.version)" in v22.*) ;; *) fail "the old Node is not first on PATH: $(node -p process.version)" ;; esac
 
 # The real claude CLI at its pin, so `claude mcp add` is the real command.
-npm install -g "$(node -e "import('$repo/scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('claude-code')))")"
+# A relative import: a bash path (/d/a/...) inside node -e would turn into a doubled-drive file URL on Windows.
+claude_spec="$(cd "$repo" && node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('claude-code')))")"
+[ -n "$claude_spec" ] || fail "no claude-code pin spec"
+npm install -g "$claude_spec"
 
 lean() { node "$repo/scripts/lean.mjs" --home "$home" --yes --no-gh --no-bun "$@"; }
 install_all() { lean --agents cursor,opencode-v2,claude --tools context-mode,gsd --profile none --lang en --privacy standard; }
