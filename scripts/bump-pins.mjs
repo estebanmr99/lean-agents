@@ -49,7 +49,7 @@ export async function bump({ text, get, now = Date.now(), today = new Date(now).
   const pins = JSON.parse(text).pins;
   const changes = [];
   for (const [key, p] of Object.entries(pins)) {
-    if (SKIP.has(key)) continue;
+    if (SKIP.has(key) || p.kind === 'download') continue;
     try {
       const pick = await pickVersion(p, get, now);
       if (!pick || !isNewer(p.version, pick.version)) continue;

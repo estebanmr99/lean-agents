@@ -93,7 +93,9 @@ export function opencodeShared({ home, dir, core, profile, opts }) {
     commands.push({
       tool: 'i-have-adhd',
       desc: 'i-have-adhd checkout for OpenCode',
-      run: [['git', 'clone', '--depth', '1', '--branch', PINS['i-have-adhd'].version, 'https://github.com/ayghri/i-have-adhd', vendor]],
+      // The tag must still point at the pinned commit; a moved tag removes the checkout and fails the command.
+      run: [['git', 'clone', '--depth', '1', '--branch', PINS['i-have-adhd'].version, 'https://github.com/ayghri/i-have-adhd', vendor],
+        [process.execPath, '-e', 'const { execFileSync } = require("child_process"); if (execFileSync("git", ["-C", process.argv[1], "rev-parse", "HEAD"]).toString().trim() !== process.argv[2]) { require("fs").rmSync(process.argv[1], { recursive: true, force: true }); console.error("i-have-adhd tag moved; pinned commit " + process.argv[2]); process.exit(1); }', vendor, PINS['i-have-adhd'].sha]],
       undo: [['node', '-e', 'require("fs").rmSync(process.argv[1], { recursive: true, force: true })', vendor]],
       skipIfExists: vendor,
     });

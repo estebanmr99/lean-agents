@@ -145,11 +145,12 @@ export function bunInstall(home, dir, platform, pm, arch = process.arch) {
   if (platform === 'win32') {
     const bin = path.join(bunDir, 'bin');
     const tmp = path.join(dir, `${name}-${version}`);
+    const q = (s) => s.replace(/'/g, "''"); // PowerShell single-quote escape for a profile path like O'Neil
     const ps = (script) => ['powershell', '-NoProfile', '-NonInteractive', '-Command', script];
     return {
       tool: 'bun', desc: `install bun ${version}`, optional: true,
-      run: [download, verify, ps(`Expand-Archive -Force -LiteralPath '${zip}' -DestinationPath '${tmp}'; New-Item -ItemType Directory -Force '${bin}' | Out-Null; Move-Item -Force '${path.join(tmp, name, 'bun.exe')}' '${path.join(bin, 'bun.exe')}'; Remove-Item -Recurse -Force '${tmp}'; $p = [Environment]::GetEnvironmentVariable('Path', 'User'); if (($p -split ';') -notcontains '${bin}') { [Environment]::SetEnvironmentVariable('Path', ($p.TrimEnd(';') + ';${bin}'), 'User') }`)],
-      undo: [rm, ps(`$p = [Environment]::GetEnvironmentVariable('Path', 'User'); [Environment]::SetEnvironmentVariable('Path', (($p -split ';' | Where-Object { $_ -and $_ -ne '${bin}' }) -join ';'), 'User')`)],
+      run: [download, verify, ps(`Expand-Archive -Force -LiteralPath '${q(zip)}' -DestinationPath '${q(tmp)}'; New-Item -ItemType Directory -Force '${q(bin)}' | Out-Null; Move-Item -Force '${q(path.join(tmp, name, 'bun.exe'))}' '${q(path.join(bin, 'bun.exe'))}'; Remove-Item -Recurse -Force '${q(tmp)}'; $p = [string][Environment]::GetEnvironmentVariable('Path', 'User'); if (($p -split ';') -notcontains '${q(bin)}') { [Environment]::SetEnvironmentVariable('Path', ($p.TrimEnd(';') + ';${q(bin)}'), 'User') }`)],
+      undo: [rm, ps(`$p = [string][Environment]::GetEnvironmentVariable('Path', 'User'); [Environment]::SetEnvironmentVariable('Path', (($p -split ';' | Where-Object { $_ -and $_ -ne '${q(bin)}' }) -join ';'), 'User')`)],
     };
   }
   return {
