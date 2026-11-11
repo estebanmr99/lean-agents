@@ -752,6 +752,7 @@ jobs:
             BUN_ZIP="$(cygpath -w "$RUNNER_TEMP/bun.zip")" powershell -NoProfile -Command 'Expand-Archive -Force -LiteralPath $env:BUN_ZIP -DestinationPath "$env:RUNNER_TEMP\bunx"; New-Item -ItemType Directory -Force "$env:BUN_INSTALL\bin" | Out-Null; Move-Item -Force "$env:RUNNER_TEMP\bunx\bun-windows-x64\bun.exe" "$env:BUN_INSTALL\bin\bun.exe"'
           else
             bash scripts/ci-download.sh bun-linux-x64 "$RUNNER_TEMP/bun.zip"
+            mkdir -p "$BUN_INSTALL/bin"
             unzip -q -j -o "$RUNNER_TEMP/bun.zip" bun-linux-x64/bun -d "$BUN_INSTALL/bin"
           fi
           echo "- Bun install at user scope, no TTY: $((SECONDS - start))s" >> "$GITHUB_STEP_SUMMARY"

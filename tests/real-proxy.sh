@@ -81,5 +81,5 @@ echo "gh through the proxy: ok"
 grep -Eo 'CONNECT [^ ]+' "$HOME/squid.txt" | sort -u
 grep -q 'registry.npmjs.org' "$HOME/squid.txt"
 grep -q 'github.com' "$HOME/squid.txt"
-grep -q 'bun.com' "$HOME/squid.txt"
+grep -q 'release-assets.githubusercontent.com' "$HOME/squid.txt"
 echo "install through the proxy: ok"
