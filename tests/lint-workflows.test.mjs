@@ -41,7 +41,7 @@ test('ci-download.sh: a matching SHA256 passes, a mismatch fails and deletes the
   const run = (sha) => {
     fs.writeFileSync(table, JSON.stringify({ x: { url: `file://${src}`, sha256: sha } }));
     const dest = path.join(dir, 'out.txt');
-    const r = spawnSync('bash', [path.join(ROOT, 'scripts', 'ci-download.sh'), 'x', dest], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, CI_DOWNLOADS: table } });
+    const r = spawnSync('bash', [path.join(ROOT, 'scripts', 'ci-download.sh'), 'x', dest], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, CI_DOWNLOADS: table, CI_LATEST: '' } });
     return { r, dest };
   };
   const ok = run(good);
