@@ -118,7 +118,7 @@ function gitBashPresent({ platform, env }) {
 // Which shell the agent will use on Windows, and what breaks without Git Bash. null off Windows.
 export function shellNotice({ platform = process.platform, env = process.env } = {}) {
   if (platform !== 'win32') return null;
-  if (gitBashPresent({ platform, env })) return { ok: true, text: 'Windows shell: Git Bash found. Agents that pick bash (OpenCode, Claude Code) can run RTK and bash-style commands.' };
+  if (gitBashPresent({ platform, env })) return { ok: true, text: 'Windows shell: Git Bash found. RTK and bash-style commands can run there.' };
   return { ok: false, text: 'Windows shell: Git Bash not found, so agents fall back to PowerShell or cmd.exe. RTK rewrites and bash-style commands then fail or are skipped, output is not compressed (more tokens) and the rules\' POSIX examples do not apply. Fix: install Git for Windows (winget install Git.Git), then run --doctor.' };
 }
 
