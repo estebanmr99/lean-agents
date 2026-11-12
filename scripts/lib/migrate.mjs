@@ -110,7 +110,7 @@ function skillFiles(dir) {
 }
 
 // Names of env and header keys only; values never leave this function.
-function mcpServers(file, keyPath) {
+export function mcpServers(file, keyPath) {
   const raw = text(file);
   const root = raw && parse(raw, [], { allowTrailingComma: true });
   let node = root;

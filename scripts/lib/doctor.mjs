@@ -4,7 +4,8 @@ import path from 'node:path';
 import { sha } from './fsops.mjs';
 import { PINS, npmSpec, behindPins, nodeRange } from './pins.mjs';
 import { version, quiet } from './system.mjs';
-import { satisfies, nodeSkipLine } from './node-runtime.mjs';
+import { satisfies, nodeSkipLine, minVersion } from './node-runtime.mjs';
+import { mcpLaunches, classify, duplicateSkills, skillDirs } from './inventory.mjs';
 import { stillNeeded, shellNotice } from './terminals.mjs';
 import { adhdSkillFiles } from './adhd.mjs';
 import { proxyReport, childEnv, fromPrivacy } from './network.mjs';
@@ -61,7 +62,44 @@ function checkAntigravity(o, core, add, q, withMcp) {
   }
 }
 
-export function doctor({ home, state, exec, nodeVersion = process.versions.node, json = false, run = quiet }) {
+// Which Node runs each registered MCP command of a pinned tool, and skills that two folders of one agent both hold.
+// Read-only, and it also covers machines lean-agents did not set up (#104 points 4-5, #132).
+function checkInventory({ home, exec, run, env, platform, fsx }, add) {
+  const rel = (p) => (p && p.startsWith(home) ? `~${p.slice(home.length)}` : p);
+  const nodes = mcpLaunches(home, { env, platform, fsx }).map((m) => {
+    let nodeVersion = m.launch.nodeVersion;
+    // Only with exec: a symlink or PATH Node has no version in its path, so ask it.
+    if (!nodeVersion && exec && m.launch.node) nodeVersion = /\d+\.\d+\.\d+/.exec(run([m.launch.node, '--version'], 20000).out ?? '')?.[0] ?? null;
+    const launch = { ...m.launch, nodeVersion };
+    const v = classify(launch, m.pin);
+    const status = v.status === 'wrong-node' ? 'error' : v.status === 'unknown' ? 'note' : 'ok';
+    const where = `${m.client} mcp ${m.name}`;
+    const major = minVersion(v.range)[0];
+    const detail = v.status === 'wrong-node'
+      ? `${m.pin} needs Node ${v.range} but this entry runs Node ${nodeVersion} (${launch.style}); run --update to register an absolute Node ${major}+ command (docs/manual-install.md)`
+      : v.status === 'unknown' ? `${m.pin} needs Node ${v.range}; the Node behind this ${launch.style} entry could not be read`
+        : `Node ${nodeVersion} (${launch.style})${v.fragile ? '; follows nvm use or PATH, so it can change' : ''}`;
+    add(`node for ${where}`, status, detail);
+    return { client: m.client, name: m.name, pin: m.pin, style: launch.style, node: rel(launch.node), nodeVersion, range: v.range, status };
+  });
+  const ORCA = new Set(['orca-cli', 'orchestration', 'computer-use']);
+  const bySkill = new Map();
+  for (const agent of ['claude', 'opencode', 'cursor', 'copilot']) {
+    for (const d of duplicateSkills(skillDirs(agent, home))) {
+      const k = `${d.name}\0${d.dirs.join('\0')}`;
+      bySkill.set(k, { ...(bySkill.get(k) ?? { name: d.name, dirs: d.dirs.map(rel), differs: d.differs, winner: d.winner, agents: [] }), agents: [...(bySkill.get(k)?.agents ?? []), agent] });
+    }
+  }
+  const skills = [...bySkill.values()];
+  for (const s of skills) {
+    const orca = ORCA.has(s.name) ? ' Orca installs this skill in both folders on purpose.' : '';
+    add(`duplicate skill ${s.name}`, s.differs ? 'changed' : 'note',
+      `in ${s.dirs.join(' and ')} (read by ${s.agents.join(', ')}); the copies ${s.differs ? 'differ' : 'are identical'}; winner: ${s.winner}. Keep one folder.${orca}`);
+  }
+  return { nodes, skills };
+}
+
+export function doctor({ home, state, exec, nodeVersion = process.versions.node, json = false, run = quiet, env = process.env, platform = process.platform, fsx = fs }) {
   const rows = [];
   const add = (item, status, detail = '') => rows.push({ item, status, detail });
   if (!state) {
@@ -128,12 +166,13 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
       if (o.tools.includes('autoskills')) add('autoskills runs', q(['npx', '-y', npmSpec('autoskills'), '--help'], 120000).ok ? 'ok' : 'error');
     }
   }
+  const { nodes, skills } = checkInventory({ home, exec, run, env, platform, fsx }, add);
   const left = leftovers(process.cwd());
   if (left.length) add('parallel workers', 'changed', `left in this repo: ${left.join(', ')} (merge them, then run scripts/parallel.mjs clean)`);
   for (const line of proxyReport()) add('network env', 'ok', line);
   const ok = !rows.some((r) => r.status === 'error' || r.status === 'missing');
   const behind = state ? behindPins(state) : [];
-  if (json) process.stdout.write(`${JSON.stringify({ ok, behind, rows }, null, 2)}\n`);
+  if (json) process.stdout.write(`${JSON.stringify({ ok, behind, nodes, skills, rows }, null, 2)}\n`);
   else print(rows);
   return ok;
 }
