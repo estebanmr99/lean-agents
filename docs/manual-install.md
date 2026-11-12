@@ -92,6 +92,12 @@ Works with or without `state.json`; the `lean-update` skill runs exactly these c
 | Skills (Caveman, i-have-adhd, lean-update, ...) | `node -e "const l=JSON.parse(require('fs').readFileSync(require('os').homedir()+'/.agents/.skill-lock.json','utf8'));for(const [n,s] of Object.entries(l.skills)) console.log(n,s.source,s.ref)"` | `ref` is the installed tag (verified with skills 1.7.4, 2026-11-06) |
 | Skills CLI | `npm ls -g skills --depth=0 --json` | `dependencies.skills.version`; `npx` runs use the pinned version, so this may be absent |
 
+### One Node per tool, one folder per skill
+
+- **Tool Node policy (with nvm).** Run every tool whose pin needs a newer Node than the one on your PATH (`engines.node` in `core/pins.json`: Context Mode and GSD need 24) on one Node that meets it, and register it by absolute path: `<nvm dir>/versions/node/v24.x.y/bin/node <that Node's lib/node_modules>/context-mode/cli.mjs server` (Windows: `%NVM_HOME%\v24.x.y\node.exe`). Install the package into that Node (`npm i -g --prefix <that Node's folder> context-mode@<pin>`). Do not register a link that follows `nvm use` (`$NVM_DIR/current`, `C:\nodejs`), a bare `node` or `npx` (first `node` on PATH; npm starts package bins with it), or an absolute `npx` (its script also runs the first `node` on PATH): any of them quietly runs the wrong Node after the next `nvm use`.
+- **Check it.** `lean-agents --doctor` lists `node for <client> mcp <name>` per entry and marks `error` when the Node is below the tool's range; `--doctor --json` adds `nodes`.
+- **A skill lives in one folder.** Keep each skill in one of the folders an agent reads (`~/.agents/skills` for OpenCode, Cursor and Copilot; `~/.claude/skills` for Claude Code), not in two: OpenCode reads both and its load order is not documented. `--doctor` lists a skill found in two folders of one agent as `duplicate skill <name>` (`--json`: `skills`), says whether the copies differ, and names no winner. It deletes nothing. Orca installs its own skills in both folders on purpose.
+
 Compare each result with `core/pins.json` at the latest release: `https://raw.githubusercontent.com/estebanmr99/lean-agents/<tag>/core/pins.json`. With the engine, `lean-agents --doctor --json` does the same and lists `behind`.
 
 ## 7. Back up before changing, delete after
