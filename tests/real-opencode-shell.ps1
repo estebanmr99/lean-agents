@@ -23,6 +23,19 @@ function New-CaseHome([string]$name) {
   return $dir
 }
 
+function Merge-MockProvider([string]$configPath, [int]$port) {
+  # Case (b) only: the real installer already wrote this file (with its own `shell` key); add the mock
+  # provider and model on top without touching anything the installer wrote.
+  $cfg = Get-Content $configPath -Raw | ConvertFrom-Json -AsHashtable
+  $cfg['model'] = 'mock/mock-model'
+  if ($Major -eq 'v1') {
+    $cfg['provider'] = @{ mock = @{ npm = '@ai-sdk/openai-compatible'; name = 'Mock'; options = @{ baseURL = "http://127.0.0.1:$port/v1" }; models = @{ 'mock-model' = @{ name = 'Mock Model' } } } }
+  } else {
+    $cfg['providers'] = @{ mock = @{ name = 'Mock'; package = '@opencode/ai/providers/openai-compatible'; settings = @{ baseURL = "http://127.0.0.1:$port/v1" }; models = @{ 'mock-model' = @{ name = 'Mock Model' } } } }
+  }
+  ($cfg | ConvertTo-Json -Depth 8) | Set-Content $configPath -Encoding utf8
+}
+
 function Write-MockConfig([string]$configPath, [int]$port, [string]$shellValue) {
   # Schema differs by major: 1.19.0 uses the singular `provider` key with `npm` + `options`
   # (opencode.ai/v1/docs/providers); 2.x uses plural `providers` with `package` + `settings`
@@ -78,16 +91,28 @@ foreach ($name in $cases.Keys) {
   $env:MOCK_LLM_DEBUG = '1'
   $mock = Start-Process node -ArgumentList "$repo\tests\fixtures\mock-llm.mjs" -RedirectStandardOutput $mockLog -NoNewWindow -PassThru
   Start-Sleep -Seconds 1
-  Write-MockConfig "$caseHome\.config\opencode\opencode.jsonc" $port $cases[$name]
+  $configPath = "$caseHome\.config\opencode\opencode.jsonc"
 
   $savedHome = $env:HOME; $savedProfile = $env:USERPROFILE; $savedXdg = $env:XDG_CONFIG_HOME; $savedPath = $env:Path
   try {
     $env:HOME = $caseHome
     $env:USERPROFILE = $caseHome
     $env:XDG_CONFIG_HOME = "$caseHome\.config"
-    # Case (b): prove the absolute path works even with Git's own dirs off PATH, not found through PATH lookup.
     if ($name -eq 'b-gitbash') {
+      # Step 2: run the real installer (not a hand-written config) and prove it wrote the Git Bash path itself.
+      # -NoCore -NoTools: the shell edit is unconditional in the adapter, not gated by any tool, so skip every
+      # prerequisite (rtk, Bun, gh) this probe does not need - keeps the job fast and winget-free.
+      $agent = if ($Major -eq 'v1') { 'opencode-v1' } else { 'opencode-v2' }
+      & "$repo\install.ps1" -Yes -Agents $agent -NoCore -NoTools -NoBun -NoGh -NoApp -Privacy strict -ModelProfile none -Lang en --no-exec
+      if ($LASTEXITCODE -ne 0) { throw "install.ps1 failed for $Major" }
+      $installed = (Get-Content $configPath -Raw | ConvertFrom-Json).shell
+      if ($installed -ne $gitBash) { throw "installer wrote shell='$installed', expected '$gitBash'" }
+      Write-Host "ok    installer wrote shell=$installed"
+      Merge-MockProvider $configPath $port
+      # Prove the absolute path still works with Git's own dirs off PATH, not found through PATH lookup.
       $env:Path = ($savedPath -split ';' | Where-Object { $_ -notmatch '(?i)\\git(\\|$)' }) -join ';'
+    } else {
+      Write-MockConfig $configPath $port $cases[$name]
     }
     # 2.x: --standalone alone was not enough on a real Windows run (first real run of this job, PR #133) -
     # a prior case's server was still bound to the shared default "managed service" port, even under

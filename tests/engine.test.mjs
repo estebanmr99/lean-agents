@@ -12,8 +12,9 @@ import { diffModels } from '../scripts/models-refresh.mjs';
 import { releaseNotes } from '../scripts/release.mjs';
 import { prereqFor, antigravityPrereqs, bunInstall } from '../scripts/lib/system.mjs';
 import { doctor } from '../scripts/lib/doctor.mjs';
-import { detectTerminals, terminalCommands, gitBashActions, stillNeeded, shellNotice } from '../scripts/lib/terminals.mjs';
+import { detectTerminals, terminalCommands, gitBashActions, stillNeeded, shellNotice, gitBashPath } from '../scripts/lib/terminals.mjs';
 import { vscodeUserDir } from '../scripts/lib/adapters/vscode-copilot.mjs';
+import { shellEdit } from '../scripts/lib/adapters/opencode-v2.mjs';
 import { npmSpec, PINS } from '../scripts/lib/pins.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -1121,6 +1122,56 @@ test('Git Bash: marked .bashrc block with the Cursor aliases and loopback NO_PRO
   assert.equal(fs.readFileSync(rc, 'utf8'), mine);
   assert.deepEqual(gitBashActions({ ...args, agents: ['claude'], terminals: [] }), []);
   assert.doesNotMatch(gitBashActions({ ...args, env: { MSYSTEM: 'MINGW64' } })[0].body, /NO_PROXY/, 'no proxy, no NO_PROXY');
+});
+
+test('gitBashPath: the standard install folders, missing, and non-Windows', () => {
+  assert.equal(gitBashPath({ platform: 'darwin', env: {} }), null, 'non-Windows: no path, even with env set');
+  assert.equal(gitBashPath({ platform: 'win32', env: {} }), null, 'nothing found');
+  assert.equal(gitBashPath({ platform: 'win32', env: { MSYSTEM: 'MINGW64' } }), null, 'MSYSTEM alone carries no path');
+  const home = userHome();
+  const bash = path.join(home, 'Git', 'bin', 'bash.exe');
+  fs.mkdirSync(path.dirname(bash), { recursive: true });
+  fs.writeFileSync(bash, '');
+  assert.equal(gitBashPath({ platform: 'win32', env: { ProgramFiles: home } }), bash, 'found under ProgramFiles');
+  assert.equal(gitBashPath({ platform: 'win32', env: { 'ProgramFiles(x86)': home } }), bash, 'found under ProgramFiles(x86)');
+  assert.equal(gitBashPath({ platform: 'win32', env: { LOCALAPPDATA: path.dirname(home) } }), null, 'LOCALAPPDATA root also needs \\Programs');
+});
+
+test('shellEdit (#124 follow-up): Windows + Git Bash found only, setIfAbsent, --shell default opts out', () => {
+  const home = userHome();
+  const bash = path.join(home, 'Git', 'bin', 'bash.exe');
+  fs.mkdirSync(path.dirname(bash), { recursive: true });
+  fs.writeFileSync(bash, '');
+  const found = { platform: 'win32', env: { ProgramFiles: home } };
+  assert.deepEqual(shellEdit(found), { path: ['shell'], value: bash, mode: 'setIfAbsent' });
+  assert.equal(shellEdit({ ...found, platform: 'darwin' }), null, 'non-Windows');
+  assert.equal(shellEdit({ platform: 'win32', env: {} }), null, 'Git Bash not found');
+  assert.equal(shellEdit({ ...found, shell: 'default' }), null, '--shell default opts out even when found');
+});
+
+// Real Windows only: process.platform and env here are the actual ones, which the adapters use directly.
+// The runner's real Git Bash (windows-latest images ship it) proves setIfAbsent, kept, opt-out and uninstall together.
+test('OpenCode shell default on Windows: written, kept if user-set, --shell default opts out, --uninstall removes it', { skip: process.platform !== 'win32' }, () => {
+  const bash = gitBashPath();
+  assert.ok(bash, 'this runner is expected to have Git Bash (windows-latest image)');
+  const read = (home) => parse(fs.readFileSync(path.join(home, '.config', 'opencode', 'opencode.jsonc'), 'utf8'));
+
+  const fresh = userHome();
+  lean(fresh, ['--yes', '--no-exec', '--agents', 'opencode-v2', '--tools', 'rtk', '--lang', 'en', '--profile', 'none']);
+  assert.equal(read(fresh).shell, bash, 'absent: written');
+
+  const theirs = userHome();
+  fs.mkdirSync(path.join(theirs, '.config', 'opencode'), { recursive: true });
+  fs.writeFileSync(path.join(theirs, '.config', 'opencode', 'opencode.jsonc'), JSON.stringify({ shell: 'C:\\mine\\bash.exe' }));
+  lean(theirs, ['--yes', '--no-exec', '--agents', 'opencode-v2', '--tools', 'rtk', '--lang', 'en', '--profile', 'none']);
+  assert.equal(read(theirs).shell, 'C:\\mine\\bash.exe', 'user-set: kept');
+
+  const optOut = userHome();
+  lean(optOut, ['--yes', '--no-exec', '--agents', 'opencode-v2', '--tools', 'rtk', '--lang', 'en', '--profile', 'none', '--shell', 'default']);
+  assert.equal(read(optOut).shell, undefined, '--shell default: not written');
+
+  lean(fresh, ['--uninstall', '--yes', '--no-exec']);
+  assert.equal(read(fresh).shell, undefined, '--uninstall: removed');
 });
 
 test('Cursor behind a proxy: only useHttp1ForAgent is merged into cli-config.json and uninstall restores it', () => {

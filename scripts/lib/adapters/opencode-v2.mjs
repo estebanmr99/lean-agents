@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { OWNED_MARK } from '../fsops.mjs';
 import { tierFor, modelFor } from '../render.mjs';
 import { configHome } from '../system.mjs';
+import { gitBashPath } from '../terminals.mjs';
 import { PINS, npmSpec, skillSource, skillsCli } from '../pins.mjs';
 
 const PERMISSIONS = {
@@ -48,6 +49,16 @@ export function localServer(core, name) {
 export function mcpEdit(path, shape, command, legacy) {
   const value = shape(command);
   return legacy ? { path, value, mode: 'upgradeIf', legacy: legacy.map(shape) } : { path, value, mode: 'setIfAbsent' };
+}
+
+// Windows only, and only when Git Bash is actually found (#124 follow-up, proven in `real-opencode-shell`
+// CI for both majors: setting `shell` to an absolute Git Bash path makes the bash/shell tool run there,
+// PATH or not). `setIfAbsent` never overwrites a `shell` the user already set. `opts.shell === 'default'`
+// opts out (`--shell default`). `opts.platform`/`opts.env` let tests fake the OS without one.
+export function shellEdit(opts) {
+  if (opts.shell === 'default') return null;
+  const bash = gitBashPath({ platform: opts.platform ?? process.platform, env: opts.env ?? process.env });
+  return bash ? { path: ['shell'], value: bash, mode: 'setIfAbsent' } : null;
 }
 
 export function profileEdits(profile, agentsKey) {
@@ -136,6 +147,8 @@ export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
     { path: ['compaction', 'buffer'], value: 40000, mode: 'setIfAbsent' },
     ...profileEdits(profile, 'agents'),
   ];
+  const shell = shellEdit(opts);
+  if (shell) edits.push(shell);
 
   for (const name of ['context-mode', 'serena', 'playwright', 'playwright-extension']) {
     if (tools.includes(name)) edits.push(mcpEdit(['mcp', 'servers', name], (command) => ({ type: 'local', command, enabled: true }), localServer(core, name).command, core.mcp[name].legacy));

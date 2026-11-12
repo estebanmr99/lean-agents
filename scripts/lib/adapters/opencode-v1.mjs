@@ -1,7 +1,7 @@
 // OpenCode 1.x adapter (>=1.18.29). Keys checked against the 1.19.0 config schema; files
 // and commands are shared with the 2.x adapter, only config keys differ.
 import path from 'node:path';
-import { configPath, localServer, opencodeShared, profileEdits } from './opencode-v2.mjs';
+import { configPath, localServer, opencodeShared, profileEdits, shellEdit } from './opencode-v2.mjs';
 import { configHome } from '../system.mjs';
 import { npmSpec } from '../pins.mjs';
 
@@ -17,6 +17,8 @@ export function opencodeV1Adapter({ home, core, profile, opts, rulesPath }) {
     { path: ['compaction', 'reserved'], value: 40000, mode: 'setIfAbsent' },
     ...profileEdits(profile, 'agent'),
   ];
+  const shell = shellEdit(opts);
+  if (shell) edits.push(shell);
 
   for (const name of ['serena', 'playwright', 'playwright-extension']) {
     if (tools.includes(name)) edits.push({ path: ['mcp', name], value: localServer(core, name), mode: 'setIfAbsent' });
