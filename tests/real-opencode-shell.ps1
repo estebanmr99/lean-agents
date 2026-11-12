@@ -17,7 +17,7 @@ $command = 'echo "MSYS=$MSYSTEM"; echo "SHELL0=$0"'
 $gitBash = "$env:ProgramFiles\Git\bin\bash.exe"
 if (-not (Test-Path $gitBash)) { throw 'Git Bash not found on the runner (expected at $env:ProgramFiles\Git\bin\bash.exe)' }
 
-function New-CaseHome([string]$name) {
+function Initialize-CaseHome([string]$name) {
   $dir = Join-Path $env:RUNNER_TEMP "shell-$Major-$name-$([guid]::NewGuid())"
   New-Item -ItemType Directory -Path "$dir\.config\opencode" -Force | Out-Null
   return $dir
@@ -81,7 +81,7 @@ $cases = [ordered]@{
 $results = @{}
 foreach ($name in $cases.Keys) {
   # Not $home: that shadows PowerShell's own read-only automatic $HOME variable.
-  $caseHome = New-CaseHome $name
+  $caseHome = Initialize-CaseHome $name
   $port = Get-Random -Minimum 20000 -Maximum 60000
   $mockLog = "$caseHome\mock.log"
   # Env vars, not argv: a Windows command line full of quotes and `$` is fragile to pass as a process argument.
