@@ -143,7 +143,7 @@ native() { if [ "$os" = windows ]; then cygpath -w "$1"; else printf '%s\n' "$1"
 # A link to Node 22 like nvm's "current" (a directory junction on Windows, which needs no admin rights).
 link="$T/node-current"
 # The doctor calls a link "nvm's" only at $NVM_DIR/current (POSIX) or at NVM_SYMLINK (nvm-windows).
-if [ "$os" = linux ]; then link="$NVM_DIR/current"; else export NVM_SYMLINK="$(native "$link")"; fi
+if [ "$os" = linux ]; then link="$NVM_DIR/current"; else NVM_SYMLINK="$(native "$link")"; export NVM_SYMLINK; fi
 node -e "require('fs').symlinkSync(process.argv[1], process.argv[2], 'junction')" "$(native "$versions/v22.20.0")" "$(native "$link")"
 if [ "$os" = linux ]; then link_node="$link/bin/node"; abs_node="$n24/bin/node"; mods="$n24/lib/node_modules"; else link_node="$link/node.exe"; abs_node="$n24/node.exe"; mods="$n24/node_modules"; fi
 mkdir -p "$HOME/.copilot" "$HOME/.agents/skills/dup-demo" "$HOME/.claude/skills/dup-demo"
