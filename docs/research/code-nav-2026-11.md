@@ -47,7 +47,7 @@ Things the numbers show:
 | Serena | `uvx -p 3.13 --from git+https://github.com/oraios/serena@<pinned sha> serena start-mcp-server --project-from-cwd` with `uv` 0.13.5 (`pip install uv==0.13.5` in a venv) | same | same |
 | Index location | `$CBM_CACHE_DIR`, default `~/.cache/codebase-memory-mcp` | same | `%CBM_CACHE_DIR%`; the daemon also writes lock files under `%LOCALAPPDATA%\cbm-daemon-*` |
 
-Not verified: a Scoop manifest (the README names Scoop but gives no bucket), the npm wrapper's download path, and macOS Intel (`darwin-amd64`). Open upstream issues that mention Windows at the time of the run (search "windows", 164 open): #2964, #2955, #2945, #2941, #2933, #2920, #2908 (large CSV auto-indexing exhausts memory).
+Not verified: a Scoop manifest (the README names Scoop but gives no bucket), the npm wrapper's download path, and macOS x86_64 (`darwin-amd64`). Open upstream issues that mention Windows at the time of the run (search "windows", 164 open): #2964, #2955, #2945, #2941, #2933, #2920, #2908 (large CSV auto-indexing exhausts memory).
 
 ## Gate from the issue
 
