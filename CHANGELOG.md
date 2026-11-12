@@ -4,6 +4,8 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-12
+
 ### Added
 
 - Windows shell notice (#124): the install summary and `--doctor` say whether Git Bash was found, and when it is missing, that RTK rewrites and bash-style commands fail or fall back, output is not compressed (more tokens) and the rules' POSIX examples do not apply, with `winget install Git.Git` as the fix. Nothing is shown off Windows. Setting OpenCode's `shell` to Git Bash is not done yet: upstream behaviour on Windows is unproven (`docs/compatibility.md`).
