@@ -5,6 +5,7 @@
 #   --read   a command that prints the worker's screen (your terminal's read command)
 #   --plan   the file the worker must write its plan to; a change means "plan written"
 # Reasons: plan file written | new PR URL <url> | limit | menu/question | error | turn ended | timeout (exit 2)
+# Point --file at a fresh log: limit, menu, error and turn-ended text already in it counts. Only PR URLs seen at start are ignored.
 # Bash 3.2 compatible; needs only grep, tail, cksum and sleep.
 
 name=${1:-}
@@ -22,6 +23,8 @@ while [ $# -gt 0 ]; do
   esac
   shift 2 || { echo "missing value for the last option" >&2; exit 64; }
 done
+case $interval in ''|*[!0-9.]*) echo "--interval must be a number" >&2; exit 64 ;; esac
+case $max in ''|*[!0-9]*) echo "--max-polls must be a whole number" >&2; exit 64 ;; esac
 { [ -n "$file" ] || [ -n "$cmd" ]; } || { echo "give --file or --read" >&2; exit 64; }
 
 # The worker's screen; empty when the reader fails (a closed terminal looks like silence, not like an error).
