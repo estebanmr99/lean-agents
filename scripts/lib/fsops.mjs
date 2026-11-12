@@ -127,6 +127,9 @@ export function revertJsonEdits(text, applied) {
       if (!Array.isArray(list)) continue;
       const i = list.findIndex((v) => JSON.stringify(v) === JSON.stringify(e.value));
       if (i >= 0) text = applyEdits(text, modify(text, [...e.path, i], undefined, FORMAT));
+    } else if (e.keepIfChanged && JSON.stringify(getAt(text, e.path)) !== JSON.stringify(e.value)) {
+      // The user changed our value after install: it is theirs now.
+      continue;
     } else if (e.previous === undefined) {
       text = applyEdits(text, modify(text, e.path, undefined, FORMAT));
     } else {

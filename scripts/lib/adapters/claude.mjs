@@ -4,6 +4,7 @@ import path from 'node:path';
 import { OWNED_MARK } from '../fsops.mjs';
 import { tierFor, modelFor } from '../render.mjs';
 import { privacyOf } from '../network.mjs';
+import { statuslineScript } from '../copilot-usage.mjs';
 import { marketplaceSource, skillSource, skillsCli } from '../pins.mjs';
 
 // Also the key of its record in state.json: removing the entry replaces that record (empty undo), so --uninstall does not remove it twice.
@@ -61,6 +62,13 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
     ...(net.telemetry === 'off' ? ['DO_NOT_TRACK'] : []),
   ];
   for (const k of off) edits.push({ path: ['env', k], value: '1', mode: 'set' });
+  if (tools.includes('copilot-usage')) {
+    // Only when the user has no statusLine (setIfAbsent); uninstall removes it only while it is still ours. Forward slashes: Claude runs it through bash, also on Windows.
+    const script = path.join(dir, 'lean-copilot-usage-statusline.mjs');
+    actions.push({ kind: 'file', path: script, content: statuslineScript() });
+    const q = (p) => `"${p.replaceAll('\\', '/')}"`;
+    edits.push({ path: ['statusLine'], value: { type: 'command', command: `${q(process.execPath)} ${q(script)}` }, mode: 'setIfAbsent', keepIfChanged: true });
+  }
   actions.push({ kind: 'json', path: path.join(dir, 'settings.json'), edits });
 
   if (tools.includes('rtk')) {

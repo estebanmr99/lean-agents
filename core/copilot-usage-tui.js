@@ -102,67 +102,85 @@ function render(solid, theme, state, mounted) {
   return box;
 }
 
-export default {
-  id: "lean-copilot-usage",
-  tui: async (api) => {
-    const state = { summary: null, loaded: false, fetchedAt: 0 };
-    const mounted = {};
-    let inFlight = false;
+// Host adapters: 1.x passes api (slots.register, api.command), 2.x passes context (ui.slot, keymap.layer).
+// Both feed the same state, rendering and refresh logic; `theme` is normalised to the 1.x token names.
+function start(host) {
+  const state = { summary: null, loaded: false, fetchedAt: 0 };
+  const mounted = {};
+  let inFlight = false;
 
-    const refresh = async () => {
-      if (inFlight) return state.summary;
-      inFlight = true;
-      try {
-        state.summary = summarize(await readQuota());
-        state.loaded = true;
-        state.fetchedAt = Date.now();
-        paint(state, mounted);
-        api.renderer.requestRender();
-      } catch {
-        state.summary = null;
-        state.loaded = true;
-        paint(state, mounted);
-      } finally {
-        inFlight = false;
-      }
-      return state.summary;
-    };
+  const refresh = async () => {
+    if (inFlight) return state.summary;
+    inFlight = true;
+    try {
+      state.summary = summarize(await readQuota());
+      state.loaded = true;
+      state.fetchedAt = Date.now();
+      paint(state, mounted);
+      host.requestRender();
+    } catch {
+      state.summary = null;
+      state.loaded = true;
+      paint(state, mounted);
+    } finally {
+      inFlight = false;
+    }
+    return state.summary;
+  };
 
-    const toast = (s) =>
-      api.ui.toast(
-        s
-          ? { title: "Copilot credits", variant: s.level === "success" ? "info" : s.level, duration: 8000, message: toastMessage(s) }
-          : { title: "Copilot credits", variant: "warning", message: "Unavailable: `gh api copilot_internal/user` failed" },
-      );
+  const toast = (s) =>
+    host.toast(
+      s
+        ? { title: "Copilot credits", variant: s.level === "success" ? "info" : s.level, duration: 8000, message: toastMessage(s) }
+        : { title: "Copilot credits", variant: "warning", message: "Unavailable: `gh api copilot_internal/user` failed" },
+    );
 
-    const solid = await import("@opentui/solid").catch(() => null);
-    if (solid) api.slots.register({ order: 950, slots: { sidebar_content: () => render(solid, api.theme.current, state, mounted) } });
-
-    const command = {
-      title: "Copilot usage",
-      value: "copilot-usage.show",
-      description: "credits left",
-      category: "Usage",
-      slash: { name: "copilot-usage" },
-      onSelect: async (dialog) => {
-        dialog?.clear?.();
-        toast(await refresh());
-      },
-    };
-    // 1.x: api.command (verified on 1.19.0). 2.x removes it: api.keymap.registerLayer (VERIFY, shape not proven yet).
-    const offCommand = api.command
-      ? api.command.register(() => [command])
-      : api.keymap?.registerLayer?.({ commands: [command], bindings: [] });
-    const offIdle = api.event?.on?.("session.idle", () => {
+  return host.solid().then((solid) => {
+    if (solid) host.slot(() => render(solid, host.theme(), state, mounted));
+    host.command(async () => toast(await refresh()));
+    host.onIdle(() => {
       if (Date.now() - state.fetchedAt >= MIN_REFRESH_MS) refresh();
     });
-    api.lifecycle?.onDispose?.(() => {
-      offCommand?.();
-      offIdle?.();
-    });
-
     refresh().then((first) => {
       if (!solid || (first && first.level !== "success")) toast(first);
     });
+  });
+}
+
+const COMMAND = { title: "Copilot usage", value: "copilot-usage.show", description: "credits left", category: "Usage", slash: { name: "copilot-usage" } };
+const solidModule = () => import("@opentui/solid").catch(() => null);
+
+const plugin = {
+  id: "lean-copilot-usage",
+  // OpenCode 1.x TUI plugin (verified on 1.19.0).
+  tui: async (api) => {
+    const offs = [];
+    await start({
+      solid: solidModule,
+      theme: () => api.theme.current,
+      requestRender: () => api.renderer.requestRender(),
+      toast: (t) => api.ui.toast(t),
+      slot: (fn) => api.slots.register({ order: 950, slots: { sidebar_content: fn } }),
+      command: (run) => offs.push(api.command?.register(() => [{ ...COMMAND, onSelect: async (dialog) => { dialog?.clear?.(); await run(); } }])),
+      onIdle: (fn) => offs.push(api.event?.on?.("session.idle", fn)),
+    });
+    api.lifecycle?.onDispose?.(() => offs.forEach((off) => off?.()));
+  },
+  // OpenCode 2.x TUI plugin (docs: https://opencode.ai/docs/build/plugins/cli): context.ui.slot, context.keymap.layer, context.ui.toast.show.
+  setup: async (context) => {
+    const t = context.theme;
+    await start({
+      solid: solidModule,
+      theme: () => ({ text: t.text.base, textMuted: t.text.muted, borderSubtle: t.border.base, success: "#98c379", warning: "#e5c07b", error: "#e06c75" }),
+      requestRender: () => {},
+      toast: (m) => context.ui.toast.show(m),
+      slot: (fn) => context.ui.slot({ append: "sidebar.content", render: fn }),
+      command: (run) => context.keymap.layer(() => ({ mode: "global", commands: [{ id: COMMAND.value, title: COMMAND.title, group: COMMAND.category, palette: true, slash: COMMAND.slash, run }] })),
+      onIdle: () => {},
+    });
   },
 };
+
+// 2.x wants Plugin.define from the host; on 1.x the import fails and the plain object is used.
+const host2 = await import("@opencode/plugin/tui").catch(() => null);
+export default host2?.Plugin ? host2.Plugin.define(plugin) : plugin;
