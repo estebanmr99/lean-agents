@@ -4,11 +4,6 @@ name: Bench code nav
 # never on pull requests and not part of ci.yml or ci-latest.yml. Run it with `gh workflow run bench-code-nav.yml --ref <branch>`.
 on:
   workflow_dispatch:
-  # TEMPORARY (session 130): GitHub only dispatches a workflow file that is on the default branch, so the first
-  # runs start from a push to this branch. Remove this trigger before the PR merges.
-  push:
-    branches: [session-130-code-nav-bench]
-    paths: ['.github/workflows/bench-code-nav.yml', 'tests/bench-code-nav.mjs']
 
 permissions:
   contents: read

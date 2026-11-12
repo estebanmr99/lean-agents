@@ -6,6 +6,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Added
 
+- Code navigation evaluation (#130): `tests/bench-code-nav.mjs` and the manual-only `bench-code-nav` workflow compare codebase-memory-mcp with Serena over MCP stdio on ubuntu, macOS and Windows (result bytes as a token proxy, answer checks, index time and size, uninstall leftovers). Result in `docs/research/code-nav-2026-11.md`: keep Serena. Nothing installed for users changes.
 - Multi-agent coordinator workflow (#60): `docs/agent-workflow.md` (roles, plan-first session prompts, model tiers, at most two workers, sandbox-first CI fixes, one-at-a-time merges, limit recovery) and an opt-in `coordinate` skill (`--tools coordinate`, never in `--all-tools`, removed by `--uninstall`) that ships a session-prompt template and `coord-watch.sh`, a bash watcher that exits with why a worker needs you (plan written, PR URL, question, limit, error, turn ended) from a transcript file or a terminal read command. New `real-coord-watch` CI job (ubuntu, macos).
 
 ## [0.7.0] - 2026-11-12
