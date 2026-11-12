@@ -89,13 +89,22 @@ foreach ($name in $cases.Keys) {
     if ($name -eq 'b-gitbash') {
       $env:Path = ($savedPath -split ';' | Where-Object { $_ -notmatch '(?i)\\git(\\|$)' }) -join ';'
     }
-    # 2.x keeps one background service on a fixed port across invocations in this job; --standalone gives each
-    # case its own private server instead (opencode run --help, 2.1.4). 1.19.0 has no managed service or flag
-    # for one: each `opencode run` already starts its own server on a random port (opencode.ai/v1/docs/cli).
-    $standalone = if ($Major -eq 'v2') { '--standalone' } else { @() }
+    # 2.x: --standalone alone was not enough on a real Windows run (first real run of this job, PR #133) -
+    # a prior case's server was still bound to the shared default "managed service" port, even under
+    # --standalone, and the runner had to reap an orphaned opencode process at cleanup. Give each case its
+    # own port (scoped to that case's HOME: opencode service get/set write <HOME>/.config/opencode/service.json,
+    # confirmed locally) and stop whatever is listening before moving to the next case.
+    # 1.19.0 has no managed service or either flag: each `opencode run` already starts its own server on a
+    # random port (opencode.ai/v1/docs/cli).
+    $standalone = if ($Major -eq 'v2') {
+      $servicePort = Get-Random -Minimum 20000 -Maximum 60000
+      & opencode service set port $servicePort | Out-Null
+      '--standalone'
+    } else { @() }
     $out = & opencode run --format json @standalone 'say hi' 2>"$caseHome\err.txt"
     $exit = $LASTEXITCODE
   } finally {
+    if ($Major -eq 'v2') { & opencode service stop 2>$null | Out-Null }
     $env:HOME = $savedHome; $env:USERPROFILE = $savedProfile; $env:XDG_CONFIG_HOME = $savedXdg; $env:Path = $savedPath
     Stop-Process -Id $mock.Id -Force -ErrorAction SilentlyContinue
   }
