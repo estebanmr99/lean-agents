@@ -24,15 +24,33 @@ function New-CaseHome([string]$name) {
 }
 
 function Write-MockConfig([string]$configPath, [int]$port, [string]$shellValue) {
-  $cfg = [ordered]@{
-    '$schema'  = 'https://opencode.ai/config.json'
-    model      = 'mock/mock-model'
-    providers  = [ordered]@{
-      mock = [ordered]@{
-        name     = 'Mock'
-        package  = '@opencode/ai/providers/openai-compatible'
-        settings = @{ baseURL = "http://127.0.0.1:$port/v1" }
-        models   = @{ 'mock-model' = @{ name = 'Mock Model' } }
+  # Schema differs by major: 1.19.0 uses the singular `provider` key with `npm` + `options`
+  # (opencode.ai/v1/docs/providers); 2.x uses plural `providers` with `package` + `settings`
+  # (opencode.ai/docs/providers). Confirmed against the current docs for each, 2026-11-12.
+  if ($Major -eq 'v1') {
+    $cfg = [ordered]@{
+      '$schema' = 'https://opencode.ai/config.json'
+      model     = 'mock/mock-model'
+      provider  = [ordered]@{
+        mock = [ordered]@{
+          npm     = '@ai-sdk/openai-compatible'
+          name    = 'Mock'
+          options = @{ baseURL = "http://127.0.0.1:$port/v1" }
+          models  = @{ 'mock-model' = @{ name = 'Mock Model' } }
+        }
+      }
+    }
+  } else {
+    $cfg = [ordered]@{
+      '$schema'  = 'https://opencode.ai/config.json'
+      model      = 'mock/mock-model'
+      providers  = [ordered]@{
+        mock = [ordered]@{
+          name     = 'Mock'
+          package  = '@opencode/ai/providers/openai-compatible'
+          settings = @{ baseURL = "http://127.0.0.1:$port/v1" }
+          models   = @{ 'mock-model' = @{ name = 'Mock Model' } }
+        }
       }
     }
   }
@@ -57,6 +75,7 @@ foreach ($name in $cases.Keys) {
   $env:MOCK_LLM_PORT = "$port"
   $env:MOCK_LLM_COMMAND = $command
   $env:MOCK_LLM_TOOL = $ToolName
+  $env:MOCK_LLM_DEBUG = '1'
   $mock = Start-Process node -ArgumentList "$repo\tests\fixtures\mock-llm.mjs" -RedirectStandardOutput $mockLog -NoNewWindow -PassThru
   Start-Sleep -Seconds 1
   Write-MockConfig "$caseHome\.config\opencode\opencode.jsonc" $port $cases[$name]
@@ -70,7 +89,11 @@ foreach ($name in $cases.Keys) {
     if ($name -eq 'b-gitbash') {
       $env:Path = ($savedPath -split ';' | Where-Object { $_ -notmatch '(?i)\\git(\\|$)' }) -join ';'
     }
-    $out = & opencode run --format json 'say hi' 2>"$caseHome\err.txt"
+    # 2.x keeps one background service on a fixed port across invocations in this job; --standalone gives each
+    # case its own private server instead (opencode run --help, 2.1.4). 1.19.0 has no managed service or flag
+    # for one: each `opencode run` already starts its own server on a random port (opencode.ai/v1/docs/cli).
+    $standalone = if ($Major -eq 'v2') { '--standalone' } else { @() }
+    $out = & opencode run --format json @standalone 'say hi' 2>"$caseHome\err.txt"
     $exit = $LASTEXITCODE
   } finally {
     $env:HOME = $savedHome; $env:USERPROFILE = $savedProfile; $env:XDG_CONFIG_HOME = $savedXdg; $env:Path = $savedPath
@@ -80,13 +103,16 @@ foreach ($name in $cases.Keys) {
   $joined = ($out -join "`n")
   Write-Host "--- $Major case $name (shell=$($cases[$name])) exit=$exit ---"
   Write-Host $joined
-  if ($exit -ne 0) { Write-Host '--- stderr ---'; Get-Content "$caseHome\err.txt" | Write-Host }
+  if ($exit -ne 0) {
+    Write-Host '--- stderr ---'; Get-Content "$caseHome\err.txt" | Write-Host
+    Write-Host '--- mock log (tools the model saw) ---'; Get-Content $mockLog | Write-Host
+  }
   $results[$name] = $joined
 }
 
 Write-Host "=== $Major summary ==="
 foreach ($name in $results.Keys) {
-  $ran = if ($results[$name] -match 'MSYS=MINGW') { 'Git Bash' } elseif ($results[$name] -match 'SHELL0=.*[Pp]ower[Ss]hell') { 'PowerShell' } elseif ($results[$name] -match 'MSYS=\\n?SHELL0=') { 'unknown (no MSYSTEM)' } else { 'undetermined' }
+  $ran = if ($results[$name] -match 'MSYS=MINGW') { 'Git Bash' } elseif ($results[$name] -match 'SHELL0=.*[Pp]ower[Ss]hell') { 'PowerShell' } elseif ($results[$name] -match 'MSYS=(\\\\[rn])*SHELL0=') { 'empty vars (likely PowerShell or cmd, not Git Bash)' } else { 'undetermined' }
   Write-Host "  $name -> $ran"
 }
 
