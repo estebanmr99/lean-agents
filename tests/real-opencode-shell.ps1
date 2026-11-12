@@ -110,15 +110,19 @@ foreach ($name in $cases.Keys) {
   $results[$name] = $joined
 }
 
+# Git Bash signal: $0 (SHELL0) is the actual interpreter path, so it names "bash" regardless of which
+# MSYSTEM flavor Git for Windows reports (MINGW64, UCRT64, CLANG64, ...). Checking MSYSTEM for a fixed
+# value like "MINGW" undercounts a real pass - that was this script's own bug on the first real run.
+$gitBashPattern = 'SHELL0=.*[Bb]ash'
 Write-Host "=== $Major summary ==="
 foreach ($name in $results.Keys) {
-  $ran = if ($results[$name] -match 'MSYS=MINGW') { 'Git Bash' } elseif ($results[$name] -match 'SHELL0=.*[Pp]ower[Ss]hell') { 'PowerShell' } elseif ($results[$name] -match 'MSYS=(\\\\[rn])*SHELL0=') { 'empty vars (likely PowerShell or cmd, not Git Bash)' } else { 'undetermined' }
+  $ran = if ($results[$name] -match $gitBashPattern) { 'Git Bash' } elseif ($results[$name] -match 'SHELL0=.*[Pp]ower[Ss]hell') { 'PowerShell' } elseif ($results[$name] -match 'MSYS=(\\\\[rn])*SHELL0=') { 'empty vars (likely PowerShell or cmd, not Git Bash)' } else { 'undetermined' }
   Write-Host "  $name -> $ran"
 }
 
 # The one hard requirement: an absolute Git Bash path in `shell` must select Git Bash, PATH or not.
 # If upstream does not honor it (opencode#38799), this throws and the follow-up records "not proven" for $Major.
-if ($results['b-gitbash'] -notmatch 'MSYS=MINGW') {
+if ($results['b-gitbash'] -notmatch $gitBashPattern) {
   throw "shell=<git bash path> did not select Git Bash on $Major - see output above. Treat as NOT PROVEN for this major."
 }
 Write-Host "PROVEN on $Major`: shell=<Git Bash path> selects Git Bash."
