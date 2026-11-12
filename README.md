@@ -344,7 +344,7 @@ If your company pays for GitHub Copilot, the official way to use Claude as an ag
 | Tier | What | Default |
 | --- | --- | --- |
 | Minimal | Rules, tiered subagents, compaction, output limits, RTK, Context Mode | Always; `--no-core` (`-NoCore` in PowerShell) leaves out RTK and Context Mode |
-| Optional tools | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0), Codeburn | Asked one by one |
+| Optional tools | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0), Codeburn, Copilot usage (credits left in OpenCode, read with `gh`; `lean-agents --usage` prints them) | Asked one by one |
 | Opt-in tools | GSD Core, AutoSkills (CC BY-NC 4.0: non-commercial use only) | Asked one by one, never in `--all-tools` |
 | Strict privacy | No telemetry, no auto-updates, no session sharing, no providers that train on your prompts | Off, opt in with `--privacy strict` |
 | Network preset | All off (work PC), all on, or per category: telemetry, auto-updates, other outbound calls. Off sets switches only: install downloads and chosen tools are not blocked ([privacy.md](docs/privacy.md#what-each-preset-does-not-block)) | All on; `--network off` (same as `--privacy strict`) or `--telemetry`, `--auto-update`, `--outbound` |

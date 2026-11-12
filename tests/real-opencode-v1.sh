@@ -63,3 +63,23 @@ echo '--- opencode debug paths ---'
 opencode debug paths || echo '(opencode debug paths is not available on this version)'
 echo '--- data dir ---'
 ls -la "$HOME/.local/share/opencode" 2>&1 || true
+
+# copilot-usage (fresh HOME, network on: strict skips it). Proves the plugin file and its tui.json entry land and
+# OpenCode still loads its config without error. TUI rendering needs a real terminal and a login: still VERIFY.
+HOME="$(mktemp -d)"
+export HOME
+export XDG_CONFIG_HOME="$HOME/.config"
+bash "$repo/install.sh" --yes --no-exec --agents opencode-v1 --tools copilot-usage --network on --lang en --profile anthropic-api
+node --input-type=module - "$HOME/.config/opencode" <<'JS'
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const dir = process.argv[2];
+const file = path.join(dir, 'plugins', 'lean-copilot-usage', 'tui.js');
+const tui = JSON.parse(fs.readFileSync(path.join(dir, 'tui.json'), 'utf8'));
+if (!fs.existsSync(file) || !tui.plugin.includes(pathToFileURL(file).href)) { console.log('FAIL  copilot-usage plugin or tui.json entry missing'); process.exit(1); }
+console.log('ok    copilot-usage plugin file and tui.json entry');
+JS
+opencode debug config > "$HOME/resolved2.txt" 2>"$HOME/stderr2.txt" || { cat "$HOME/resolved2.txt" "$HOME/stderr2.txt"; exit 1; }
+if grep -i -E 'tui\.json|copilot-usage|plugin.*(error|fail)' "$HOME/stderr2.txt"; then echo 'FAIL  OpenCode reported a tui.json or plugin error'; exit 1; fi
+echo 'ok    opencode debug config loads with the copilot-usage plugin installed'

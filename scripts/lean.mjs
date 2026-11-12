@@ -22,6 +22,7 @@ import { MIGRATE_SOURCES, MIGRATE_TARGETS, readSource, detectSources, migratePla
 import { adhdCommand } from './lib/adhd.mjs';
 import { gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPresent, which, run, quiet, exists, isolate, configHome, envDir } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
+import { copilotUsage } from './lib/copilot-usage.mjs';
 import { draftIssue } from './lib/feedback.mjs';
 import { pinVersions, behindPins, pinTool, nodeRange, npmSpec } from './lib/pins.mjs';
 import { findNvm, resolveToolNodes, nvmLatest, nvmInstallArgv, nvmEnv, toolEnv } from './lib/node-runtime.mjs';
@@ -40,7 +41,7 @@ FIXED_PROFILE['vscode-copilot'] = 'github-copilot';
 // Extensions cannot be installed silently without admin policy, so the user installs it.
 const EXTENSION_NOTE = 'install the Playwright Extension yourself from https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm . Each session asks you to approve the connection; optional auto-approve: docs/browser-extension.md';
 const MINIMAL_TOOLS = ['rtk', 'context-mode'];
-const OPTIONAL_TOOLS = ['serena', 'playwright', 'ponytail', 'caveman', 'i-have-adhd', 'dcp', 'codeburn'];
+const OPTIONAL_TOOLS = ['serena', 'playwright', 'ponytail', 'caveman', 'i-have-adhd', 'dcp', 'codeburn', 'copilot-usage'];
 // Asked for one by one and never part of --all-tools.
 const OPT_IN_TOOLS = ['gsd', 'autoskills', 'playwright-extension'];
 const TOOL_INFO = {
@@ -52,6 +53,7 @@ const TOOL_INFO = {
   'i-have-adhd': 'i-have-adhd: skimmable, action-first formatting for every answer',
   dcp: 'DCP: prunes old context on OpenCode 1.x (AGPL-3.0)',
   codeburn: 'Codeburn: usage and cost report across agents, run with npx',
+  'copilot-usage': 'Copilot usage: credits left in the OpenCode sidebar and /copilot-usage, read with gh, no model request (needs gh login; off with --outbound off)',
   gsd: 'GSD Core: spec-driven workflow skills and agents (large install)',
   autoskills: 'AutoSkills: picks skills per project, run with npx (CC BY-NC 4.0: non-commercial use only)',
 };
@@ -104,6 +106,7 @@ function parseArgs(argv) {
       case '--update': o.command = 'update'; break;
       case '--uninstall': o.command = 'uninstall'; break;
       case '--doctor': o.command = 'doctor'; break;
+      case '--usage': o.command = 'usage'; break;
       case '--skip-agents': case '--no-admin': break; // defaults in v1: agents are never installed, nothing needs admin
       case '--help': case '-h': o.command = 'help'; break;
       case '--version': o.command = 'version'; break;
@@ -152,6 +155,7 @@ const HELP = `Usage: lean-agents [options]
   --uninstall            Undo everything lean-agents changed
   --doctor               Check the install
   --version              Print the lean-agents version
+  --usage                Print the Copilot credits left (one gh call, no model request)
 `;
 
 async function prompter(yes) {
@@ -273,8 +277,13 @@ async function choose(o, saved) {
     }
   }
   await chooseNetwork(o, saved, p);
+  if (o.network.outbound === 'off' && o.tools.includes('copilot-usage')) {
+    console.log('copilot-usage skipped: it calls api.github.com, which --outbound off blocks.');
+    o.tools = o.tools.filter((t) => t !== 'copilot-usage');
+  }
   await chooseUnverified(o, saved, p);
   o.gh ??= saved?.gh ?? (!which('gh') && yesNo(await p.ask('Install GitHub CLI (gh)? You log in yourself afterwards', 'y')));
+  if (o.tools.includes('copilot-usage') && !o.gh && !which('gh')) console.log('copilot-usage needs gh to read your credits: install it yourself (https://cli.github.com/) and run gh auth login.');
   if (o.tools.includes('context-mode') && !o.project) o.bun ??= saved?.bun ?? (bunPresent(o.home) || yesNo(await p.ask('Install Bun so Context Mode runs faster?', 'y')));
   o.lang ??= saved?.lang ?? (await p.select({ ask: 'Language for rules and replies (en/es)?', message: 'Language for rules and replies', options: [{ value: 'en', label: 'English' }, { value: 'es', label: 'Español' }], def: 'en' }));
   if (o.agents.some((a) => a.startsWith('opencode')) && !o.profile) {
@@ -621,6 +630,10 @@ async function main() {
   if (o.command === 'help') return console.log(HELP);
   if (o.command === 'version') return console.log(JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version);
   if (o.command === 'doctor') return process.exit(doctor({ home: o.home, state: readState(o.home), exec: o.exec, nodeVersion: NODE_VERSION, json: o.json }) ? 0 : 1);
+  if (o.command === 'usage') {
+    const network = { ...(o.networkPreset ? preset(o.networkPreset) : fromPrivacy(o.privacy) ?? readState(o.home)?.options.network ?? {}), ...o.networkFlags };
+    return console.log(network.outbound === 'off' ? 'usage skipped: outbound calls are off (no request to api.github.com)' : copilotUsage());
+  }
   if (o.command === 'feedback') return feedback(o);
   if (o.command === 'uninstall') return uninstall(o);
   return install(o);
