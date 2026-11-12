@@ -5,9 +5,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
+const ROOT = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const ENGINE = path.join(ROOT, 'scripts', 'lean.mjs');
 const TUI_SOURCE = path.join(ROOT, 'core', 'copilot-usage-tui.js');
 const isWin = process.platform === 'win32';
@@ -110,10 +110,10 @@ async function until(ok) {
 }
 
 test('tui.js: limited credits paint into the mounted nodes after data arrives; no model request', async () => {
-  const plugin = await loadPlugin();
   const old = process.env.PATH;
-  process.env.PATH = fakeGh(LIMITED);
   try {
+    const plugin = await loadPlugin();
+    process.env.PATH = fakeGh(LIMITED);
     const { api, calls } = fakeApi();
     await plugin.tui(api);
     const box = calls.slots[0].slots.sidebar_content();
@@ -131,9 +131,9 @@ test('tui.js: limited credits paint into the mounted nodes after data arrives; n
 });
 
 test('tui.js: unlimited and gh failure (unavailable, not zero)', async () => {
-  const plugin = await loadPlugin();
   const old = process.env.PATH;
   try {
+    const plugin = await loadPlugin();
     process.env.PATH = fakeGh(UNLIMITED);
     let { api, calls } = fakeApi();
     await plugin.tui(api);
@@ -152,12 +152,45 @@ test('tui.js: unlimited and gh failure (unavailable, not zero)', async () => {
 });
 
 test('tui.js: registers the command through keymap.registerLayer when api.command is missing (2.x)', async () => {
-  const plugin = await loadPlugin();
   const old = process.env.PATH;
-  process.env.PATH = fakeGh(LIMITED);
   try {
+    const plugin = await loadPlugin();
+    process.env.PATH = fakeGh(LIMITED);
     const { api, calls } = fakeApi({ keymap: true });
     await plugin.tui(api);
     assert.equal(calls.layers[0].commands[0].slash.name, 'copilot-usage');
   } finally { process.env.PATH = old; }
+});
+
+test('tui.js: unusable numbers show unavailable, an out-of-range percent is clamped', async () => {
+  const old = process.env.PATH;
+  const quota = (p) => ({ quota_reset_date: '2026-12-01', quota_snapshots: { premium_interactions: { unlimited: false, entitlement: 100, remaining: 50, ...p } } });
+  try {
+    const plugin = await loadPlugin();
+    for (const [data, want] of [[quota({ percent_remaining: 'x' }), /unavailable/], [quota({ percent_remaining: 250 }), /100% left/]]) {
+      process.env.PATH = fakeGh(data);
+      const { api, calls } = fakeApi();
+      await plugin.tui(api);
+      const box = calls.slots[0].slots.sidebar_content();
+      await until(() => !texts(box).includes('loading...'));
+      assert.match(texts(box).join('|'), want);
+    }
+  } finally { process.env.PATH = old; }
+});
+
+test('--usage under --outbound off prints a skip note and makes no call', () => {
+  const r = spawnSync(process.execPath, [ENGINE, '--home', tmp('home'), '--usage', '--outbound', 'off'], { encoding: 'utf8', env: { ...process.env, PATH: fakeGh(LIMITED) } });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /usage skipped/);
+  assert.ok(!/credits left/.test(r.stdout));
+});
+
+test('fresh HOME: install creates tui.json, uninstall removes it (the empty plugin folder stays: fsops removes files only)', () => {
+  const home = tmp('home');
+  const dir = path.join(home, '.config', 'opencode');
+  engine(home, ['--agents', 'opencode-v1', '--tools', 'copilot-usage', '--network', 'on']);
+  assert.ok(fs.existsSync(path.join(dir, 'tui.json')));
+  engine(home, ['--uninstall']);
+  assert.ok(!fs.existsSync(path.join(dir, 'tui.json')));
+  assert.ok(!fs.existsSync(path.join(dir, 'plugins', 'lean-copilot-usage', 'tui.js')));
 });

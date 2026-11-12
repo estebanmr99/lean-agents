@@ -282,8 +282,8 @@ async function choose(o, saved) {
     o.tools = o.tools.filter((t) => t !== 'copilot-usage');
   }
   await chooseUnverified(o, saved, p);
-  if (o.tools.includes('copilot-usage')) o.gh ??= true;
   o.gh ??= saved?.gh ?? (!which('gh') && yesNo(await p.ask('Install GitHub CLI (gh)? You log in yourself afterwards', 'y')));
+  if (o.tools.includes('copilot-usage') && !o.gh && !which('gh')) console.log('copilot-usage needs gh to read your credits: install it yourself (https://cli.github.com/) and run gh auth login.');
   if (o.tools.includes('context-mode') && !o.project) o.bun ??= saved?.bun ?? (bunPresent(o.home) || yesNo(await p.ask('Install Bun so Context Mode runs faster?', 'y')));
   o.lang ??= saved?.lang ?? (await p.select({ ask: 'Language for rules and replies (en/es)?', message: 'Language for rules and replies', options: [{ value: 'en', label: 'English' }, { value: 'es', label: 'Español' }], def: 'en' }));
   if (o.agents.some((a) => a.startsWith('opencode')) && !o.profile) {
@@ -628,7 +628,10 @@ async function main() {
   if (o.command === 'help') return console.log(HELP);
   if (o.command === 'version') return console.log(JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version);
   if (o.command === 'doctor') return process.exit(doctor({ home: o.home, state: readState(o.home), exec: o.exec, nodeVersion: NODE_VERSION, json: o.json }) ? 0 : 1);
-  if (o.command === 'usage') return console.log(copilotUsage());
+  if (o.command === 'usage') {
+    const network = { ...(o.networkPreset ? preset(o.networkPreset) : fromPrivacy(o.privacy) ?? readState(o.home)?.options.network ?? {}), ...o.networkFlags };
+    return console.log(network.outbound === 'off' ? 'usage skipped: outbound calls are off (no request to api.github.com)' : copilotUsage());
+  }
   if (o.command === 'feedback') return feedback(o);
   if (o.command === 'uninstall') return uninstall(o);
   return install(o);

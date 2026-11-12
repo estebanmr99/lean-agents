@@ -29,8 +29,9 @@ function summarize(user) {
   const p = user?.quota_snapshots?.premium_interactions;
   if (!p) return null;
   if (p.unlimited) return { unlimited: true, level: "success" };
+  if (![p.entitlement, p.remaining, p.percent_remaining].every(Number.isFinite)) return null;
   const spent = p.entitlement - p.remaining;
-  const pct = Math.floor(p.percent_remaining);
+  const pct = Math.min(100, Math.max(0, Math.floor(p.percent_remaining)));
   const reset = new Date(`${user.quota_reset_date}T00:00:00Z`);
   const days = Math.max(0, Math.ceil((reset.getTime() - Date.now()) / 86400000));
   return {
@@ -117,6 +118,10 @@ export default {
         state.fetchedAt = Date.now();
         paint(state, mounted);
         api.renderer.requestRender();
+      } catch {
+        state.summary = null;
+        state.loaded = true;
+        paint(state, mounted);
       } finally {
         inFlight = false;
       }
