@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-// Builds dist/notes.md and the source archives for a release. Used by release.yml and CI.
+// Builds dist/notes.md, the source archives, the npm tarball and SHA256SUMS for a release. Used by release.yml and CI.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -14,6 +15,17 @@ export function releaseNotes(changelog, version) {
   const rest = lines.slice(start + 1);
   const end = rest.findIndex((l) => l.startsWith('## ['));
   return rest.slice(0, end < 0 ? undefined : end).join('\n').trim();
+}
+
+// Needs `npm ci --omit=dev` first: the tarball bundles node_modules.
+export function packDist(dist, version) {
+  const name = `lean-agents-${version}`;
+  execFileSync('npm', ['pack', '--pack-destination', dist, '--silent'], { cwd: ROOT });
+  for (const f of ['install.sh', 'install.ps1']) fs.copyFileSync(path.join(ROOT, f), path.join(dist, f));
+  const files = [`${name}.tgz`, `${name}.tar.gz`, `${name}.zip`, 'install.sh', 'install.ps1'];
+  const sums = files.map((f) => `${crypto.createHash('sha256').update(fs.readFileSync(path.join(dist, f))).digest('hex')}  ${f}\n`);
+  fs.writeFileSync(path.join(dist, 'SHA256SUMS'), sums.join(''));
+  return files;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -29,5 +41,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   for (const ext of ['tar.gz', 'zip']) {
     execFileSync('git', ['archive', '--format', ext, '--prefix', `${name}/`, '-o', path.join(dist, `${name}.${ext}`), 'HEAD'], { cwd: ROOT });
   }
-  console.log(`dist: notes.md, ${name}.tar.gz, ${name}.zip`);
+  const packed = packDist(dist, version);
+  console.log(`dist: notes.md, SHA256SUMS, ${packed.join(', ')}`);
 }

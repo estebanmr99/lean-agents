@@ -12,13 +12,19 @@ Never read, print or store my API keys or tokens, and never run gh auth login fo
 
 ## Steps the agent follows
 
-1. **Get the engine.** Clone the repo to `~/.config/lean-agents/src` (Windows: `%USERPROFILE%\.config\lean-agents\src`). Use `node scripts/lean.mjs` below; Node.js 22.20 or newer.
-2. **Detect the setup.** Run `node scripts/lean.mjs --doctor --json`. It prints `{"ok": bool, "rows": [{"item", "status", "detail"}]}`; `status` is `ok`, `changed`, `note`, `error` or `missing`. `missing` on `lean-agents` means a fresh install.
+1. **Get the engine.** Use the latest release, not a clone of `main`. Run the release bootstrap with the read-only flags of step 2; it checks the download against the release's `SHA256SUMS` and unpacks it to `~/.config/lean-agents/src` (Windows: `%USERPROFILE%\.config\lean-agents\src`). Node.js 22.20 or newer.
+   - macOS, Linux, Git Bash: `curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --doctor --json`
+   - Windows PowerShell: `& ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -Doctor --json`
+   - Once the npm package is published, `npx lean-agents --doctor --json` does the same.
+
+   Later steps run `node scripts/lean.mjs` from that folder.
+2. **Detect the setup.** The step 1 command printed this; run `node scripts/lean.mjs --doctor --json` to repeat it. It prints `{"ok": bool, "rows": [{"item", "status", "detail"}]}`; `status` is `ok`, `changed`, `note`, `error` or `missing`. `missing` on `lean-agents` means a fresh install.
 3. **Ask the user**, one question each, with the answer's flag:
    - Which agents? `--agents claude,opencode-v2,copilot-cli,antigravity,vscode-copilot,cursor`
    - Which tools? `--tools <list>` or `--all-tools`; `--no-core` leaves out RTK and Context Mode.
    - Move an existing setup over? `--migrate auto` (see the README, "Migrate from another tool").
    - Which network preset? `--network on` or `--network off` (strict). `--telemetry`, `--auto-update` and `--outbound` override one category.
+   - Which terminal integration? Orca and Warp are detected and preselected: `--terminal orca|warp|both|none` (`none` opts out). The terminal apps are never installed.
    - Install GitHub CLI? It is on by default when missing; `--no-gh` skips it. The user runs `gh auth login` themselves.
 4. **Show the plan.** Run `node scripts/lean.mjs --yes --dry-run --json <flags>`. stdout is one JSON object (`agents`, `tools`, `network`, `files`, `commands`); messages go to stderr. Summarize files and commands for the user and wait for a yes. A line starting with `! git not found` on stderr means git is missing: show its install hint.
 5. **Install.** Run the same command without `--dry-run` and `--json`.

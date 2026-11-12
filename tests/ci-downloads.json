@@ -12,8 +12,8 @@
   },
   "cursor-installer": {
     "url": "https://cursor.com/install",
-    "sha256": "42764927ae080e23fc95be59e18ed8df54a305823ff6c4d6c490951c525f8c4c",
-    "checked": "2026-11-10"
+    "sha256": "e8c7a37d74b27a4beedf2dc5fc3b4c83627b2dc5c05a51d34f95ffec3cc0a247",
+    "checked": "2026-11-12"
   },
   "vscode-linux-x64": {
     "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/2c33b50b16c472efe58357d1d2a8a5414bc23fbf/code-stable-x64-1793133762.tar.gz",

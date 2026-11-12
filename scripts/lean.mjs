@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // lean-agents engine: plan, apply, update, uninstall and doctor.
-// install.sh / install.ps1 make sure Node and this checkout exist, then call this file.
+// `npx lean-agents` runs this file; install.sh / install.ps1 make sure Node and a verified release exist, then call it.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -106,6 +106,7 @@ function parseArgs(argv) {
       case '--doctor': o.command = 'doctor'; break;
       case '--skip-agents': case '--no-admin': break; // defaults in v1: agents are never installed, nothing needs admin
       case '--help': case '-h': o.command = 'help'; break;
+      case '--version': o.command = 'version'; break;
       default: throw new Error(`unknown option ${a} (see --help)`);
     }
   }
@@ -150,6 +151,7 @@ const HELP = `Usage: lean-agents [options]
   --update               Re-apply with your saved choices
   --uninstall            Undo everything lean-agents changed
   --doctor               Check the install
+  --version              Print the lean-agents version
 `;
 
 async function prompter(yes) {
@@ -615,6 +617,7 @@ async function main() {
   isolate(o.home);
   shareProxy();
   if (o.command === 'help') return console.log(HELP);
+  if (o.command === 'version') return console.log(JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version);
   if (o.command === 'doctor') return process.exit(doctor({ home: o.home, state: readState(o.home), exec: o.exec, nodeVersion: NODE_VERSION, json: o.json }) ? 0 : 1);
   if (o.command === 'feedback') return feedback(o);
   if (o.command === 'uninstall') return uninstall(o);

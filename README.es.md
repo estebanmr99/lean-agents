@@ -15,10 +15,10 @@
 Se instala sobre los agentes y CLIs que ya usas y mejora cómo trabajan: reglas `AGENTS.md` / `CLAUDE.md`, subagentes baratos, herramientas MCP que ahorran contexto y presets de privacidad.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --dry-run
+npx lean-agents@latest --dry-run
 ```
 
-`--dry-run` lista cada archivo y comando antes; nada cambia. Windows PowerShell y todas las opciones: [Inicio rápido](#inicio-rápido).
+`--dry-run` lista cada archivo y comando antes; nada cambia. Sin `npx`, Windows PowerShell y todas las opciones: [Inicio rápido](#inicio-rápido).
 
 <img src="docs/assets/demo.gif" alt="install.sh --dry-run lista cada archivo y comando que cambiaría" width="720">
 
@@ -84,42 +84,52 @@ lean-agents funciona con Claude Code, OpenCode 1.x y 2.x, GitHub Copilot CLI, An
    ```
 2. Mira qué cambiaría lean-agents (`--yes` acepta los valores por defecto, así la vista previa no pregunta). macOS, Linux o Git Bash:
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --agents opencode-v2 --profile github-copilot --dry-run --yes
+   curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --agents opencode-v2 --profile github-copilot --dry-run --yes
    ```
    Windows PowerShell:
    ```powershell
-   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -Agents opencode-v2 -Profile github-copilot -DryRun -Yes
+   & ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -Agents opencode-v2 -Profile github-copilot -DryRun -Yes
    ```
 3. Corre lo mismo sin el dry run; en una terminal te hace las preguntas que saltaste con `--yes`. macOS, Linux o Git Bash:
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --agents opencode-v2 --profile github-copilot
+   curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --agents opencode-v2 --profile github-copilot
    ```
    Windows PowerShell:
    ```powershell
-   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -Agents opencode-v2 -Profile github-copilot
+   & ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -Agents opencode-v2 -Profile github-copilot
    ```
 4. Abre `opencode`, ejecuta `/connect`, elige GitHub Copilot e inicia sesión con tu cuenta de GitHub (necesita un plan de Copilot). lean-agents nunca maneja el inicio de sesión.
    - Los subagentes usan el perfil `github-copilot`: `fast` = claude-haiku-5.5, `balanced` = claude-sonnet-5.5, `strong` = claude-opus-5.5.
    - No se usan modelos gratuitos de OpenCode.
 5. Revisa el resultado:
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --doctor
+   curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --doctor
    ```
 
 Las demos para Claude Desktop y Cursor vienen después.
 
 ## Inicio rápido
 
+En cualquier sistema con Node.js 22.20+ y git (macOS, Linux, Windows):
+
+```bash
+npx lean-agents@latest --dry-run
+```
+
+El mismo comando ejecuta `--doctor`, `--update` (siempre la versión más nueva) y `--uninstall`; `npx lean-agents --version` muestra la versión. npm comprueba la integridad del paquete.
+
+Los bootstraps de abajo descargan el último release, lo comprueban con el `SHA256SUMS` del release y solo entonces lo ejecutan (`LEAN_AGENTS_VERSION=0.7.0` fija un release). Ya instalado, `--dry-run`, `--doctor` y `--uninstall` no usan la red. Un checkout local (`bash install.sh` desde un clon) se confía tal cual; solo la descarga del release se comprueba con checksum.
+
 macOS, Linux o Git Bash:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --dry-run
+curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --dry-run
 ```
 
 Windows PowerShell:
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -DryRun
+& ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -DryRun
 ```
 
 ¿Prefieres que lo haga tu agente? Pega esto en Claude Code, OpenCode o Copilot CLI ([la guía](docs/install-with-an-agent.md) tiene los pasos y la salida `--json`):
@@ -228,11 +238,11 @@ lean-agents configura el chat de Copilot en VS Code y Cursor (el editor y su CLI
 - **Cursor:** subagentes en `~/.cursor/agents/`, servidores MCP en `~/.cursor/mcp.json`, el hook de RTK y skills. Cursor guarda las reglas de usuario en su pantalla de ajustes, no en un archivo, así que lean-agents no puede escribirlas. Usa el modo equipo de abajo para darle a Cursor las reglas a través del `AGENTS.md` del repo.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --dry-run --agents vscode-copilot,cursor
+curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --dry-run --agents vscode-copilot,cursor
 ```
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -DryRun -Agents vscode-copilot,cursor
+& ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -DryRun -Agents vscode-copilot,cursor
 ```
 
 Quita `--dry-run` (`-DryRun`) para aplicar. `--uninstall` lo quita todo otra vez.
@@ -256,15 +266,15 @@ Pone la configuración compartida en un repositorio, así todo el equipo la reci
 Ejecútalo desde la raíz del repositorio, revisa el plan, aplica y haz commit:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --project . --dry-run --tools serena --yes
-curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --project . --tools serena
+curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --project . --dry-run --tools serena --yes
+curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --project . --tools serena
 git add AGENTS.md .github .vscode .cursor && git commit -m "chore: add lean-agents team setup"
 ```
 
 En Windows:
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -Project . -DryRun -Tools serena -Yes
+& ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -Project . -DryRun -Tools serena -Yes
 ```
 
 - Después, `--project . --update` vuelve a aplicar tus opciones guardadas y `--project . --uninstall` quita solo lo que añadió lean-agents.
@@ -289,14 +299,14 @@ Copia la configuración que ya tienes en una herramienta a los agentes que elija
 Primero la vista previa; quita `--dry-run` para aplicar:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --migrate auto --agents claude --dry-run
-curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --migrate vscode-copilot --project . --agents claude,opencode-v2 --dry-run
+curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --migrate auto --agents claude --dry-run
+curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --migrate vscode-copilot --project . --agents claude,opencode-v2 --dry-run
 ```
 
 En Windows:
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.ps1))) -Migrate auto -Agents claude -DryRun
+& ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -Migrate auto -Agents claude -DryRun
 ```
 
 - La simulación imprime una tabla: elemento, origen, destino y si se migró, se omitió o solo se informó.
@@ -359,8 +369,8 @@ Si tu empresa paga GitHub Copilot, la forma oficial de usar Claude como agente e
    El instalador pasa ambas formas a cada comando (brew y git leen minúsculas, uv mayúsculas) y las muestra en `--dry-run` y `--doctor` con la contraseña cambiada por `***`. Nunca las escribe en disco. Qué variable de CA lee cada herramienta: [docs/compatibility.md](docs/compatibility.md#proxy-and-corporate-ca).
 3. **Elige un preset de red.** El instalador pregunta: **todo apagado** (PC de empresa), **todo encendido** (PC personal) o **por categoría**. Para correrlo sin preguntas:
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --dry-run --network off                # todo apagado
-   curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --yes --network off --auto-update on   # apagado, pero con auto updates
+   curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --dry-run --network off                # todo apagado
+   curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --yes --network off --auto-update on   # apagado, pero con auto updates
    ```
    Las opciones por categoría son `--telemetry on|off`, `--auto-update on|off` y `--outbound on|off`. `--network off` es igual que `--privacy strict`. En PowerShell se pasan tal cual, por ejemplo `-DryRun --network off`. Qué apaga cada categoría por agente: [docs/privacy.md](docs/privacy.md). La elección se guarda y `--update` la reutiliza.
 4. **`gh`**: GitHub CLI se instala sin admin si falta (`--no-gh` lo omite); luego corre `gh auth login` tú mismo.

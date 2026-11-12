@@ -1,18 +1,23 @@
 #!/usr/bin/env bash
 # lean-agents bootstrap for macOS, Linux and Git Bash on Windows.
-# Makes sure git and Node.js 22.20+ exist, fetches lean-agents, then hands over to the
-# Node engine (scripts/lean.mjs), which shows the full plan before changing anything.
+# Makes sure git and Node.js 22.20+ exist, downloads the latest release (npm tarball), checks it against
+# the release's SHA256SUMS, then hands over to the Node engine (scripts/lean.mjs), which shows the full
+# plan before changing anything. Node users can skip this: npx lean-agents@latest
 #
-#   curl -fsSL https://raw.githubusercontent.com/estebanmr99/lean-agents/main/install.sh | bash -s -- --dry-run
+#   curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --dry-run
+#
+# Env: LEAN_AGENTS_VERSION=0.7.0 pins a release; LEAN_AGENTS_DIST=<dir or https url> reads the release
+# files from there instead (CI and mirrors; prints a warning); LEAN_AGENTS_SRC moves the install folder.
 set -euo pipefail
 
-REPO_URL="${LEAN_AGENTS_REPO:-https://github.com/estebanmr99/lean-agents}"
-REF="${LEAN_AGENTS_REF:-main}"
+REPO="estebanmr99/lean-agents"
 SRC="${LEAN_AGENTS_SRC:-$HOME/.config/lean-agents/src}"
 
 say() { printf '%s\n' "$*"; }
-die() { printf 'lean-agents: %s\n' "$*" >&2; exit 1; }
+warn() { printf 'lean-agents: %s\n' "$*" >&2; }
+die() { warn "$*"; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
+sha256_of() { node -e 'const h=process.getBuiltinModule("node:crypto").createHash("sha256");h.update(process.getBuiltinModule("node:fs").readFileSync(process.argv[1]));process.stdout.write(h.digest("hex"))' "$1"; }
 
 ask() {
   # Read from the terminal even when this script is piped into bash.
@@ -22,7 +27,15 @@ ask() {
 }
 
 dry_run=false
-for arg in "$@"; do [[ "$arg" == "--dry-run" ]] && dry_run=true; done
+offline=false
+update=false
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) dry_run=true; offline=true ;;
+    --doctor|--uninstall) offline=true ;;
+    --update) update=true ;;
+  esac
+done
 
 ensure_tool() {
   local bin="$1" formula="$2" url="$3"
@@ -44,22 +57,104 @@ else
   die "Node.js is required for the engine. Install it and run this again."
 fi
 
-# Use the checkout this script lives in, if any; otherwise clone or update ~/.config/lean-agents/src.
+run_engine() {
+  local code=0
+  node "$1/scripts/lean.mjs" "${@:2}" || code=$?
+  return "$code"
+}
+
+# A checkout is used only when this script is a real file next to scripts/lean.mjs. Piped into bash,
+# BASH_SOURCE is empty, so a scripts/lean.mjs in the current directory is never run.
+# A checkout you run as a file is trusted as it is (you chose it); only the release download is checksum-verified.
 here=""
-if script_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"; then here="$script_dir"; fi
+if [[ -f "${BASH_SOURCE[0]:-}" ]] && script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"; then here="$script_dir"; fi
 if [[ -n "$here" && -f "$here/scripts/lean.mjs" ]]; then
-  SRC="$here"
-elif [[ -d "$SRC/.git" ]]; then
-  git -C "$SRC" fetch --quiet --depth 1 origin "$REF"
-  git -C "$SRC" checkout --quiet FETCH_HEAD
+  # node_modules/.lean-agents-lock holds the package-lock.json hash from the last npm ci, so a changed lockfile reinstalls.
+  lock=""
+  [[ -f "$here/package-lock.json" ]] && lock="$(sha256_of "$here/package-lock.json")"
+  if [[ ! -d "$here/node_modules/jsonc-parser" || ! -d "$here/node_modules/@clack/prompts" || "$(cat "$here/node_modules/.lean-agents-lock" 2>/dev/null || true)" != "$lock" ]]; then
+    (cd "$here" && npm ci --omit=dev --silent --no-audit --no-fund) || die "npm install failed in $here"
+    printf '%s\n' "$lock" > "$here/node_modules/.lean-agents-lock"
+  fi
+  exec node "$here/scripts/lean.mjs" "$@"
+fi
+
+stamp="$SRC/.lean-agents-release"
+
+# Already installed: --dry-run, --doctor and --uninstall (without --update) run it with no network.
+if $offline && ! $update && [[ -f "$stamp" && -f "$SRC/scripts/lean.mjs" ]]; then
+  exec node "$SRC/scripts/lean.mjs" "$@"
+fi
+
+# Never replace a folder that is not a lean-agents install (the old git clone has scripts/lean.mjs and goes).
+if [[ -e "$SRC" && ! -f "$SRC/scripts/lean.mjs" ]]; then
+  die "$SRC exists and is not a lean-agents install. Move it away or set LEAN_AGENTS_SRC."
+fi
+# An old bootstrap clone is clean and goes; a clone with local changes is never deleted.
+if [[ -e "$SRC/.git" ]] && ! { dirty="$(git -C "$SRC" status --porcelain 2>&1)" && [[ -z "$dirty" ]]; }; then
+  die "$SRC is a git clone with local changes (or git cannot read it), so it is left alone. Commit or move it, or set LEAN_AGENTS_SRC to another folder."
+fi
+
+if [[ -n "${LEAN_AGENTS_DIST:-}" ]]; then
+  base="${LEAN_AGENTS_DIST%/}"
+  [[ "$base" == https://* || -d "$base" ]] || die "LEAN_AGENTS_DIST must be an https URL or an existing folder."
+  warn "warning: LEAN_AGENTS_DIST is set, so lean-agents comes from $base and not from GitHub releases."
+elif [[ -n "${LEAN_AGENTS_VERSION:-}" ]]; then
+  base="https://github.com/$REPO/releases/download/v${LEAN_AGENTS_VERSION#v}"
 else
-  have git || die "git is required to download lean-agents."
-  mkdir -p "$(dirname "$SRC")"
-  git clone --quiet --depth 1 --branch "$REF" "$REPO_URL" "$SRC"
+  base="https://github.com/$REPO/releases/latest/download"
 fi
 
-if [[ ! -d "$SRC/node_modules/jsonc-parser" || ! -d "$SRC/node_modules/@clack/prompts" ]]; then
-  (cd "$SRC" && npm ci --omit=dev --silent --no-audit --no-fund) || die "npm install failed in $SRC"
+get() {
+  if [[ "$base" == https://* ]]; then
+    have curl || die "curl is required to download lean-agents."
+    curl -fsSL "$base/$1" -o "$2" || die "could not download $base/$1"
+  else
+    cp "$base/$1" "$2" || die "could not read $base/$1"
+  fi
+}
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+get SHA256SUMS "$tmp/SHA256SUMS"
+line="$(grep -E '^[0-9a-f]{64}  lean-agents-[0-9A-Za-z._-]+\.tgz$' "$tmp/SHA256SUMS" | head -n 1 || true)"
+[[ -n "$line" ]] || die "SHA256SUMS has no lean-agents tarball."
+want="${line%%  *}"
+name="${line##*  }"
+version="${name#lean-agents-}"
+version="${version%.tgz}"
+
+if [[ -f "$stamp" && -f "$SRC/scripts/lean.mjs" && "$(cat "$stamp")" == "$want" ]]; then
+  say "lean-agents v$version already installed."
+  code=0
+  run_engine "$SRC" "$@" || code=$?
+  exit "$code"
 fi
 
-exec node "$SRC/scripts/lean.mjs" "$@"
+get "$name" "$tmp/$name"
+got="$(sha256_of "$tmp/$name")"
+[[ "$got" == "$want" ]] || die "checksum mismatch for $name (expected $want, got $got). Nothing was installed."
+
+# A dry run with nothing installed leaves HOME untouched: the engine runs from a temp folder.
+if $dry_run && [[ ! -f "$stamp" ]]; then
+  mkdir "$tmp/src"
+  tar -xzf "$tmp/$name" -C "$tmp/src" --strip-components 1
+  code=0
+  run_engine "$tmp/src" "$@" || code=$?
+  exit "$code"
+fi
+
+mkdir -p "$(dirname "$SRC")"
+rm -rf "$SRC.new"
+mkdir "$SRC.new"
+tar -xzf "$tmp/$name" -C "$SRC.new" --strip-components 1
+[[ -f "$SRC.new/scripts/lean.mjs" ]] || die "$name has no scripts/lean.mjs."
+printf '%s\n' "$want" > "$SRC.new/.lean-agents-release"
+rm -rf "$SRC"
+mv "$SRC.new" "$SRC"
+say "lean-agents v$version installed in $SRC"
+
+code=0
+run_engine "$SRC" "$@" || code=$?
+exit "$code"
