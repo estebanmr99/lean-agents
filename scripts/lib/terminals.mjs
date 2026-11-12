@@ -159,7 +159,7 @@ export function gitBashActions({ home, terminals, agents, platform = process.pla
 
 // Manual steps lean-agents cannot script: printed after install and by --doctor.
 // `check` (when present) says whether a step is already done.
-export function stillNeeded({ home, terminals, agents, platform = process.platform, env = process.env, exec = false }) {
+export function stillNeeded({ home, terminals, agents, platform = process.platform, env = process.env, exec = false, readEnv = readWindowsEnv }) {
   const out = [];
   if (agents.includes('cursor')) {
     out.push({ text: 'Cursor: run `agent login` once (CLI) and sign in to the Cursor app; `agent mcp login <server>` for any MCP server that needs OAuth.' });
@@ -170,6 +170,15 @@ export function stillNeeded({ home, terminals, agents, platform = process.platfo
     if (platform === 'win32') {
       out.push({ text: 'Orca: click "Install CLI & Skills" in Orca to put `orca` on PATH (%LOCALAPPDATA%\\Programs\\Orca\\resources\\bin).', check: exec ? () => Boolean(which('orca')) : undefined });
     }
+    if (platform === 'win32' && hasProxy(env)) {
+      // Orca hands its own env to every terminal and Bun (OpenCode) reads proxy vars once, so a NO_PROXY added later needs an Orca restart.
+      out.push({
+        text: 'Orca behind a proxy: the Windows user NO_PROXY must list localhost, 127.0.0.1 and ::1, and Orca must be restarted after you change it (an Orca started earlier keeps the old value: status posts go to the proxy and fail with 403).',
+        check: exec ? () => LOOPBACK.every((h) => (readEnv('User', 'NO_PROXY') ?? readEnv('Machine', 'NO_PROXY') ?? '').split(',').map((x) => x.trim()).includes(h)) : undefined,
+      });
+    }
+    // Mod+P is Ctrl+P on Windows; the rebind is the owner's report from the Windows work PC (#78).
+    if (platform === 'win32') out.push({ text: 'Orca: Ctrl+P opens Orca\'s worktree quick-open, so OpenCode never sees it. To keep Ctrl+P for OpenCode, put {"platforms":{"win32":{"worktree.quickOpen":["Ctrl+Shift+P"]}}} in ~/.orca/keybindings.json (lean-agents never edits that file).' });
     out.push(
       { text: 'Orca: the first launch turns on agent status hooks, which write into ~/.claude/settings.json and ~/.cursor/hooks.json (Settings > Agents > Agent status hooks). --uninstall leaves them alone.', check: () => orcaHooksFound(home).length > 0 },
       { text: 'Orca: Settings > Agents > Agent permissions may start agents in Yolo mode; pick Manual if you expect approval prompts.' },
