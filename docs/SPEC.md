@@ -494,6 +494,7 @@ Mark each `[x]` when merged.
 - [x] **Session 107 — Context Mode MCP starts with server** (0.7.0). Issue #107, PR #110. Sonnet.
 - [x] **Issue #123 — Copilot credits in OpenCode** (0.7.0). PR #125. Sidebar on OpenCode 2.x stays **VERIFY**.
 - [x] **Issue #124 — Windows shell notice** (0.7.0). PR #127. Warning only; making Git Bash the OpenCode shell default is a follow-up.
+- [x] **Issue #60 — Multi-agent coordinator workflow** (0.8.0). PR #131. `docs/agent-workflow.md`, opt-in `coordinate` skill, `coord-watch.sh`, `real-coord-watch` CI job.
 - [ ] **Issue #124 follow-up — Git Bash as OpenCode's default shell** (0.8.0). Branch `session-124b-opencode-shell`. `real-opencode-shell` CI job (windows-latest, OpenCode 1.19.0 and 2.2.5) with a mock OpenAI-compatible LLM proves (or disproves) that the `shell` config key selects Git Bash on Windows; only if proven do the adapters set it by default (`--shell default` opts out).
 - [x] **Issue #126 — README rewrite** (0.7.0). PR #128.
 - [x] **Session 108 — One update channel** (0.7.0). Issue #108. Haiku.
