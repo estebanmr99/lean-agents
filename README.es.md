@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="docs/assets/banner.svg" alt="Banner de lean-agents" width="640">
+<img src="docs/assets/banner-es.svg" alt="lean-agents: tu agente rinde tanto como su configuración" width="640">
 
 # lean-agents
 
-**El instalador de las herramientas que ahorran tokens y estiran tu presupuesto mientras usas varios agentes de código a la vez.**
+**Tu agente rinde tanto como su configuración. lean-agents se encarga de la configuración.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![CI](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml) [![Secret scan](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml) ![GitHub stars](https://img.shields.io/github/stars/estebanmr99/lean-agents?style=social)
 
@@ -12,15 +12,53 @@
 
 </div>
 
-Se instala sobre los agentes y CLIs que ya usas y mejora cómo trabajan: reglas `AGENTS.md` / `CLAUDE.md`, subagentes baratos, herramientas MCP que ahorran contexto y presets de privacidad.
+Lo que escribe tu agente depende de lo que le das: tu prompt y la configuración que lo rodea. Reglas. Subagentes baratos para lo aburrido. Herramientas que ahorran tokens. La privacidad que tú elegiste.
 
-```bash
-npx lean-agents@latest --dry-run
+No tendrías que perfeccionar cada prompt. lean-agents deja el resto listo, una sola vez, sobre los agentes que ya usas.
+
+### Pega esto en tu agente
+
+Te pregunta cada decisión, muestra una vista previa y espera tu visto bueno.
+
+```text
+Instala lean-agents por mí desde https://github.com/estebanmr99/lean-agents.
+Sigue docs/install-with-an-agent.md de ese repo. Pregunta antes de cada cambio.
+Nunca leas, muestres ni guardes mis claves o tokens, y nunca corras gh auth login por mí.
 ```
 
-`--dry-run` lista cada archivo y comando antes; nada cambia. Sin `npx`, Windows PowerShell y todas las opciones: [Inicio rápido](#inicio-rápido).
+### O ejecútalo tú
+
+macOS, Linux o Git Bash. `--dry-run` lista cada archivo y comando; nada cambia:
+
+```bash
+curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --dry-run
+```
+
+Windows PowerShell:
+
+```powershell
+& ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -DryRun
+```
+
+Opciones, fijar una versión y checksums: [Inicio rápido](#inicio-rápido).
+
+### Novedades
+
+Lee las [notas del último release](https://github.com/estebanmr99/lean-agents/releases/latest) y el [CHANGELOG](CHANGELOG.md). ¿Ya lo tienes instalado? Pega esto para actualizar; también sirve para una instalación hecha a mano:
+
+```text
+Actualiza lean-agents por mí desde https://github.com/estebanmr99/lean-agents.
+Usa el skill lean-update, o sigue docs/install-with-an-agent.md "Update with an agent". Muéstrame primero una tabla y pregunta antes de cada cambio.
+Nunca leas, muestres ni guardes mis claves o tokens.
+```
+
+<div align="center">
+
+<img src="docs/assets/agents.svg" alt="Funciona con Claude Code, OpenCode, Copilot CLI, Antigravity CLI, VS Code Copilot y Cursor" width="520">
 
 <img src="docs/assets/demo.gif" alt="install.sh --dry-run lista cada archivo y comando que cambiaría" width="720">
+
+</div>
 
 ## Agentes compatibles
 
@@ -38,21 +76,6 @@ En Windows, los agentes funcionan mejor con Git Bash instalado (RTK y los comand
 
 ✅ un job de CI ejecuta el binario real en ese sistema (columnas de sistema) o lean-agents lo escribe (columnas de función) · ⚠️ escrito, carga sin comprobar · ➖ no disponible · VERIFY aún sin comprobar. Archivos por agente y fechas de verificación: [docs/compatibility.md](docs/compatibility.md).
 
-## De un vistazo
-
-- **Reglas:** un único conjunto corto de reglas globales, generado para cada agente.
-- **Subagentes baratos:** exploración, investigación y revisión corren en el nivel de modelo más barato que sirva.
-- **Herramientas que ahorran contexto:** RTK, Context Mode, Serena y Playwright MCP.
-- **Presets de privacidad:** `--privacy strict` u `off` para telemetría, actualizaciones y llamadas salientes.
-
-```mermaid
-flowchart LR
-  A["Tus agentes<br>Claude Code, OpenCode, Copilot CLI,<br>Antigravity, VS Code, Cursor"] --> L["lean-agents"]
-  L --> R["Reglas"]
-  L --> S["Subagentes baratos"]
-  L --> M["Herramientas MCP"]
-```
-
 **Para quién es:** desarrolladores solos · equipos (`--project` escribe la configuración en el repo) · PCs de trabajo detrás de un proxy ([detalles](#en-una-pc-de-trabajo-proxy-red-y-revisión-de-seguridad)).
 
 <!-- details -->
@@ -69,6 +92,21 @@ lean-agents funciona con Claude Code, OpenCode 1.x y 2.x, GitHub Copilot CLI, An
 - [Modo equipo](#modo-equipo---project) · [Migrar](#migrar-desde-otra-herramienta---migrate) · [Sesiones de agentes en paralelo](#sesiones-de-agentes-en-paralelo) · [Claude a través de GitHub Copilot](#claude-a-través-de-github-copilot)
 - [Niveles de instalación](#niveles-de-instalación) · [En una PC de trabajo](#en-una-pc-de-trabajo-proxy-red-y-revisión-de-seguridad) · [Modelos siempre al día](#modelos-siempre-al-día)
 - [Seguridad](#seguridad) · [Créditos](#créditos) · [Hoja de ruta](#hoja-de-ruta) · [Contribuir](#contribuir) · [Licencia](#licencia)
+
+## De un vistazo
+
+- **Reglas:** un único conjunto corto de reglas globales, generado para cada agente.
+- **Subagentes baratos:** exploración, investigación y revisión corren en el nivel de modelo más barato que sirva.
+- **Herramientas que ahorran contexto:** RTK, Context Mode, Serena y Playwright MCP.
+- **Presets de privacidad:** `--privacy strict` u `off` para telemetría, actualizaciones y llamadas salientes.
+
+```mermaid
+flowchart LR
+  A["Tus agentes<br>Claude Code, OpenCode, Copilot CLI,<br>Antigravity, VS Code, Cursor"] --> L["lean-agents"]
+  L --> R["Reglas"]
+  L --> S["Subagentes baratos"]
+  L --> M["Herramientas MCP"]
+```
 
 ## Demo: OpenCode con modelos de GitHub Copilot
 
@@ -112,43 +150,11 @@ Las demos para Claude Desktop y Cursor vienen después.
 
 ## Inicio rápido
 
-En cualquier sistema con Node.js 22.20+ y git (macOS, Linux, Windows):
+Los comandos están arriba: el prompt para tu agente, el comando de instalación y el prompt de actualización. Los bootstraps descargan el último release, lo comprueban con el `SHA256SUMS` del release y solo entonces lo ejecutan (`LEAN_AGENTS_VERSION=0.7.0` fija un release). Ya instalado, `--dry-run`, `--doctor` y `--uninstall` no usan la red. Un checkout local (`bash install.sh` desde un clon) se confía tal cual; solo la descarga del release se comprueba con checksum.
 
-```bash
-npx lean-agents@latest --dry-run
-```
+Cuando el paquete npm esté publicado, `npx lean-agents@latest` ejecutará los mismos comandos (Node.js 22.20+ y git).
 
-El mismo comando ejecuta `--doctor`, `--update` (siempre la versión más nueva) y `--uninstall`; `npx lean-agents --version` muestra la versión. npm comprueba la integridad del paquete.
-
-Los bootstraps de abajo descargan el último release, lo comprueban con el `SHA256SUMS` del release y solo entonces lo ejecutan (`LEAN_AGENTS_VERSION=0.7.0` fija un release). Ya instalado, `--dry-run`, `--doctor` y `--uninstall` no usan la red. Un checkout local (`bash install.sh` desde un clon) se confía tal cual; solo la descarga del release se comprueba con checksum.
-
-macOS, Linux o Git Bash:
-
-```bash
-curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --dry-run
-```
-
-Windows PowerShell:
-
-```powershell
-& ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -DryRun
-```
-
-¿Prefieres que lo haga tu agente? Pega esto en Claude Code, OpenCode o Copilot CLI ([la guía](docs/install-with-an-agent.md) tiene los pasos y la salida `--json`):
-
-```text
-Instala lean-agents por mí desde https://github.com/estebanmr99/lean-agents.
-Sigue docs/install-with-an-agent.md de ese repo. Pregunta antes de cada cambio.
-Nunca leas, muestres ni guardes mis claves o tokens, y nunca corras gh auth login por mí.
-```
-
-Para actualizar después, pega esto (el skill `lean-update` se instala con lean-agents; sin él, el agente lee [la guía](docs/install-with-an-agent.md#update-with-an-agent)). También sirve para una instalación hecha a mano:
-
-```text
-Actualiza lean-agents por mí desde https://github.com/estebanmr99/lean-agents.
-Usa el skill lean-update, o sigue docs/install-with-an-agent.md "Update with an agent". Muéstrame primero una tabla y pregunta antes de cada cambio.
-Nunca leas, muestres ni guardes mis claves o tokens.
-```
+Los prompts para el agente tienen [una guía](docs/install-with-an-agent.md) con los pasos y la salida `--json`; [los pasos de actualización](docs/install-with-an-agent.md#update-with-an-agent) funcionan también sin el skill `lean-update`.
 
 Usa `--lang es` para que las reglas y las respuestas queden en español.
 

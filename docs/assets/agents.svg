@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 672 40" width="672" height="40" role="img" aria-label="Works with Claude Code, OpenCode, Copilot CLI, Antigravity CLI, VS Code Copilot and Cursor">
+<g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#f8fafc">
+  <rect x="0" y="4" width="120" height="32" rx="16" fill="#0f172a" stroke="#38bdf8"/>
+  <text x="60" y="25" text-anchor="middle">Claude Code</text>
+  <rect x="130" y="4" width="95" height="32" rx="16" fill="#0f172a" stroke="#38bdf8"/>
+  <text x="177.5" y="25" text-anchor="middle">OpenCode</text>
+  <rect x="235" y="4" width="120" height="32" rx="16" fill="#0f172a" stroke="#38bdf8"/>
+  <text x="295" y="25" text-anchor="middle">Copilot CLI</text>
+  <rect x="365" y="4" width="120" height="32" rx="16" fill="#0f172a" stroke="#38bdf8"/>
+  <text x="425" y="25" text-anchor="middle">Antigravity</text>
+  <rect x="495" y="4" width="87" height="32" rx="16" fill="#0f172a" stroke="#38bdf8"/>
+  <text x="538.5" y="25" text-anchor="middle">VS Code</text>
+  <rect x="592" y="4" width="78" height="32" rx="16" fill="#0f172a" stroke="#38bdf8"/>
+  <text x="631" y="25" text-anchor="middle">Cursor</text>
+</g>
+</svg>
