@@ -127,7 +127,7 @@ test('duplicate skills: same content is a note, different content is changed; th
   assert.match(rows.diff.detail, /differ; winner: unknown \(load order\)/);
   assert.match(rows['orca-cli'].detail, /Orca installs this skill/);
   assert.equal(r.skills.length, 3);
-  assert.deepEqual(r.skills.find((s) => s.name === 'diff').dirs, ['~/.agents/skills', '~/.claude/skills']);
+  assert.deepEqual(r.skills.find((s) => s.name === 'diff').dirs.map((d) => d.replaceAll('\\', '/')), ['~/.agents/skills', '~/.claude/skills']);
   assert.ok(r.skills[0].agents.includes('opencode'));
   assert.equal(r.ok, true);
 });

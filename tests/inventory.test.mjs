@@ -10,7 +10,7 @@ import { launchOf, pinOf, classify, skillDirs, duplicateSkills, clients } from '
 const fsx = (files = [], links = {}) => ({ existsSync: (p) => files.includes(p) || p in links, realpathSync: (p) => links[p] ?? p });
 
 const POSIX = '/h/.nvm/versions/node';
-const WIN = 'C:\\Users\\u\\AppData\\Roaming\\nvm';
+const WIN = 'C:\\nvm';
 const cases = {
   linux: {
     platform: 'linux',
