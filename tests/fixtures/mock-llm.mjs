@@ -6,9 +6,11 @@
 // Tool name differs by major: OpenCode 2.2.5 names it "shell" (confirmed locally on 2.1.4); 1.19.0 may still call it "bash".
 import http from 'node:http';
 
-const PORT = Number(process.argv[2] ?? process.env.MOCK_LLM_PORT ?? 0);
-const COMMAND = process.argv[3] ?? 'echo "MSYS=$MSYSTEM"; echo "SHELL0=$0"';
-const TOOL_NAME = process.argv[4] ?? 'shell';
+// Env vars first: Windows process-argument quoting for a string full of quotes and `$` is fragile,
+// so the CI caller sets these instead of passing them as argv.
+const PORT = Number(process.env.MOCK_LLM_PORT ?? process.argv[2] ?? 0);
+const COMMAND = process.env.MOCK_LLM_COMMAND ?? process.argv[3] ?? 'echo "MSYS=$MSYSTEM"; echo "SHELL0=$0"';
+const TOOL_NAME = process.env.MOCK_LLM_TOOL ?? process.argv[4] ?? 'shell';
 
 function toolCallMessage(id) {
   return {

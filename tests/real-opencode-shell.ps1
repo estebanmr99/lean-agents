@@ -49,24 +49,28 @@ $cases = [ordered]@{
 
 $results = @{}
 foreach ($name in $cases.Keys) {
-  $home = New-CaseHome $name
+  # Not $home: that shadows PowerShell's own read-only automatic $HOME variable.
+  $caseHome = New-CaseHome $name
   $port = Get-Random -Minimum 20000 -Maximum 60000
-  $mockLog = "$home\mock.log"
-  $mock = Start-Process node -ArgumentList @("`"$repo\tests\fixtures\mock-llm.mjs`"", "$port", "`"$command`"", $ToolName) `
-    -RedirectStandardOutput $mockLog -NoNewWindow -PassThru
+  $mockLog = "$caseHome\mock.log"
+  # Env vars, not argv: a Windows command line full of quotes and `$` is fragile to pass as a process argument.
+  $env:MOCK_LLM_PORT = "$port"
+  $env:MOCK_LLM_COMMAND = $command
+  $env:MOCK_LLM_TOOL = $ToolName
+  $mock = Start-Process node -ArgumentList "$repo\tests\fixtures\mock-llm.mjs" -RedirectStandardOutput $mockLog -NoNewWindow -PassThru
   Start-Sleep -Seconds 1
-  Write-MockConfig "$home\.config\opencode\opencode.jsonc" $port $cases[$name]
+  Write-MockConfig "$caseHome\.config\opencode\opencode.jsonc" $port $cases[$name]
 
   $savedHome = $env:HOME; $savedProfile = $env:USERPROFILE; $savedXdg = $env:XDG_CONFIG_HOME; $savedPath = $env:Path
   try {
-    $env:HOME = $home
-    $env:USERPROFILE = $home
-    $env:XDG_CONFIG_HOME = "$home\.config"
+    $env:HOME = $caseHome
+    $env:USERPROFILE = $caseHome
+    $env:XDG_CONFIG_HOME = "$caseHome\.config"
     # Case (b): prove the absolute path works even with Git's own dirs off PATH, not found through PATH lookup.
     if ($name -eq 'b-gitbash') {
       $env:Path = ($savedPath -split ';' | Where-Object { $_ -notmatch '(?i)\\git(\\|$)' }) -join ';'
     }
-    $out = & opencode run --format json 'say hi' 2>"$home\err.txt"
+    $out = & opencode run --format json 'say hi' 2>"$caseHome\err.txt"
     $exit = $LASTEXITCODE
   } finally {
     $env:HOME = $savedHome; $env:USERPROFILE = $savedProfile; $env:XDG_CONFIG_HOME = $savedXdg; $env:Path = $savedPath
@@ -76,7 +80,7 @@ foreach ($name in $cases.Keys) {
   $joined = ($out -join "`n")
   Write-Host "--- $Major case $name (shell=$($cases[$name])) exit=$exit ---"
   Write-Host $joined
-  if ($exit -ne 0) { Write-Host '--- stderr ---'; Get-Content "$home\err.txt" | Write-Host }
+  if ($exit -ne 0) { Write-Host '--- stderr ---'; Get-Content "$caseHome\err.txt" | Write-Host }
   $results[$name] = $joined
 }
 
