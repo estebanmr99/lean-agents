@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="docs/assets/banner.svg" alt="lean-agents banner" width="640">
+<img src="docs/assets/banner.svg" alt="lean-agents: your agent is only as good as its setup" width="640">
 
 # lean-agents
 
-**The installer for the tools that save tokens and stretch your budget while you run several coding agents at once.**
+**Your agent is only as good as its setup. lean-agents does the setup.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![CI](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml) [![Secret scan](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml) ![GitHub stars](https://img.shields.io/github/stars/estebanmr99/lean-agents?style=social)
 
@@ -12,15 +12,53 @@
 
 </div>
 
-It installs on top of the agents and CLIs you already use and improves how they work: `AGENTS.md` / `CLAUDE.md` rules, cheap subagents, context-saving MCP tools and privacy presets.
+What your agent writes is only as good as what you give it: your prompt, and the setup around it. Rules. Cheap subagents for the boring work. Tools that save tokens. Privacy you chose.
 
-```bash
-npx lean-agents@latest --dry-run
+You should not have to perfect every prompt. lean-agents sets the rest up for you, once, on top of the agents you already use.
+
+### Paste this into your agent
+
+It asks you each choice, shows a dry run, and waits for your OK.
+
+```text
+Install lean-agents for me from https://github.com/estebanmr99/lean-agents.
+Follow docs/install-with-an-agent.md in that repo. Ask before every change.
+Never read, print or store my API keys or tokens, and never run gh auth login for me.
 ```
 
-`--dry-run` lists every file and command first; nothing changes. No `npx`, or Windows PowerShell, or every flag: [Quick start](#quick-start).
+### Or run it yourself
+
+macOS, Linux or Git Bash. `--dry-run` lists every file and command; nothing changes:
+
+```bash
+curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --dry-run
+```
+
+Windows PowerShell:
+
+```powershell
+& ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -DryRun
+```
+
+Flags, pinning a version, checksums: [Quick start](#quick-start).
+
+### What's new
+
+Read the [latest release notes](https://github.com/estebanmr99/lean-agents/releases/latest) and the [CHANGELOG](CHANGELOG.md). Already installed? Paste this to update; it also takes over an install you made by hand:
+
+```text
+Update lean-agents for me from https://github.com/estebanmr99/lean-agents.
+Use the lean-update skill, or follow docs/install-with-an-agent.md "Update with an agent". Show me a table first and ask before every change.
+Never read, print or store my API keys or tokens.
+```
+
+<div align="center">
+
+<img src="docs/assets/agents.svg" alt="Works with Claude Code, OpenCode, Copilot CLI, Antigravity CLI, VS Code Copilot and Cursor" width="520">
 
 <img src="docs/assets/demo.gif" alt="install.sh --dry-run listing every file and command it would change" width="720">
+
+</div>
 
 ## Supported agents
 
@@ -38,21 +76,6 @@ On Windows, agents work best with Git Bash installed (RTK and bash-style command
 
 ✅ a CI job runs the real binary on that OS (OS columns) or lean-agents writes it (feature columns) · ⚠️ written, load unproven · ➖ not available · VERIFY not proven yet. Per-agent files and verification dates: [docs/compatibility.md](docs/compatibility.md).
 
-## At a glance
-
-- **Rules:** one short global rule set, rendered for each agent.
-- **Cheap subagents:** exploration, research and review run on the cheapest fitting model tier.
-- **Context-saving tools:** RTK, Context Mode, Serena and Playwright MCP.
-- **Privacy presets:** `--privacy strict` or `off` for telemetry, updates and outbound calls.
-
-```mermaid
-flowchart LR
-  A["Your agents<br>Claude Code, OpenCode, Copilot CLI,<br>Antigravity, VS Code, Cursor"] --> L["lean-agents"]
-  L --> R["Rules"]
-  L --> S["Cheap subagents"]
-  L --> M["MCP tools"]
-```
-
 **Who it's for:** solo developers · teams (`--project` writes the setup into the repo) · work PCs behind a proxy ([details](#on-a-work-pc-proxy-network-and-security-review)).
 
 <!-- details -->
@@ -69,6 +92,21 @@ lean-agents works with Claude Code, OpenCode 1.x and 2.x, GitHub Copilot CLI, An
 - [Team mode](#team-mode---project) · [Migrate](#migrate-from-another-tool---migrate) · [Parallel agent sessions](#parallel-agent-sessions) · [Claude through GitHub Copilot](#claude-through-github-copilot)
 - [Install tiers](#install-tiers) · [On a work PC](#on-a-work-pc-proxy-network-and-security-review) · [Models that stay current](#models-that-stay-current)
 - [Safety](#safety) · [Credits](#credits) · [Roadmap](#roadmap) · [Contributing](#contributing) · [License](#license)
+
+## At a glance
+
+- **Rules:** one short global rule set, rendered for each agent.
+- **Cheap subagents:** exploration, research and review run on the cheapest fitting model tier.
+- **Context-saving tools:** RTK, Context Mode, Serena and Playwright MCP.
+- **Privacy presets:** `--privacy strict` or `off` for telemetry, updates and outbound calls.
+
+```mermaid
+flowchart LR
+  A["Your agents<br>Claude Code, OpenCode, Copilot CLI,<br>Antigravity, VS Code, Cursor"] --> L["lean-agents"]
+  L --> R["Rules"]
+  L --> S["Cheap subagents"]
+  L --> M["MCP tools"]
+```
 
 ## Demo: OpenCode with GitHub Copilot models
 
@@ -112,43 +150,11 @@ Claude Desktop and Cursor demo paths come later.
 
 ## Quick start
 
-Any system with Node.js 22.20+ and git (macOS, Linux, Windows):
+The commands are at the top: the agent prompt, the install command and the update prompt. The bootstraps download the latest release, check it against the release's `SHA256SUMS`, and only then run it (`LEAN_AGENTS_VERSION=0.7.0` pins a release). Once installed, `--dry-run`, `--doctor` and `--uninstall` need no network. A local checkout (`bash install.sh` from a clone) is trusted as it is; only the release download is checksum-verified.
 
-```bash
-npx lean-agents@latest --dry-run
-```
+Once the npm package is published, `npx lean-agents@latest` will run the same commands (Node.js 22.20+ and git).
 
-The same command runs `--doctor`, `--update` (always the newest version) and `--uninstall`; `npx lean-agents --version` prints the version. npm checks the package integrity.
-
-The bootstraps below download the latest release, check it against the release's `SHA256SUMS`, and only then run it (`LEAN_AGENTS_VERSION=0.7.0` pins a release). Once installed, `--dry-run`, `--doctor` and `--uninstall` need no network. A local checkout (`bash install.sh` from a clone) is trusted as it is; only the release download is checksum-verified.
-
-macOS, Linux or Git Bash:
-
-```bash
-curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --dry-run
-```
-
-Windows PowerShell:
-
-```powershell
-& ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -DryRun
-```
-
-Prefer your agent to do it? Paste this into Claude Code, OpenCode or Copilot CLI ([the guide](docs/install-with-an-agent.md) has the steps and `--json` output):
-
-```text
-Install lean-agents for me from https://github.com/estebanmr99/lean-agents.
-Follow docs/install-with-an-agent.md in that repo. Ask before every change.
-Never read, print or store my API keys or tokens, and never run gh auth login for me.
-```
-
-To update later, paste this (the `lean-update` skill is installed with lean-agents; without it, the agent reads [the guide](docs/install-with-an-agent.md#update-with-an-agent)). It also takes over an install you made by hand:
-
-```text
-Update lean-agents for me from https://github.com/estebanmr99/lean-agents.
-Use the lean-update skill, or follow docs/install-with-an-agent.md "Update with an agent". Show me a table first and ask before every change.
-Never read, print or store my API keys or tokens.
-```
+The agent prompts have [a guide](docs/install-with-an-agent.md) with the steps and `--json` output; [the update steps](docs/install-with-an-agent.md#update-with-an-agent) work without the `lean-update` skill too.
 
 Use `--lang es` to get the rules and replies in Spanish.
 
