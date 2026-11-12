@@ -107,7 +107,7 @@ foreach ($name in $cases.Keys) {
       if ($LASTEXITCODE -ne 0) { throw "install.ps1 failed for $Major" }
       $installed = (Get-Content $configPath -Raw | ConvertFrom-Json).shell
       if ($installed -ne $gitBash) { throw "installer wrote shell='$installed', expected '$gitBash'" }
-      Write-Host "ok    installer wrote shell=$installed"
+      Write-Output "ok    installer wrote shell=$installed"
       Merge-MockProvider $configPath $port
       # Prove the absolute path still works with Git's own dirs off PATH, not found through PATH lookup.
       $env:Path = ($savedPath -split ';' | Where-Object { $_ -notmatch '(?i)\\git(\\|$)' }) -join ';'
@@ -135,11 +135,11 @@ foreach ($name in $cases.Keys) {
   }
 
   $joined = ($out -join "`n")
-  Write-Host "--- $Major case $name (shell=$($cases[$name])) exit=$exit ---"
-  Write-Host $joined
+  Write-Output "--- $Major case $name (shell=$($cases[$name])) exit=$exit ---"
+  Write-Output $joined
   if ($exit -ne 0) {
-    Write-Host '--- stderr ---'; Get-Content "$caseHome\err.txt" | Write-Host
-    Write-Host '--- mock log (tools the model saw) ---'; Get-Content $mockLog | Write-Host
+    Write-Output '--- stderr ---'; Get-Content "$caseHome\err.txt" | Write-Output
+    Write-Output '--- mock log (tools the model saw) ---'; Get-Content $mockLog | Write-Output
   }
   $results[$name] = $joined
 }
@@ -148,10 +148,10 @@ foreach ($name in $cases.Keys) {
 # MSYSTEM flavor Git for Windows reports (MINGW64, UCRT64, CLANG64, ...). Checking MSYSTEM for a fixed
 # value like "MINGW" undercounts a real pass - that was this script's own bug on the first real run.
 $gitBashPattern = 'SHELL0=.*[Bb]ash'
-Write-Host "=== $Major summary ==="
+Write-Output "=== $Major summary ==="
 foreach ($name in $results.Keys) {
   $ran = if ($results[$name] -match $gitBashPattern) { 'Git Bash' } elseif ($results[$name] -match 'SHELL0=.*[Pp]ower[Ss]hell') { 'PowerShell' } elseif ($results[$name] -match 'MSYS=(\\\\[rn])*SHELL0=') { 'empty vars (likely PowerShell or cmd, not Git Bash)' } else { 'undetermined' }
-  Write-Host "  $name -> $ran"
+  Write-Output "  $name -> $ran"
 }
 
 # The one hard requirement: an absolute Git Bash path in `shell` must select Git Bash, PATH or not.
@@ -159,4 +159,4 @@ foreach ($name in $results.Keys) {
 if ($results['b-gitbash'] -notmatch $gitBashPattern) {
   throw "shell=<git bash path> did not select Git Bash on $Major - see output above. Treat as NOT PROVEN for this major."
 }
-Write-Host "PROVEN on $Major`: shell=<Git Bash path> selects Git Bash."
+Write-Output "PROVEN on $Major`: shell=<Git Bash path> selects Git Bash."
