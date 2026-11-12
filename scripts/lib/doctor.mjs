@@ -85,16 +85,16 @@ function checkInventory({ home, exec, run, env, platform, fsx }, add) {
   const ORCA = new Set(['orca-cli', 'orchestration', 'computer-use']);
   const bySkill = new Map();
   for (const agent of ['claude', 'opencode', 'cursor', 'copilot']) {
-    for (const d of duplicateSkills(skillDirs(agent, home))) {
+    for (const d of duplicateSkills(skillDirs(agent, home), fsx)) {
       const k = `${d.name}\0${d.dirs.join('\0')}`;
-      bySkill.set(k, { ...(bySkill.get(k) ?? { name: d.name, dirs: d.dirs.map(rel), differs: d.differs, winner: d.winner, agents: [] }), agents: [...(bySkill.get(k)?.agents ?? []), agent] });
+      bySkill.set(k, { ...(bySkill.get(k) ?? { name: d.name, dirs: d.dirs.map(rel), differs: d.differs, unreadable: d.unreadable, winner: d.winner, agents: [] }), agents: [...(bySkill.get(k)?.agents ?? []), agent] });
     }
   }
   const skills = [...bySkill.values()];
   for (const s of skills) {
     const orca = ORCA.has(s.name) ? ' Orca installs this skill in both folders on purpose.' : '';
     add(`duplicate skill ${s.name}`, s.differs ? 'changed' : 'note',
-      `in ${s.dirs.join(' and ')} (read by ${s.agents.join(', ')}); the copies ${s.differs ? 'differ' : 'are identical'}; winner: ${s.winner}. Keep one folder.${orca}`);
+      `in ${s.dirs.join(' and ')} (read by ${s.agents.join(', ')}); ${s.unreadable ? 'a copy is unreadable, so they could not be compared' : `the copies ${s.differs ? 'differ' : 'are identical'}`}; winner: ${s.winner}. Keep one folder.${orca}`);
   }
   return { nodes, skills };
 }

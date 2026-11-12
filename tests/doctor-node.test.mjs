@@ -120,7 +120,7 @@ test('duplicate skills: same content is a note, different content is changed; th
   put('.agents', 'same', 'a'); put('.claude', 'same', 'a');
   put('.agents', 'diff', 'a'); put('.claude', 'diff', 'b');
   put('.agents', 'orca-cli', 'o'); put('.claude', 'orca-cli', 'o');
-  const r = run(h);
+  const r = run(h, { fs });
   const rows = Object.fromEntries(r.rows.filter((x) => x.item.startsWith('duplicate skill ')).map((x) => [x.item.slice(16), x]));
   assert.equal(rows.same.status, 'note');
   assert.equal(rows.diff.status, 'changed');
@@ -136,5 +136,5 @@ test('no duplicate when each agent reads one folder', () => {
   const h = tmp();
   fs.mkdirSync(path.join(h, '.claude', 'skills', 'x'), { recursive: true });
   fs.writeFileSync(path.join(h, '.claude', 'skills', 'x', 'SKILL.md'), 'x');
-  assert.deepEqual(run(h).skills, []);
+  assert.deepEqual(run(h, { fs }).skills, []);
 });

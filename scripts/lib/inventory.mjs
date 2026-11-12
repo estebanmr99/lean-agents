@@ -46,8 +46,8 @@ export function launchOf(argv, { env = process.env, platform = process.platform,
   const key = Object.keys(env).find((k) => k.toUpperCase() === 'PATH');
   const onPath = () => (env[key] ?? '').split(win ? ';' : ':').filter(Boolean).map((d) => P.join(d, win ? 'node.exe' : 'node')).find(exists) ?? null;
   const links = win ? [env.NVM_SYMLINK ?? 'C:\\nodejs'] : env.NVM_DIR ? [P.join(env.NVM_DIR, 'current'), P.join(env.NVM_DIR, 'alias')] : [];
-  const isLink = (p) => links.some((l) => (win ? p.toLowerCase().startsWith(l.toLowerCase()) : p.startsWith(l)))
-    || (!VERSION_DIR.test(p) && real(p) !== p);
+  // Only nvm's own links move with `nvm use`; any other link (Homebrew's /opt/homebrew/bin/node) is a fixed path whose real path gives the version.
+  const isLink = (p) => links.some((l) => (win ? p.toLowerCase().startsWith(l.toLowerCase()) : p.startsWith(l)));
   const versionOf = (p) => (VERSION_DIR.exec(p) ?? VERSION_DIR.exec(real(p)))?.[1] ?? null;
   const out = (style, node) => ({ style, node, nodeVersion: node ? versionOf(node) : null });
 
@@ -130,35 +130,39 @@ export function skillDirs(agent, home) {
 const SAFE_NAME = /^[A-Za-z0-9][\w.-]*$/;
 
 // One hash over the paths and bytes of every file under a skill folder.
-function treeSha(dir) {
+// A file or folder that cannot be read gives the marker 'unreadable' instead of an error, so --doctor never crashes on it.
+const UNREADABLE = 'unreadable';
+function treeSha(dir, fsx) {
   const h = createHash('sha256');
   const walk = (d, rel) => {
-    for (const e of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1))) {
+    for (const e of fsx.readdirSync(d, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1))) {
       const p = j(d, e.name);
       if (e.isDirectory()) walk(p, `${rel}${e.name}/`);
-      else if (e.isFile()) h.update(`${rel}${e.name}\0`).update(fs.readFileSync(p)).update('\0');
+      else if (e.isFile()) h.update(`${rel}${e.name}\0`).update(fsx.readFileSync(p)).update('\0');
     }
   };
-  walk(dir, '');
+  try { walk(dir, ''); } catch { return UNREADABLE; }
   return h.digest('hex');
 }
 
 // Skills (a folder with SKILL.md) found in two or more of `dirs`. Two paths that are one folder (a link) are not a duplicate.
-export function duplicateSkills(dirs) {
+export function duplicateSkills(dirs, fsx = fs) {
   const found = new Map();
   for (const d of dirs) {
     let names;
-    try { names = fs.readdirSync(d); } catch { continue; }
-    for (const name of names.filter((n) => SAFE_NAME.test(n) && fs.existsSync(j(d, n, 'SKILL.md')))) {
-      const real = fs.realpathSync(j(d, name));
+    try { names = fsx.readdirSync(d); } catch { continue; }
+    for (const name of names.filter((n) => SAFE_NAME.test(n) && fsx.existsSync(j(d, n, 'SKILL.md')))) {
+      let real;
+      try { real = fsx.realpathSync(j(d, name)); } catch { real = j(d, name); }
       const list = found.get(name) ?? [];
       if (!list.some((x) => x.real === real)) list.push({ dir: d, real });
       found.set(name, list);
     }
   }
   return [...found].filter(([, l]) => l.length > 1).sort(([a], [b]) => (a < b ? -1 : 1)).map(([name, l]) => {
-    const shas = l.map((x) => treeSha(j(x.dir, name)));
+    const shas = l.map((x) => treeSha(j(x.dir, name), fsx));
+    const unreadable = shas.includes(UNREADABLE);
     // The load order is not documented and OpenCode 1.19's log shows the "existing" copy changing per skill (#78), so no winner is claimed.
-    return { name, dirs: l.map((x) => x.dir), shas, differs: new Set(shas).size > 1, winner: 'unknown (load order)' };
+    return { name, dirs: l.map((x) => x.dir), shas, unreadable, differs: unreadable || new Set(shas).size > 1, winner: 'unknown (load order)' };
   });
 }

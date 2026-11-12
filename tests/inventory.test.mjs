@@ -141,3 +141,22 @@ test('duplicateSkills: a folder that is a link to the other is one copy', { skip
   fs.symlinkSync(path.join(h, '.agents', 'skills', 'linked'), path.join(h, '.claude', 'skills', 'linked'));
   assert.deepEqual(duplicateSkills(skillDirs('opencode-v2', h)), []);
 });
+
+test('launchOf: a Homebrew-style link is a fixed path, not an nvm link; the real path gives the version', () => {
+  const brew = fsx([], { '/opt/homebrew/bin/node': `${POSIX}/v24.15.0/bin/node` });
+  const l = launchOf(['/opt/homebrew/bin/node', 'cli.mjs'], { env: { NVM_DIR: '/h/.nvm' }, platform: 'linux', fsx: brew });
+  assert.equal(l.style, 'absolute');
+  assert.equal(l.nodeVersion, '24.15.0');
+  assert.equal(classify(l, 'context-mode').fragile, false);
+});
+
+test('duplicateSkills: an unreadable skill file gives the unreadable marker instead of throwing', () => {
+  const { h, put } = skillHome();
+  put('.agents', 'same', '# same');
+  put('.claude', 'same', '# same');
+  const real = { ...fs, readFileSync: (p, ...a) => { if (String(p).includes(`${path.sep}.claude${path.sep}`)) throw new Error('EACCES'); return fs.readFileSync(p, ...a); } };
+  const [d] = duplicateSkills(skillDirs('opencode-v2', h), real);
+  assert.deepEqual(d.shas.map((s) => s === 'unreadable'), [false, true]);
+  assert.equal(d.unreadable, true);
+  assert.equal(d.differs, true);
+});
