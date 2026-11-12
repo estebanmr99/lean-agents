@@ -71,4 +71,4 @@ jobs:
       - name: Publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish "dist/lean-agents-${GITHUB_REF_NAME#v}.tgz" --provenance --access public
+        run: npm publish "./dist/lean-agents-${GITHUB_REF_NAME#v}.tgz" --provenance --access public

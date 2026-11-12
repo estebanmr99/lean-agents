@@ -25,10 +25,10 @@ boot_run() {
   local d="$1"; shift
   mkdir -p "$work/cwd"
   rc=0
-  out="$(cd "$work/cwd" && cat "$boot" | LEAN_AGENTS_DIST="$d" bash -s -- "$@" 2>&1)" || rc=$?
+  out="$(cd "$work/cwd" && LEAN_AGENTS_DIST="$d" bash -s -- "$@" < "$boot" 2>&1)" || rc=$?
 }
 sha() { node -e 'const h=process.getBuiltinModule("node:crypto").createHash("sha256");h.update(process.getBuiltinModule("node:fs").readFileSync(process.argv[1]));console.log(h.digest("hex"))' "$1"; }
-tgz="$(cd "$dist" && ls lean-agents-*.tgz | head -n 1)"
+tgz="$(basename "$(find "$dist" -maxdepth 1 -name 'lean-agents-*.tgz' | head -n 1)")"
 src_stamp() { cat "$HOME/.config/lean-agents/src/.lean-agents-release"; }
 
 echo "--- (a) a scripts/lean.mjs in the current directory never runs"

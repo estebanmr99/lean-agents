@@ -157,6 +157,8 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           export HOME="$(mktemp -d)"
+          # npm ci (run by install.sh when node_modules is stale) writes its cache to $HOME/.npm; keep that out of the check.
+          export npm_config_cache="$RUNNER_TEMP/npm-cache"
           bash install.sh --dry-run --yes --no-exec --agents claude,opencode-v2 --all-tools --privacy strict --profile vertex-gemini
           test -z "$(ls -A "$HOME")"
       - name: With a terminal and stdin from /dev/null, the installer asks, then exits
@@ -215,7 +217,7 @@ jobs:
           grep -q '^package/node_modules/jsonc-parser/package.json$' dist/tgz.txt
           grep -q '^package/node_modules/@clack/prompts/package.json$' dist/tgz.txt
           if grep -qE '^package/(tests|docs|\.github)/' dist/tgz.txt; then echo 'tests, docs or .github in the tarball'; exit 1; fi
-          npm publish --dry-run "dist/lean-agents-$version.tgz"
+          npm publish --dry-run "./dist/lean-agents-$version.tgz"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: dist
