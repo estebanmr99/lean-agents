@@ -26,7 +26,7 @@ export function treeHash(dir) {
   return h.digest('hex');
 }
 
-export const SECRETS = ['relay-env-secret-123', 'relay-header-secret-456', 'hook-arg-secret-789'];
+export const SECRETS = ['relay-env-secret-123', 'relay-header-secret-456', 'hook-arg-secret-789']; // gitleaks:allow (fake values the tests assert are never printed)
 
 export async function seedHandbuilt(home, { old, neu, link, win = false }) {
   const bin = (n) => (win ? j(n.dir, 'node.exe') : j(n.dir, 'bin', 'node'));
