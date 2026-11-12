@@ -65,7 +65,7 @@ const REAL_HOME = os.homedir();
 function parseArgs(argv) {
   const o = {
     command: 'install', dryRun: false, yes: false, agents: null, tools: null, privacy: null, profile: null,
-    lang: null, home: os.homedir(), exec: true, adhdAlways: null, ponytailMode: null,
+    lang: null, home: os.homedir(), exec: true, adhdAlways: null, ponytailMode: null, shell: null,
     networkPreset: null, networkFlags: {}, gh: null, bun: null, terminals: null, app: true, core: true,
   };
   const list = (v) => v.split(',').map((s) => s.trim()).filter(Boolean);
@@ -102,6 +102,7 @@ function parseArgs(argv) {
       case '--project': o.project = fs.realpathSync(path.resolve(next())); break;
       case '--migrate': o.migrate = next(); if (o.migrate !== 'auto' && !MIGRATE_SOURCES.includes(o.migrate)) throw new Error(`unknown --migrate source "${o.migrate}" (available: ${[...MIGRATE_SOURCES, 'auto'].join(', ')})`); break;
       case '--no-exec': o.exec = false; break;
+      case '--shell': o.shell = next(); if (!['default', 'git-bash'].includes(o.shell)) throw new Error('--shell takes default or git-bash'); break;
       case '--adhd-always': o.adhdAlways = true; break;
       case '--ponytail-mode': o.ponytailMode = next(); break;
       case '--update': o.command = 'update'; break;
@@ -152,6 +153,8 @@ const HELP = `Usage: lean-agents [options]
                          Never moves or overwrites; MCP env and header values are not copied; hooks are only listed
   --adhd-always          Turn on i-have-adhd for every answer
   --ponytail-mode lite|full|ultra|off
+  --shell default|git-bash  OpenCode on Windows: set its shell to Git Bash when found (default: git-bash;
+                         never overwrites a shell you set yourself; "default" opts out)
   --update               Re-apply with your saved choices
   --uninstall            Undo everything lean-agents changed
   --doctor               Check the install
@@ -294,6 +297,8 @@ async function choose(o, saved) {
   if (o.profile === 'none') o.profile = null;
   if (o.tools.includes('i-have-adhd')) o.adhdAlways ??= saved?.adhdAlways ?? yesNo(await p.ask('Use i-have-adhd on every answer?', 'y'));
   if (o.tools.includes('ponytail')) o.ponytailMode ??= saved?.ponytailMode ?? (await p.select({ ask: 'Ponytail default mode (lite/full/ultra/off)?', message: 'Ponytail default mode', options: ['lite', 'full', 'ultra', 'off'].map((v) => ({ value: v })), def: 'lite' }));
+  // On by default, never asked: --shell default opts out.
+  o.shell ??= saved?.shell ?? 'git-bash';
   return p;
 }
 
@@ -536,7 +541,7 @@ async function install(o) {
     installedAt: previous?.installedAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     pins: pinVersions(),
-    options: o.migrate ? previous?.options ?? { migrateOnly: true, agents: o.agents, tools: [], privacy: o.privacy, network: o.network, gh: false, terminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false } : { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, gh: o.gh, terminals: o.terminals, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun },
+    options: o.migrate ? previous?.options ?? { migrateOnly: true, agents: o.agents, tools: [], privacy: o.privacy, network: o.network, gh: false, terminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false, shell: 'git-bash' } : { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, gh: o.gh, terminals: o.terminals, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun, shell: o.shell },
     ...(o.toolNode && { toolNode: { version: o.toolNode.version, installedByLean: !!o.toolNode.install || (previous?.toolNode?.version === o.toolNode.version && !!previous.toolNode.installedByLean) } }),
     files: [...(previous?.files ?? []), ...files],
     // A command that ran again replaces its earlier record, so --uninstall undoes it once.

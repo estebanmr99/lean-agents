@@ -107,12 +107,23 @@ function orcaWindowsCommands({ network, env, readEnv }) {
   return commands;
 }
 
+// Git Bash's bash.exe absolute path, found under the standard install folders; null off Windows or not found.
+// MSYSTEM alone (a shell started from Git Bash) carries no path, so it is not a source here.
+export function gitBashPath({ platform = process.platform, env = process.env } = {}) {
+  if (platform !== 'win32') return null;
+  const roots = [env.ProgramFiles, env['ProgramFiles(x86)'], env.LOCALAPPDATA && path.join(env.LOCALAPPDATA, 'Programs')];
+  for (const d of roots) {
+    if (!d) continue;
+    const p = path.join(d, 'Git', 'bin', 'bash.exe');
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
 // Git Bash on Windows: a shell started from it, or the standard install folders.
 function gitBashPresent({ platform, env }) {
   if (platform !== 'win32') return false;
-  if (env.MSYSTEM) return true;
-  const roots = [env.ProgramFiles, env['ProgramFiles(x86)'], env.LOCALAPPDATA && path.join(env.LOCALAPPDATA, 'Programs')];
-  return roots.some((d) => d && fs.existsSync(path.join(d, 'Git', 'bin', 'bash.exe')));
+  return Boolean(env.MSYSTEM) || Boolean(gitBashPath({ platform, env }));
 }
 
 // Which shell the agent will use on Windows, and what breaks without Git Bash. null off Windows.

@@ -65,14 +65,14 @@ Nunca leas, muestres ni guardes mis claves o tokens.
 | Agente | macOS | Linux | Windows | Reglas | Subagentes | Herramientas MCP | Job de CI con binario real |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Claude Code | VERIFY | ✅ | VERIFY | ✅ | ✅ | ✅ | `real-claude` |
-| OpenCode 1.x | VERIFY | ✅ | ✅ | ✅ | ✅ | ✅ | `real-opencode-v1`, `real-windows` |
-| OpenCode 2.x | VERIFY | ✅ | VERIFY | ✅ | ✅ | ✅ | `real-opencode` |
+| OpenCode 1.x | VERIFY | ✅ | ✅ | ✅ | ✅ | ✅ | `real-opencode-v1`, `real-windows`, `real-opencode-shell` |
+| OpenCode 2.x | VERIFY | ✅ | VERIFY | ✅ | ✅ | ✅ | `real-opencode`, `real-opencode-shell` |
 | Copilot CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `real-copilot`, `real-copilot-windows` |
 | Antigravity CLI | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ | `real-antigravity`, `real-antigravity-windows` |
 | VS Code Copilot | ✅ | ✅ | VERIFY | ⚠️ | ⚠️ | ✅ | `real-vscode` |
 | Cursor | VERIFY | ✅ | ✅ | ➖ (solo con `--project`) | ⚠️ | ✅ | `real-cursor`, `real-cursor-windows` |
 
-En Windows, los agentes funcionan mejor con Git Bash instalado (RTK y los comandos estilo bash lo necesitan); el resumen de la instalación y `--doctor` te dicen qué shell se encontró y qué hacer si falta.
+En Windows, los agentes funcionan mejor con Git Bash instalado (RTK y los comandos estilo bash lo necesitan); el resumen de la instalación y `--doctor` te dicen qué shell se encontró y qué hacer si falta. Para OpenCode, lean-agents también pone su clave `shell` en Git Bash cuando lo encuentra, así la herramienta bash corre ahí por defecto (`--shell default` lo desactiva; un `shell` que ya hayas puesto se conserva).
 
 ✅ un job de CI ejecuta el binario real en ese sistema (columnas de sistema) o lean-agents lo escribe (columnas de función) · ⚠️ escrito, carga sin comprobar · ➖ no disponible · VERIFY aún sin comprobar. Archivos por agente y fechas de verificación: [docs/compatibility.md](docs/compatibility.md).
 
