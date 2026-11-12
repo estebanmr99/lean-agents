@@ -5,7 +5,7 @@ import { sha } from './fsops.mjs';
 import { PINS, npmSpec, behindPins, nodeRange } from './pins.mjs';
 import { version, quiet } from './system.mjs';
 import { satisfies, nodeSkipLine } from './node-runtime.mjs';
-import { stillNeeded } from './terminals.mjs';
+import { stillNeeded, shellNotice } from './terminals.mjs';
 import { adhdSkillFiles } from './adhd.mjs';
 import { proxyReport, childEnv, fromPrivacy } from './network.mjs';
 import { leftovers } from './parallel.mjs';
@@ -78,6 +78,8 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
     add('lean-agents', 'ok', `v${state.version}, agents: ${o.agents.join(', ')}, privacy: ${o.privacy}`);
     if (nodeNote) add('context-mode', 'note', nodeNote);
     if (o.agents.includes('opencode-v1')) add('OpenCode 1.x: supported; lean-agents will not upgrade it', 'ok');
+    const shell = shellNotice();
+    if (shell) add('shell', shell.ok ? 'ok' : 'note', shell.text);
     if (o.terminals?.length) add('terminals', 'ok', `integrations for ${o.terminals.join(', ')} (commands listed below; app settings are yours)`);
     for (const t of stillNeeded({ home, terminals: o.terminals ?? [], agents: o.agents, exec })) {
       add('still needed', t.check?.() ? 'ok' : 'note', t.text);

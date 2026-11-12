@@ -12,7 +12,7 @@ import { diffModels } from '../scripts/models-refresh.mjs';
 import { releaseNotes } from '../scripts/release.mjs';
 import { prereqFor, antigravityPrereqs, bunInstall } from '../scripts/lib/system.mjs';
 import { doctor } from '../scripts/lib/doctor.mjs';
-import { detectTerminals, terminalCommands, gitBashActions, stillNeeded } from '../scripts/lib/terminals.mjs';
+import { detectTerminals, terminalCommands, gitBashActions, stillNeeded, shellNotice } from '../scripts/lib/terminals.mjs';
 import { vscodeUserDir } from '../scripts/lib/adapters/vscode-copilot.mjs';
 import { npmSpec, PINS } from '../scripts/lib/pins.mjs';
 
@@ -1084,6 +1084,17 @@ test('Orca on Windows: skill for Cursor and VS Code Copilot, telemetry and NO_PR
   const away = terminalCommands({ ...win, network: { telemetry: 'off' }, env: proxied, system: false, readEnv: rd(null) });
   assert.deepEqual(away.filter((c) => /powershell/.test(text(c))), [], '--home never touches the machine');
   assert.deepEqual(terminalCommands({ ...win, platform: 'darwin', network: { telemetry: 'off' }, env: proxied, readEnv: rd(null) }).filter((c) => /powershell/.test(text(c))), []);
+});
+
+test('shellNotice: Git Bash present, missing, and non-Windows', () => {
+  assert.equal(shellNotice({ platform: 'linux', env: { MSYSTEM: 'MINGW64' } }), null);
+  assert.equal(shellNotice({ platform: 'darwin', env: {} }), null);
+  const ok = shellNotice({ platform: 'win32', env: { MSYSTEM: 'MINGW64' } });
+  assert.equal(ok.ok, true);
+  assert.match(ok.text, /Git Bash found/);
+  const bad = shellNotice({ platform: 'win32', env: {} });
+  assert.equal(bad.ok, false);
+  assert.match(bad.text, /RTK.*more tokens.*winget install Git\.Git/s);
 });
 
 test('Git Bash: marked .bashrc block with the Cursor aliases and loopback NO_PROXY, undone byte for byte', () => {

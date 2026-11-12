@@ -34,6 +34,8 @@ npx lean-agents@latest --dry-run
 | VS Code Copilot | ✅ | ✅ | VERIFY | ⚠️ | ⚠️ | ✅ | `real-vscode` |
 | Cursor | VERIFY | ✅ | ✅ | ➖ (solo con `--project`) | ⚠️ | ✅ | `real-cursor`, `real-cursor-windows` |
 
+En Windows, los agentes funcionan mejor con Git Bash instalado (RTK y los comandos estilo bash lo necesitan); el resumen de la instalación y `--doctor` te dicen qué shell se encontró y qué hacer si falta.
+
 ✅ un job de CI ejecuta el binario real en ese sistema (columnas de sistema) o lean-agents lo escribe (columnas de función) · ⚠️ escrito, carga sin comprobar · ➖ no disponible · VERIFY aún sin comprobar. Archivos por agente y fechas de verificación: [docs/compatibility.md](docs/compatibility.md).
 
 ## De un vistazo

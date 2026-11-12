@@ -4,6 +4,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Added
+
+- Windows shell notice (#124): the install summary and `--doctor` say whether Git Bash was found, and when it is missing, that RTK rewrites and bash-style commands fail or fall back, output is not compressed (more tokens) and the rules' POSIX examples do not apply, with `winget install Git.Git` as the fix. Nothing is shown off Windows. Setting OpenCode's `shell` to Git Bash is not done yet: upstream behaviour on Windows is unproven (`docs/compatibility.md`).
+
 ### Changed
 
 - Install from a verified release, and from npm (#65, #46; S1, S2, S3, N4): `install.sh` and `install.ps1` download the latest release's `lean-agents-<version>.tgz`, check its SHA256 against the release's `SHA256SUMS`, and only then extract it to `~/.config/lean-agents/src` (dependencies are bundled from `package-lock.json`, so there is no `npm ci` and a changed lockfile always reinstalls). The old git clone there is replaced; a folder that is not a lean-agents install is refused. A `scripts/lean.mjs` in the current directory never runs when the script is piped into bash. With an install in place, `--dry-run`, `--doctor` and `--uninstall` (without `--update`) use no network; a `--dry-run` without an install runs from a temp folder and leaves HOME untouched. The package is ready for `npx lean-agents@latest` (`files`, bundled dependencies, `repository`); `release.yml` builds the tarball and `SHA256SUMS` and, once the owner enables it, publishes to npm with provenance. `lean-agents --version` prints the version. New `package` CI job (ubuntu, macos, windows: `npx` from the packed tarball, dry run, install, `--doctor`, `--uninstall`) and `real-bootstrap.sh` / `.ps1`.
