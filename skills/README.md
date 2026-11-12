@@ -7,5 +7,6 @@ Original skills shipped by lean-agents, in the Agent Skills format:
 - `update-models`: keeps your tier-to-model mapping on the latest good models.
 - `lean-update`: updates a lean-agents install (with or without the script): table of installed vs pinned, backup, ask first, optional issue draft. The engine installs it for every agent.
 - `parallel-sessions`: coordinator playbook for one agent per task in its own git worktree (helper: `scripts/parallel.mjs`).
+- `coordinate` (opt-in, `--tools coordinate`): coordinator playbook with a session-prompt template and a worker watcher script (`docs/agent-workflow.md`).
 
 Install with `npx skills add estebanmr99/lean-agents`.

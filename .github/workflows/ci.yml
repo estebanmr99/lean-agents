@@ -463,6 +463,24 @@ jobs:
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - run: bash tests/real-parallel.sh
 
+  real-coord-watch:
+    # The coordinate skill's watcher, copied out of the repo, in a throwaway git repo and HOME against fake worker transcripts.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["ubuntu-latest","macos-latest"]') }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
+      - run: bash tests/real-coord-watch.sh
+
   real-claude:
     # Real Claude Code, throwaway HOME, no login: MCP servers go through the claude CLI.
     needs: changes
