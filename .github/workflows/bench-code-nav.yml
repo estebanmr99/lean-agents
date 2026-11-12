@@ -1,0 +1,83 @@
+name: Bench code nav
+
+# Session 130 (#130): codebase-memory-mcp vs Serena, over MCP stdio, no model login. Slow, so manual only:
+# never on pull requests and not part of ci.yml or ci-latest.yml. Run it with `gh workflow run bench-code-nav.yml --ref <branch>`.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: 24
+  UV_VERSION: 0.13.5
+
+jobs:
+  bench:
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # the medium repo is this one at a pinned commit
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Throwaway HOME
+        run: |
+          home="$(mktemp -d)"
+          echo "HOME=$home" >> "$GITHUB_ENV"
+          if [ "$RUNNER_OS" = Windows ]; then
+            win="$(cygpath -w "$home")"
+            { echo "USERPROFILE=$win"; echo "BENCH_HOME=$win\\bench"; } >> "$GITHUB_ENV"
+          else
+            echo "BENCH_HOME=$home/bench" >> "$GITHUB_ENV"
+          fi
+      - name: Install uv (pinned, in a venv)
+        run: |
+          py=python3
+          if [ "$RUNNER_OS" = Windows ]; then py=python; fi
+          "$py" -m venv "$RUNNER_TEMP/uvenv"
+          if [ "$RUNNER_OS" = Windows ]; then bin="$RUNNER_TEMP/uvenv/Scripts"; else bin="$RUNNER_TEMP/uvenv/bin"; fi
+          "$bin/python" -m pip install --quiet "uv==$UV_VERSION"
+          if [ "$RUNNER_OS" = Windows ]; then cygpath -w "$bin" >> "$GITHUB_PATH"; else echo "$bin" >> "$GITHUB_PATH"; fi
+          "$bin/uvx" --version
+      - name: Install codebase-memory-mcp (pinned release, SHA256 checked, binary only)
+        run: |
+          mkdir -p "$HOME/cbm-bin"
+          case "$RUNNER_OS" in
+            Linux) bash scripts/ci-download.sh cbm-linux-amd64 "$RUNNER_TEMP/cbm.tgz"; tar -xzf "$RUNNER_TEMP/cbm.tgz" -C "$HOME/cbm-bin"; exe="$HOME/cbm-bin/codebase-memory-mcp" ;;
+            macOS) bash scripts/ci-download.sh cbm-darwin-arm64 "$RUNNER_TEMP/cbm.tgz"; tar -xzf "$RUNNER_TEMP/cbm.tgz" -C "$HOME/cbm-bin"; exe="$HOME/cbm-bin/codebase-memory-mcp" ;;
+            Windows)
+              bash scripts/ci-download.sh cbm-windows-amd64 "$RUNNER_TEMP/cbm.zip"
+              CBM_ZIP="$(cygpath -w "$RUNNER_TEMP/cbm.zip")" CBM_DIR="$(cygpath -w "$HOME/cbm-bin")" powershell -NoProfile -Command 'Expand-Archive -Force -LiteralPath $env:CBM_ZIP -DestinationPath $env:CBM_DIR'
+              exe="$(cygpath -w "$HOME/cbm-bin/codebase-memory-mcp.exe")" ;;
+          esac
+          echo "CBM_BIN=$exe" >> "$GITHUB_ENV"
+          ls -la "$HOME/cbm-bin"
+      - name: Bench, undo check (Git Bash on Windows)
+        run: node tests/bench-code-nav.mjs --home "$BENCH_HOME" --out "$BENCH_HOME/out" --check-uninstall
+      - name: Bench, PowerShell launch (Windows only; medium repo)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: node tests/bench-code-nav.mjs --home "${env:BENCH_HOME}-ps" --out "${env:BENCH_HOME}-ps\out" --repo medium --server cbm,serena-tools
+      - name: Collect results
+        if: always()
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/bench-artifacts"
+          cp "$BENCH_HOME"/out/bench-* "$GITHUB_WORKSPACE/bench-artifacts/" || true
+          if [ "$RUNNER_OS" = Windows ]; then for f in "$BENCH_HOME"-ps/out/bench-*; do cp "$f" "$GITHUB_WORKSPACE/bench-artifacts/powershell-$(basename "$f")" || true; done; fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: bench-code-nav-${{ matrix.os }}
+          path: bench-artifacts
+          if-no-files-found: error

@@ -31,6 +31,24 @@
     "sha256": "cd2c0fccc78f3ede1f50ca827a15f063eda13d4d150a3d0674f4f6e323d864a5",
     "checked": "2026-11-10"
   },
+  "cbm-linux-amd64": {
+    "url": "https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.12.1/codebase-memory-mcp-linux-amd64.tar.gz",
+    "sha256": "8453015145f072c1b9b019cbdd02cea8cc6f18cc5e116036dd20992631c638c7",
+    "checked": "2026-11-12",
+    "version": "v0.12.1"
+  },
+  "cbm-darwin-arm64": {
+    "url": "https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.12.1/codebase-memory-mcp-darwin-arm64.tar.gz",
+    "sha256": "9bfcbe38414b47969a3e1d1c1999f5357409387c86fa3d24221b5458267660d2",
+    "checked": "2026-11-12",
+    "version": "v0.12.1"
+  },
+  "cbm-windows-amd64": {
+    "url": "https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.12.1/codebase-memory-mcp-windows-amd64.zip",
+    "sha256": "4e4e0f16b45233af5c757a1fcbe3c3b16e9056375b1fbe2ce020b6de75dedcc0",
+    "checked": "2026-11-12",
+    "version": "v0.12.1"
+  },
   "nvm-sh": {
     "url": "https://raw.githubusercontent.com/nvm-sh/nvm/v0.41.0/nvm.sh",
     "sha256": "e7ffd3d192735da61e5eb04e68f1aca4a293af4cd0000864568d6de7aa8f6fc4",
