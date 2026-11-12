@@ -26,7 +26,7 @@ import { copilotUsage } from './lib/copilot-usage.mjs';
 import { draftIssue } from './lib/feedback.mjs';
 import { pinVersions, behindPins, pinTool, nodeRange, npmSpec } from './lib/pins.mjs';
 import { findNvm, resolveToolNodes, nvmLatest, nvmInstallArgv, nvmEnv, toolEnv } from './lib/node-runtime.mjs';
-import { leanUpdateCommands } from './lib/lean-update.mjs';
+import { leanUpdateCommands, coordinateCommands } from './lib/lean-update.mjs';
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
 import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
 import { unverifiedItems, notesFile } from './lib/unverified.mjs';
@@ -43,7 +43,7 @@ const EXTENSION_NOTE = 'install the Playwright Extension yourself from https://c
 const MINIMAL_TOOLS = ['rtk', 'context-mode'];
 const OPTIONAL_TOOLS = ['serena', 'playwright', 'ponytail', 'caveman', 'i-have-adhd', 'dcp', 'codeburn', 'copilot-usage'];
 // Asked for one by one and never part of --all-tools.
-const OPT_IN_TOOLS = ['gsd', 'autoskills', 'playwright-extension'];
+const OPT_IN_TOOLS = ['gsd', 'autoskills', 'playwright-extension', 'coordinate'];
 const TOOL_INFO = {
   serena: 'Serena MCP: symbol-level code navigation, so agents read less code',
   playwright: 'Playwright MCP: lets agents drive a browser to check web UIs',
@@ -55,6 +55,7 @@ const TOOL_INFO = {
   codeburn: 'Codeburn: usage and cost report across agents, run with npx',
   'copilot-usage': 'Copilot usage: credits left in the OpenCode sidebar and /copilot-usage, read with gh, no model request (needs gh login; off with --outbound off)',
   gsd: 'GSD Core: spec-driven workflow skills and agents (large install)',
+  coordinate: 'Coordinate skill: playbook, session prompt and watcher to run several agents in separate git worktrees',
   autoskills: 'AutoSkills: picks skills per project, run with npx (CC BY-NC 4.0: non-commercial use only)',
 };
 
@@ -374,6 +375,7 @@ function buildPlan(o) {
     commands.push(...r.commands.map((c) => ({ ...c, agent })));
   }
   commands.push(...leanUpdateCommands(o.agents));
+  if (o.tools.includes('coordinate')) commands.push(...coordinateCommands(o.agents));
   commands.push(...terminalCommands({ terminals: o.terminals, agents: o.agents, network: o.network, system: o.home === REAL_HOME }));
   actions.push(...gitBashActions({ home: o.home, terminals: o.terminals, agents: o.agents }));
   if (o.tools.includes('gsd')) {

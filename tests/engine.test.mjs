@@ -1219,6 +1219,22 @@ test('--uninstall removes the lean-update skill', { skip: process.platform === '
   assert.match(fs.readFileSync(log, 'utf8'), /skills@\d[\d.]* remove lean-update -g -y/);
 });
 
+test('the coordinate skill is opt-in: not by default, not with --all-tools, installed when selected, removed by --uninstall', { skip: process.platform === 'win32' }, () => {
+  const plan = (args) => lean(fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-')), ['--yes', '--no-exec', '--dry-run', '--agents', 'claude', '--lang', 'en', '--profile', 'none', ...args]);
+  assert.doesNotMatch(plan(['--tools', 'rtk']), /--skill coordinate/);
+  assert.doesNotMatch(plan(['--all-tools']), /--skill coordinate/);
+  assert.match(plan(['--tools', 'coordinate']), /skills@\d[\d.]* add \S+ --skill coordinate -a claude-code -g -y/);
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-bin-'));
+  const log = path.join(bin, 'npx.log');
+  fs.writeFileSync(path.join(bin, 'npx'), `#!/bin/sh\necho "$@" >> "${log}"\n`, { mode: 0o755 });
+  const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` };
+  lean(home, ['--yes', '--agents', 'claude', '--tools', 'coordinate', '--no-core', '--no-gh', '--no-bun', '--lang', 'en', '--profile', 'none'], env);
+  assert.match(fs.readFileSync(log, 'utf8'), /--skill coordinate -a claude-code/);
+  lean(home, ['--uninstall', '--yes'], env);
+  assert.match(fs.readFileSync(log, 'utf8'), /skills@\d[\d.]* remove coordinate -g -y/);
+});
+
 test('--update prints old -> new for pins in use; --doctor --json lists them under behind', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
   lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--tools', 'caveman', '--lang', 'en', '--profile', 'none']);

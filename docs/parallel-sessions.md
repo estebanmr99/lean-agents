@@ -1,6 +1,6 @@
 # Parallel agent sessions
 
-`scripts/parallel.mjs` runs one worker agent per task, each in its own git worktree, and merges them one at a time. The coordinator playbook is the `parallel-sessions` skill.
+`scripts/parallel.mjs` runs one worker agent per task, each in its own git worktree, and merges them one at a time. The coordinator playbook is the `parallel-sessions` skill. For the hands-on method (session prompts, a watcher, one PR at a time) see [agent-workflow](agent-workflow.md).
 
 ## Task file
 

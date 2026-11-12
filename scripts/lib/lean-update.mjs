@@ -15,13 +15,15 @@ const SKILLS_AGENT = {
 // CI installs the skill from the checkout (LEAN_AGENTS_SKILL_SOURCE) because the pinned release tag does not exist before release.
 const source = () => process.env.LEAN_AGENTS_SKILL_SOURCE || skillSource('lean-update');
 
-export function leanUpdateCommands(agents) {
-  return [...new Set(agents.map((a) => SKILLS_AGENT[a]).filter(Boolean))].map((flag) => ({
-    tool: 'lean-update',
-    optional: true, // the pinned tag may not exist yet (before a release); the rest of the install still stands
-    desc: `lean-update skill for ${flag}`,
-    run: [['npx', '-y', skillsCli(), 'add', source(), '--skill', 'lean-update', '-a', flag, '-g', '-y']],
-    // Without -a: `remove -a` keeps ~/.agents/skills while another detected agent may share that folder.
-    undo: [['npx', '-y', skillsCli(), 'remove', 'lean-update', '-g', '-y']],
-  }));
-}
+// Same repo and tag for every skill this repo ships; `coordinate` is opt-in, lean-update is always installed.
+const skillCommands = (skill, agents) => [...new Set(agents.map((a) => SKILLS_AGENT[a]).filter(Boolean))].map((flag) => ({
+  tool: skill,
+  optional: true, // the pinned tag may not exist yet (before a release); the rest of the install still stands
+  desc: `${skill} skill for ${flag}`,
+  run: [['npx', '-y', skillsCli(), 'add', source(), '--skill', skill, '-a', flag, '-g', '-y']],
+  // Without -a: `remove -a` keeps ~/.agents/skills while another detected agent may share that folder.
+  undo: [['npx', '-y', skillsCli(), 'remove', skill, '-g', '-y']],
+}));
+
+export const leanUpdateCommands = (agents) => skillCommands('lean-update', agents);
+export const coordinateCommands = (agents) => skillCommands('coordinate', agents);
