@@ -14,7 +14,7 @@ $flags = @{ Yes = $true; Agents = 'claude'; NoTools = $true; Privacy = 'standard
 
 function Fail($Message) { throw "FAIL: $Message" }
 function Sha($Path) { (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLower() }
-function New-TempProfile {
+function Initialize-TempProfile {
   $script:dir = Join-Path $work ([guid]::NewGuid().ToString())
   New-Item -ItemType Directory -Path $script:dir | Out-Null
   $env:USERPROFILE = $script:dir
@@ -37,7 +37,7 @@ function Get-Stamp { (Get-Content (& $stampPath) -Raw).Trim() }
 
 try {
   Write-Output '--- (a) a scripts\lean.mjs in the current directory never runs'
-  New-TempProfile
+  Initialize-TempProfile
   New-Item -ItemType Directory -Force -Path "$work\cwd\scripts" | Out-Null
   Set-Content "$work\cwd\scripts\lean.mjs" "require('node:fs').writeFileSync(process.env.USERPROFILE + '/planted-ran', '1')"
   Invoke-Boot $Dist (Merge @{ DryRun = $true })
@@ -46,13 +46,13 @@ try {
   Remove-Item -Recurse -Force "$work\cwd"
 
   Write-Output '--- (b) a dry run without an install leaves USERPROFILE empty'
-  New-TempProfile
+  Initialize-TempProfile
   Invoke-Boot $Dist (Merge @{ DryRun = $true })
   if ($rc -ne 0) { Fail "dry run failed: $out" }
   if (@(Get-ChildItem -Force $dir).Count -ne 0) { Fail "dry run wrote: $((Get-ChildItem -Force $dir).Name)" }
 
   Write-Output '--- (c) install writes the stamp; the rerun says already installed'
-  New-TempProfile
+  Initialize-TempProfile
   Invoke-Boot $Dist (Merge @{})
   if ($rc -ne 0) { Fail "install failed: $out" }
   if ((Get-Stamp) -ne (Sha (Join-Path $Dist $tgz))) { Fail 'stamp is not the tarball sha256' }
@@ -68,7 +68,7 @@ try {
   if ($rc -ne 0) { Fail "offline uninstall failed: $out" }
 
   Write-Output '--- (e) a repacked tarball with new SHA256SUMS reinstalls'
-  New-TempProfile
+  Initialize-TempProfile
   Invoke-Boot $Dist (Merge @{})
   if ($rc -ne 0) { Fail "install failed: $out" }
   $old = Get-Stamp
@@ -94,12 +94,12 @@ try {
   if ((Get-Stamp) -ne $before -or (Test-Path "$env:USERPROFILE\.config\lean-agents\src.new")) { Fail 'src changed after a bad checksum' }
 
   Write-Output '--- (g) LEAN_AGENTS_DIST prints a warning'
-  New-TempProfile
+  Initialize-TempProfile
   Invoke-Boot $Dist (Merge @{ DryRun = $true })
   if ($out -notmatch 'LEAN_AGENTS_DIST is set') { Fail "no override warning: $out" }
 
   Write-Output '--- (h) a foreign src folder is refused'
-  New-TempProfile
+  Initialize-TempProfile
   New-Item -ItemType Directory -Force -Path "$dir\.config\lean-agents\src" | Out-Null
   Set-Content "$dir\.config\lean-agents\src\keep" 'keep'
   Invoke-Boot $Dist (Merge @{})
@@ -107,7 +107,7 @@ try {
   if ((Get-Content "$dir\.config\lean-agents\src\keep" -Raw).Trim() -ne 'keep') { Fail 'foreign src was modified' }
 
   Write-Output '--- (i) a git clone in src is replaced only when clean'
-  New-TempProfile
+  Initialize-TempProfile
   $srcdir = "$dir\.config\lean-agents\src"
   New-Item -ItemType Directory -Force -Path "$srcdir\scripts" | Out-Null
   Set-Content "$srcdir\scripts\lean.mjs" '// old'
@@ -121,7 +121,7 @@ try {
   if ($rc -ne 0 -or (Test-Path "$srcdir\.git") -or -not (Test-Path "$srcdir\.lean-agents-release")) { Fail "clean clone was not replaced: $rc $out" }
 
   Write-Output '--- (j) a checkout reinstalls its dependencies when package-lock.json changes'
-  New-TempProfile
+  Initialize-TempProfile
   $co = Join-Path $work 'checkout'
   New-Item -ItemType Directory -Path $co | Out-Null
   foreach ($item in 'scripts', 'core', 'profiles', 'package.json', 'package-lock.json', 'install.ps1') { Copy-Item -Recurse (Join-Path $repo $item) $co }

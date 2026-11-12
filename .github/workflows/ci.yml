@@ -265,7 +265,7 @@ jobs:
           test -n "$(ls -A "$t/h")"
           lean --doctor --home "$t/h" --no-exec
           lean --uninstall --yes --home "$t/h" --no-exec
-          test -z "$(find "$t/h" -type f -not -path "$t/h/.config/lean-agents/*")"
+          test -z "$(find "$t/h" -type f -not -path "*/.config/lean-agents/*")"
       - name: Bootstrap install.sh against the release files
         run: bash tests/real-bootstrap.sh dist
       - name: Bootstrap install.ps1 on PowerShell 5.1
