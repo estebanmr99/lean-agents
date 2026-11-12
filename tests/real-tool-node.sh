@@ -167,6 +167,39 @@ if (!s || !s.differs || s.winner !== 'unknown (load order)') bad.push('dup-demo 
 if (bad.length) { console.log('FAIL ' + bad.join('; ')); process.exit(1); }
 " "$T/doctor.json" || fail "the doctor rows are wrong (see above)"
 
+echo "--- --adopt --json on a hand-built HOME classifies it and writes nothing (#106)"
+fixture="$repo/tests/fixtures/handbuilt.mjs"
+seed_win=posix
+if [ "$os" = windows ]; then seed_win=win; fi
+seed_json="$(node "$fixture" "$home" "$(native "$versions/v22.20.0")" 22.20.0 "$(native "$n24")" "$(basename "$n24" | cut -c2-)" "$(native "$link")" "$seed_win")"
+echo "seeded: $seed_json"
+out="$(mktemp -d)" # outside HOME, which is hashed
+hash_before="$(node "$fixture" hash "$home")"
+lean --adopt --json --no-exec > "$out/adopt.json" 2> "$out/adopt.err" || { cat "$out/adopt.err"; fail "--adopt --json failed"; }
+lean --adopt --no-exec > "$out/adopt.txt" || fail "--adopt failed"
+hash_after="$(node "$fixture" hash "$home")"
+[ "$hash_before" = "$hash_after" ] || fail "--adopt changed the HOME tree"
+node -e "
+const r = JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'));
+const seed = JSON.parse(process.argv[2]);
+console.log(JSON.stringify({ toolNode: r.toolNode, opencode: r.opencode, plan: r.plan, stopgaps: r.stopgaps }, null, 2));
+const f = (kind, name, client) => r.items.find((i) => i.kind === kind && i.name === name && (!client || i.client === client));
+const bad = [];
+if (r.version !== 1) bad.push('version');
+if (!f('mcp', 'context-mode', 'claude')?.status.includes('wrong-node')) bad.push('bare npx MCP is not wrong-node');
+if (f('mcp', 'ctx-link')?.launch.style !== 'symlink') bad.push('ctx-link is not a symlink launch');
+if (f('mcp', 'relay')?.owner !== 'user' || f('mcp', 'relay').action !== 'keep') bad.push('relay is not a kept user MCP');
+if (!f('plugin', 'ghost@nowhere')?.status.includes('stale')) bad.push('no stale enabledPlugins');
+if (f('plugin', 'plugins/rtk.ts')?.owner !== 'user') bad.push('rtk.ts is not a user plugin');
+if (r.items.filter((i) => i.kind === 'skill' && i.name === 'dup-demo' && i.status.includes('duplicate')).length !== 2) bad.push('duplicate skill');
+if (r.items.filter((i) => i.kind === 'npm' && i.status.includes('duplicate')).length !== 2) bad.push('npm copies are not both duplicates');
+if (r.toolNode.source !== 'reuse' || !/^24\./.test(r.toolNode.version)) bad.push('tool Node is not the installed Node 24');
+if (!r.stopgaps.length) bad.push('no stopgaps');
+if (seed.sessions !== null && r.opencode.sessions !== seed.sessions) bad.push('session count ' + r.opencode.sessions);
+if (JSON.stringify(r).includes('relay-env-secret') || JSON.stringify(r).includes('relay-header-secret') || JSON.stringify(r).includes('hook-arg-secret')) bad.push('secret in output');
+if (bad.length) { console.log('FAIL ' + bad.join('; ')); process.exit(1); }
+" "$out/adopt.json" "$seed_json" || fail "the --adopt report is wrong (see above)"
+
 echo "--- no nvm: the skip line, and no context-mode key"
 if [ "$os" = linux ]; then export NVM_DIR="$T/no-nvm"; else unset NVM_HOME; fi
 rm -rf "$HOME/.config" "$HOME/.cursor"
