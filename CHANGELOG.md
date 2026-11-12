@@ -7,6 +7,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ### Added
 
 - Multi-agent coordinator workflow (#60): `docs/agent-workflow.md` (roles, plan-first session prompts, model tiers, at most two workers, sandbox-first CI fixes, one-at-a-time merges, limit recovery) and an opt-in `coordinate` skill (`--tools coordinate`, never in `--all-tools`, removed by `--uninstall`) that ships a session-prompt template and `coord-watch.sh`, a bash watcher that exits with why a worker needs you (plan written, PR URL, question, limit, error, turn ended) from a transcript file or a terminal read command. New `real-coord-watch` CI job (ubuntu, macos).
+- `real-opencode-shell` CI job (#124 follow-up, windows-latest, OpenCode 1.19.0 and 2.2.5): a local mock OpenAI-compatible LLM (`tests/fixtures/mock-llm.mjs`) drives one bash/shell tool call with no login and no paid model, so `tests/real-opencode-shell.ps1` can print which shell actually ran it for `shell` absent, `shell` = an absolute Git Bash path (with Git off PATH), and `shell` = `powershell.exe`. Spike only: no default is shipped from this yet (see `docs/compatibility.md`).
 
 ## [0.7.0] - 2026-11-12
 

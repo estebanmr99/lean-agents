@@ -434,6 +434,45 @@ jobs:
       - name: Install lean-agents and check what OpenCode resolved
         run: bash tests/real-opencode-v1.sh
 
+  real-opencode-shell:
+    # Spike for issue #124 follow-up: does OpenCode's `shell` config key govern the Windows bash/shell
+    # tool? Real binary, throwaway USERPROFILE, a local mock LLM (tests/fixtures/mock-llm.mjs), no login
+    # and no paid model. Prints the resolved shell per case for both majors; fails only if an absolute
+    # Git Bash path in `shell` does not select Git Bash.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 15
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        major: [v1, v2]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
+      - run: npm ci
+      - name: Install OpenCode 1.19
+        if: matrix.major == 'v1'
+        shell: pwsh
+        run: |
+          npm install -g opencode-ai@1.19.0
+          if ($LASTEXITCODE -ne 0) { throw 'npm install opencode-ai failed' }
+      - name: Install OpenCode 2
+        if: matrix.major == 'v2'
+        shell: bash
+        run: |
+          bash scripts/ci-install-opencode-v2.sh
+          echo "$USERPROFILE/.opencode/bin" >> "$GITHUB_PATH"
+      - name: Probe the shell the bash/shell tool uses
+        shell: pwsh
+        run: ./tests/real-opencode-shell.ps1 -Major ${{ matrix.major }}
+
   real-parallel:
     # Real git worktrees in a throwaway repo and HOME; real Claude Code and OpenCode only get their flags checked.
     # The Orca path stays VERIFY until a job installs Orca.
