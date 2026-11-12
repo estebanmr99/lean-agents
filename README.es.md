@@ -342,7 +342,7 @@ Si tu empresa paga GitHub Copilot, la forma oficial de usar Claude como agente e
 | Nivel | Qué incluye | Por defecto |
 | --- | --- | --- |
 | Mínimo | Reglas, subagentes por costo, compactación, límites de salida, RTK, Context Mode | Siempre; `--no-core` (`-NoCore` en PowerShell) deja fuera RTK y Context Mode |
-| Herramientas opcionales | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0), Codeburn | Se pregunta una por una |
+| Herramientas opcionales | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0), Codeburn, Copilot usage (créditos restantes en OpenCode, leídos con `gh`; `lean-agents --usage` los imprime) | Se pregunta una por una |
 | Herramientas por elección | GSD Core, AutoSkills (CC BY-NC 4.0: solo uso no comercial) | Se pregunta una por una, nunca en `--all-tools` |
 | Privacidad estricta | Sin telemetría, sin auto updates, sin compartir sesiones, sin proveedores que entrenan con tus prompts | Apagado, se activa con `--privacy strict` |
 | Preset de red | Todo apagado (PC de trabajo), todo encendido, o por categoría: telemetría, auto updates, otras salidas. Apagado solo cambia interruptores: las descargas de la instalación y las herramientas elegidas no se bloquean ([privacy.md](docs/privacy.md#what-each-preset-does-not-block)) | Todo encendido; `--network off` (igual que `--privacy strict`) o `--telemetry`, `--auto-update`, `--outbound` |

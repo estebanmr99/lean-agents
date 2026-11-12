@@ -3,7 +3,7 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { OWNED_MARK } from '../fsops.mjs';
 import { tierFor, modelFor } from '../render.mjs';
 import { configHome } from '../system.mjs';
@@ -80,6 +80,13 @@ export function opencodeShared({ home, dir, core, profile, opts }) {
   const commands = [];
   if (tools.includes('ponytail')) {
     actions.push({ kind: 'json', path: ponytailConfig(home), edits: [{ path: ['defaultMode'], value: opts.ponytailMode, mode: 'setIfAbsent' }] });
+  }
+  if (tools.includes('copilot-usage')) {
+    // Own folder, so the hand-made copilot-usage-tui is never touched. tui.json loads it as a TUI plugin.
+    const file = path.join(dir, 'plugins', 'lean-copilot-usage', 'tui.js');
+    const source = fs.readFileSync(fileURLToPath(new URL('../../../core/copilot-usage-tui.js', import.meta.url)), 'utf8');
+    actions.push({ kind: 'file', path: file, content: `// ${OWNED_MARK}\n${source}` });
+    actions.push({ kind: 'json', path: path.join(dir, 'tui.json'), edits: [{ path: ['plugin'], value: pathToFileURL(file).href, mode: 'arrayAdd' }] });
   }
   for (const agent of core.agents) {
     actions.push({ kind: 'file', path: path.join(dir, 'agents', `${agent.name}.md`), content: renderOpenCodeAgent(agent, profile) });
