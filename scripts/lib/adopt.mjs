@@ -128,7 +128,9 @@ export async function inventory({ home, env = process.env, platform = process.pl
     try { target = spec.startsWith('file://') ? fileURLToPath(spec) : null; } catch { /* not a local file URL */ }
     if (target && !fsx.existsSync(target)) status.push('stale');
     if (/context-mode/.test(spec) && names.has('opencode\0context-mode')) status.push('duplicate'); // plugin and MCP; the MCP row gets the same mark below
-    add({ client: 'opencode', kind: 'plugin', name: spec.replace(/^file:\/\/.*[\\/]/, 'file:').replace(/\/\/[^/@\s]*@/, '//').replace(/[?#].*$/, ''), file, keyPath: [key], owner: !target && MANAGED_PLUGIN.test(spec) ? 'managed' : 'user', status });
+    // a local plugin is named `<folder>/<file>`: two `tui.js` in different folders stay distinct
+    const name = target ? `${path.basename(path.dirname(target))}/${path.basename(target)}` : spec.replace(/\/\/[^/@\s]*@/, '//').replace(/[?#].*$/, '');
+    add({ client: 'opencode', kind: 'plugin', name, file, keyPath: [key], owner: !target && MANAGED_PLUGIN.test(spec) ? 'managed' : 'user', status, extra: target ? { source: rel(target) } : {} });
   };
   for (const [file, keys] of [[ocCfg, ['plugin', 'plugins']], [j(ocDir, 'tui.json'), ['plugin']], [j(ocDir, 'tui.jsonc'), ['plugin']]]) {
     const c = readJson(file);
@@ -136,6 +138,7 @@ export async function inventory({ home, env = process.env, platform = process.pl
   }
   const pdir = j(ocDir, 'plugins');
   for (const e of fsx.existsSync(pdir) ? fsx.readdirSync(pdir, { withFileTypes: true }) : []) {
+    if (e.name.startsWith('.') || e.name === 'node_modules' || (!e.isDirectory() && !/\.[cm]?[jt]s$/.test(e.name))) continue; // package.json and friends are not plugins
     const f = j(pdir, e.name);
     let owned = false;
     if (e.isFile()) { try { owned = hasMark(fs.readFileSync(f, 'utf8')); } catch { /* unreadable: user */ } }

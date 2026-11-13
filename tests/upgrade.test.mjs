@@ -46,7 +46,7 @@ test('every class appears and translation rows give the right before/after', { s
 
   assert.equal(up(r, 'keybinds').upgrade.class, 'user-manual'); assert.match(up(r, 'keybinds').upgrade.reason, /VERIFY/);
   assert.match(up(r, 'provider').upgrade.reason, /no verified 2\.x key/);
-  assert.match(up(r, 'plugins/rtk.ts').upgrade.reason, /api\.keymap/);
+  assert.match(up(r, 'plugins/rtk.ts').upgrade.reason, /2\.x plugin API is not proven/);
   assert.match(up(r, 'plugins/orca-status-tui-shim.js').upgrade.reason, /stopgap/);
   assert.ok(TRANSLATIONS.every((t) => t.source));
 });
