@@ -141,7 +141,9 @@ export function bunInstall(home, dir, platform, pm, arch = process.arch) {
   const zip = path.join(dir, `${name}-${version}.zip`);
   const download = [platform === 'win32' ? 'curl.exe' : 'curl', '-fsSL', '-o', zip, `https://github.com/oven-sh/bun/releases/download/bun-v${version}/${name}.zip`];
   const verify = [process.execPath, VERIFY, zip, sha256[name.slice(4)]];
-  const rm = [process.execPath, '-e', 'require("fs").rmSync(process.argv[1], { recursive: true, force: true })', bunDir];
+  // Undo removes only the binary this install put there, then the dirs it made if they are empty: ~/.bun may hold the user's cache or global packages.
+  const exe = platform === 'win32' ? 'bun.exe' : 'bun';
+  const rm = [process.execPath, '-e', `const fs = require("fs"), p = require("path"), d = p.join(require("os").homedir(), ".bun"), b = p.join(d, "bin"); if (p.resolve(process.argv[1]) !== d) { console.error("refusing to remove under " + process.argv[1] + ": not the Bun dir lean-agents installed"); process.exit(1); } try { fs.unlinkSync(p.join(b, "${exe}")); } catch {} for (const x of [b, d]) try { fs.rmdirSync(x); } catch {}`, bunDir];
   if (platform === 'win32') {
     const bin = path.join(bunDir, 'bin');
     const tmp = path.join(dir, `${name}-${version}`);

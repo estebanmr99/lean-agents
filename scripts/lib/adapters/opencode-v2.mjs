@@ -84,6 +84,17 @@ function ponytailConfig(home) {
   return path.join(appData, 'ponytail', 'config.json');
 }
 
+// state.json is editable, so the undo does not trust its path: it re-derives the vendor dir from HOME (the engine points it at --home)
+// and refuses anything else, or a symlink, through fsops.unsafe.
+const SCRIPT = (fsops, system) => `import os from 'node:os'; import path from 'node:path'; import fs from 'node:fs';
+import { unsafe } from ${JSON.stringify(fsops)}; import { configHome } from ${JSON.stringify(system)};
+const home = os.homedir(); const want = path.join(configHome(home), 'opencode', 'vendor', 'i-have-adhd');
+const why = (process.platform === 'win32' ? (x) => x.toLowerCase() : (x) => x)(path.resolve(process.argv[1])) !== (process.platform === 'win32' ? want.toLowerCase() : want) ? 'not the path lean-agents installed' : unsafe(want, [home]);
+if (why) { console.error('refusing to remove ' + process.argv[1] + ': ' + why); process.exit(1); }
+fs.rmSync(want, { recursive: true, force: true });`;
+const vendorUndo = (vendor) => [process.execPath, '--input-type=module', '-e',
+  SCRIPT(pathToFileURL(fileURLToPath(new URL('../fsops.mjs', import.meta.url))).href, pathToFileURL(fileURLToPath(new URL('../system.mjs', import.meta.url))).href), vendor];
+
 // Everything that is the same on OpenCode 1.x and 2.x: files and commands, not config keys.
 export function opencodeShared({ home, dir, core, profile, opts, v2 = false }) {
   const tools = opts.tools;
@@ -114,7 +125,7 @@ export function opencodeShared({ home, dir, core, profile, opts, v2 = false }) {
       // The tag must still point at the pinned commit; a moved tag removes the checkout and fails the command.
       run: [['git', 'clone', '--depth', '1', '--branch', PINS['i-have-adhd'].version, 'https://github.com/ayghri/i-have-adhd', vendor],
         [process.execPath, fileURLToPath(new URL('../verify-commit.mjs', import.meta.url)), vendor, PINS['i-have-adhd'].sha]],
-      undo: [['node', '-e', 'require("fs").rmSync(process.argv[1], { recursive: true, force: true })', vendor]],
+      undo: [vendorUndo(vendor)],
       skipIfExists: vendor,
     });
     actions.push({
