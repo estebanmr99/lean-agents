@@ -2,6 +2,7 @@
 # Usage: python3 tests/real-opencode-tui.py <HOME>  (HOME, USERPROFILE and XDG_CONFIG_HOME come from the environment)
 # Windows has no pty module: CI installs pywinpty in a throwaway venv for that job only.
 import os
+import re
 import shutil
 import signal
 import sys
@@ -77,8 +78,6 @@ else:
                 break
     os.kill(pid, signal.SIGKILL)
     os.waitpid(pid, 0)
-import re
-
 print(f"tui output bytes: {out}")
 print(repr(tail[-400:]))
 # What the TUI showed last, without escape codes: tells a real screen from an error.

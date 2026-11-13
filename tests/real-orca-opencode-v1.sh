@@ -77,6 +77,8 @@ JS
   if [ "$windows" = yes ]; then opencode debug paths >&2 || true; fi
   "$PY" "$repo/tests/real-opencode-tui.py" "$(native "$HOME")" >&2
   sed "s/^/  $name: /" "$HOME/marker.txt" >&2
+  # The control probe proves the TUI started and loaded plugins; without it a count of 0 means nothing.
+  grep -q '^control-probe.js ' "$HOME/marker.txt" || { echo "$name: the TUI never loaded the control probe" >&2; exit 1; }
   # Only Orca's managed name counts; the probes are diagnostics.
   { grep -c '^orca-opencode-status.js ' "$HOME/marker.txt" || true; } | tr -d ' '
 }
