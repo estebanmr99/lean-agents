@@ -6,6 +6,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- The engine saves `state.json` after writing files and before and after each command, so a write error or an interrupted or failing command no longer leaves files that `--uninstall` cannot undo (#158).
 - `--doctor` (text and `--json`) and the install preview print only `set` / `not set` for proxy and CA variables, so internal proxy hosts, ports and CA paths no longer reach stdout; `NO_PROXY` also reports whether the loopback entries are present (#172).
 
 ### Changed
