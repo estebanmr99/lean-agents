@@ -29,8 +29,8 @@ function Invoke-Git($Dir) {
   $ErrorActionPreference = $old
   if ($code -ne 0) { Fail "git $args failed in $Dir" }
 }
-# New-PushedClone <dir>: a pushed, clean clone of a local bare remote with an old scripts\lean.mjs.
-function New-PushedClone($Dir) {
+# Build-PushedClone <dir>: a pushed, clean clone of a local bare remote with an old scripts\lean.mjs.
+function Build-PushedClone($Dir) {
   $remote = Join-Path $work ([guid]::NewGuid().ToString())
   git init -q --bare $remote 2>&1 | Out-Null
   New-Item -ItemType Directory -Force -Path "$Dir\scripts" | Out-Null
@@ -142,14 +142,14 @@ try {
   Invoke-Boot $Dist (Merge @{})
   if ($rc -ne 1 -or $out -notmatch 'no upstream') { Fail "clone without upstream: $rc $out" }
   if (-not (Test-Path "$srcdir\.git")) { Fail 'clone without upstream was deleted' }
-  New-PushedClone $srcdir
+  Build-PushedClone $srcdir
   Invoke-Boot $Dist (Merge @{})
   if ($rc -ne 0 -or (Test-Path "$srcdir\.git") -or -not (Test-Path "$srcdir\.lean-agents-release")) { Fail "clean clone was not replaced: $rc $out" }
 
   Write-Output '--- (i2) a clone with unpushed commits, or at LEAN_AGENTS_SRC, is never deleted'
   Initialize-TempProfile
   $srcdir = "$dir\.config\lean-agents\src"
-  New-PushedClone $srcdir
+  Build-PushedClone $srcdir
   Set-Content "$srcdir\new" 'x'
   Invoke-Git $srcdir add -A
   Invoke-Git $srcdir -c user.name=t -c user.email=t@t commit -q -m unpushed
@@ -159,7 +159,7 @@ try {
   if ((git -C $srcdir rev-parse HEAD) -ne $head -or (Get-Content "$srcdir\scripts\lean.mjs" -Raw).Trim() -ne '// old') { Fail 'unpushed clone changed' }
   Initialize-TempProfile
   $srcdir = "$dir\.config\lean-agents\src"
-  New-PushedClone $srcdir
+  Build-PushedClone $srcdir
   $head = git -C $srcdir rev-parse HEAD
   $env:LEAN_AGENTS_SRC = $srcdir
   Invoke-Boot $Dist (Merge @{})

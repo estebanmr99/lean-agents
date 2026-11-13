@@ -109,13 +109,16 @@ if ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot 'scripts\lean.mjs')))
         $keep = 'it has local changes (or git cannot read it)'
       } else {
         $unpushed = git -C $Src log '@{u}..' --oneline 2>$null
-        if ($LASTEXITCODE -ne 0) {
+        $unpushedCode = $LASTEXITCODE
+        $stash = git -C $Src stash list 2>$null
+        $branches = @(git -C $Src for-each-ref refs/heads 2>$null)
+        if ($unpushedCode -ne 0) {
           $keep = 'it has no upstream branch'
         } elseif ($unpushed) {
           $keep = 'it has commits that are not pushed'
-        } elseif (git -C $Src stash list 2>$null) {
+        } elseif ($stash) {
           $keep = 'it has a stash'
-        } elseif (@(git -C $Src for-each-ref refs/heads 2>$null).Count -gt 1) {
+        } elseif ($branches.Count -gt 1) {
           $keep = 'it has more than one local branch'
         }
       }
