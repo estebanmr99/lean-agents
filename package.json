@@ -25,7 +25,7 @@
     "check-private": "bash scripts/check-private.sh"
   },
   "dependencies": {
-    "@clack/prompts": "1.8.1",
+    "@clack/prompts": "1.9.0",
     "jsonc-parser": "^3.3.1"
   }
 }
