@@ -2,7 +2,7 @@
 
 What comes next, in order. Each step is one build session in `docs/SPEC.md` section 14 and one PR. A step is done when its CI job with real binaries is green and its issues are closed.
 
-Released: [`v0.5.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.5.0) (2026-11-04). [`v0.6.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.6.0) (2026-11-06) is done and waits for the owner's tag; it folds in the planned 0.5.1 and raises the minimum Node to 22.20.
+Latest release: [`v0.8.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.8.0) (2026-11-12). Earlier: [`v0.7.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.7.0) and [`v0.6.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.6.0) (2026-11-06, which raised the minimum Node to 22.20), and [`v0.5.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.5.0) (2026-11-04).
 
 ## Done in 0.6.0: fixes from real installs (planned as 0.5.1)
 
@@ -68,13 +68,17 @@ Scope and order from the architecture checkpoint [`docs/checkpoints/0.7.0.md`](c
 - [#103](https://github.com/estebanmr99/lean-agents/issues/103): harness benchmark and personal vs enterprise recommendation (later).
 - Close the **VERIFY** items in `docs/compatibility.md` that need a logged-in app (Antigravity rule and skill loading, Copilot `model` format, VS Code reading Copilot CLI hooks).
 - Codex CLI and Gemini CLI adapters.
+- [#179](https://github.com/estebanmr99/lean-agents/issues/179): fresh machine, one command from a clean Mac or Windows PC to the full setup, proven in CI.
+- [#180](https://github.com/estebanmr99/lean-agents/issues/180): install with an agent, VS Code Copilot chat (agent mode) as the installing agent for peers.
+- [#181](https://github.com/estebanmr99/lean-agents/issues/181): finish step, local HTML summary, login checklist and an agent verify prompt that files feedback issues.
+- [#182](https://github.com/estebanmr99/lean-agents/issues/182): release train, one command updates everything lean-agents installed, to the release's pins, with version notes.
 - Tag `v1.0.0` and run the full launch in `docs/launch.md`.
 
 ## Promotion
 
 Order matters: fix what a new visitor would hit first, then show it, then post.
 
-1. **After 0.6.0:** Windows behind a proxy works end to end. Most first-time users will try exactly that path.
+1. **Windows behind a proxy:** works end to end (done in 0.6.0). Most first-time users will try exactly that path.
 2. **After session 9:** the README shows each use case in a GIF, so a visitor sees it working in 10 seconds.
 3. **Directories and lists (low effort, lasting):** open PRs to curated lists for Claude Code, OpenCode and MCP; keep the GitHub topics current.
 4. **One write-up from real experience:** "Setting up coding agents on a corporate Windows PC behind a proxy". Issues #22, #25 and #28 are the material. Post it on dev.to or a blog and link the repo.
