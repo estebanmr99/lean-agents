@@ -52,11 +52,12 @@ test('the same plugin in the server config and tui.json is two needed rows with 
   const oc = j(h, '.config', 'opencode');
   put(j(oc, 'opencode.jsonc'), '{ "plugin": ["@tarquinen/opencode-dcp@latest"] }');
   put(j(oc, 'tui.json'), '{ "plugin": ["@tarquinen/opencode-dcp@latest"] }');
-  const r = spawnSync(process.execPath, [LEAN, '--home', h, '--no-exec', '--adopt', '--json'], { encoding: 'utf8', env: { ...process.env, NVM_DIR: j(h, '.nvm'), HOME: h } });
+  const env = { PATH: process.env.PATH, NVM_DIR: j(h, '.nvm'), HOME: h }; // no inherited XDG_* or other vars
+  const r = spawnSync(process.execPath, [LEAN, '--home', h, '--no-exec', '--adopt', '--json'], { encoding: 'utf8', env });
   const rows = JSON.parse(r.stdout).items.filter((i) => i.name === '@tarquinen/opencode-dcp@latest');
   assert.deepEqual(rows.map((i) => i.file).sort(), ['~/.config/opencode/opencode.jsonc', '~/.config/opencode/tui.json']);
   assert.ok(rows.every((i) => !i.status.includes('duplicate')));
-  const text = spawnSync(process.execPath, [LEAN, '--home', h, '--no-exec', '--adopt'], { encoding: 'utf8', env: { ...process.env, NVM_DIR: j(h, '.nvm'), HOME: h } }).stdout;
+  const text = spawnSync(process.execPath, [LEAN, '--home', h, '--no-exec', '--adopt'], { encoding: 'utf8', env }).stdout;
   const lines = text.split('\n').filter((l) => l.includes('opencode-dcp'));
   assert.equal(lines.length, 2);
   assert.ok(lines.some((l) => l.includes('opencode.jsonc')) && lines.some((l) => l.includes('tui.json')));
