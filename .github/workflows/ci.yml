@@ -462,6 +462,30 @@ jobs:
       - name: Install lean-agents and check what OpenCode resolved
         run: bash tests/real-opencode-v1.sh
 
+  spike-opencode-side:
+    # Manual only (workflow_dispatch; no per-PR cost), kept for reruns before PR B (0.9.0, #80 B0): OpenCode 1.19 and 2.2.5 in one throwaway HOME. Prints
+    # V1-V4 evidence (paths, config/data hashes, key tolerance, installer footprint) for the
+    # shared-vs-isolated layout decision; fails only if setup (installs) or a binary's --version fails.
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && github.event_name == 'workflow_dispatch'
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
+      - run: npm ci
+      - name: Side-by-side spike
+        shell: bash
+        run: bash tests/spike-opencode-side.sh
+
   real-opencode-shell:
     # Spike for issue #124 follow-up: does OpenCode's `shell` config key govern the Windows bash/shell
     # tool? Real binary, throwaway USERPROFILE, a local mock LLM (tests/fixtures/mock-llm.mjs), no login
