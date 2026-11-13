@@ -16,6 +16,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - README (EN and ES): an "All flags" table covers every flag in `--help`, `--home` included (#167).
 - Install docs (README, `docs/install-with-an-agent.md`, `skills/lean-update/SKILL.md`) use `npx lean-agents@latest` first and state Node.js 22.20+; Context Mode 2 and GSD Core need Node.js 24 via nvm. The bootstraps moved to a fallback section, and the `LEAN_AGENTS_VERSION` example is 0.8.0 (#178).
 
+### Fixed
+
+- Pin-bump PRs no longer fail the agent-lifecycle test: it builds the claude-code version check from `core/pins.json` instead of a hardcoded version (#159).
+
 ## [0.8.0] - 2026-11-12
 
 ### Added

@@ -7,6 +7,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { agentLifecycle, agentTable, LIFECYCLE_AGENTS } from '../scripts/lib/agent-lifecycle.mjs';
+import { PINS } from '../scripts/lib/pins.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const lean = (home, ...args) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args], { encoding: 'utf8' });
@@ -29,7 +30,8 @@ test('dry run prints the pinned plan for every agent and changes nothing', { ski
   const r = lean(home, '--install-agent', LIFECYCLE_AGENTS.join(','), '--dry-run');
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /verify-sha256\.mjs/);
-  assert.match(r.stdout, /claude-installer\.sh 2\.1\.312/);
+  const claudePin = PINS['claude-code'].version.replace(/\./g, '\\.');
+  assert.match(r.stdout, new RegExp(`claude-installer\\.sh ${claudePin}`));
   assert.match(r.stdout, /--version 2\.2\.5 --no-modify-path/);
   assert.match(r.stdout, /npm install -g --prefix .*@github\/copilot@1\.0\.105/);
   // `opencode --version` (the 1.x guard) may make its own cache dirs; lean-agents writes no state.
