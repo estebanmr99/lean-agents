@@ -76,6 +76,8 @@ refute grep -rq "$secret" "$HOME/.claude" "$HOME/.config/opencode" "$HOME/.claud
 # 3. Into Antigravity: Cursor's agent, skill and MCP servers, and a Claude rule; agy reads them back.
 mkdir -p "$HOME/.claude"
 printf 'Be brief.\n' > "$HOME/.claude/CLAUDE.md"
+mkdir -p "$HOME/.cursor/skills/demo"
+printf -- '---\nname: demo\ndescription: Demo skill.\n---\nSay hi.\n' > "$HOME/.cursor/skills/demo/SKILL.md"
 bash "$repo/install.sh" --yes --no-exec --migrate cursor --agents antigravity
 bash "$repo/install.sh" --yes --no-exec --migrate claude --agents antigravity
 ag="$HOME/.gemini/config"
