@@ -432,13 +432,14 @@ Checked 2026-11-10 for Session 65 (#65, #46), with npm 12.2.1 and Node 26.12.1 i
 **Owner steps (never run by a session):**
 
 1. npm account with 2FA. In the repo: environment `npm` with the owner as required reviewer, and variable `NPM_PUBLISH=true`.
-2. First publish: a short-lived granular write token in the environment secret `NPM_TOKEN`, push the tag `v0.7.0`, approve the `npm` job.
+2. First publish (done for 0.8.0, 2026-11-13): the CI token route failed twice with `EOTP`, because the account's 2FA mode ("authorization and publishing", security key) asks for a one-time password on every publish unless the granular token has **Bypass 2FA** ticked. The owner published the checksum-verified release tarball from a local terminal (`npm login`, then `npm publish <tgz> --access public`; plain `!` in an agent cannot answer the Enter prompt). npm CLI 12 sent it to [staged publishing](https://docs.npmjs.com/staged-publishing/): the registry showed a `0.0.0-stage` placeholder until a maintainer approved it with 2FA (Staged Packages tab or `npm stage approve <id>`). 0.8.0 has no provenance statement.
 3. Then on npmjs.com package settings add a trusted publisher (repo, `release.yml`, environment `npm`), delete the secret and revoke the token.
 4. The release uploads `lean-agents-<v>.tgz`, `SHA256SUMS`, `install.sh` and `install.ps1`; the bootstrap URLs under `releases/latest/download/` work only after the first release.
 
 **VERIFY** (not proven by CI yet):
 
 - A trusted publisher can be set before the first publish (the docs imply the package must exist).
+- The `npm` job publishes through the trusted publisher (OIDC) with provenance, and whether npm stages it for approval (next release).
 - `npm publish <tgz> --provenance` from the tarball path.
 - `releases/latest` skips prereleases and drafts.
 - Node 24's bundled npm is 11.5.1 or newer (needed for OIDC).
