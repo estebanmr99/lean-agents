@@ -13,6 +13,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ### Changed
 
 - Release gate: `release.yml` stops before building anything when `docs/audit-<version>.md` is missing or an issue labeled `audit` is still open, so no release ships half audited. Audit findings of medium or higher get the new `audit` label.
+- The Cursor CLI installer pin moves to `cursor.com/install` as of 2026-11-13 (reviewed: one download from `downloads.cursor.com`, no sudo or eval), which fixes the `real-cursor` sha256 mismatch (#193).
 
 ### Docs
 
