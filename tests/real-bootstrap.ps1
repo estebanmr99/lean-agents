@@ -20,6 +20,28 @@ function Initialize-TempProfile {
   $env:USERPROFILE = $script:dir
   $env:APPDATA = "$($script:dir)\AppData\Roaming"
 }
+# Invoke-Git <dir> <args...>: git writes progress to stderr, which stops a 5.1 script, so errors are checked by exit code.
+function Invoke-Git($Dir) {
+  $old = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  git -C $Dir @args 2>&1 | Out-Null
+  $code = $LASTEXITCODE
+  $ErrorActionPreference = $old
+  if ($code -ne 0) { Fail "git $args failed in $Dir" }
+}
+# Build-PushedClone <dir>: a pushed, clean clone of a local bare remote with an old scripts\lean.mjs.
+function Build-PushedClone($Dir) {
+  $remote = Join-Path $work ([guid]::NewGuid().ToString())
+  git init -q --bare $remote 2>&1 | Out-Null
+  New-Item -ItemType Directory -Force -Path "$Dir\scripts" | Out-Null
+  Set-Content "$Dir\scripts\lean.mjs" '// old'
+  if (-not (Test-Path "$Dir\.git")) { git init -q $Dir 2>&1 | Out-Null }
+  Invoke-Git $Dir checkout -q -B main
+  Invoke-Git $Dir add -A
+  if (git -C $Dir status --porcelain) { Invoke-Git $Dir -c user.name=t -c user.email=t@t commit -q -m old }
+  Invoke-Git $Dir remote add origin $remote
+  Invoke-Git $Dir push -q -u origin main
+}
 # Invoke-Boot <dist> <params>: output in $out, 0 or 1 in $rc. Runs from $work\cwd, which holds no lean-agents.
 function Invoke-Boot($From, $Params) {
   New-Item -ItemType Directory -Force -Path "$work\cwd" | Out-Null
@@ -111,14 +133,39 @@ try {
   $srcdir = "$dir\.config\lean-agents\src"
   New-Item -ItemType Directory -Force -Path "$srcdir\scripts" | Out-Null
   Set-Content "$srcdir\scripts\lean.mjs" '// old'
-  git -C $srcdir init -q
+  git -c init.defaultBranch=main -C $srcdir init -q
   Invoke-Boot $Dist (Merge @{})
   if ($rc -ne 1 -or $out -notmatch 'local changes') { Fail "dirty clone: $rc $out" }
   if (-not (Test-Path "$srcdir\.git") -or (Get-Content "$srcdir\scripts\lean.mjs" -Raw).Trim() -ne '// old') { Fail 'dirty clone was modified' }
-  git -C $srcdir add -A
-  git -C $srcdir -c user.name=t -c user.email=t@t commit -q -m old
+  Invoke-Git $srcdir add -A
+  Invoke-Git $srcdir -c user.name=t -c user.email=t@t commit -q -m old
+  Invoke-Boot $Dist (Merge @{})
+  if ($rc -ne 1 -or $out -notmatch 'no upstream') { Fail "clone without upstream: $rc $out" }
+  if (-not (Test-Path "$srcdir\.git")) { Fail 'clone without upstream was deleted' }
+  Build-PushedClone $srcdir
   Invoke-Boot $Dist (Merge @{})
   if ($rc -ne 0 -or (Test-Path "$srcdir\.git") -or -not (Test-Path "$srcdir\.lean-agents-release")) { Fail "clean clone was not replaced: $rc $out" }
+
+  Write-Output '--- (i2) a clone with unpushed commits, or at LEAN_AGENTS_SRC, is never deleted'
+  Initialize-TempProfile
+  $srcdir = "$dir\.config\lean-agents\src"
+  Build-PushedClone $srcdir
+  Set-Content "$srcdir\new" 'x'
+  Invoke-Git $srcdir add -A
+  Invoke-Git $srcdir -c user.name=t -c user.email=t@t commit -q -m unpushed
+  $head = git -C $srcdir rev-parse HEAD
+  Invoke-Boot $Dist (Merge @{})
+  if ($rc -ne 1 -or $out -notmatch 'not pushed' -or $out -notmatch 'Move it away') { Fail "unpushed clone: $rc $out" }
+  if ((git -C $srcdir rev-parse HEAD) -ne $head -or (Get-Content "$srcdir\scripts\lean.mjs" -Raw).Trim() -ne '// old') { Fail 'unpushed clone changed' }
+  Initialize-TempProfile
+  $srcdir = "$dir\.config\lean-agents\src"
+  Build-PushedClone $srcdir
+  $head = git -C $srcdir rev-parse HEAD
+  $env:LEAN_AGENTS_SRC = $srcdir
+  Invoke-Boot $Dist (Merge @{})
+  Remove-Item Env:LEAN_AGENTS_SRC
+  if ($rc -ne 1 -or $out -notmatch 'LEAN_AGENTS_SRC points at a git clone' -or $out -notmatch 'Move it away') { Fail "LEAN_AGENTS_SRC clone: $rc $out" }
+  if ((git -C $srcdir rev-parse HEAD) -ne $head -or (Get-Content "$srcdir\scripts\lean.mjs" -Raw).Trim() -ne '// old') { Fail 'LEAN_AGENTS_SRC clone changed' }
 
   Write-Output '--- (j) a checkout reinstalls its dependencies when package-lock.json changes'
   Initialize-TempProfile

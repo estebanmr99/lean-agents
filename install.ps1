@@ -95,12 +95,36 @@ if ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot 'scripts\lean.mjs')))
   if ((Test-Path $Src) -and -not (Test-Path (Join-Path $Src 'scripts\lean.mjs'))) {
     throw "lean-agents: $Src exists and is not a lean-agents install. Move it away or set LEAN_AGENTS_SRC."
   }
-  # An old bootstrap clone is clean and goes; a clone with local changes is never deleted.
+  # An old bootstrap clone is clean, on one branch and fully pushed, so it goes. Anything else (local changes,
+  # no upstream, unpushed commits, a stash, extra branches) or any clone the user pointed LEAN_AGENTS_SRC at stays.
   if (Test-Path (Join-Path $Src '.git')) {
-    $dirty = git -C $Src status --porcelain 2>&1
-    if ($LASTEXITCODE -ne 0 -or $dirty) {
-      throw "lean-agents: $Src is a git clone with local changes (or git cannot read it), so it is left alone. Commit or move it, or set LEAN_AGENTS_SRC to another folder."
+    $keep = $null
+    # Git writes warnings and "no upstream" to stderr, which would stop a 5.1 script before the message below.
+    $ErrorActionPreference = 'Continue'
+    if ($env:LEAN_AGENTS_SRC) {
+      $keep = 'LEAN_AGENTS_SRC points at a git clone'
+    } else {
+      $dirty = git -C $Src status --porcelain 2>&1
+      if ($LASTEXITCODE -ne 0 -or $dirty) {
+        $keep = 'it has local changes (or git cannot read it)'
+      } else {
+        $unpushed = git -C $Src log '@{u}..' --oneline 2>$null
+        $unpushedCode = $LASTEXITCODE
+        $stash = git -C $Src stash list 2>$null
+        $branches = @(git -C $Src for-each-ref refs/heads 2>$null)
+        if ($unpushedCode -ne 0) {
+          $keep = 'it has no upstream branch'
+        } elseif ($unpushed) {
+          $keep = 'it has commits that are not pushed'
+        } elseif ($stash) {
+          $keep = 'it has a stash'
+        } elseif ($branches.Count -gt 1) {
+          $keep = 'it has more than one local branch'
+        }
+      }
     }
+    $ErrorActionPreference = 'Stop'
+    if ($keep) { throw "lean-agents: $Src is a git clone and is left alone ($keep). Move it away, or set LEAN_AGENTS_SRC to another folder." }
   }
   if ($env:LEAN_AGENTS_DIST) {
     $base = $env:LEAN_AGENTS_DIST.TrimEnd('/', '\')
