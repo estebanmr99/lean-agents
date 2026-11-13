@@ -152,14 +152,27 @@ export async function inventory({ home, env = process.env, platform = process.pl
 
   // --- Skills in every folder some agent reads
   const dirs = [...new Set(['claude', 'opencode', 'cursor', 'copilot'].flatMap((a) => skillDirs(a, home)))];
-  const dupDirs = new Map();
-  for (const a of ['claude', 'opencode', 'cursor', 'copilot']) for (const d of duplicateSkills(skillDirs(a, home), fsx)) dupDirs.set(d.name, d);
+  // A skill is a duplicate only in the folders one client reads together (#176); links count, a client scanning both paths meets it twice.
+  const dupRows = new Map(); // `${folder}\0${name}` -> { clients, copies: { folder: short sha }, differs, linked }
+  for (const a of ['claude', 'opencode', 'cursor', 'copilot']) {
+    for (const d of duplicateSkills(skillDirs(a, home), fsx, { links: true })) {
+      const group = d.dirs.map((x, i) => ({ dir: x, sha: d.shas[i] }));
+      for (const g of group) {
+        const row = dupRows.get(`${g.dir}\0${d.name}`) ?? { clients: [], copies: {}, differs: false, linked: false };
+        if (!row.clients.includes(a)) row.clients.push(a);
+        for (const x of group) row.copies[rel(x.dir)] = x.sha === 'unreadable' ? x.sha : x.sha.slice(0, 8);
+        row.differs ||= d.differs; row.linked ||= d.linked;
+        dupRows.set(`${g.dir}\0${d.name}`, row);
+      }
+    }
+  }
   for (const d of dirs) {
     let list = [];
     try { list = fsx.readdirSync(d).filter((n) => fsx.existsSync(j(d, n, 'SKILL.md'))); } catch { continue; }
     for (const name of list) {
-      const dup = dupDirs.get(name);
-      add({ client: 'skills', kind: 'skill', name, file: j(d, name), owner: MANAGED_SKILLS.has(name) ? 'managed' : 'user', status: dup ? ['duplicate'] : [], extra: dup ? { copies: dup.dirs.map(rel), differs: dup.differs } : {} });
+      const dup = dupRows.get(`${d}\0${name}`);
+      const fix = dup && `keep one folder (e.g. ~/.agents/skills) and delete the other copy after a backup${dup.linked ? '; the copies are links, so remove the extra link, not the folder it points to' : ''}${Object.keys(dup.copies).includes('~/.claude/skills') ? '; Claude Code reads only ~/.claude/skills' : ''}`;
+      add({ client: 'skills', kind: 'skill', name, file: j(d, name), owner: MANAGED_SKILLS.has(name) ? 'managed' : 'user', status: dup ? ['duplicate'] : [], extra: dup ? { copies: Object.keys(dup.copies), hashes: dup.copies, clients: dup.clients.sort(), differs: dup.differs, linked: dup.linked, fix } : {} });
     }
   }
 
@@ -218,7 +231,10 @@ export async function adopt(o) {
   console.log(`--adopt (dry run: nothing is changed; --yes applies). Found: ${Object.entries(by).map(([k, n]) => `${n} ${k}`).join(', ') || 'nothing'}`);
   console.log(`tool Node: ${r.toolNode.range ? `${r.toolNode.range} -> ${r.toolNode.node ?? 'no matching Node installed, nvm not found'} (${r.toolNode.source ?? 'none'})` : 'not needed'}`);
   console.log(`OpenCode: major ${r.opencode.major ?? 'none'}, ${r.opencode.dbBytes} bytes of db, sessions ${r.opencode.sessions ?? 'unknown'}${r.opencode.note ? ` (${r.opencode.note})` : ''}`);
-  for (const i of r.items.filter((x) => x.action !== 'keep' || x.owner === 'managed')) console.log(`  ${i.action.padEnd(9)} ${i.owner.padEnd(8)} ${i.client} ${i.kind} ${i.name}${i.status.length ? `  [${i.status.join(', ')}]` : ''}  (${i.file})`);
+  for (const i of r.items.filter((x) => x.action !== 'keep' || x.owner === 'managed')) {
+    console.log(`  ${i.action.padEnd(9)} ${i.owner.padEnd(8)} ${i.client} ${i.kind} ${i.name}${i.status.length ? `  [${i.status.join(', ')}]` : ''}  (${i.file})`);
+    if (i.kind === 'skill' && i.fix) console.log(`            ${i.clients.join(' and ')} loads it twice: ${Object.entries(i.hashes).map(([d, h]) => `${d} ${h}`).join(', ')} (${i.differs ? 'differs' : 'identical'}); ${i.fix}`);
+  }
   console.log(`  user-owned items kept untouched: ${r.items.filter((i) => i.owner === 'user' && i.action === 'keep').length}`);
   for (const s of r.stopgaps) console.log(`  stopgap   ${s.file}${s.replaceWith ? `: replace with ${s.replaceWith}` : `: ${s.note}`}`);
   console.log(r.plan.length ? `Plan (${r.plan.length} steps; add --yes to apply, --confirm-removals to allow the removals):\n${r.plan.map((l) => `  - ${l}`).join('\n')}` : 'Plan: nothing to change.');
@@ -295,8 +311,9 @@ export function adoptPlan(r, { home, env, platform, realHome, state, fsx = fs })
   for (const name of new Set(r.items.filter((i) => i.kind === 'skill' && i.status.includes('duplicate')).map((i) => i.name))) {
     const drop = j(shared, name);
     // Keep the copy in ~/.claude/skills (Claude reads only that folder, OpenCode reads both); Cursor and Copilot read only ~/.agents/skills, so with them present nothing is removed.
-    if (fsx.existsSync(j(claude, name, 'SKILL.md')) && fsx.existsSync(j(drop, 'SKILL.md')) && !otherAgents) out.dupSkills.push(drop);
-    else out.notes.push(`skill ${name} stays in both folders (${otherAgents ? 'Cursor or Copilot read only ~/.agents/skills' : 'the copies are not the ~/.agents and ~/.claude pair'}); keep one by hand`);
+    const linked = r.items.some((i) => i.kind === 'skill' && i.name === name && i.linked);
+    if (fsx.existsSync(j(claude, name, 'SKILL.md')) && fsx.existsSync(j(drop, 'SKILL.md')) && !otherAgents && !linked) out.dupSkills.push(drop);
+    else out.notes.push(`skill ${name} stays in both folders (${linked ? 'the copies are links to one folder' : otherAgents ? 'Cursor or Copilot read only ~/.agents/skills' : 'the copies are not the ~/.agents and ~/.claude pair'}); keep one by hand`);
   }
   const have = (need) => Object.entries(need).every(([k, v]) => (state?.options?.[k] ?? []).includes(v));
   for (const sg of STOPGAPS) {

@@ -146,8 +146,9 @@ export function treeSha(dir, fsx) {
   return h.digest('hex');
 }
 
-// Skills (a folder with SKILL.md) found in two or more of `dirs`. Two paths that are one folder (a link) are not a duplicate.
-export function duplicateSkills(dirs, fsx = fs) {
+// Skills (a folder with SKILL.md) found in two or more of `dirs`. Two paths that are one folder (a link) are not a duplicate,
+// unless `links` is set: --adopt counts them, because a client scanning both paths still meets the skill twice (#176).
+export function duplicateSkills(dirs, fsx = fs, { links = false } = {}) {
   const found = new Map();
   for (const d of dirs) {
     let names;
@@ -156,7 +157,7 @@ export function duplicateSkills(dirs, fsx = fs) {
       let real;
       try { real = fsx.realpathSync(j(d, name)); } catch { real = j(d, name); }
       const list = found.get(name) ?? [];
-      if (!list.some((x) => x.real === real)) list.push({ dir: d, real });
+      if (links || !list.some((x) => x.real === real)) list.push({ dir: d, real });
       found.set(name, list);
     }
   }
@@ -164,7 +165,7 @@ export function duplicateSkills(dirs, fsx = fs) {
     const shas = l.map((x) => treeSha(j(x.dir, name), fsx));
     const unreadable = shas.includes(UNREADABLE);
     // The load order is not documented and OpenCode 1.19's log shows the "existing" copy changing per skill (#78), so no winner is claimed.
-    return { name, dirs: l.map((x) => x.dir), shas, unreadable, differs: unreadable || new Set(shas).size > 1, winner: 'unknown (load order)' };
+    return { name, dirs: l.map((x) => x.dir), shas, unreadable, linked: new Set(l.map((x) => x.real)).size < l.length, differs: unreadable || new Set(shas).size > 1, winner: 'unknown (load order)' };
   });
 }
 
