@@ -24,6 +24,13 @@ export const LeanOrcaStatusShim = async (ctx) => {
 };
 `;
 
+// Windows only: the bug is seen on the Windows work PC and not reproduced on Linux or macOS in CI, where the
+// shim would run Orca's plugin a second time.
+export function orcaShimActions({ dir, terminals, platform = process.platform }) {
+  if (platform !== 'win32' || !terminals?.includes('orca')) return [];
+  return [{ kind: 'file', path: path.join(dir, 'plugins', 'lean-orca-status-shim.js'), content: ORCA_SHIM }];
+}
+
 export function opencodeV1Adapter({ home, core, profile, opts, rulesPath }) {
   const dir = path.join(configHome(home), 'opencode');
   const tools = opts.tools;
@@ -54,7 +61,7 @@ export function opencodeV1Adapter({ home, core, profile, opts, rulesPath }) {
     });
   }
   if (opts.terminals?.includes('warp')) edits.push({ path: ['plugin'], value: npmSpec('warp-opencode'), mode: 'arrayAdd', legacy: ['@warp-dot-dev/opencode-warp', '@warp-dot-dev/opencode-warp@0.1.7'] });
-  if (opts.terminals?.includes('orca')) actions.push({ kind: 'file', path: path.join(dir, 'plugins', 'lean-orca-status-shim.js'), content: ORCA_SHIM });
+  actions.push(...orcaShimActions({ dir, terminals: opts.terminals, platform: opts.platform }));
   if (tools.includes('ponytail')) edits.push({ path: ['plugin'], value: npmSpec('ponytail'), mode: 'arrayAdd', legacy: ['@dietrichgebert/ponytail'] });
   if (tools.includes('dcp')) {
     edits.push({ path: ['plugin'], value: npmSpec('opencode-dcp'), mode: 'arrayAdd' });

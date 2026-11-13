@@ -7,6 +7,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { stillNeeded } from '../scripts/lib/terminals.mjs';
+import { orcaShimActions } from '../scripts/lib/adapters/opencode-v1.mjs';
 
 const lean = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'lean.mjs');
 const shimOf = (h) => path.join(h, '.config', 'opencode', 'plugins', 'lean-orca-status-shim.js');
@@ -17,21 +18,30 @@ function run(home, args) {
 }
 const fresh = () => fs.mkdtempSync(path.join(os.tmpdir(), 'lean-orca-shim-'));
 
-test('shim: written for OpenCode 1.x with Orca, not for 2.x or without Orca, removed by --uninstall', () => {
+test('shim actions: Windows with Orca only', () => {
+  const dir = '/cfg/opencode';
+  const [a, ...rest] = orcaShimActions({ dir, terminals: ['orca'], platform: 'win32' });
+  assert.equal(rest.length, 0);
+  assert.equal(a.kind, 'file');
+  assert.equal(a.path, path.join(dir, 'plugins', 'lean-orca-status-shim.js'));
+  assert.match(a.content, /managed by lean-agents/);
+  assert.match(a.content, /Bun\.isMainThread/);
+  assert.match(a.content, /orca-opencode-status\.js/);
+  assert.deepEqual(orcaShimActions({ dir, terminals: ['orca'], platform: 'linux' }), [], 'Linux would run the plugin twice');
+  assert.deepEqual(orcaShimActions({ dir, terminals: ['orca'], platform: 'darwin' }), []);
+  assert.deepEqual(orcaShimActions({ dir, terminals: ['warp'], platform: 'win32' }), [], 'no Orca, no shim');
+  assert.deepEqual(orcaShimActions({ dir, terminals: undefined, platform: 'win32' }), []);
+});
+
+test('shim: the installer writes it on Windows only, never for 2.x, and --uninstall removes it', () => {
+  const win = process.platform === 'win32';
   const v1 = fresh();
   run(v1, ['--agents', 'opencode-v1', '--terminal', 'orca']);
-  const text = fs.readFileSync(shimOf(v1), 'utf8');
-  assert.match(text, /managed by lean-agents/);
-  assert.match(text, /Bun\.isMainThread/);
-  assert.match(text, /orca-opencode-status\.js/);
+  assert.equal(fs.existsSync(shimOf(v1)), win);
 
   const v2 = fresh();
   run(v2, ['--agents', 'opencode-v2', '--terminal', 'orca']);
   assert.equal(fs.existsSync(shimOf(v2)), false, 'never for 2.x');
-
-  const none = fresh();
-  run(none, ['--agents', 'opencode-v1', '--terminal', 'warp']);
-  assert.equal(fs.existsSync(shimOf(none)), false, 'no Orca, no shim');
 
   run(v1, ['--uninstall']);
   assert.equal(fs.existsSync(shimOf(v1)), false, 'uninstall removes it');

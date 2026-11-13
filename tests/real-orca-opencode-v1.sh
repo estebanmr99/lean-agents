@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Orca status on OpenCode 1.x (issue #78), with the real OpenCode 1.19 TUI in a pseudo-terminal and a throwaway HOME.
-# Orca itself is GUI-only and not installed: a fake plugin under Orca's managed name (same export) writes a marker
-# line when OpenCode calls its factory, and a fake TUI plugin has Orca's id. Used by CI; safe locally (temp HOME).
-#   A: Orca's file alone            -> the TUI worker must NOT call it (the bug)
-#   B: plus the installer's shim    -> it must be called
-#   C: like A without the TUI entry -> recorded only, to show whether the id clash matters
+# Orca itself is GUI-only and not installed: a fake plugin under Orca's managed name (same export shape) writes a
+# marker line when OpenCode calls its factory, and a fake TUI plugin has Orca's id. Used by CI (Linux and Windows
+# through Git Bash); safe locally (temp HOME). PY names the Python with a pty (pywinpty on Windows).
+#   A: Orca's file alone            -> reported: does the TUI worker call it?
+#   B: plus the installer's output  -> on Windows the shim must make the worker call it; elsewhere no shim is written
+#   C: like A without the TUI entry -> reported, to show whether the id clash matters
 set -euo pipefail
 
 command -v opencode >/dev/null || { echo "opencode not on PATH" >&2; exit 1; }
@@ -13,19 +14,36 @@ export HOME
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 opencode --version
 
-# $1 = case name; $2 = yes to add the installer's shim; $3 = yes to add Orca's TUI plugin entry. Prints the marker line count.
-run_case() {
-  local name="$1" shim="$2" tui="$3"
+PY="${PY:-python3}"
+case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) windows=yes ;; *) windows=no ;; esac
+# Mixed form (C:/dir) for native programs on Windows; unchanged elsewhere.
+native() { if [ "$windows" = yes ]; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
+
+# Fresh throwaway HOME for one case; OpenCode on Windows reads USERPROFILE, not HOME.
+new_home() {
   HOME="$(mktemp -d)"
   export HOME
-  export XDG_CONFIG_HOME="$HOME/.config"
+  if [ "$windows" = yes ]; then USERPROFILE="$(cygpath -w "$HOME")"; export USERPROFILE; fi
+  XDG_CONFIG_HOME="$(native "$HOME")/.config"
+  export XDG_CONFIG_HOME
   unset XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
+}
+
+install() {
+  node "$repo/scripts/lean.mjs" --home "$(native "$HOME")" --yes --no-exec --no-tools --agents opencode-v1 --terminal orca \
+    --privacy standard --lang en --profile anthropic-api </dev/null >"$HOME/install.txt" 2>&1 || { cat "$HOME/install.txt"; exit 1; }
+}
+
+# $1 = case name; $2 = yes to run the installer (Orca selected); $3 = yes to add Orca's TUI plugin entry. Prints the marker line count.
+run_case() {
+  local name="$1" inst="$2" tui="$3"
+  new_home
   local dir="$XDG_CONFIG_HOME/opencode"
   mkdir -p "$dir/plugins" "$dir/orca-opencode-status-tui"
   cat > "$dir/plugins/orca-opencode-status.js" <<'JS'
 import fs from 'node:fs';
-// Same shape as Orca's generated file: a named factory, and a default export that is the factory itself
-// when ORCA_OPENCODE_PLUGIN_API=v1 and an { id, server } object otherwise (Orca source, 2026-11).
+// Same shape as Orca's generated file: a default export that is the factory itself when
+// ORCA_OPENCODE_PLUGIN_API=v1 and an { id, server } object otherwise (Orca source, 2026-11).
 const OrcaOpenCodeStatusPlugin = async () => {
   fs.appendFileSync(process.env.FAKE_ORCA_MARKER, `factory called main=${globalThis.Bun?.isMainThread} pid=${process.pid}\n`);
   return {};
@@ -38,32 +56,35 @@ JS
 export default { id: 'orca-opencode-status', tui: async () => {} };
 JS
   if [ "$tui" = yes ]; then
-    printf '{ "plugin": ["file://%s/orca-opencode-status-tui/tui.js"] }\n' "$dir" > "$dir/tui.json"
+    local url="file://$dir/orca-opencode-status-tui/tui.js"
+    case "$dir" in /*) ;; *) url="file:///$dir/orca-opencode-status-tui/tui.js" ;; esac
+    printf '{ "plugin": ["%s"] }\n' "$url" > "$dir/tui.json"
   fi
-  if [ "$shim" = yes ]; then
-    # The shim comes from the installer, so a change to it is what this case tests.
-    node "$repo/scripts/lean.mjs" --home "$HOME" --yes --no-exec --no-tools --agents opencode-v1 --terminal orca \
-      --privacy standard --lang en --profile anthropic-api </dev/null >"$HOME/install.txt" 2>&1 || { cat "$HOME/install.txt"; exit 1; }
-    test -f "$dir/plugins/lean-orca-status-shim.js"
-  fi
-  export FAKE_ORCA_MARKER="$HOME/marker.txt"
-  : > "$FAKE_ORCA_MARKER"
-  python3 "$repo/tests/real-opencode-tui.py" "$HOME" >&2
-  sed "s/^/  $name: /" "$FAKE_ORCA_MARKER" >&2
-  wc -l < "$FAKE_ORCA_MARKER" | tr -d ' '
+  if [ "$inst" = yes ]; then install; fi
+  FAKE_ORCA_MARKER="$(native "$HOME")/marker.txt"
+  export FAKE_ORCA_MARKER
+  : > "$HOME/marker.txt"
+  "$PY" "$repo/tests/real-opencode-tui.py" "$(native "$HOME")" >&2
+  sed "s/^/  $name: /" "$HOME/marker.txt" >&2
+  wc -l < "$HOME/marker.txt" | tr -d ' '
 }
 
 a="$(run_case A no yes)"
 b="$(run_case B yes yes)"
 c="$(run_case C no no)"
-echo "marker lines: A (no shim) = $a, B (shim) = $b, C (no TUI entry, no shim) = $c"
-[ "$a" -eq 0 ] || { echo "A: the TUI called Orca's plugin without the shim; the bug did not reproduce" >&2; exit 1; }
-[ "$b" -ge 1 ] || { echo "B: the shim did not make the TUI call Orca's plugin" >&2; exit 1; }
+echo "marker lines: A (no shim) = $a, B (installer) = $b, C (no TUI entry, no shim) = $c"
 
-# Uninstall removes the shim (B's HOME is the last one with a shim, so redo it quickly).
-HOME="$(mktemp -d)"; export HOME XDG_CONFIG_HOME="$HOME/.config"
-node "$repo/scripts/lean.mjs" --home "$HOME" --yes --no-exec --no-tools --agents opencode-v1 --terminal orca --privacy standard --lang en --profile anthropic-api </dev/null >/dev/null 2>&1
-test -f "$XDG_CONFIG_HOME/opencode/plugins/lean-orca-status-shim.js"
-node "$repo/scripts/lean.mjs" --home "$HOME" --uninstall --yes --no-exec </dev/null >/dev/null 2>&1
-if test -e "$XDG_CONFIG_HOME/opencode/plugins/lean-orca-status-shim.js"; then echo "uninstall left the shim" >&2; exit 1; fi
+# Install and uninstall once more in a clean HOME for the file checks.
+new_home
+install
+shim="$XDG_CONFIG_HOME/opencode/plugins/lean-orca-status-shim.js"
+if [ "$windows" = yes ]; then
+  test -f "$shim" || { echo "the installer did not write the shim on Windows" >&2; exit 1; }
+  [ "$b" -ge 1 ] || { echo "B: the shim did not make the TUI call Orca's plugin" >&2; exit 1; }
+else
+  if test -e "$shim"; then echo "the shim must be Windows-only" >&2; exit 1; fi
+  [ "$b" -le 1 ] || { echo "B: Orca's plugin ran twice without a shim" >&2; exit 1; }
+fi
+node "$repo/scripts/lean.mjs" --home "$(native "$HOME")" --uninstall --yes --no-exec </dev/null >/dev/null 2>&1
+if test -e "$shim"; then echo "uninstall left the shim" >&2; exit 1; fi
 echo "real-orca-opencode-v1: OK"
