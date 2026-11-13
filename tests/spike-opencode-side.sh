@@ -150,6 +150,7 @@ cat > "$CFG/opencode.jsonc" <<'JSON'
   "share": "disabled"
 }
 JSON
+# shellcheck disable=SC2016 # literal $schema key
 printf '%s\n' '{ "$schema": "https://opencode.ai/tui.json", "theme": "opencode" }' > "$CFG/tui.json"
 snap_both S0-seeded
 
