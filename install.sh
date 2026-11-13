@@ -90,9 +90,24 @@ fi
 if [[ -e "$SRC" && ! -f "$SRC/scripts/lean.mjs" ]]; then
   die "$SRC exists and is not a lean-agents install. Move it away or set LEAN_AGENTS_SRC."
 fi
-# An old bootstrap clone is clean and goes; a clone with local changes is never deleted.
-if [[ -e "$SRC/.git" ]] && ! { dirty="$(git -C "$SRC" status --porcelain 2>&1)" && [[ -z "$dirty" ]]; }; then
-  die "$SRC is a git clone with local changes (or git cannot read it), so it is left alone. Commit or move it, or set LEAN_AGENTS_SRC to another folder."
+# An old bootstrap clone is clean, on one branch and fully pushed, so it goes. Anything else (local changes,
+# no upstream, unpushed commits, a stash, extra branches) or any clone the user pointed LEAN_AGENTS_SRC at stays.
+if [[ -e "$SRC/.git" ]]; then
+  keep=""
+  if [[ -n "${LEAN_AGENTS_SRC:-}" ]]; then
+    keep="LEAN_AGENTS_SRC points at a git clone"
+  elif ! dirty="$(git -C "$SRC" status --porcelain 2>&1)" || [[ -n "$dirty" ]]; then
+    keep="it has local changes (or git cannot read it)"
+  elif ! unpushed="$(git -C "$SRC" log '@{u}..' --oneline 2>&1)"; then
+    keep="it has no upstream branch"
+  elif [[ -n "$unpushed" ]]; then
+    keep="it has commits that are not pushed"
+  elif [[ -n "$(git -C "$SRC" stash list 2>&1)" ]]; then
+    keep="it has a stash"
+  elif [[ "$(git -C "$SRC" for-each-ref refs/heads 2>&1 | wc -l)" -gt 1 ]]; then
+    keep="it has more than one local branch"
+  fi
+  [[ -z "$keep" ]] || die "$SRC is a git clone and is left alone ($keep). Move it away, or set LEAN_AGENTS_SRC to another folder."
 fi
 
 if [[ -n "${LEAN_AGENTS_DIST:-}" ]]; then
