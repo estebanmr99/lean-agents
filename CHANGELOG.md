@@ -6,6 +6,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- The lifecycle test builds the opencode-v2 and copilot-cli version checks from `core/pins.json`, so a pin bump no longer fails CI (#184).
 - The engine saves `state.json` after writing files and before and after each command, so a write error or an interrupted or failing command no longer leaves files that `--uninstall` cannot undo (#158).
 - `--uninstall` removes only what lean-agents created: the Linux and Windows Bun undo deletes `~/.bun/bin/bun` (`bun.exe`) and then its dirs only if empty, so your Bun cache and global packages stay; the OpenCode vendor undo re-derives the checkout path from your home at undo time and refuses a symlink, an edited `state.json` path or anything outside the home (#157).
 - `--doctor` (text and `--json`) and the install preview print only `set` / `not set` for proxy and CA variables, so internal proxy hosts, ports and CA paths no longer reach stdout; `NO_PROXY` also reports whether the loopback entries are present (#172).

@@ -32,8 +32,10 @@ test('dry run prints the pinned plan for every agent and changes nothing', { ski
   assert.match(r.stdout, /verify-sha256\.mjs/);
   const claudePin = PINS['claude-code'].version.replace(/\./g, '\\.');
   assert.match(r.stdout, new RegExp(`claude-installer\\.sh ${claudePin}`));
-  assert.match(r.stdout, /--version 2\.2\.5 --no-modify-path/);
-  assert.match(r.stdout, /npm install -g --prefix .*@github\/copilot@1\.0\.105/);
+  const v2Pin = PINS['opencode-v2'].version.replace(/\./g, '\\.');
+  const copilotPin = PINS['copilot-cli'].version.replace(/\./g, '\\.');
+  assert.match(r.stdout, new RegExp(`--version ${v2Pin} --no-modify-path`));
+  assert.match(r.stdout, new RegExp(`npm install -g --prefix .*@github/copilot@${copilotPin}`));
   // `opencode --version` (the 1.x guard) may make its own cache dirs; lean-agents writes no state.
   assert.ok(!fs.existsSync(path.join(home, '.config', 'lean-agents')), 'dry run wrote state');
 });
