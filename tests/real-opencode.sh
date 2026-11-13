@@ -87,8 +87,8 @@ child.stdout.on('data', (d) => {
 child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'lean-agents-ci', version: '0' } } }) + '\n');
 JS
 
-# copilot-usage (fresh HOME, network on: strict skips it). Proves the plugin file and its tui.json entry land and
-# (the 1.x script also runs `opencode debug config`; 2.x cannot, see below). TUI rendering needs a real terminal and a login: still VERIFY.
+# copilot-usage (fresh HOME, network on: strict skips it). Proves the plugin file lands and no tui.json entry is written
+# (2.x discovers plugins/<dir>/tui.js itself). The TUI rendering is proven by real-usage-v2 (tests/real-usage-v2.py).
 HOME="$(mktemp -d)"
 export HOME
 export XDG_CONFIG_HOME="$HOME/.config"
@@ -96,11 +96,9 @@ bash "$repo/install.sh" --yes --no-exec --agents opencode-v2 --tools copilot-usa
 node --input-type=module - "$HOME/.config/opencode" <<'JS'
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 const dir = process.argv[2];
 const file = path.join(dir, 'plugins', 'lean-copilot-usage', 'tui.js');
-const tui = JSON.parse(fs.readFileSync(path.join(dir, 'tui.json'), 'utf8'));
-if (!fs.existsSync(file) || !tui.plugin.includes(pathToFileURL(file).href)) { console.log('FAIL  copilot-usage plugin or tui.json entry missing'); process.exit(1); }
-console.log('ok    copilot-usage plugin file and tui.json entry');
+if (!fs.existsSync(file) || fs.existsSync(path.join(dir, 'tui.json'))) { console.log('FAIL  copilot-usage plugin file missing, or a tui.json was written on 2.x'); process.exit(1); }
+console.log('ok    copilot-usage plugin file (no tui.json entry on 2.x)');
 JS
 # No second `opencode debug config` here: the first HOME's managed OpenCode service still holds its fixed port, so a new HOME cannot start one.

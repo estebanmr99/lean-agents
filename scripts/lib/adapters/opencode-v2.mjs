@@ -85,7 +85,7 @@ function ponytailConfig(home) {
 }
 
 // Everything that is the same on OpenCode 1.x and 2.x: files and commands, not config keys.
-export function opencodeShared({ home, dir, core, profile, opts }) {
+export function opencodeShared({ home, dir, core, profile, opts, v2 = false }) {
   const tools = opts.tools;
   const actions = [];
   const commands = [];
@@ -93,11 +93,12 @@ export function opencodeShared({ home, dir, core, profile, opts }) {
     actions.push({ kind: 'json', path: ponytailConfig(home), edits: [{ path: ['defaultMode'], value: opts.ponytailMode, mode: 'setIfAbsent' }] });
   }
   if (tools.includes('copilot-usage')) {
-    // Own folder, so the hand-made copilot-usage-tui is never touched. tui.json loads it as a TUI plugin.
+    // Own folder, so the hand-made copilot-usage-tui is never touched. 1.x loads it through a tui.json entry; 2.x discovers
+    // plugins/<dir>/tui.js by itself (docs: opencode.ai/docs/build/plugins), so there is no config entry there.
     const file = path.join(dir, 'plugins', 'lean-copilot-usage', 'tui.js');
     const source = fs.readFileSync(fileURLToPath(new URL('../../../core/copilot-usage-tui.js', import.meta.url)), 'utf8');
     actions.push({ kind: 'file', path: file, content: `// ${OWNED_MARK}\n${source}` });
-    actions.push({ kind: 'json', path: path.join(dir, 'tui.json'), edits: [{ path: ['plugin'], value: pathToFileURL(file).href, mode: 'arrayAdd' }] });
+    if (!v2) actions.push({ kind: 'json', path: path.join(dir, 'tui.json'), edits: [{ path: ['plugin'], value: pathToFileURL(file).href, mode: 'arrayAdd' }] });
   }
   for (const agent of core.agents) {
     actions.push({ kind: 'file', path: path.join(dir, 'agents', `${agent.name}.md`), content: renderOpenCodeAgent(agent, profile) });
@@ -138,7 +139,7 @@ export function opencodeShared({ home, dir, core, profile, opts }) {
 export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
   const dir = path.join(configHome(home), 'opencode');
   const tools = opts.tools;
-  const { actions, commands } = opencodeShared({ home, dir, core, profile, opts });
+  const { actions, commands } = opencodeShared({ home, dir, core, profile, opts, v2: true });
   const edits = [
     { path: ['$schema'], value: 'https://opencode.ai/config.json', mode: 'setIfAbsent' },
     { path: ['instructions'], value: rulesPath, mode: 'arrayAdd' },

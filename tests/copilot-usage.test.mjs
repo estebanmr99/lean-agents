@@ -47,26 +47,36 @@ const engine = (home, args) => {
   return r.stdout;
 };
 
-for (const agent of ['opencode-v1', 'opencode-v2']) {
-  test(`${agent}: plugin file and tui.json entry are added, kept once, and undone`, () => {
-    const home = tmp('home');
-    const dir = path.join(home, '.config', 'opencode');
-    fs.mkdirSync(dir, { recursive: true });
-    const mine = { plugin: ['@tarquinen/opencode-dcp@3.2.1', 'file:///orca/status-shim.js'] };
-    fs.writeFileSync(path.join(dir, 'tui.json'), JSON.stringify(mine));
-    const args = ['--agents', agent, '--tools', 'copilot-usage', '--network', 'on'];
-    engine(home, args);
-    engine(home, args);
-    const file = path.join(dir, 'plugins', 'lean-copilot-usage', 'tui.js');
-    assert.match(fs.readFileSync(file, 'utf8'), /^\/\/ managed by lean-agents\n/);
-    const entry = pathToFileURL(file).href;
-    const tui = JSON.parse(fs.readFileSync(path.join(dir, 'tui.json'), 'utf8'));
-    assert.deepEqual(tui.plugin, [...mine.plugin, entry]);
-    engine(home, ['--uninstall']);
-    assert.ok(!fs.existsSync(file));
-    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'tui.json'), 'utf8')).plugin, mine.plugin);
-  });
-}
+test('opencode-v1: plugin file and tui.json entry are added, kept once, and undone', () => {
+  const home = tmp('home');
+  const dir = path.join(home, '.config', 'opencode');
+  fs.mkdirSync(dir, { recursive: true });
+  const mine = { plugin: ['@tarquinen/opencode-dcp@3.2.1', 'file:///orca/status-shim.js'] };
+  fs.writeFileSync(path.join(dir, 'tui.json'), JSON.stringify(mine));
+  const args = ['--agents', 'opencode-v1', '--tools', 'copilot-usage', '--network', 'on'];
+  engine(home, args);
+  engine(home, args);
+  const file = path.join(dir, 'plugins', 'lean-copilot-usage', 'tui.js');
+  assert.match(fs.readFileSync(file, 'utf8'), /^\/\/ managed by lean-agents\n/);
+  const tui = JSON.parse(fs.readFileSync(path.join(dir, 'tui.json'), 'utf8'));
+  assert.deepEqual(tui.plugin, [...mine.plugin, pathToFileURL(file).href]);
+  engine(home, ['--uninstall']);
+  assert.ok(!fs.existsSync(file));
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'tui.json'), 'utf8')).plugin, mine.plugin);
+});
+
+// 2.x discovers plugins/<dir>/tui.js on its own: the file is written and tui.json is left alone.
+test('opencode-v2: plugin file only (no tui.json entry), undone by --uninstall', () => {
+  const home = tmp('home');
+  const dir = path.join(home, '.config', 'opencode');
+  const args = ['--agents', 'opencode-v2', '--tools', 'copilot-usage', '--network', 'on'];
+  engine(home, args);
+  const file = path.join(dir, 'plugins', 'lean-copilot-usage', 'tui.js');
+  assert.match(fs.readFileSync(file, 'utf8'), /^\/\/ managed by lean-agents\n/);
+  assert.ok(!fs.existsSync(path.join(dir, 'tui.json')));
+  engine(home, ['--uninstall']);
+  assert.ok(!fs.existsSync(file));
+});
 
 test('--outbound off skips copilot-usage with a note and writes nothing', () => {
   const home = tmp('home');
@@ -86,8 +96,8 @@ async function loadPlugin() {
   return (await import(pathToFileURL(path.join(dir, 'tui.js')).href)).default;
 }
 
-function fakeApi({ keymap = false } = {}) {
-  const calls = { toast: [], command: [], layers: [], render: 0, slots: [] };
+function fakeApi() {
+  const calls = { toast: [], command: [], render: 0, slots: [] };
   const api = {
     theme: { current: { text: 'T', textMuted: 'M', success: 'S', warning: 'W', error: 'E', borderSubtle: 'B' } },
     slots: { register: (s) => calls.slots.push(s) },
@@ -96,8 +106,7 @@ function fakeApi({ keymap = false } = {}) {
     event: { on: () => () => {} },
     lifecycle: { onDispose: () => {} },
   };
-  if (keymap) api.keymap = { registerLayer: (l) => { calls.layers.push(l); return () => {}; } };
-  else api.command = { register: (f) => { calls.command.push(f()); return () => {}; } };
+  api.command = { register: (f) => { calls.command.push(f()); return () => {}; } };
   // The plugin must never reach a model or a session.
   for (const name of ['client', 'session', 'sdk']) Object.defineProperty(api, name, { get() { throw new Error(`plugin touched api.${name}`); } });
   return { api, calls };
@@ -151,14 +160,29 @@ test('tui.js: unlimited and gh failure (unavailable, not zero)', async () => {
   } finally { process.env.PATH = old; }
 });
 
-test('tui.js: registers the command through keymap.registerLayer when api.command is missing (2.x)', async () => {
+test('tui.js on 2.x: setup registers the sidebar slot and the /copilot-usage layer, and toasts through ui.toast.show', async () => {
   const old = process.env.PATH;
   try {
     const plugin = await loadPlugin();
     process.env.PATH = fakeGh(LIMITED);
-    const { api, calls } = fakeApi({ keymap: true });
-    await plugin.tui(api);
-    assert.equal(calls.layers[0].commands[0].slash.name, 'copilot-usage');
+    const calls = { slots: [], layers: [], toasts: [] };
+    const tok = (name) => ({ name });
+    const context = {
+      theme: { text: { base: tok('T'), muted: tok('M') }, border: { base: tok('B') } },
+      ui: { slot: (s) => calls.slots.push(s), toast: { show: (t) => calls.toasts.push(t) } },
+      keymap: { layer: (f) => calls.layers.push(f()) },
+    };
+    for (const name of ['client', 'data', 'app']) Object.defineProperty(context, name, { get() { throw new Error(`plugin touched context.${name}`); } });
+    await plugin.setup(context);
+    assert.equal(calls.slots[0].append, 'sidebar.content');
+    const box = calls.slots[0].render({ sessionID: 's' });
+    await until(() => !texts(box).includes('loading...'));
+    assert.ok(texts(box).join('|').includes('15,441'));
+    const cmd = calls.layers[0].commands[0];
+    assert.equal(cmd.slash.name, 'copilot-usage');
+    assert.equal(cmd.palette, true);
+    await cmd.run();
+    assert.match(calls.toasts[0].message, /Left 15,441 \(\$154\.41\)/);
   } finally { process.env.PATH = old; }
 });
 
@@ -193,4 +217,60 @@ test('fresh HOME: install creates tui.json, uninstall removes it (the empty plug
   engine(home, ['--uninstall']);
   assert.ok(!fs.existsSync(path.join(dir, 'tui.json')));
   assert.ok(!fs.existsSync(path.join(dir, 'plugins', 'lean-copilot-usage', 'tui.js')));
+});
+
+// Claude Code status line: written only when the user has none, removed by --uninstall only while it is still ours.
+const claudeArgs = ['--agents', 'claude', '--tools', 'copilot-usage', '--network', 'on'];
+const settingsOf = (home) => path.join(home, '.claude', 'settings.json');
+const script = (home) => path.join(home, '.claude', 'lean-copilot-usage-statusline.mjs');
+
+test('claude statusLine: none set -> written, runs, and uninstall removes it', () => {
+  const home = tmp('home');
+  engine(home, claudeArgs);
+  const s = JSON.parse(fs.readFileSync(settingsOf(home), 'utf8')).statusLine;
+  assert.equal(s.type, 'command');
+  assert.ok(s.command.includes(script(home).replaceAll('\\', '/')));
+  assert.match(fs.readFileSync(script(home), 'utf8'), /^\/\/ managed by lean-agents\n/);
+  // The shipped script, run with a fake gh and its own cache dir: same text as --usage, behind a label.
+  const run = (json) => {
+    const r = spawnSync(process.execPath, [script(home)], { encoding: 'utf8', env: { ...process.env, PATH: fakeGh(json), TMPDIR: tmp('cache'), TEMP: tmp('cache') } });
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout.trim();
+  };
+  assert.equal(run(LIMITED), 'Copilot: 15441 of 25000 credits left (61%), about $154.41 of $250.00, resets 2026-12-01');
+  assert.equal(run(UNLIMITED), 'Copilot: Unlimited premium requests');
+  assert.equal(run(null), 'Copilot: unavailable');
+  engine(home, ['--uninstall']);
+  assert.ok(!fs.existsSync(script(home)));
+  assert.ok(!fs.existsSync(settingsOf(home)) || !('statusLine' in JSON.parse(fs.readFileSync(settingsOf(home), 'utf8'))));
+});
+
+test('claude statusLine: the user\'s own value is kept, with a note, and survives uninstall', () => {
+  const home = tmp('home');
+  fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
+  const mine = { type: 'command', command: 'echo mine' };
+  fs.writeFileSync(settingsOf(home), JSON.stringify({ statusLine: mine }));
+  assert.match(engine(home, claudeArgs), /kept your values for:.*statusLine/);
+  assert.deepEqual(JSON.parse(fs.readFileSync(settingsOf(home), 'utf8')).statusLine, mine);
+  engine(home, ['--uninstall']);
+  assert.deepEqual(JSON.parse(fs.readFileSync(settingsOf(home), 'utf8')).statusLine, mine);
+});
+
+test('claude statusLine: a value the user changed after install stays on uninstall', () => {
+  const home = tmp('home');
+  engine(home, claudeArgs);
+  const j = JSON.parse(fs.readFileSync(settingsOf(home), 'utf8'));
+  j.statusLine = { type: 'command', command: 'echo later' };
+  fs.writeFileSync(settingsOf(home), JSON.stringify(j));
+  engine(home, ['--uninstall']);
+  assert.equal(JSON.parse(fs.readFileSync(settingsOf(home), 'utf8')).statusLine.command, 'echo later');
+});
+
+test('claude statusLine: not installed without the copilot-usage tool or under --outbound off', () => {
+  for (const args of [['--agents', 'claude', '--no-tools', '--network', 'on'], ['--agents', 'claude', '--tools', 'copilot-usage', '--outbound', 'off']]) {
+    const home = tmp('home');
+    engine(home, args);
+    assert.ok(!('statusLine' in JSON.parse(fs.readFileSync(settingsOf(home), 'utf8'))));
+    assert.ok(!fs.existsSync(script(home)));
+  }
 });
