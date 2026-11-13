@@ -83,6 +83,22 @@ lean --adopt --no-exec > "$out/dry.txt" || fail "--adopt dry run failed"
 lean --adopt --yes --dry-run --no-exec > /dev/null || fail "--adopt --yes --dry-run failed"
 [ "$(user_hash)" = "$before" ] || fail "the dry run changed the HOME"
 [ ! -e "$HOME/.config/lean-agents" ] || fail "the dry run created the state folder"
+
+echo "--- --upgrade-agent opencode --dry-run --json: classifies the 1.x keys, changes nothing, prints no values"
+lean --upgrade-agent opencode --dry-run --json --no-exec > "$out/upgrade.json" || fail "--upgrade-agent opencode --dry-run --json failed"
+node --input-type=module - "$out/upgrade.json" <<'JS' || fail "the upgrade dry run misclassified the fixture"
+import fs from 'node:fs';
+const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const cls = (name) => r.items.find((i) => i.upgrade && i.name === name)?.upgrade.class;
+const want = [['agent.reviewer', 'user-translatable'], ['compaction.reserved', 'user-translatable'], ['autoupdate', 'user-translatable'], ['keybinds', 'user-manual'], ['plugins/rtk.ts', 'user-manual'], ['agent/lean.md', 'managed']];
+const bad = want.filter(([n, c]) => cls(n) !== c);
+for (const [n, c] of bad) console.log(`FAIL  ${n}: ${cls(n)} (want ${c})`);
+if (r.upgrade.from !== 'opencode-v1' || !r.upgrade.counts.managed) bad.push(['counts']);
+process.exit(bad.length ? 1 : 0);
+JS
+! grep -qE 'relay-(env|header)-secret|hook-arg-secret' "$out/upgrade.json" || fail "the upgrade dry run printed a secret"
+[ "$(user_hash)" = "$before" ] || fail "the upgrade dry run changed the HOME"
+[ ! -e "$HOME/.config/lean-agents" ] || fail "the upgrade dry run created the state folder"
 settings_before="$(cat "$HOME/.claude/settings.json")"
 rtk_before="$(cat "$HOME/.config/opencode/plugins/rtk.ts")"
 

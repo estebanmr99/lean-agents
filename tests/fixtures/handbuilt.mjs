@@ -52,8 +52,10 @@ export async function seedHandbuilt(home, { old, neu, link, win = false }) {
   put(j(home, '.claude', 'plugins', 'installed_plugins.json'), JSON.stringify({ version: 1, plugins: { 'context-mode@context-mode': [{ scope: 'user' }] } }));
 
   const oc = j(home, '.config', 'opencode');
-  put(j(oc, 'opencode.jsonc'), `{\n  // user comment\n  "mcp": { "context-mode": { "type": "local", "command": ["npx", "-y", "context-mode@2.1.4", "server"] } },\n  "plugin": ["context-mode", "${new URL(`file://${win ? '/' : ''}${j(home, 'gone', 'plugin.js').replaceAll('\\', '/')}`).href}"]\n}\n`);
+  put(j(oc, 'opencode.jsonc'), `{\n  // user comment\n  "mcp": { "context-mode": { "type": "local", "command": ["npx", "-y", "context-mode@2.1.4", "server"] }, "mine": { "type": "remote", "url": "https://example.invalid/mine", "headers": { "Authorization": "Bearer ${SECRETS[1]}" } } },\n  "agent": { "reviewer": { "mode": "subagent" } },\n  "compaction": { "auto": true, "reserved": 20000 },\n  "autoupdate": false,\n  "disabled_providers": ["opencode"],\n  "keybinds": { "leader": "ctrl+x" },\n  "provider": { "acme": { "options": { "apiKey": "${SECRETS[0]}" } } },\n  "plugin": ["context-mode", "some-npm-plugin@1.0.0", "${new URL(`file://${win ? '/' : ''}${j(home, 'gone', 'plugin.js').replaceAll('\\', '/')}`).href}"]\n}\n`);
   put(j(oc, 'tui.json'), JSON.stringify({ plugin: [new URL(`file://${win ? '/' : ''}${j(oc, 'plugins', 'copilot-usage-tui', 'tui.js').replaceAll('\\', '/')}`).href] }));
+  put(j(oc, 'agents', 'mine.md'), '# my agent\n'); // a 1.x agents/ file of the user's
+  put(j(oc, 'agent', 'lean.md'), '<!-- managed by lean-agents -->\n'); // an owned one
   put(j(oc, 'plugins', 'rtk.ts'), 'export default {}\n'); // a user plugin: no lean-agents mark
   put(j(oc, 'plugins', 'orca-status-tui-shim.js'), 'export default {}\n'); // #78 stopgap
   put(j(home, '.local', 'bin', 'copilot-usage'), '#!/bin/sh\n'); // #123 stopgap

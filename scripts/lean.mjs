@@ -20,14 +20,15 @@ import { projectPlan, projectStateDir } from './lib/project.mjs';
 import { gsdPlan } from './lib/gsd.mjs';
 import { MIGRATE_SOURCES, MIGRATE_TARGETS, readSource, detectSources, migratePlan, finishRows, formatTable } from './lib/migrate.mjs';
 import { adhdCommand } from './lib/adhd.mjs';
-import { gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPresent, which, run, quiet, exists, isolate, configHome, envDir } from './lib/system.mjs';
+import { version as binVersion, gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPresent, which, run, quiet, exists, isolate, configHome, envDir } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
-import { adopt } from './lib/adopt.mjs';
+import { adopt, inventory } from './lib/adopt.mjs';
+import { upgradeInventory, formatUpgrade } from './lib/upgrade.mjs';
 import { copilotUsage } from './lib/copilot-usage.mjs';
 import { draftIssue } from './lib/feedback.mjs';
 import { pinVersions, behindPins, pinTool, nodeRange, npmSpec } from './lib/pins.mjs';
 import { findNvm, resolveToolNodes, nvmLatest, nvmInstallArgv, nvmEnv, toolEnv } from './lib/node-runtime.mjs';
-import { leanUpdateCommands, coordinateCommands } from './lib/lean-update.mjs';
+import { leanUpdateCommands, coordinateCommands, leanMigrateCommands } from './lib/lean-update.mjs';
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
 import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
 import { unverifiedItems, notesFile } from './lib/unverified.mjs';
@@ -44,7 +45,7 @@ const EXTENSION_NOTE = 'install the Playwright Extension yourself from https://c
 const MINIMAL_TOOLS = ['rtk', 'context-mode'];
 const OPTIONAL_TOOLS = ['serena', 'playwright', 'ponytail', 'caveman', 'i-have-adhd', 'dcp', 'codeburn', 'copilot-usage'];
 // Asked for one by one and never part of --all-tools.
-const OPT_IN_TOOLS = ['gsd', 'autoskills', 'playwright-extension', 'coordinate'];
+const OPT_IN_TOOLS = ['gsd', 'autoskills', 'playwright-extension', 'coordinate', 'lean-migrate'];
 const TOOL_INFO = {
   serena: 'Serena MCP: symbol-level code navigation, so agents read less code',
   playwright: 'Playwright MCP: lets agents drive a browser to check web UIs',
@@ -56,6 +57,7 @@ const TOOL_INFO = {
   codeburn: 'Codeburn: usage and cost report across agents, run with npx',
   'copilot-usage': 'Copilot usage: credits left in the OpenCode sidebar and /copilot-usage, read with gh, no model request (needs gh login; off with --outbound off)',
   gsd: 'GSD Core: spec-driven workflow skills and agents (large install)',
+  'lean-migrate': 'lean-migrate skill: guides the OpenCode 1.x to 2.x upgrade through --upgrade-agent opencode (dry run first)',
   coordinate: 'Coordinate skill: playbook, session prompt and watcher to run several agents in separate git worktrees',
   autoskills: 'AutoSkills: picks skills per project, run with npx (CC BY-NC 4.0: non-commercial use only)',
 };
@@ -110,6 +112,7 @@ function parseArgs(argv) {
       case '--uninstall': o.command = 'uninstall'; break;
       case '--doctor': o.command = 'doctor'; break;
       case '--adopt': o.command = 'adopt'; break;
+      case '--upgrade-agent': o.command = 'upgrade-agent'; o.upgradeAgent = next(); if (o.upgradeAgent !== 'opencode') throw new Error('--upgrade-agent takes opencode'); break;
       case '--undo': o.undo = true; break;
       case '--keep-backup': o.keepBackup = true; break;
       case '--confirm-removals': o.confirmRemovals = true; break;
@@ -170,6 +173,8 @@ const HELP = `Usage: lean-agents [options]
   --confirm-removals     With --adopt --yes and no terminal: also remove old npm copies, a duplicate skill folder and
                          hand-made stopgaps (all backed up; on a terminal a menu asks instead)
   --keep-backup          Keep the backup after a verified --adopt --yes (--adopt --undo needs it to restore bytes)
+  --upgrade-agent opencode  Dry run: classify the OpenCode 1.x config as managed, translatable to 2.x or manual and print the
+                         translation table; changes nothing (with --json: one JSON object). Apply and --undo come later
   --undo                 With --adopt: restore what the last --adopt --yes changed
   --version              Print the lean-agents version
   --usage                Print the Copilot credits left (one gh call, no model request)
@@ -395,6 +400,7 @@ function buildPlan(o) {
   }
   commands.push(...leanUpdateCommands(o.agents));
   if (o.tools.includes('coordinate')) commands.push(...coordinateCommands(o.agents));
+  if (o.tools.includes('lean-migrate')) commands.push(...leanMigrateCommands(o.agents));
   commands.push(...terminalCommands({ terminals: o.terminals, agents: o.agents, network: o.network, system: o.home === REAL_HOME }));
   actions.push(...gitBashActions({ home: o.home, terminals: o.terminals, agents: o.agents }));
   if (o.tools.includes('gsd')) {
@@ -651,6 +657,15 @@ async function main() {
   if (o.command === 'help') return console.log(HELP);
   if (o.command === 'version') return console.log(JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version);
   if (o.command === 'doctor') return process.exit(doctor({ home: o.home, state: readState(o.home), exec: o.exec, nodeVersion: NODE_VERSION, json: o.json }) ? 0 : 1);
+  if (o.command === 'upgrade-agent') {
+    if (o.undo || (o.yes && !o.dryRun)) throw new Error('--upgrade-agent opencode apply and --undo are not in this release yet; it only lists (dry run)');
+    const env = process.env;
+    const inv = await inventory({ home: o.home, env, realHome: REAL_HOME });
+    const bin = which('opencode');
+    const r = upgradeInventory(inv, { home: o.home, binary: { path: bin, version: bin && o.exec ? binVersion('opencode') : null } });
+    if (o.json) process.stdout.write(`${JSON.stringify(r, null, 2)}\n`); else console.log(formatUpgrade(r));
+    return process.exit(0);
+  }
   if ((o.undo || o.keepBackup || o.confirmRemovals) && o.command !== 'adopt') throw new Error('--undo, --keep-backup and --confirm-removals go with --adopt');
   if (o.command === 'adopt') {
     // Removals outside the JSON edits need a yes: a menu on a terminal, --confirm-removals without one.
