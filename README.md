@@ -160,7 +160,8 @@ Use `--lang es` to get the rules and replies in Spanish.
 
 Always start with `--dry-run`: it shows every file and command before anything changes. Then run it again without `--dry-run`; it asks which agents, tools, privacy level, language and model profile you want.
 
-- Useful flags: `--all-tools`, `--privacy strict`, `--lang es`, `--profile vertex-gemini`, `--update`, `--uninstall`, `--doctor`, `--json` (with `--dry-run` or `--doctor`, for agents) (`--help` lists them all).
+- Useful flags: `--all-tools`, `--privacy strict`, `--lang es`, `--profile vertex-gemini`, `--update`, `--uninstall`, `--doctor`, `--json` (with `--dry-run`, `--doctor` or `--adopt`, for agents) (`--help` lists them all).
+- `--adopt`: lists what a hand-built machine already has (MCP servers, Claude hooks and plugins, OpenCode plugins, skills, npm copies under each nvm Node, OpenCode session count), marks each one managed, user, stale, duplicate, drift or wrong-node, and prints the planned action. Alone it changes nothing; env and header values are never read. `--adopt --yes` applies the plan: it backs up every file it edits to `~/.config/lean-agents/adopt-<time>/` (owner-only), re-registers managed MCPs as `<tool Node> <entry>`, checks that each one answers `initialize` and that your own files and the OpenCode session count are unchanged, runs `--doctor`, and undoes itself if anything fails. Removing an old npm copy, a duplicate skill folder or a hand-made stopgap needs a yes (a menu on a terminal, `--confirm-removals` without one); otherwise they are listed and kept. `--keep-backup` keeps the backup after a good run; `--adopt --undo` restores every edited file byte for byte from it.
 - In PowerShell the common flags are PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`. Any other flag is passed as it is, for example `-DryRun --network off`.
 - Context Mode 2 needs Node.js 24.15 and GSD Core needs Node.js 24 (`engines.node` in `core/pins.json`). On an older active Node, lean-agents runs them on an nvm Node 24 without changing your default (nvm-windows: one already installed) and registers it with its absolute path; on Claude Code that means an MCP server instead of the Context Mode plugin, so its hooks and skills are not installed. Without nvm it skips them with one line. Everything else works on Node.js 22.20 or newer.
 - With Context Mode, the installer also sets up Bun by default (faster `ctx_execute`); add `--no-bun` (`-NoBun` in PowerShell) to skip it. With Antigravity, `--no-app` (`-NoApp`) skips installing the app. See the Bun row in [Install tiers](#install-tiers).
@@ -296,7 +297,7 @@ On Windows:
 <details>
 <summary>What is copied and what is not</summary>
 
-Copies the setup you already have in one tool to the agents you pick (`--agents`), for your user or, with `--project`, inside a repository. Sources: `claude`, `vscode-copilot`, `cursor`, `copilot-cli`, `opencode-v1`, `opencode-v2`, or `auto` (every one found). Paths and upstream sources: [compatibility notes](docs/compatibility.md).
+Copies the setup you already have in one tool to the agents you pick (`--agents`), for your user or, with `--project`, inside a repository. Sources: `claude`, `vscode-copilot`, `cursor`, `copilot-cli`, `opencode-v1`, `opencode-v2`, `antigravity` (user scope only), or `auto` (every one found). Paths and upstream sources: [compatibility notes](docs/compatibility.md).
 
 | Item | What happens |
 | --- | --- |
@@ -350,7 +351,7 @@ If your company pays for GitHub Copilot, the official way to use Claude as an ag
 | Tier | What | Default |
 | --- | --- | --- |
 | Minimal | Rules, tiered subagents, compaction, output limits, RTK, Context Mode | Always; `--no-core` (`-NoCore` in PowerShell) leaves out RTK and Context Mode |
-| Optional tools | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0), Codeburn, Copilot usage (credits left in OpenCode, read with `gh`; `lean-agents --usage` prints them) | Asked one by one |
+| Optional tools | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0), Codeburn, Copilot usage (credits left in the OpenCode sidebar and the Claude Code status line, read with `gh`; `lean-agents --usage` prints them) | Asked one by one |
 | Opt-in tools | GSD Core, AutoSkills (CC BY-NC 4.0: non-commercial use only), the `coordinate` skill (coordinator playbook, session prompt and worker watcher: [docs/agent-workflow.md](docs/agent-workflow.md)) | Asked one by one, never in `--all-tools` |
 | Strict privacy | No telemetry, no auto-updates, no session sharing, no providers that train on your prompts | Off, opt in with `--privacy strict` |
 | Network preset | All off (work PC), all on, or per category: telemetry, auto-updates, other outbound calls. Off sets switches only: install downloads and chosen tools are not blocked ([privacy.md](docs/privacy.md#what-each-preset-does-not-block)) | All on; `--network off` (same as `--privacy strict`) or `--telemetry`, `--auto-update`, `--outbound` |

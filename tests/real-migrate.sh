@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-# Migrates fixture setups with the real OpenCode 2 and Claude Code binaries in a throwaway HOME:
-# a VS Code Copilot repository (project scope) and a Cursor user setup (user scope, where the
-# Claude MCP server goes through `claude mcp add`). Used by CI; safe locally because HOME is a temp directory.
+# Migrates fixture setups with the real OpenCode 2, Claude Code and Antigravity (agy) binaries in a throwaway HOME:
+# a VS Code Copilot repository (project scope), a Cursor user setup (user scope, where the Claude MCP server
+# goes through `claude mcp add`), then Cursor and Claude into Antigravity (read back by agy) and Antigravity
+# into Claude and OpenCode 2. Used by CI; safe locally because HOME is a temp directory.
 set -euo pipefail
 
 command -v opencode >/dev/null || { echo "opencode not on PATH" >&2; exit 1; }
 command -v claude >/dev/null || { echo "claude not on PATH" >&2; exit 1; }
+command -v agy >/dev/null || { echo "agy not on PATH" >&2; exit 1; }
 
+agy_bin="$(command -v agy)"
 HOME="$(mktemp -d)"
 export HOME
 export XDG_CONFIG_HOME="$HOME/.config"
@@ -70,11 +73,43 @@ check grep -q 'helper' "$HOME/user-agents.txt"
 check test -f "$HOME/.claude/agents/helper.md"
 refute grep -rq "$secret" "$HOME/.claude" "$HOME/.config/opencode" "$HOME/.claude.json" "$HOME/claude-gh.txt" "$HOME/claude-remote.txt" "$HOME/user-config.txt"
 
-# 3. Uninstall removes the Claude server it added.
+# 3. Into Antigravity: Cursor's agent, skill and MCP servers, and a Claude rule; agy reads them back.
+mkdir -p "$HOME/.claude"
+printf 'Be brief.\n' > "$HOME/.claude/CLAUDE.md"
+mkdir -p "$HOME/.cursor/skills/demo"
+printf -- '---\nname: demo\ndescription: Demo skill.\n---\nSay hi.\n' > "$HOME/.cursor/skills/demo/SKILL.md"
+bash "$repo/install.sh" --yes --no-exec --migrate cursor --agents antigravity
+bash "$repo/install.sh" --yes --no-exec --migrate claude --agents antigravity
+ag="$HOME/.gemini/config"
+"$agy_bin" agents </dev/null > "$HOME/agy-agents.txt" 2>&1 || true
+"$agy_bin" mcp list </dev/null > "$HOME/agy-mcp.txt" 2>&1 || true
+check grep -q 'helper' "$HOME/agy-agents.txt"
+check grep -q 'gh' "$HOME/agy-mcp.txt"
+check grep -q 'Be brief' "$ag/rules/migrated-rules.md"
+# The skills folder is VERIFY upstream: record what agy says, only the file is checked.
+check test -f "$ag/skills/demo/SKILL.md"
+refute grep -rq "$secret" "$ag" "$HOME/agy-agents.txt" "$HOME/agy-mcp.txt"
+
+# 4. From Antigravity: an agent and an MCP server written there land in Claude Code and OpenCode 2.
+printf '%s\n' '---' 'name: fromagy' 'description: From agy' 'subagent: true' '---' 'Hello.' > "$ag/agents/fromagy.md"
+node -e 'const f=process.argv[1],fs=require("fs"),c=JSON.parse(fs.readFileSync(f,"utf8"));c.mcpServers.agymcp={command:"npx",args:["-y","agy-mcp"]};fs.writeFileSync(f,JSON.stringify(c))' "$ag/mcp_config.json"
+bash "$repo/install.sh" --yes --migrate antigravity --agents claude,opencode-v2
+claude mcp get agymcp > "$HOME/claude-agymcp.txt" 2>&1 || true
+opencode debug config > "$HOME/user-config2.txt"
+agents_in "$HOME" "$HOME/user-agents2.txt" fromagy
+check grep -q 'agy-mcp' "$HOME/claude-agymcp.txt"
+check grep -q 'agy-mcp' "$HOME/user-config2.txt"
+check grep -q 'fromagy' "$HOME/user-agents2.txt"
+check test -f "$HOME/.claude/agents/fromagy.md"
+
+# 5. Uninstall removes the Claude server it added.
 bash "$repo/install.sh" --yes --uninstall
 refute claude mcp get gh
+refute claude mcp get agymcp
+refute test -e "$ag/rules/migrated-rules.md"
+refute test -e "$ag/agents/helper.md"
 
 if [ "$fail" -ne 0 ]; then
-  for f in project-config.txt project-agents.txt claude-gh.txt claude-remote.txt user-config.txt user-agents.txt; do echo "--- $f"; head -60 "$HOME/$f"; done
+  for f in project-config.txt project-agents.txt claude-gh.txt claude-remote.txt user-config.txt user-agents.txt agy-agents.txt agy-mcp.txt claude-agymcp.txt user-agents2.txt; do echo "--- $f"; head -60 "$HOME/$f"; done
   exit 1
 fi

@@ -35,5 +35,7 @@ $env:Path = "$($old.DirectoryName);$env:Path"
 
 $bash = "$env:ProgramFiles\Git\bin\bash.exe"
 if (-not (Test-Path $bash)) { throw 'Git Bash is not on the runner' }
-& $bash "$repo/tests/real-tool-node.sh"
-if ($LASTEXITCODE -ne 0) { throw "real-tool-node.sh failed ($LASTEXITCODE)" }
+# TOOL_NODE_TEST names another script that needs the same nvm-windows setup (real-adopt.sh).
+$test = if ($env:TOOL_NODE_TEST) { $env:TOOL_NODE_TEST } else { 'real-tool-node.sh' }
+& $bash "$repo/tests/$test"
+if ($LASTEXITCODE -ne 0) { throw "$test failed ($LASTEXITCODE)" }

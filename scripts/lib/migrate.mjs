@@ -12,6 +12,7 @@ import { vscodeUserDir } from './adapters/vscode-copilot.mjs';
 import { renderClaudeAgent } from './adapters/claude.mjs';
 import { renderCopilotAgent } from './adapters/copilot-cli.mjs';
 import { renderCursorAgent } from './adapters/cursor.mjs';
+import { renderAntigravityAgent } from './adapters/antigravity.mjs';
 
 const j = path.join;
 
@@ -74,6 +75,16 @@ const opencodeSource = (b, user, from) => {
     mcp: [[configPath(user ? cfg : b), from === 'opencode-v1' ? ['mcp'] : ['mcp', 'servers']]], hooks: [], verify: [],
   };
 };
+// Antigravity: ~/.gemini/config (agy 1.4.12 in CI). Project scope paths are unproven (VERIFY), so there is none.
+// Skills dir and GEMINI.md/AGENTS.md are docs only (VERIFY): GEMINI.md/AGENTS.md are only reported.
+SOURCES.antigravity = (b, user) => {
+  if (!user) return { rules: [], ruleDirs: [], agents: null, skills: null, prompts: null, mcp: [], hooks: [], verify: [] };
+  const d = j(b, '.gemini', 'config');
+  return {
+    rules: [], ruleDirs: [[j(d, 'rules'), '.md']], agents: [j(d, 'agents'), '.md'], skills: j(d, 'skills'), prompts: null,
+    mcp: [[j(d, 'mcp_config.json'), ['mcpServers']]], hooks: [], verify: [j(b, '.gemini', 'GEMINI.md'), j(b, '.gemini', 'AGENTS.md')],
+  };
+};
 SOURCES['opencode-v1'] = opencodeSource;
 SOURCES['opencode-v2'] = opencodeSource;
 
@@ -110,7 +121,7 @@ function skillFiles(dir) {
 }
 
 // Names of env and header keys only; values never leave this function.
-function mcpServers(file, keyPath) {
+export function mcpServers(file, keyPath) {
   const raw = text(file);
   const root = raw && parse(raw, [], { allowTrailingComma: true });
   let node = root;
@@ -221,6 +232,17 @@ const TARGETS = {
       rulesPath: user ? j(c, 'copilot-instructions.md') : j(b, 'AGENTS.md'),
     };
   },
+};
+TARGETS.antigravity = (b, user) => {
+  if (!user) throw new Error('cannot migrate to antigravity with --project: its project paths are unverified, use user scope');
+  const d = j(b, '.gemini', 'config');
+  return {
+    agent: [j(d, 'agents'), '.md', (a) => renderAntigravityAgent(a, null)], skills: j(d, 'skills'), prompts: null,
+    // Remote key `serverUrl` is from the docs only (VERIFY). No env syntax is verified, so env names are only reported.
+    mcp: { file: j(d, 'mcp_config.json'), key: ['mcpServers'], value: (s) => (s.url ? { serverUrl: s.url } : { command: s.command[0], args: s.command.slice(1) }) },
+    rules: (_f, body) => [{ kind: 'file', path: j(d, 'rules', 'migrated-rules.md'), content: body }],
+    rulesPath: j(d, 'rules', 'migrated-rules.md'),
+  };
 };
 const opencodeTarget = (v2) => (b, user) => {
   const cfg = user ? j(configHome(b), 'opencode') : j(b, '.opencode');

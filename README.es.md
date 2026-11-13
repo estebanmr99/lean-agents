@@ -160,7 +160,8 @@ Usa `--lang es` para que las reglas y las respuestas queden en español.
 
 Empieza siempre con `--dry-run`: muestra cada archivo y comando antes de cambiar nada. Luego córrelo otra vez sin `--dry-run`; te pregunta qué agentes, herramientas, nivel de privacidad, idioma y perfil de modelos quieres.
 
-- Opciones útiles: `--all-tools`, `--privacy strict`, `--lang es`, `--profile vertex-gemini`, `--update`, `--uninstall`, `--doctor`, `--json` (con `--dry-run` o `--doctor`, para agentes) (`--help` las lista todas).
+- Opciones útiles: `--all-tools`, `--privacy strict`, `--lang es`, `--profile vertex-gemini`, `--update`, `--uninstall`, `--doctor`, `--json` (con `--dry-run`, `--doctor` o `--adopt`, para agentes) (`--help` las lista todas).
+- `--adopt`: lista lo que ya tiene una máquina armada a mano (servidores MCP, hooks y plugins de Claude, plugins de OpenCode, skills, copias npm bajo cada Node de nvm, número de sesiones de OpenCode), marca cada elemento como managed, user, stale, duplicate, drift o wrong-node e imprime la acción prevista. Solo, no cambia nada; nunca lee valores de env ni de cabeceras. `--adopt --yes` aplica el plan: copia cada archivo que edita a `~/.config/lean-agents/adopt-<hora>/` (solo para ti), registra los MCP administrados como `<Node de la herramienta> <entrada>`, comprueba que cada uno responde a `initialize` y que tus archivos y el número de sesiones de OpenCode no cambian, ejecuta `--doctor` y se deshace solo si algo falla. Quitar una copia npm vieja, una carpeta de skill duplicada o un parche hecho a mano pide confirmación (un menú en terminal, `--confirm-removals` sin terminal); si no, se listan y se dejan. `--keep-backup` conserva la copia tras una ejecución correcta; `--adopt --undo` restaura cada archivo editado byte a byte desde ella.
 - En PowerShell las opciones comunes van en PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`. Cualquier otra opción se pasa tal cual, por ejemplo `-DryRun --network off`.
 - Context Mode 2 necesita Node.js 24.15 y GSD Core necesita Node.js 24 (`engines.node` en `core/pins.json`). Con un Node activo más antiguo, lean-agents los ejecuta con un Node 24 de nvm sin cambiar tu Node por defecto (nvm-windows: uno ya instalado) y lo registra con su ruta absoluta; en Claude Code eso significa un servidor MCP en lugar del plugin de Context Mode, así que sus hooks y skills no se instalan. Sin nvm los omite con una línea. Todo lo demás funciona con Node.js 22.20 o superior.
 - Con Context Mode, el instalador también instala Bun por defecto (`ctx_execute` más rápido); añade `--no-bun` (`-NoBun` en PowerShell) para omitirlo. Con Antigravity, `--no-app` (`-NoApp`) omite la instalación de la app. Ver la fila de Bun en [Niveles de instalación](#niveles-de-instalación).
@@ -296,7 +297,7 @@ En Windows:
 <details>
 <summary>Qué se copia y qué no</summary>
 
-Copia la configuración que ya tienes en una herramienta a los agentes que elijas (`--agents`), para tu usuario o, con `--project`, dentro de un repositorio. Orígenes: `claude`, `vscode-copilot`, `cursor`, `copilot-cli`, `opencode-v1`, `opencode-v2` o `auto` (todos los que encuentre). Rutas y fuentes oficiales: [notas de compatibilidad](docs/compatibility.md).
+Copia la configuración que ya tienes en una herramienta a los agentes que elijas (`--agents`), para tu usuario o, con `--project`, dentro de un repositorio. Orígenes: `claude`, `vscode-copilot`, `cursor`, `copilot-cli`, `opencode-v1`, `opencode-v2`, `antigravity` (solo a nivel de usuario) o `auto` (todos los que encuentre). Rutas y fuentes oficiales: [notas de compatibilidad](docs/compatibility.md).
 
 | Elemento | Qué pasa |
 | --- | --- |
@@ -350,7 +351,7 @@ Si tu empresa paga GitHub Copilot, la forma oficial de usar Claude como agente e
 | Nivel | Qué incluye | Por defecto |
 | --- | --- | --- |
 | Mínimo | Reglas, subagentes por costo, compactación, límites de salida, RTK, Context Mode | Siempre; `--no-core` (`-NoCore` en PowerShell) deja fuera RTK y Context Mode |
-| Herramientas opcionales | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0), Codeburn, Copilot usage (créditos restantes en OpenCode, leídos con `gh`; `lean-agents --usage` los imprime) | Se pregunta una por una |
+| Herramientas opcionales | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0), Codeburn, Copilot usage (créditos restantes en la barra lateral de OpenCode y en la línea de estado de Claude Code, leídos con `gh`; `lean-agents --usage` los imprime) | Se pregunta una por una |
 | Herramientas por elección | GSD Core, AutoSkills (CC BY-NC 4.0: solo uso no comercial), la skill `coordinate` (guía de coordinador, plantilla de prompt y vigilante de workers: [docs/agent-workflow.md](docs/agent-workflow.md)) | Se pregunta una por una, nunca en `--all-tools` |
 | Privacidad estricta | Sin telemetría, sin auto updates, sin compartir sesiones, sin proveedores que entrenan con tus prompts | Apagado, se activa con `--privacy strict` |
 | Preset de red | Todo apagado (PC de trabajo), todo encendido, o por categoría: telemetría, auto updates, otras salidas. Apagado solo cambia interruptores: las descargas de la instalación y las herramientas elegidas no se bloquean ([privacy.md](docs/privacy.md#what-each-preset-does-not-block)) | Todo encendido; `--network off` (igual que `--privacy strict`) o `--telemetry`, `--auto-update`, `--outbound` |

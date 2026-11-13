@@ -300,9 +300,8 @@ jobs:
       - name: Install lean-agents and check what OpenCode resolved
         run: bash tests/real-opencode.sh
 
-  real-migrate:
-    # --migrate with the real OpenCode 2 and Claude Code binaries, throwaway HOME, no login:
-    # `claude mcp add` runs here (no --no-exec) and `claude mcp get` reads the result back.
+  real-usage-v2:
+    # Copilot credits (#123) in the real OpenCode 2 TUI: sidebar box and /copilot-usage toast, fake gh, throwaway HOME.
     needs: changes
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 10
@@ -317,10 +316,37 @@ jobs:
         with:
           node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
       - run: npm ci
-      - name: Install Claude Code and OpenCode 2
+      - name: Install OpenCode 2
+        run: |
+          bash scripts/ci-install-opencode-v2.sh
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+      - name: Sidebar and /copilot-usage in the TUI
+        run: python3 tests/real-usage-v2.py
+
+  real-migrate:
+    # --migrate with the real OpenCode 2, Claude Code and Antigravity (agy) binaries, throwaway HOME, no login:
+    # `claude mcp add` runs here (no --no-exec) and `claude mcp get` reads the result back;
+    # migrations into Antigravity are read back with `agy agents` and `agy mcp list`.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
+      - run: npm ci
+      - name: Install Claude Code, OpenCode 2 and Antigravity CLI
         run: |
           npm install -g "$(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('claude-code')))")"
           bash scripts/ci-install-opencode-v2.sh
+          bash scripts/ci-download.sh antigravity-installer "$RUNNER_TEMP/agy-install"
+          bash "$RUNNER_TEMP/agy-install"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - run: bash tests/real-migrate.sh
@@ -558,6 +584,14 @@ jobs:
           grep -q playwright "$HOME/mcp.txt"
           if ! grep -q 'context-mode needs Node >=24.15.0' "$HOME/install.txt"; then grep -q 'plugin:context-mode' "$HOME/mcp.txt"; fi
           grep -q 'rtk hook' "$HOME/.claude/settings.json"
+          # Claude status line (#123): written because the fresh HOME had none; run its command with a fake gh.
+          mkdir -p "$HOME/fakegh"
+          printf '%s\n' '#!/bin/sh' "echo '{\"quota_reset_date\":\"2026-12-01\",\"quota_snapshots\":{\"premium_interactions\":{\"unlimited\":false,\"entitlement\":25000,\"remaining\":15441,\"percent_remaining\":61.7}}}'" > "$HOME/fakegh/gh"
+          chmod +x "$HOME/fakegh/gh"
+          cmd="$(node -p 'JSON.parse(require("fs").readFileSync(process.env.HOME + "/.claude/settings.json", "utf8")).statusLine.command')"
+          line="$(echo '{}' | PATH="$HOME/fakegh:$PATH" TMPDIR="$(mktemp -d)" bash -c "$cmd")"
+          echo "status line: $line"
+          test "$line" = 'Copilot: 15441 of 25000 credits left (61%), about $154.41 of $250.00, resets 2026-12-01'
           test -f "$HOME/.claude/skills/caveman/SKILL.md"
           grep -q '^disable-model-invocation: false$' "$HOME"/.claude/plugins/cache/i-have-adhd/i-have-adhd/*/skills/i-have-adhd/SKILL.md
           node -e 'JSON.parse(require("fs").readFileSync(process.env.HOME + "/.claude/settings.json", "utf8"))'
@@ -568,6 +602,8 @@ jobs:
           cat "$HOME/mcp-after.txt"
           if grep -qE 'serena|playwright|context-mode' "$HOME/mcp-after.txt"; then exit 1; fi
           if grep -q 'rtk hook' "$HOME/.claude/settings.json"; then exit 1; fi
+          if grep -q statusLine "$HOME/.claude/settings.json"; then exit 1; fi
+          test ! -e "$HOME/.claude/lean-copilot-usage-statusline.mjs"
           test ! -e "$HOME/.claude/skills/caveman"
 
   real-tools:
@@ -986,6 +1022,46 @@ jobs:
         shell: pwsh
         env:
           NVM_SETUP: ${{ runner.temp }}\nvm-setup.exe
+        run: ./tests/real-tool-node.ps1
+
+  real-adopt:
+    # --adopt --yes on a hand-built HOME (#106): real nvm with Node 22.20 first and Node 24 installed, real npm and Context Mode. Dry run changes nothing,
+    # apply verifies (initialize, doctor, sessions, user files), --adopt --undo restores every byte. Throwaway HOME.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.20.0
+      - run: npm ci
+      - name: nvm (v0.41.0), Node 22.20 and 24, then the adopt run
+        if: runner.os == 'Linux'
+        run: |
+          bash scripts/ci-download.sh nvm-sh "$RUNNER_TEMP/nvm.sh"
+          NVM_SH="$RUNNER_TEMP/nvm.sh" bash tests/real-adopt.sh
+      - name: Download nvm-windows
+        if: runner.os == 'Windows'
+        run: bash scripts/ci-download.sh nvm-windows-x64-setup "$RUNNER_TEMP/nvm-setup.exe"
+      - name: nvm-windows, Node 22.20 and 24, then the adopt run
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          NVM_SETUP: ${{ runner.temp }}\nvm-setup.exe
+          TOOL_NODE_TEST: real-adopt.sh
         run: ./tests/real-tool-node.ps1
 
   real-cursor:

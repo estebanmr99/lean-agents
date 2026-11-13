@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { plan, apply, undo } from '../scripts/lib/fsops.mjs';
+import { plan, apply, undo, applyJsonEdits, revertJsonEdits } from '../scripts/lib/fsops.mjs';
 
 const edit = (value) => ({ path: ['plugin'], value, mode: 'arrayAdd', legacy: ['@scope/pkg'] });
 
@@ -60,4 +60,12 @@ test('user entry survives bump and uninstall of a pre-existing list', () => {
   assert.deepEqual(t.list(), ['other', '@scope/pkg@2.0.0']);
   undo(t.files(), [t.home]);
   assert.deepEqual(t.list(), ['other']);
+});
+
+test('mode remove drops the key, records the old value, and undo writes it back', () => {
+  const text = '{\n  "a": { "x": 1, "y": [2] },\n  "b": true\n}\n';
+  const r = applyJsonEdits(text, [{ path: ['a', 'x'], mode: 'remove', previous: 1 }, { path: ['a', 'gone'], mode: 'remove' }]);
+  assert.deepEqual(JSON.parse(r.text), { a: { y: [2] }, b: true });
+  assert.equal(r.applied.length, 1, 'a key that is not there is skipped');
+  assert.deepEqual(JSON.parse(revertJsonEdits(r.text, r.applied)), JSON.parse(text));
 });

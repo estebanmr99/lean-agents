@@ -138,6 +138,68 @@ if [ -e "$n24/lib/node_modules/context-mode" ] || [ -e "$n24/node_modules/contex
 [ -d "$n24" ] || fail "uninstall removed Node 24"
 if claude mcp get context-mode >/dev/null 2>&1; then fail "claude still has the context-mode entry"; fi
 
+echo "--- --doctor shows the Node per tool: a symlink-launched MCP is flagged, an absolute one is ok, a duplicate skill is reported (#104, #132)"
+native() { if [ "$os" = windows ]; then cygpath -w "$1"; else printf '%s\n' "$1"; fi; }
+# A link to Node 22 like nvm's "current" (a directory junction on Windows, which needs no admin rights).
+link="$T/node-current"
+# The doctor calls a link "nvm's" only at $NVM_DIR/current (POSIX) or at NVM_SYMLINK (nvm-windows).
+if [ "$os" = linux ]; then link="$NVM_DIR/current"; else NVM_SYMLINK="$(native "$link")"; export NVM_SYMLINK; fi
+node -e "require('fs').symlinkSync(process.argv[1], process.argv[2], 'junction')" "$(native "$versions/v22.20.0")" "$(native "$link")"
+if [ "$os" = linux ]; then link_node="$link/bin/node"; abs_node="$n24/bin/node"; mods="$n24/lib/node_modules"; else link_node="$link/node.exe"; abs_node="$n24/node.exe"; mods="$n24/node_modules"; fi
+mkdir -p "$HOME/.copilot" "$HOME/.agents/skills/dup-demo" "$HOME/.claude/skills/dup-demo"
+node -e "
+const [file, link, abs, mods] = process.argv.slice(1);
+const cli = require('path').join(mods, 'context-mode', 'cli.mjs');
+require('fs').writeFileSync(file, JSON.stringify({ mcpServers: { 'ctx-link': { command: link, args: [cli, 'server'] }, 'ctx-abs': { command: abs, args: [cli, 'server'] } } }));
+" "$HOME/.copilot/mcp-config.json" "$(native "$link_node")" "$(native "$abs_node")" "$(native "$mods")"
+echo '# one' > "$HOME/.agents/skills/dup-demo/SKILL.md"
+echo '# two' > "$HOME/.claude/skills/dup-demo/SKILL.md"
+lean --doctor --json --no-exec > "$T/doctor.json" || true
+node -e "
+const d = JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'));
+console.log(JSON.stringify({ nodes: d.nodes, skills: d.skills }, null, 2));
+const n = Object.fromEntries(d.nodes.map((x) => [x.name, x]));
+const bad = [];
+if (n['ctx-link']?.style !== 'symlink' || n['ctx-link'].status !== 'error' || !/^22\./.test(n['ctx-link'].nodeVersion)) bad.push('ctx-link is not a flagged symlink on Node 22');
+if (n['ctx-abs']?.style !== 'absolute' || n['ctx-abs'].status !== 'ok' || !/^24\./.test(n['ctx-abs'].nodeVersion)) bad.push('ctx-abs is not an ok absolute Node 24');
+const s = d.skills.find((x) => x.name === 'dup-demo');
+if (!s || !s.differs || s.winner !== 'unknown (load order)') bad.push('dup-demo is not reported as a differing duplicate');
+if (bad.length) { console.log('FAIL ' + bad.join('; ')); process.exit(1); }
+" "$T/doctor.json" || fail "the doctor rows are wrong (see above)"
+
+echo "--- --adopt --json on a hand-built HOME classifies it and writes nothing (#106)"
+fixture="$repo/tests/fixtures/handbuilt.mjs"
+seed_win=posix
+if [ "$os" = windows ]; then seed_win=win; fi
+seed_json="$(node "$fixture" "$home" "$(native "$versions/v22.20.0")" 22.20.0 "$(native "$n24")" "$(basename "$n24" | cut -c2-)" "$(native "$link")" "$seed_win")"
+echo "seeded: $seed_json"
+out="$(mktemp -d)" # outside HOME, which is hashed
+hash_before="$(node "$fixture" hash "$home")"
+lean --adopt --json --no-exec > "$out/adopt.json" 2> "$out/adopt.err" || { cat "$out/adopt.err"; fail "--adopt --json failed"; }
+lean --adopt --dry-run --no-exec > "$out/adopt.txt" || fail "--adopt failed"
+hash_after="$(node "$fixture" hash "$home")"
+[ "$hash_before" = "$hash_after" ] || fail "--adopt changed the HOME tree"
+node -e "
+const r = JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'));
+const seed = JSON.parse(process.argv[2]);
+console.log(JSON.stringify({ toolNode: r.toolNode, opencode: r.opencode, plan: r.plan, stopgaps: r.stopgaps }, null, 2));
+const f = (kind, name, client) => r.items.find((i) => i.kind === kind && i.name === name && (!client || i.client === client));
+const bad = [];
+if (r.version !== 1) bad.push('version');
+if (!f('mcp', 'context-mode', 'claude')?.status.includes('wrong-node')) bad.push('bare npx MCP is not wrong-node');
+if (f('mcp', 'ctx-link')?.launch.style !== 'symlink') bad.push('ctx-link is not a symlink launch');
+if (f('mcp', 'relay')?.owner !== 'user' || f('mcp', 'relay').action !== 'keep') bad.push('relay is not a kept user MCP');
+if (!f('plugin', 'ghost@nowhere')?.status.includes('stale')) bad.push('no stale enabledPlugins');
+if (f('plugin', 'plugins/rtk.ts')?.owner !== 'user') bad.push('rtk.ts is not a user plugin');
+if (r.items.filter((i) => i.kind === 'skill' && i.name === 'dup-demo' && i.status.includes('duplicate')).length !== 2) bad.push('duplicate skill');
+if (r.items.filter((i) => i.kind === 'npm' && i.status.includes('duplicate')).length !== 2) bad.push('npm copies are not both duplicates');
+if (r.toolNode.source !== 'reuse' || !/^24\./.test(r.toolNode.version)) bad.push('tool Node is not the installed Node 24');
+if (!r.stopgaps.length) bad.push('no stopgaps');
+if (seed.sessions !== null && r.opencode.sessions !== seed.sessions) bad.push('session count ' + r.opencode.sessions);
+if (JSON.stringify(r).includes('relay-env-secret') || JSON.stringify(r).includes('relay-header-secret') || JSON.stringify(r).includes('hook-arg-secret')) bad.push('secret in output');
+if (bad.length) { console.log('FAIL ' + bad.join('; ')); process.exit(1); }
+" "$out/adopt.json" "$seed_json" || fail "the --adopt report is wrong (see above)"
+
 echo "--- no nvm: the skip line, and no context-mode key"
 if [ "$os" = linux ]; then export NVM_DIR="$T/no-nvm"; else unset NVM_HOME; fi
 rm -rf "$HOME/.config" "$HOME/.cursor"
