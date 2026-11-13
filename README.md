@@ -6,7 +6,7 @@
 
 **Your agent is only as good as its setup. lean-agents does the setup.**
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![CI](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml) [![Secret scan](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml) ![GitHub stars](https://img.shields.io/github/stars/estebanmr99/lean-agents?style=social)
+[![npm](https://img.shields.io/npm/v/lean-agents.svg)](https://www.npmjs.com/package/lean-agents) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![CI](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml) [![Secret scan](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml) ![GitHub stars](https://img.shields.io/github/stars/estebanmr99/lean-agents?style=social)
 
 [Leer en español](README.es.md)
 
@@ -152,7 +152,7 @@ Claude Desktop and Cursor demo paths come later.
 
 The commands are at the top: the agent prompt, the install command and the update prompt. The bootstraps download the latest release, check it against the release's `SHA256SUMS`, and only then run it (`LEAN_AGENTS_VERSION=0.7.0` pins a release). Once installed, `--dry-run`, `--doctor` and `--uninstall` need no network. A local checkout (`bash install.sh` from a clone) is trusted as it is; only the release download is checksum-verified.
 
-Once the npm package is published, `npx lean-agents@latest` will run the same commands (Node.js 22.20+ and git).
+With Node.js 22.20+ and git, [`npx lean-agents@latest`](https://www.npmjs.com/package/lean-agents) runs the same commands (for example `npx lean-agents@latest --doctor`).
 
 The agent prompts have [a guide](docs/install-with-an-agent.md) with the steps and `--json` output; [the update steps](docs/install-with-an-agent.md#update-with-an-agent) work without the `lean-update` skill too.
 
