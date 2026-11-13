@@ -176,3 +176,37 @@ test('an empty hook command is skipped and a plugin URL query is not printed', a
   assert.ok(!JSON.stringify(r).includes('qsecret-1'));
   fs.rmSync(home, { recursive: true, force: true });
 });
+
+test('an inline VAR=value prefix in a hook never becomes the printed name', async () => {
+  const home = fs.realpathSync(fs.mkdtempSync(j(os.tmpdir(), 'adopt-envhook-')));
+  fs.mkdirSync(j(home, '.claude'), { recursive: true });
+  fs.writeFileSync(j(home, '.claude', 'settings.json'), JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: 'API_KEY=hsecret-9 node hook.js' }] }] } }));
+  const r = await inventory({ home, env: { PATH: '' }, platform: process.platform, realHome: '/nowhere' });
+  assert.equal(r.items.find((i) => i.kind === 'hook')?.name, 'Stop:node');
+  assert.ok(!JSON.stringify(r).includes('hsecret-9'));
+  fs.rmSync(home, { recursive: true, force: true });
+});
+
+test('--undo keeps the backup when a removed folder exists again', { skip }, async () => {
+  const s = await seeded();
+  assert.equal(lean(s.home, ['--yes', '--keep-backup', '--confirm-removals']).status, 0);
+  const dup = j(s.home, '.agents', 'skills', 'dup-demo');
+  fs.mkdirSync(dup, { recursive: true });
+  fs.writeFileSync(j(dup, 'SKILL.md'), 'new\n');
+  const u = lean(s.home, ['--undo']);
+  assert.notEqual(u.status, 0, 'a folder left behind is a problem, not "Undone."');
+  const st = JSON.parse(fs.readFileSync(j(s.home, '.config', 'lean-agents', 'state.json'), 'utf8'));
+  assert.ok(st.adopt?.backupDir && fs.existsSync(j(st.adopt.backupDir, 'dirs', '.agents', 'skills', 'dup-demo')), 'the only copy stays in the backup');
+});
+
+test('--confirm-removals never deletes through a symlinked folder', { skip: process.platform === 'win32' && 'symlinks need admin on Windows' }, async () => {
+  const s = await seeded();
+  const outside = fs.realpathSync(fs.mkdtempSync(j(os.tmpdir(), 'adopt-outside-')));
+  const dup = j(s.home, '.agents', 'skills', 'dup-demo');
+  fs.cpSync(dup, j(outside, 'dup-demo'), { recursive: true });
+  fs.rmSync(dup, { recursive: true });
+  fs.symlinkSync(j(outside, 'dup-demo'), dup);
+  lean(s.home, ['--yes', '--keep-backup', '--confirm-removals']);
+  assert.ok(fs.existsSync(j(outside, 'dup-demo', 'SKILL.md')), 'the target outside HOME is untouched');
+  fs.rmSync(outside, { recursive: true, force: true });
+});

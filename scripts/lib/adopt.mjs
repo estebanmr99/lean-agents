@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'jsonc-parser';
-import { hasMark, plan as planFiles, revertJsonEdits, sha, writePrivate, privateDir, dropBackups } from './fsops.mjs';
+import { hasMark, plan as planFiles, revertJsonEdits, sha, writePrivate, privateDir, dropBackups, unsafe } from './fsops.mjs';
 import { PINS, npmSpec, pinVersions } from './pins.mjs';
 import { configHome, envDir } from './system.mjs';
 import { configPath } from './adapters/opencode-v2.mjs';
@@ -99,6 +99,8 @@ export async function inventory({ home, env = process.env, platform = process.pl
       for (const h of Array.isArray(g?.hooks) ? g.hooks : []) {
         if (typeof h?.command !== 'string') continue;
         const argv = h.command.split(/\s+/).filter(Boolean);
+        // Inline `VAR=value` prefixes can hold secrets: never use them as the name.
+        while (argv.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(argv[0])) argv.shift();
         if (!argv.length) continue;
         const pin = pinOf(argv);
         const launch = launchOf(argv, { env, platform, fsx });
@@ -369,6 +371,8 @@ export async function adoptApply(o) {
   // 3. removals: copy into the backup, then delete
   const drop = (list, label) => {
     for (const d of list) {
+      const why = unsafe(d, [home]);
+      if (why) { console.log(`  kept ${label} ${rel(d)}: ${why}`); continue; }
       const backup = j(backupDir, 'dirs', relIn(home, d));
       privateDir(path.dirname(backup), stateDir);
       fs.cpSync(d, backup, { recursive: true });
@@ -443,7 +447,8 @@ export async function adoptUndo(o) {
   }
   for (const d of a.dirs) {
     if (!d.backup || !fs.existsSync(d.backup)) { console.log(`  ! no backup for ${d.path}; nothing restored`); ok = false; continue; }
-    if (fs.existsSync(d.path)) { console.log(`  left ${d.path} (it exists again)`); continue; }
+    // Keep the backup: it is the only copy of this folder.
+    if (fs.existsSync(d.path)) { console.log(`  left ${d.path} (it exists again); its copy stays in the backup`); ok = false; continue; }
     fs.mkdirSync(path.dirname(d.path), { recursive: true });
     fs.cpSync(d.backup, d.path, { recursive: true });
     console.log(`  restored ${d.path}`);
@@ -452,6 +457,8 @@ export async function adoptUndo(o) {
     let now = null;
     try { now = bytes(f.path); } catch { /* gone */ }
     if (now === null) { console.log(`  ! ${f.path} is gone; left`); continue; }
+    const why = unsafe(f.path, [home, configHome(home)]);
+    if (why) { console.log(`  ! ${f.path}: ${why}`); ok = false; continue; }
     if (sha(now) === f.after && f.backup && fs.existsSync(f.backup)) { fs.writeFileSync(f.path, bytes(f.backup)); console.log(`  restored ${f.path}`); continue; }
     // Edited since (or no backup kept): take back only our keys.
     fs.writeFileSync(f.path, revertJsonEdits(now.toString('utf8'), f.applied ?? []));

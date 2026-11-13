@@ -181,7 +181,7 @@ Empieza siempre con `--dry-run`: muestra cada archivo y comando antes de cambiar
 | Reglas globales (AGENTS.md) | ✅ | ✅ | ✅ | ✅ | ⚠️ se escriben, carga sin probar |
 | Subagentes por costo | ✅ | ✅ | ✅ | ✅ | ✅ flash, pro |
 | RTK (comprime la salida del shell) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Context Mode | ✅ plugin | ✅ MCP | ✅ plugin | ✅ plugin | ✅ plugin |
+| Context Mode | ✅ plugin | ✅ MCP | ✅ plugin | ✅ MCP | ➖ omitido (sin setup v2) |
 | Serena + Playwright MCP | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Navegador con tu sesión (opcional) | ➖ Claude in Chrome | ✅ opcional | ✅ opcional | ✅ opcional | ➖ |
 | Ponytail | ✅ | ✅ | ✅ | ➖ | ➖ |
@@ -407,7 +407,7 @@ Los subagentes piden un nivel (`fast`, `balanced`, `strong`), no un modelo. En C
 - Respalda cada archivo antes de tocarlo. `--uninstall` lo restaura.
 - Nunca sobrescribe tu `AGENTS.md` ni tu `CLAUDE.md`: los importa o agrega un bloque marcado.
 - Nunca pide, guarda ni muestra API keys. Tú inicias sesión en los proveedores.
-- No necesita permisos de administrador (`--no-admin`), así que funciona en laptops de trabajo restringidas.
+- No necesita permisos de administrador, así que funciona en laptops de trabajo restringidas.
 - Se puede revisar antes de instalar: [docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md) es un prompt que tu agente corre sobre este repo.
 
 ## Créditos

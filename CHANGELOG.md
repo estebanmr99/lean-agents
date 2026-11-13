@@ -21,6 +21,11 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - Git Bash as OpenCode's default shell on Windows (#124 follow-up): `--shell default|git-bash` (default `git-bash`). When Git Bash is found, OpenCode's `shell` key is set to its absolute `bash.exe` path through the usual `setIfAbsent` json edit, so a `shell` you already set is never overwritten; `--shell default` opts out; `--uninstall` removes it. Proven with a real OpenCode binary on `windows-latest` for both majors (1.19.0 and 2.2.5) in the new `real-opencode-shell` CI job: a local mock OpenAI-compatible LLM (`tests/fixtures/mock-llm.mjs`) drives one bash/shell tool call with no login and no paid model, and for the Git Bash case the job runs the real installer (not a hand-written config) and checks its own output. See `docs/compatibility.md` for the evidence (job IDs, date).
 - Copilot credits, follow-up (#123): the OpenCode 2.x sidebar box and `/copilot-usage` toast are now proven on the real 2.x TUI (new `real-usage-v2` CI job, pseudo-terminal, fake `gh`). 2.x has a different TUI plugin API (`Plugin.define` with `setup(context)`, `context.ui.slot`, `context.keymap.layer`), so `plugins/lean-copilot-usage/tui.js` now exports both the 1.x and the 2.x entry points; on 2.x the plugin folder is discovered by itself, so no `tui.json` entry is written there (the 0.7.0 file and entry did not load on 2.x). New Claude Code status line: with `copilot-usage` selected, `~/.claude/lean-copilot-usage-statusline.mjs` (owned, built from the `--usage` formatter, `gh` called at most once per 5 minutes, nothing under `--outbound off`) is registered as `statusLine` only if you have none; `--uninstall` removes it only while the value is still ours. Cursor, Copilot CLI, VS Code and Antigravity: see `docs/compatibility.md` (Copilot CLI and Antigravity document a status line command, not wired yet).
 
+### Fixed
+
+- `--adopt` safety (pre-release audit): a Claude hook named after an inline `VAR=value` prefix no longer prints that value; `--adopt --undo` keeps the backup (and exits non-zero) when a removed folder exists again; apply and undo skip a folder or file reached through a symlink or outside HOME.
+- README: Context Mode row for OpenCode 1.x/2.x and the "no admin rights" line now match what the installer does.
+
 ## [0.7.0] - 2026-11-12
 
 ### Added
