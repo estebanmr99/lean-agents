@@ -159,13 +159,13 @@ test('redactText: ordinary words stay unchanged', () => {
   }
 });
 
-test('proxyReport keeps the host but drops userinfo, query strings and the home path', () => {
-  const lines = proxyReport({ HTTPS_PROXY: ['http://u:p', 'proxy.example:3128/?token=abc'].join('@'), NODE_EXTRA_CA_CERTS: '/home/me/ca.pem?x=1' }, '/home/me');
-  assert.deepEqual(lines, ['HTTPS_PROXY=http://***@proxy.example:3128/?<redacted>', 'NODE_EXTRA_CA_CERTS=~/ca.pem?<redacted>']);
+test('proxyReport prints set only: no host, path, userinfo or query', () => {
+  const lines = proxyReport({ HTTPS_PROXY: ['http://u:p', 'proxy.example:3128/?token=abc'].join('@'), NODE_EXTRA_CA_CERTS: '/home/me/ca.pem?x=1' });
+  assert.deepEqual(lines, ['HTTPS_PROXY=set', 'NODE_EXTRA_CA_CERTS=set']);
 });
 
 test('redaction review cases: scheme-less proxy creds, env-style names, home prefix collision', () => {
-  assert.equal(proxyReport({ HTTPS_PROXY: ['ci:pw', 'proxy.corp:3128'].join('@') }, '/nohome')[0], 'HTTPS_PROXY=***@proxy.corp:3128');
+  assert.equal(proxyReport({ HTTPS_PROXY: ['ci:pw', 'proxy.corp:3128'].join('@') })[0], 'HTTPS_PROXY=set');
   const o = { home: '/nohome', env: {}, user: '', host: 'unused-host' };
   assert.equal(redactText('npm_config_prefix npm_package_version hf_hub', o), 'npm_config_prefix npm_package_version hf_hub');
   assert.ok(!redactText(`npm_${'a'.repeat(36)}`, o).includes('npm_a'));

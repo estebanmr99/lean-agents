@@ -707,12 +707,12 @@ test('proxy variables are shown redacted, shared in both cases, and never writte
   const env = { ...process.env, https_proxy: 'http://alice:s3cret@127.0.0.1:3128', NO_PROXY: 'localhost', NODE_EXTRA_CA_CERTS: '/etc/corp-ca.pem' };
   delete env.HTTPS_PROXY; delete env.no_proxy;
   const out = lean(home, ['--yes', '--no-exec', '--agents', 'claude,opencode-v2', '--all-tools', '--network', 'off', '--lang', 'en', '--profile', 'none'], env);
-  assert.match(out, /HTTPS_PROXY=http:\/\/\*\*\*@127\.0\.0\.1:3128 NO_PROXY=localhost NODE_EXTRA_CA_CERTS=\/etc\/corp-ca\.pem/);
-  assert.ok(!out.includes('s3cret'));
+  assert.match(out, /HTTPS_PROXY=set NO_PROXY=set \(loopback missing: 127\.0\.0\.1, ::1\) NODE_EXTRA_CA_CERTS=set/);
+  assert.ok(!out.includes('s3cret') && !out.includes('corp-ca'));
   for (const [f, text] of Object.entries(snapshot(home))) assert.ok(!text.includes('s3cret') && !text.includes('3128'), f);
   const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, '--doctor', '--no-exec'], { encoding: 'utf8', env });
-  assert.match(r.stdout, /network env\s+HTTPS_PROXY=http:\/\/\*\*\*@127\.0\.0\.1:3128/);
-  assert.ok(!r.stdout.includes('s3cret'));
+  assert.match(r.stdout, /network env\s+HTTPS_PROXY=set/);
+  assert.ok(!r.stdout.includes('s3cret') && !r.stdout.includes('127.0.0.1:3128'));
   const { shareProxy, redactUrl } = await import('../scripts/lib/network.mjs');
   assert.equal(redactUrl('http://ci:p@ss@host:3128'), 'http://***@host:3128');
   const e = { https_proxy: 'http://p:1', NO_PROXY: 'x', NODE_USE_ENV_PROXY: '0' };
@@ -721,6 +721,17 @@ test('proxy variables are shown redacted, shared in both cases, and never writte
   const e2 = { HTTP_PROXY: 'http://p:1' };
   shareProxy(e2);
   assert.equal(e2.NODE_USE_ENV_PROXY, '1');
+});
+
+test('doctor network rows print only set / not set, in text and JSON', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-netrows-'));
+  const env = { ...process.env, HTTPS_PROXY: 'http://proxy.example.corp:8080', NO_PROXY: 'localhost,127.0.0.1,::1,10.1.2.3', NODE_EXTRA_CA_CERTS: '/opt/corp/ca-bundle.pem', SSL_CERT_FILE: '/srv/tls/other.pem', http_proxy: 'http://lower.example.corp:3128' };
+  for (const k of ['HTTP_PROXY', 'https_proxy', 'no_proxy', 'ALL_PROXY']) delete env[k];
+  for (const args of [[], ['--json']]) {
+    const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, '--doctor', '--no-exec', ...args], { encoding: 'utf8', env });
+    for (const leak of ['proxy.example.corp', '8080', '/opt/corp', 'ca-bundle', '10.1.2.3', '/srv/tls', 'lower.example.corp', '3128']) assert.ok(!r.stdout.includes(leak), `${args} leaks ${leak}`);
+    for (const row of ['HTTPS_PROXY=set', 'NO_PROXY=set (loopback present)', 'NODE_EXTRA_CA_CERTS=set', 'HTTP_PROXY=set']) assert.ok(r.stdout.includes(row), `${args} lacks ${row}`);
+  }
 });
 
 test('gh installs at user scope with brew or winget, only when asked for', () => {

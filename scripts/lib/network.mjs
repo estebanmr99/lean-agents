@@ -1,5 +1,4 @@
 // Network choices (telemetry, auto-update, other outbound calls) and proxy handling for child commands.
-import os from 'node:os';
 export const CATEGORIES = ['telemetry', 'autoUpdate', 'outbound'];
 export const preset = (value) => Object.fromEntries(CATEGORIES.map((c) => [c, value]));
 
@@ -29,12 +28,6 @@ export const redactUrl = (v) => v.replace(/(^|\/\/|=)[^/\s=]*@/g, '$1***@');
 
 // Names whose values are secrets: redactText scrubs their values, allowedEnv never passes them on.
 export const SECRET_NAME = /TOKEN|SECRET|PASSW|API_?KEY|(^|_)AUTH($|_)|CREDENTIAL|PRIVATE/i;
-
-// Light scrub for proxy and CA values the user needs to read: no userinfo, no query string, home as ~.
-export function scrubValue(v, home = os.homedir()) {
-  const out = redactUrl(v).replace(/\?\S*/g, '?<redacted>');
-  return home ? out.split(home).join('~') : out;
-}
 
 // What a child process may inherit. Sources are in docs/compatibility.md; the rest (GH_TOKEN, API keys, ...) stays here.
 const ENV_EXACT = new Set(['PATH', 'HOME', 'USER', 'LOGNAME', 'USERNAME', 'SHELL', 'TERM', 'COLORTERM', 'LANG', 'TZ', 'TMPDIR', 'TMP', 'TEMP', 'CI', 'NODE_OPTIONS', 'NODE_USE_ENV_PROXY', 'OPENSSL_CONF', 'DO_NOT_TRACK', 'COPILOT_HOME', 'CLAUDE_CONFIG_DIR', 'BUN_INSTALL']);
@@ -68,12 +61,17 @@ export function shareProxy(env = process.env) {
 // True when a proxy is configured (NO_PROXY alone is not one).
 export const hasProxy = (env = process.env) => PROXY_VARS.slice(0, 3).some((n) => env[n] || env[n.toLowerCase()]);
 
-export function proxyReport(env = process.env, home = os.homedir()) {
+// Values never leave this report (proxy hosts and CA paths are internal): only set / not set, plus loopback in NO_PROXY.
+export function proxyReport(env = process.env) {
   const lines = [];
   for (const name of PROXY_VARS) {
     const value = env[name] || env[name.toLowerCase()];
-    if (value) lines.push(`${name}=${scrubValue(value, home)}`);
+    if (!value) continue;
+    if (name !== 'NO_PROXY') { lines.push(`${name}=set`); continue; }
+    const have = value.split(',').map((x) => x.trim());
+    const missing = ['localhost', '127.0.0.1', '::1'].filter((h) => !have.includes(h));
+    lines.push(`NO_PROXY=set (loopback ${missing.length ? `missing: ${missing.join(', ')}` : 'present'})`);
   }
-  for (const name of CA_VARS) if (env[name]) lines.push(`${name}=${scrubValue(env[name], home)}`);
+  for (const name of CA_VARS) if (env[name]) lines.push(`${name}=set`);
   return lines;
 }
