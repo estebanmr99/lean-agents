@@ -572,8 +572,6 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Use the runner's Linuxbrew
         run: echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
-      - name: --install-agent and --uninstall-agent (installer script)
-        run: node tests/real-agent-lifecycle.mjs claude
       - name: Install every tool, check them, uninstall
         run: |
           export HOME="$(mktemp -d)"
@@ -609,6 +607,9 @@ jobs:
           if grep -q statusLine "$HOME/.claude/settings.json"; then exit 1; fi
           test ! -e "$HOME/.claude/lean-copilot-usage-statusline.mjs"
           test ! -e "$HOME/.claude/skills/caveman"
+      # Last: the native installer may replace the npm-installed claude the steps above use.
+      - name: --install-agent and --uninstall-agent (installer script)
+        run: node tests/real-agent-lifecycle.mjs claude
 
   real-tools:
     # Real tool installs through the engine, throwaway HOME, real OpenCode 2 for the doctor.
