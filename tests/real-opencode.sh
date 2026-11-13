@@ -59,32 +59,17 @@ JS
 # The registered Context Mode command must start an MCP server (#107): run it as written and send `initialize`.
 node --input-type=module - "$HOME/resolved.txt" "$repo" <<'JS'
 import fs from 'node:fs';
-import { spawn } from 'node:child_process';
 const { resolvedOpenCodeConfig } = await import(`${process.argv[3]}/scripts/lib/doctor.mjs`);
+const { probeInitialize } = await import(`${process.argv[3]}/scripts/lib/inventory.mjs`);
 const { satisfies } = await import(`${process.argv[3]}/scripts/lib/node-runtime.mjs`);
 const { nodeRange } = await import(`${process.argv[3]}/scripts/lib/pins.mjs`);
 if (!satisfies(process.versions.node, nodeRange('context-mode'))) { console.log('skip  context-mode initialize (Node below the pin range)'); process.exit(0); }
 const cfg = resolvedOpenCodeConfig(fs.readFileSync(process.argv[2], 'utf8'));
 const entry = (cfg.mcp?.servers ?? cfg.mcp)?.['context-mode'];
 if (!entry) { console.log('FAIL  context-mode is not registered'); process.exit(1); }
-const [cmd, ...args] = entry.command;
-const child = spawn(cmd, args, { stdio: ['pipe', 'pipe', 'inherit'] });
-const timer = setTimeout(() => { console.log('FAIL  context-mode: no initialize reply in 120s'); child.kill(); process.exit(1); }, 120000);
-let buf = '';
-child.on('exit', (code) => { console.log(`FAIL  context-mode exited (${code}) before replying to initialize`); process.exit(1); });
-child.stdout.on('data', (d) => {
-  buf += d;
-  for (const line of buf.split('\n')) {
-    let msg; try { msg = JSON.parse(line); } catch { continue; }
-    if (msg?.id !== 1) continue;
-    console.log(`initialize reply: ${line}`);
-    const name = msg.result?.serverInfo?.name;
-    console.log(`${name === 'context-mode' ? 'ok    ' : 'FAIL  '} context-mode initialize serverInfo.name = ${name}`);
-    clearTimeout(timer); child.removeAllListeners('exit'); child.kill();
-    process.exit(name === 'context-mode' ? 0 : 1);
-  }
-});
-child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'lean-agents-ci', version: '0' } } }) + '\n');
+const r = await probeInitialize(entry.command, { expect: 'context-mode' });
+console.log(`${r.ok ? 'ok    ' : 'FAIL  '} context-mode initialize serverInfo.name = ${r.name}${r.error ? ` (${r.error})` : ''}`);
+process.exit(r.ok ? 0 : 1);
 JS
 
 # copilot-usage (fresh HOME, network on: strict skips it). Proves the plugin file lands and no tui.json entry is written
