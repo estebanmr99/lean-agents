@@ -74,6 +74,7 @@ JS
   FAKE_ORCA_MARKER="$(native "$HOME")/marker.txt"
   export FAKE_ORCA_MARKER
   : > "$HOME/marker.txt"
+  if [ "$windows" = yes ]; then opencode debug paths >&2 || true; fi
   "$PY" "$repo/tests/real-opencode-tui.py" "$(native "$HOME")" >&2
   sed "s/^/  $name: /" "$HOME/marker.txt" >&2
   # Only Orca's managed name counts; the probes are diagnostics.

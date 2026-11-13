@@ -13,6 +13,7 @@ os.makedirs(cwd, exist_ok=True)
 env = {**os.environ, "TERM": "xterm-256color", "OPENCODE_DISABLE_AUTOUPDATE": "1"}
 seconds = 20
 out = 0
+tail = ""
 
 if os.name == "nt":
     from winpty import PtyProcess
@@ -21,11 +22,13 @@ if os.name == "nt":
     proc = PtyProcess.spawn(["cmd", "/c", shutil.which("opencode")], cwd=cwd, env=env, dimensions=(40, 120))
 
     def drain():
-        global out
+        global out, tail
         # Keep reading: a full pty buffer would block the TUI.
         try:
             while True:
-                out += len(proc.read(65536))
+                chunk = proc.read(65536)
+                out += len(chunk)
+                tail = (tail + chunk)[-6000:]
         except Exception:
             pass
 
@@ -50,9 +53,15 @@ else:
         r, _, _ = select.select([fd], [], [], 0.2)
         if r:
             try:
-                out += len(os.read(fd, 65536))
+                chunk = os.read(fd, 65536)
+                out += len(chunk)
+                tail = (tail + chunk.decode(errors="replace"))[-6000:]
             except OSError:
                 break
     os.kill(pid, signal.SIGKILL)
     os.waitpid(pid, 0)
+import re
+
 print(f"tui output bytes: {out}")
+# What the TUI showed last, without escape codes: tells a real screen from an error.
+print(re.sub(r"\s+", " ", re.sub(r"\x1b(\[[0-9;?]*[A-Za-z]|\][^\x07]*\x07)", "", tail))[-700:])
