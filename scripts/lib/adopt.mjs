@@ -123,10 +123,11 @@ export async function inventory({ home, env = process.env, platform = process.pl
       const argv = (h.command.match(/"[^"]*"|'[^']*'|\S+/g) ?? []).map((a) => a.replace(/^(["'])(.*)\1$/, '$2'));
       while (argv.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(argv[0])) argv.shift();
       if (!argv.length) continue;
-      const encoded = /-enc\w*\b/i.test(h.command);
+      const encoded = /(^|\s)-enc\w*(\s|$)/i.test(h.command);
       // Only an absolute path can carry the mark: a bare `rtk` would resolve against the cwd.
       const script = !encoded && path.isAbsolute(argv[0]) ? argv[0] : null;
-      const managed = Boolean(script) && fsx.existsSync(script) && hasMark(readJsonText(script) ?? '');
+      // RTK and GSD write their own Cursor hooks without the mark, so the name match counts too (#199).
+      const managed = !encoded && (MANAGED_HOOK.test(h.command) || (Boolean(script) && fsx.existsSync(script) && hasMark(readJsonText(script) ?? '')));
       add({ client: 'cursor', kind: 'hook', name: `${event}:${encoded ? 'powershell' : path.basename(argv[0])}`, file: cursorHooks, keyPath: ['hooks', event], owner: managed ? 'managed' : 'user', extra: encoded && orcaFile ? { note: 'Orca agent status hook' } : undefined });
     }
   }
