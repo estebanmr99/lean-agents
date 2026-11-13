@@ -27,3 +27,4 @@ const skillCommands = (skill, agents) => [...new Set(agents.map((a) => SKILLS_AG
 
 export const leanUpdateCommands = (agents) => skillCommands('lean-update', agents);
 export const coordinateCommands = (agents) => skillCommands('coordinate', agents);
+export const leanMigrateCommands = (agents) => skillCommands('lean-migrate', agents);
