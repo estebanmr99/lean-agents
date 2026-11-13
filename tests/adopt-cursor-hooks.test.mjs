@@ -34,7 +34,7 @@ const goodHooks = (home) => JSON.stringify({
   version: 1,
   hooks: {
     sessionStart: [{ command: j(home, 'synthetic', 'gsd-cursor-demo.js') }],
-    stop: [{ command: `${j(home, 'synthetic', 'gsd-cursor-demo.js')} --event stop` }],
+    stop: [{ command: `${j(home, 'synthetic', 'gsd-cursor-demo.js')} --encoding utf8 --event stop` }], // `--encoding` is not `-enc`
     preToolUse: [{ command: 'rtk hook cursor' }],
     beforeShellExecution: [{ command: 'TOKEN=sekrit rtk hook cursor' }],
     sessionEnd: [{ command: `powershell.exe -NoProfile -EncodedCommand ${PAYLOAD}` }],
@@ -42,6 +42,7 @@ const goodHooks = (home) => JSON.stringify({
     beforeSubmitPrompt: [{ command: `"${j(home, 'My Hooks', 'quoted-cursor-demo.js')}"` }],
     beforeMCPExecution: [{ command: `powershell -enc ${PAYLOAD}` }],
     beforeReadFile: [{ type: 'prompt', prompt: 'ignored' }],
+    beforeTabFileRead: [{ command: j(home, 'synthetic', 'user-cursor-demo.js') }],
   },
 });
 
@@ -51,12 +52,17 @@ test('lists each Cursor hook by event and basename, keep, no payload', { skip },
   const hooks = cursor(r);
   assert.deepEqual(hooks.map((i) => i.name).sort(), [
     'afterFileEdit:lean-cursor-demo.js', 'beforeMCPExecution:powershell', 'beforeShellExecution:rtk', 'beforeSubmitPrompt:quoted-cursor-demo.js',
-    'preToolUse:rtk', 'sessionEnd:powershell', 'sessionStart:gsd-cursor-demo.js', 'stop:gsd-cursor-demo.js',
+    'beforeTabFileRead:user-cursor-demo.js', 'preToolUse:rtk', 'sessionEnd:powershell', 'sessionStart:gsd-cursor-demo.js', 'stop:gsd-cursor-demo.js',
   ]);
   for (const i of hooks) assert.equal(i.action, 'keep');
   const owner = (name) => hooks.find((i) => i.name === name).owner;
-  assert.equal(owner('sessionStart:gsd-cursor-demo.js'), 'user');
-  assert.equal(owner('preToolUse:rtk'), 'user');
+  assert.equal(owner('sessionStart:gsd-cursor-demo.js'), 'managed'); // GSD name match, no mark (#199)
+  assert.equal(owner('stop:gsd-cursor-demo.js'), 'managed');
+  assert.equal(owner('preToolUse:rtk'), 'managed'); // RTK name match, no mark (#199)
+  assert.equal(owner('beforeShellExecution:rtk'), 'managed'); // inline VAR=value prefix
+  assert.equal(owner('beforeTabFileRead:user-cursor-demo.js'), 'user');
+  assert.equal(owner('sessionEnd:powershell'), 'user'); // encoded Orca hook stays user
+  assert.equal(owner('beforeMCPExecution:powershell'), 'user');
   assert.equal(owner('afterFileEdit:lean-cursor-demo.js'), 'managed');
   assert.equal(owner('beforeSubmitPrompt:quoted-cursor-demo.js'), 'managed'); // quoted path with a space
   assert.equal(hooks.find((i) => i.name === 'beforeMCPExecution:powershell').note, 'Orca agent status hook'); // -enc alias
@@ -80,21 +86,21 @@ test('no base64 payload or secret in JSON or text output, and nothing is written
     assert.ok(!out.includes(PAYLOAD));
     assert.ok(!out.includes('sekrit'));
   }
-  assert.equal(JSON.parse(cli.stdout).items.filter((i) => i.client === 'cursor').length, 8);
-  assert.match(text.stdout, /keep +user +cursor hook sessionStart:gsd-cursor-demo\.js/);
+  assert.equal(JSON.parse(cli.stdout).items.filter((i) => i.client === 'cursor').length, 9);
+  assert.match(text.stdout, /keep +managed +cursor hook sessionStart:gsd-cursor-demo\.js/);
   assert.match(text.stdout, /cursor hook sessionEnd:powershell .*Orca agent status hook/);
   assert.equal(fs.readFileSync(j(s.home, '.cursor', 'hooks.json'), 'utf8'), before);
 });
 
-test('a hook path that is a directory is user-owned; a bare command never reads the cwd', { skip }, async () => {
-  const s = seeded((home) => JSON.stringify({ version: 1, hooks: { stop: [{ command: j(home, 'synthetic') }], preToolUse: [{ command: 'rtk hook cursor' }] } }));
-  fs.writeFileSync(j(s.home, 'rtk'), '// managed by lean-agents\n'); // a cwd file that must not count
+test('a hook path that is a directory is user-owned; an unknown bare command never reads the cwd',{ skip }, async () => {
+  const s = seeded((home) => JSON.stringify({ version: 1, hooks: { stop: [{ command: j(home, 'synthetic') }], preToolUse: [{ command: 'mytool hook cursor' }] } }));
+  fs.writeFileSync(j(s.home, 'mytool'), '// managed by lean-agents\n'); // a cwd file that must not count
   const cwd = process.cwd();
   process.chdir(s.home);
   try {
     const r = await run(s);
     assert.equal(cursor(r).find((i) => i.name === 'stop:synthetic').owner, 'user');
-    assert.equal(cursor(r).find((i) => i.name === 'preToolUse:rtk').owner, 'user');
+    assert.equal(cursor(r).find((i) => i.name === 'preToolUse:mytool').owner, 'user');
   } finally { process.chdir(cwd); }
 });
 
