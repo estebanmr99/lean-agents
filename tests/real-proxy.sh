@@ -38,8 +38,8 @@ bash "$repo/install.sh" --yes --agents opencode-v2 --tools serena,caveman --netw
   --lang en --profile anthropic-api | tee "$HOME/install.txt"
 node "$repo/scripts/lean.mjs" --doctor | tee "$HOME/doctor.txt"
 
-grep -q 'HTTPS_PROXY=http://\*\*\*@127.0.0.1:3128' "$HOME/install.txt"
-grep -q 'network env.*HTTPS_PROXY=http://\*\*\*@127.0.0.1:3128' "$HOME/doctor.txt"
+grep -q 'HTTPS_PROXY=set' "$HOME/install.txt"
+grep -q 'network env.*HTTPS_PROXY=set' "$HOME/doctor.txt"
 if grep -rq "$pw" "$HOME/install.txt" "$HOME/doctor.txt" "$HOME/.config"; then echo "proxy password leaked" >&2; exit 1; fi
 test -f "$HOME/.agents/skills/caveman/SKILL.md"
 # Bun came through the proxy, the all-off preset wrote its telemetry block, and Bun's own fetch honors the proxy.
