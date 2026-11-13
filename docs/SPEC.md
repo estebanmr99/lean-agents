@@ -533,7 +533,7 @@ Done when: the `assets` workflow renders every image and GIF, and the owner has 
 
 - README EN and ES in sync with the code and the CHANGELOG (flags, tables, Node version, pins). `node scripts/check-readme.mjs` is enforced by CI (the `lint` job and the release workflow); a person still re-reads the first screen.
 - README still fits the 1-minute rule: hero within the line budget before Details, support matrix matches the CI jobs in `ci.yml` (cells without a real-binary job say VERIFY), alt text on every image.
-- Audit rerun: update `docs/audit-2026-11.md` (or the newest `docs/audit-*.md`); every medium or higher finding is fixed or has an open issue.
+- Audit rerun before tagging: write `docs/audit-<version>.md` (format of [`audit-0.8.0.md`](audit-0.8.0.md)); every medium or higher finding is an issue labeled `audit`, and all of them are closed (fixed) before the tag. Enforced: the `Audit gate` step in `release.yml` fails the release, before any publish, when the file is missing or an `audit` issue is open.
 - Labels triaged: no open issue without a `type:` and a `priority:` label (`bash scripts/labels.sh` first if labels are missing); p0 issues are closed or consciously deferred.
 - Architecture checkpoint (#59): write `docs/checkpoints/<version>.md`, one keep / change / spike per question. Latest: [`docs/checkpoints/0.7.0.md`](checkpoints/0.7.0.md).
 - `docs/ROADMAP.md` and `CHANGELOG.md` match what is merged.
