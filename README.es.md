@@ -6,7 +6,7 @@
 
 **Tu agente rinde tanto como su configuración. lean-agents se encarga de la configuración.**
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![CI](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml) [![Secret scan](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml) ![GitHub stars](https://img.shields.io/github/stars/estebanmr99/lean-agents?style=social)
+[![npm](https://img.shields.io/npm/v/lean-agents.svg)](https://www.npmjs.com/package/lean-agents) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![CI](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/ci.yml) [![Secret scan](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/estebanmr99/lean-agents/actions/workflows/secret-scan.yml) ![GitHub stars](https://img.shields.io/github/stars/estebanmr99/lean-agents?style=social)
 
 [Read in English](README.md)
 
@@ -152,7 +152,7 @@ Las demos para Claude Desktop y Cursor vienen después.
 
 Los comandos están arriba: el prompt para tu agente, el comando de instalación y el prompt de actualización. Los bootstraps descargan el último release, lo comprueban con el `SHA256SUMS` del release y solo entonces lo ejecutan (`LEAN_AGENTS_VERSION=0.7.0` fija un release). Ya instalado, `--dry-run`, `--doctor` y `--uninstall` no usan la red. Un checkout local (`bash install.sh` desde un clon) se confía tal cual; solo la descarga del release se comprueba con checksum.
 
-Cuando el paquete npm esté publicado, `npx lean-agents@latest` ejecutará los mismos comandos (Node.js 22.20+ y git).
+Con Node.js 22.20+ y git, [`npx lean-agents@latest`](https://www.npmjs.com/package/lean-agents) ejecuta los mismos comandos (por ejemplo `npx lean-agents@latest --doctor`).
 
 Los prompts para el agente tienen [una guía](docs/install-with-an-agent.md) con los pasos y la salida `--json`; [los pasos de actualización](docs/install-with-an-agent.md#update-with-an-agent) funcionan también sin el skill `lean-update`.
 
