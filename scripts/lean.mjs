@@ -224,7 +224,8 @@ const NODE_TOOLS = [['context-mode', 'context-mode'], ['gsd', 'gsd-core']];
 // Migration copies files only: no tools, terminals, network or model questions.
 async function chooseMigration(o, p) {
   if (!o.agents) {
-    const found = Object.keys(detectAgents()).filter((a) => MIGRATE_TARGETS.includes(a));
+    // Antigravity has no project scope: never auto-pick it for --project.
+    const found = Object.keys(detectAgents()).filter((a) => MIGRATE_TARGETS.includes(a) && !(o.project && a === 'antigravity'));
     if (!found.length) throw new Error('no target agent found on PATH: pass --agents');
     o.agents = found;
   }

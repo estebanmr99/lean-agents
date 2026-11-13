@@ -297,7 +297,7 @@ On Windows:
 <details>
 <summary>What is copied and what is not</summary>
 
-Copies the setup you already have in one tool to the agents you pick (`--agents`), for your user or, with `--project`, inside a repository. Sources: `claude`, `vscode-copilot`, `cursor`, `copilot-cli`, `opencode-v1`, `opencode-v2`, or `auto` (every one found). Paths and upstream sources: [compatibility notes](docs/compatibility.md).
+Copies the setup you already have in one tool to the agents you pick (`--agents`), for your user or, with `--project`, inside a repository. Sources: `claude`, `vscode-copilot`, `cursor`, `copilot-cli`, `opencode-v1`, `opencode-v2`, `antigravity` (user scope only), or `auto` (every one found). Paths and upstream sources: [compatibility notes](docs/compatibility.md).
 
 | Item | What happens |
 | --- | --- |

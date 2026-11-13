@@ -324,8 +324,9 @@ jobs:
         run: python3 tests/real-usage-v2.py
 
   real-migrate:
-    # --migrate with the real OpenCode 2 and Claude Code binaries, throwaway HOME, no login:
-    # `claude mcp add` runs here (no --no-exec) and `claude mcp get` reads the result back.
+    # --migrate with the real OpenCode 2, Claude Code and Antigravity (agy) binaries, throwaway HOME, no login:
+    # `claude mcp add` runs here (no --no-exec) and `claude mcp get` reads the result back;
+    # migrations into Antigravity are read back with `agy agents` and `agy mcp list`.
     needs: changes
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 10
@@ -340,10 +341,12 @@ jobs:
         with:
           node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
       - run: npm ci
-      - name: Install Claude Code and OpenCode 2
+      - name: Install Claude Code, OpenCode 2 and Antigravity CLI
         run: |
           npm install -g "$(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('claude-code')))")"
           bash scripts/ci-install-opencode-v2.sh
+          bash scripts/ci-download.sh antigravity-installer "$RUNNER_TEMP/agy-install"
+          bash "$RUNNER_TEMP/agy-install"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - run: bash tests/real-migrate.sh

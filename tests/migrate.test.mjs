@@ -164,3 +164,76 @@ test('malformed sources do not crash, rules merge into one block, URL tokens sta
   // The only copy of the token is the source file.
   for (const [file, content] of Object.entries(snapshot(home))) if (!file.startsWith('.cursor/')) assert.ok(!content.includes('TOKEN-789'), file);
 });
+
+// An Antigravity user setup: a rule, an agent, a skill, MCP servers with secrets.
+function antigravityHome() {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-migrate-'));
+  put(home, '.gemini/config/rules/style.md', 'Use tabs.\n');
+  put(home, '.gemini/config/agents/ag.md', '---\nname: ag\ndescription: Does ag\nsubagent: true\n---\nBe careful.\n');
+  put(home, '.gemini/config/skills/demo/SKILL.md', '---\nname: demo\ndescription: demo\n---\nDo demo.\n');
+  put(home, '.gemini/config/mcp_config.json', JSON.stringify({
+    mcpServers: {
+      gh: { command: 'npx', args: ['-y', 'gh-mcp'], env: { GH_TOKEN: SECRET } },
+      remote: { url: 'https://example.com/mcp', headers: { Authorization: `Bearer ${SECRET}` } },
+    },
+  }));
+  return home;
+}
+
+test('antigravity is a source: neutral shape, no secret values, lean-agents own files skipped', () => {
+  const home = antigravityHome();
+  put(home, '.gemini/config/rules/lean-agents.md', '<!-- managed by lean-agents -->\nours\n');
+  const r = readSource('antigravity', home, 'user');
+  assert.deepEqual(r.rules.map((x) => x.text), ['Use tabs.']);
+  assert.deepEqual(r.agents.map((a) => a.name), ['ag']);
+  assert.deepEqual(r.skills.map((s) => s.name), ['demo']);
+  assert.deepEqual(r.mcp.map((m) => [m.name, m.envNames, m.headerNames]), [['gh', ['GH_TOKEN'], []], ['remote', [], ['Authorization']]]);
+  assert.ok(!JSON.stringify(r).includes(SECRET));
+  assert.equal(readSource('antigravity', home, 'project').agents.length, 0);
+});
+
+test('antigravity migrates into every other target and back', () => {
+  const home = antigravityHome();
+  const targets = ['claude', 'opencode-v2', 'opencode-v1', 'cursor', 'copilot-cli', 'vscode-copilot'];
+  for (const t of targets) {
+    const { actions, rows } = migratePlan({ sources: [readSource('antigravity', home, 'user')], targets: [t], base: home, scope: 'user', stateDir: path.join(home, 's') });
+    assert.ok(rows.some((r) => r.item === 'agent ag' && r.status === 'migrated'), t);
+    assert.ok(!JSON.stringify(actions).includes(SECRET), t);
+  }
+  for (const from of ['claude', 'opencode-v2', 'cursor', 'copilot-cli']) {
+    const h = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-migrate-'));
+    put(h, from === 'claude' ? '.claude/agents/a.md' : from === 'cursor' ? '.cursor/agents/a.md' : from === 'copilot-cli' ? '.copilot/agents/a.agent.md' : '.config/opencode/agents/a.md', '---\nname: a\ndescription: A\n---\nBody.\n');
+    put(h, from === 'claude' ? '.claude.json' : from === 'cursor' ? '.cursor/mcp.json' : from === 'copilot-cli' ? '.copilot/mcp-config.json' : '.config/opencode/opencode.json',
+      JSON.stringify(from === 'opencode-v2' ? { mcp: { servers: { gh: { type: 'local', command: ['npx', 'gh-mcp'], environment: { GH_TOKEN: SECRET } } } } } : { mcpServers: { gh: { command: 'npx', args: ['gh-mcp'], env: { GH_TOKEN: SECRET } } } }));
+    const { actions, rows } = migratePlan({ sources: [readSource(from, h, 'user')], targets: ['antigravity'], base: h, scope: 'user', stateDir: path.join(h, 's') });
+    assert.ok(rows.some((r) => r.item === 'agent a' && r.target.endsWith(path.join('.gemini', 'config', 'agents', 'a.md'))), from);
+    const mcp = actions.find((x) => x.kind === 'json');
+    assert.deepEqual(mcp.edits[0].value, { command: 'npx', args: ['gh-mcp'] }, from);
+    assert.ok(rows.some((r) => /env GH_TOKEN not written/.test(r.note)), from);
+    assert.ok(!JSON.stringify(actions).includes(SECRET), from);
+  }
+});
+
+test('antigravity is a target for rules, agents, skills and MCP; --uninstall restores the home', () => {
+  const home = cursorHome();
+  put(home, 'AGENTS.md', 'unrelated\n');
+  put(home, '.claude/CLAUDE.md', 'Be brief.\n');
+  const before = snapshot(home);
+  const out = lean(home, ['--yes', '--no-exec', '--migrate', 'claude', '--agents', 'antigravity']);
+  assert.match(out, /rules\s+\S+\s+~\/\.gemini\/config\/rules\/migrated-rules\.md\s+migrated/);
+  assert.match(fs.readFileSync(path.join(home, '.gemini', 'config', 'rules', 'migrated-rules.md'), 'utf8'), /Be brief\./);
+  lean(home, ['--yes', '--no-exec', '--migrate', 'cursor', '--agents', 'antigravity']);
+  const dir = path.join(home, '.gemini', 'config');
+  assert.match(fs.readFileSync(path.join(dir, 'agents', 'x.md'), 'utf8'), /^name: x$/m);
+  assert.ok(fs.existsSync(path.join(dir, 'skills', 'demo', 'SKILL.md')));
+  const mcp = JSON.parse(fs.readFileSync(path.join(dir, 'mcp_config.json'), 'utf8'));
+  assert.deepEqual(mcp.mcpServers.gh, { command: 'npx', args: ['-y', 'gh-mcp'] });
+  assert.deepEqual(mcp.mcpServers.remote, { serverUrl: 'https://example.com/mcp' });
+  for (const [file, content] of Object.entries(snapshot(home))) {
+    if (!file.startsWith('.cursor/')) assert.ok(!content.includes(SECRET), `${file} has a secret value`);
+  }
+  lean(home, ['--yes', '--no-exec', '--uninstall']);
+  const after = Object.fromEntries(Object.entries(snapshot(home)).filter(([f]) => !f.startsWith('.config/lean-agents/')));
+  assert.deepEqual(after, before);
+  assert.match(lean(home, ['--yes', '--no-exec', '--migrate', 'cursor', '--agents', 'antigravity', '--project', home], 1), /project paths are unverified/);
+});
