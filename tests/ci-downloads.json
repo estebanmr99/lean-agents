@@ -1,20 +1,5 @@
 {
-  "note": "CI downloads checked by SHA256 before they run (scripts/ci-download.sh). In latest mode (ci-latest) a mismatch only warns. Update by hand when an installer changes; bun entries must match core/pins.json.",
-  "opencode-installer": {
-    "url": "https://opencode.ai/v2/install",
-    "sha256": "bbc4584fd6a888bcd14623b8a63afa0f1b4075a2e84a2c3518cd509b446b3135",
-    "checked": "2026-11-10"
-  },
-  "antigravity-installer": {
-    "url": "https://antigravity.google/cli/install.sh",
-    "sha256": "62966c07365423bd4dc209355060744058fb30d60f5323e2d360e39de64e5042",
-    "checked": "2026-11-10"
-  },
-  "cursor-installer": {
-    "url": "https://cursor.com/install",
-    "sha256": "e8c7a37d74b27a4beedf2dc5fc3b4c83627b2dc5c05a51d34f95ffec3cc0a247",
-    "checked": "2026-11-12"
-  },
+  "note": "CI downloads checked by SHA256 before they run (scripts/ci-download.sh). In latest mode (ci-latest) a mismatch only warns. Update by hand when an installer changes; bun entries must match core/pins.json. The agent installer scripts (claude, opencode, antigravity, cursor) live in core/pins.json; ci-download.sh falls back to it.",
   "vscode-linux-x64": {
     "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/2c33b50b16c472efe58357d1d2a8a5414bc23fbf/code-stable-x64-1793133762.tar.gz",
     "sha256": "17b72a7e6f40a5b5dce9850f10eea13ce734a63052b67fa021cc01e715ad4cf1",

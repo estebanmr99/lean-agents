@@ -5,8 +5,9 @@
 # summary say so, and nothing is merged without a human reviewing the pin-bump PR.
 set -euo pipefail
 key=$1 dest=$2
-url=$(node -p "require(process.env.CI_DOWNLOADS || './tests/ci-downloads.json')['$key'].url")
-want=$(node -p "require(process.env.CI_DOWNLOADS || './tests/ci-downloads.json')['$key'].sha256")
+entry="(require(process.env.CI_DOWNLOADS || './tests/ci-downloads.json')['$key'] || require('./core/pins.json').pins['$key'])"
+url=$(node -p "$entry.url")
+want=$(node -p "$entry.sha256")
 curl -fsSL -o "$dest" "$url"
 # Hashed in node: sha256sum prefixes the hash with a backslash when the path has one (Windows runners).
 got=$(node --input-type=module -e "import { sha256 } from './scripts/lib/verify-sha256.mjs'; console.log(sha256(process.argv[1]))" "$dest")
