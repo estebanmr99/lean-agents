@@ -52,4 +52,5 @@ area: ci|5319e7|.github/workflows and tests/real-*
 area: docs|5319e7|README, docs/, CHANGELOG
 area: adapters|5319e7|scripts/lib/adapters and per-agent output
 version-watch|ededed|Opened by the daily version watch
+audit|c5def5|Medium+ audit finding; an open one blocks the release workflow
 EOF
