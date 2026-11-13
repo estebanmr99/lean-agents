@@ -86,7 +86,6 @@ check grep -q 'gh' "$HOME/agy-mcp.txt"
 check grep -q 'Be brief' "$ag/rules/migrated-rules.md"
 # The skills folder is VERIFY upstream: record what agy says, only the file is checked.
 check test -f "$ag/skills/demo/SKILL.md"
-"$agy_bin" --help </dev/null 2>&1 | head -40 || true
 refute grep -rq "$secret" "$ag" "$HOME/agy-agents.txt" "$HOME/agy-mcp.txt"
 
 # 4. From Antigravity: an agent and an MCP server written there land in Claude Code and OpenCode 2.
