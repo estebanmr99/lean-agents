@@ -461,11 +461,10 @@ jobs:
         run: bash tests/real-opencode-v1.sh
 
   spike-opencode-side:
-    # TEMPORARY (#80 B0, remove with PR B): OpenCode 1.19 and 2.2.5 in one throwaway HOME. Prints
+    # Manual only (workflow_dispatch; no per-PR cost), kept for reruns before PR B (0.9.0, #80 B0): OpenCode 1.19 and 2.2.5 in one throwaway HOME. Prints
     # V1-V4 evidence (paths, config/data hashes, key tolerance, installer footprint) for the
     # shared-vs-isolated layout decision; fails only if setup (installs) or a binary's --version fails.
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: github.event_name == 'workflow_dispatch'
     timeout-minutes: 25
     strategy:
       fail-fast: false
