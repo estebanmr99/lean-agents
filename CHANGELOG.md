@@ -6,6 +6,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- `--adopt` flags a skill one client reads from two folders (OpenCode: `~/.claude/skills` and `~/.agents/skills`; Cursor and Copilot: their own folder and `~/.agents/skills`) as `duplicate`, also when the copies are links to one folder, which the Skills CLI makes and `--adopt` used to hide. Each row names the clients, each folder's short hash (identical or differs) and the fix (keep one folder, delete the other after a backup); `~/.cursor/skills` and `~/.claude/skills` alone are not flagged, and a link target is never auto-deleted (#176).
 - `--adopt`: a pinned npm copy newer than the pin is `newer` and kept (not `drift` and `upgrade`); a duplicate copy under a Node below the tool's floor is `below-floor` and removed; each text row ends with its source file, so the same plugin in the server config and `tui.json` reads as two needed entries (#174).
 - `--upgrade-agent opencode`: the `api.command` reason is given only to plugin files that use `api.command` (others say the 2.x plugin API is not proven), `plugins/package.json` and `node_modules` are not listed as plugins, local `tui.json` plugins are named `<folder>/tui.js` instead of `file:tui.js`, and `permission` and `experimental` get a specific **VERIFY** reason (#173).
 - The lifecycle test builds the opencode-v2 and copilot-cli version checks from `core/pins.json`, so a pin bump no longer fails CI (#184).
