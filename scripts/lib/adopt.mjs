@@ -120,11 +120,12 @@ export async function inventory({ home, env = process.env, platform = process.pl
   for (const [event, hooks] of Object.entries(ch?.hooks && typeof ch.hooks === 'object' ? ch.hooks : {})) {
     for (const h of Array.isArray(hooks) ? hooks : []) {
       if (typeof h?.command !== 'string') continue;
-      const argv = h.command.split(/\s+/).filter(Boolean);
+      const argv = (h.command.match(/"[^"]*"|'[^']*'|\S+/g) ?? []).map((a) => a.replace(/^(["'])(.*)\1$/, '$2'));
       while (argv.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(argv[0])) argv.shift();
       if (!argv.length) continue;
-      const encoded = /-EncodedCommand\s/i.test(h.command);
-      const script = encoded ? null : argv[0];
+      const encoded = /-enc\w*\b/i.test(h.command);
+      // Only an absolute path can carry the mark: a bare `rtk` would resolve against the cwd.
+      const script = !encoded && path.isAbsolute(argv[0]) ? argv[0] : null;
       const managed = Boolean(script) && fsx.existsSync(script) && hasMark(readJsonText(script) ?? '');
       add({ client: 'cursor', kind: 'hook', name: `${event}:${encoded ? 'powershell' : path.basename(argv[0])}`, file: cursorHooks, keyPath: ['hooks', event], owner: managed ? 'managed' : 'user', extra: encoded && orcaFile ? { note: 'Orca agent status hook' } : undefined });
     }
@@ -249,8 +250,8 @@ export async function adopt(o) {
   console.log(`--adopt (dry run: nothing is changed; --yes applies). Found: ${Object.entries(by).map(([k, n]) => `${n} ${k}`).join(', ') || 'nothing'}`);
   console.log(`tool Node: ${r.toolNode.range ? `${r.toolNode.range} -> ${r.toolNode.node ?? 'no matching Node installed, nvm not found'} (${r.toolNode.source ?? 'none'})` : 'not needed'}`);
   console.log(`OpenCode: major ${r.opencode.major ?? 'none'}, ${r.opencode.dbBytes} bytes of db, sessions ${r.opencode.sessions ?? 'unknown'}${r.opencode.note ? ` (${r.opencode.note})` : ''}`);
-  for (const i of r.items.filter((x) => x.action !== 'keep' || x.owner === 'managed')) {
-    console.log(`  ${i.action.padEnd(9)} ${i.owner.padEnd(8)} ${i.client} ${i.kind} ${i.name}${i.status.length ? `  [${i.status.join(', ')}]` : ''}  (${i.file})`);
+  for (const i of r.items.filter((x) => x.action !== 'keep' || x.owner === 'managed' || x.kind === 'hook')) {
+    console.log(`  ${i.action.padEnd(9)} ${i.owner.padEnd(8)} ${i.client} ${i.kind} ${i.name}${i.status.length ? `  [${i.status.join(', ')}]` : ''}${i.note ? `  (${i.note})` : ''}  (${i.file})`);
     if (i.kind === 'skill' && i.fix) console.log(`            ${i.clients.join(' and ')} loads it twice: ${Object.entries(i.hashes).map(([d, h]) => `${d} ${h}`).join(', ')} (${i.differs ? 'differs' : 'identical'}); ${i.fix}`);
   }
   console.log(`  user-owned items kept untouched: ${r.items.filter((i) => i.owner === 'user' && i.action === 'keep').length}`);

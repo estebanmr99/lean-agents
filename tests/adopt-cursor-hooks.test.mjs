@@ -21,6 +21,8 @@ function seeded(hooks) {
   fs.mkdirSync(j(home, '.nvm'), { recursive: true });
   fs.writeFileSync(j(home, 'synthetic', 'gsd-cursor-demo.js'), '// synthetic GSD hook\n');
   fs.writeFileSync(j(home, 'synthetic', 'lean-cursor-demo.js'), '// managed by lean-agents\n');
+  fs.mkdirSync(j(home, 'My Hooks'));
+  fs.writeFileSync(j(home, 'My Hooks', 'quoted-cursor-demo.js'), '// managed by lean-agents\n');
   if (hooks !== null) fs.writeFileSync(j(home, '.cursor', 'hooks.json'), typeof hooks === 'function' ? hooks(home) : hooks);
   const env = { PATH: process.env.PATH, NVM_DIR: j(home, '.nvm'), HOME: home };
   return { home, env };
@@ -37,6 +39,8 @@ const goodHooks = (home) => JSON.stringify({
     beforeShellExecution: [{ command: 'TOKEN=sekrit rtk hook cursor' }],
     sessionEnd: [{ command: `powershell.exe -NoProfile -EncodedCommand ${PAYLOAD}` }],
     afterFileEdit: [{ command: j(home, 'synthetic', 'lean-cursor-demo.js') }],
+    beforeSubmitPrompt: [{ command: `"${j(home, 'My Hooks', 'quoted-cursor-demo.js')}"` }],
+    beforeMCPExecution: [{ command: `powershell -enc ${PAYLOAD}` }],
     beforeReadFile: [{ type: 'prompt', prompt: 'ignored' }],
   },
 });
@@ -46,14 +50,16 @@ test('lists each Cursor hook by event and basename, keep, no payload', { skip },
   const r = await run(s);
   const hooks = cursor(r);
   assert.deepEqual(hooks.map((i) => i.name).sort(), [
-    'afterFileEdit:lean-cursor-demo.js', 'beforeShellExecution:rtk', 'preToolUse:rtk', 'sessionEnd:powershell',
-    'sessionStart:gsd-cursor-demo.js', 'stop:gsd-cursor-demo.js',
+    'afterFileEdit:lean-cursor-demo.js', 'beforeMCPExecution:powershell', 'beforeShellExecution:rtk', 'beforeSubmitPrompt:quoted-cursor-demo.js',
+    'preToolUse:rtk', 'sessionEnd:powershell', 'sessionStart:gsd-cursor-demo.js', 'stop:gsd-cursor-demo.js',
   ]);
   for (const i of hooks) assert.equal(i.action, 'keep');
   const owner = (name) => hooks.find((i) => i.name === name).owner;
   assert.equal(owner('sessionStart:gsd-cursor-demo.js'), 'user');
   assert.equal(owner('preToolUse:rtk'), 'user');
   assert.equal(owner('afterFileEdit:lean-cursor-demo.js'), 'managed');
+  assert.equal(owner('beforeSubmitPrompt:quoted-cursor-demo.js'), 'managed'); // quoted path with a space
+  assert.equal(hooks.find((i) => i.name === 'beforeMCPExecution:powershell').note, 'Orca agent status hook'); // -enc alias
   const hook = hooks.find((i) => i.name === 'sessionStart:gsd-cursor-demo.js');
   assert.equal(hook.kind, 'hook'); assert.deepEqual(hook.keyPath, ['hooks', 'sessionStart']); assert.equal(hook.file, '~/.cursor/hooks.json');
   assert.equal(hooks.find((i) => i.name === 'sessionEnd:powershell').note, 'Orca agent status hook');
@@ -74,8 +80,22 @@ test('no base64 payload or secret in JSON or text output, and nothing is written
     assert.ok(!out.includes(PAYLOAD));
     assert.ok(!out.includes('sekrit'));
   }
-  assert.equal(JSON.parse(cli.stdout).items.filter((i) => i.client === 'cursor').length, 6);
+  assert.equal(JSON.parse(cli.stdout).items.filter((i) => i.client === 'cursor').length, 8);
+  assert.match(text.stdout, /keep +user +cursor hook sessionStart:gsd-cursor-demo\.js/);
+  assert.match(text.stdout, /cursor hook sessionEnd:powershell .*Orca agent status hook/);
   assert.equal(fs.readFileSync(j(s.home, '.cursor', 'hooks.json'), 'utf8'), before);
+});
+
+test('a hook path that is a directory is user-owned; a bare command never reads the cwd', { skip }, async () => {
+  const s = seeded((home) => JSON.stringify({ version: 1, hooks: { stop: [{ command: j(home, 'synthetic') }], preToolUse: [{ command: 'rtk hook cursor' }] } }));
+  fs.writeFileSync(j(s.home, 'rtk'), '// managed by lean-agents\n'); // a cwd file that must not count
+  const cwd = process.cwd();
+  process.chdir(s.home);
+  try {
+    const r = await run(s);
+    assert.equal(cursor(r).find((i) => i.name === 'stop:synthetic').owner, 'user');
+    assert.equal(cursor(r).find((i) => i.name === 'preToolUse:rtk').owner, 'user');
+  } finally { process.chdir(cwd); }
 });
 
 test('missing or invalid hooks.json gives no cursor items and no crash', { skip }, async () => {
