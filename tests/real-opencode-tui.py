@@ -34,6 +34,7 @@ if os.name == "nt":
 
     threading.Thread(target=drain, daemon=True).start()
     time.sleep(seconds)
+    print(f"alive at the end: {proc.isalive()}")
     # The process tree, so no opencode worker outlives the case.
     os.system(f"taskkill /F /T /PID {proc.pid} >NUL 2>&1")
 else:
@@ -63,5 +64,6 @@ else:
 import re
 
 print(f"tui output bytes: {out}")
+print(repr(tail[-400:]))
 # What the TUI showed last, without escape codes: tells a real screen from an error.
 print(re.sub(r"\s+", " ", re.sub(r"\x1b(\[[0-9;?]*[A-Za-z]|\][^\x07]*\x07)", "", tail))[-700:])
