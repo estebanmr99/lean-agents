@@ -28,7 +28,12 @@ export const TRANSLATIONS = [
 const row = (key) => TRANSLATIONS.find((t) => t.key === key);
 
 // Keys with no verified 2.x equivalent, and so no row.
-const MANUAL_KEYS = new Set(['provider', 'permission', 'experimental']);
+const MANUAL_KEYS = new Set(['provider']);
+// Keys the docs name but whose value conversion they do not state as a rule (opencode.ai/docs/migrate-v1, permissions, config; 2026-11-13, docs only).
+const MANUAL_WHY = {
+  permission: 'VERIFY: 2.x renames it to `permissions` (array of {action, resource, effect}; bash -> shell, task -> subagent); the docs show no general rule to convert the 1.x values',
+  experimental: 'VERIFY: 2.x keeps `experimental` but only `mcp_timeout` and `subagent_depth` have a documented mapping; `batch_tool`, `openTelemetry`, `primary_tools` and `continue_loop_on_deny` are ignored in 2.x',
+};
 const SAME = new Set(['instructions', 'default_agent', 'model', 'share', 'shell']);
 const HANDLED = new Set(['$schema', 'mcp', 'plugin']); // mcp and plugin come from the adopt items
 
@@ -39,22 +44,36 @@ const verifyRow = (t, before) => ({ class: 'user-manual', before, after: null, r
 const manual = (before, reason) => ({ class: 'user-manual', before, after: null, reason, source: null });
 const managed = (before, after) => ({ class: 'managed', before, after, reason: 'lean-agents owns it; the 2.x adapter reinstalls it', source: 'adapters/opencode-v2.mjs' });
 
+// The source text of a local plugin (a file, or the entry file of a folder), or null when unreadable.
+function pluginSource(it, home, fsx) {
+  const p = (x) => (x.startsWith('~') ? home + x.slice(1) : x);
+  const f = p(it.source ?? it.file);
+  try {
+    if (!fsx.statSync(f).isDirectory()) return fsx.readFileSync(f, 'utf8');
+    const entry = ['tui.js', 'index.js', 'index.ts'].find((n) => fsx.existsSync(j(f, n)));
+    return entry ? fsx.readFileSync(j(f, entry), 'utf8') : null;
+  } catch { return null; }
+}
+// Only a file that calls `api.command` gets the 1.x -> 2.x API reason; for the rest nothing is proven either way.
+const localPluginReason = (text) => (text !== null && /\bapi\.command\b/.test(text)
+  ? 'JS/TS plugin uses 1.x API `api.command`; 2.x uses `api.keymap`'
+  : 'local plugin file: the 2.x plugin API is not proven for it');
+
 // Classify one adopt item of the OpenCode 1.x config (mcp, plugin, plugins/ file) or a skill.
-function classifyItem(it, stopgaps) {
+function classifyItem(it, stopgaps, home, fsx) {
   if (it.owner === 'managed') return managed(`${it.kind} ${it.name}`, it.kind === 'plugin' ? 'plugins[]' : it.kind === 'mcp' ? `mcp.servers.${it.name}` : it.file);
   if (it.kind === 'mcp') return translate(row('mcp'), it.name);
   if (it.kind === 'skill') { const t = row('skills'); return t.verified ? translate(t, it.name, `skill ${it.name}`) : verifyRow(t, `skill ${it.name}`); }
   if (it.kind === 'plugin' && it.keyPath.length) {
     const tui = /tui\.jsonc?$/.test(it.file);
     const t = row(tui ? 'tui-plugin' : 'plugin');
-    const local = it.name.startsWith('file:');
     if (!t.verified) return verifyRow(t, `${tui ? 'tui.json ' : ''}plugin ${it.name}`);
-    if (local) return manual(`plugin ${it.name}`, 'local plugin file: the 2.x plugin API is not proven for it');
+    if (it.source) return manual(`plugin ${it.name}`, localPluginReason(pluginSource(it, home, fsx)));
     return translate(t, it.name, `plugin ${it.name}`);
   }
   const sg = stopgaps.find((s) => s.file === it.file);
   if (sg) return manual(`plugin ${it.name}`, `leftover stopgap: replace with ${sg.replaceWith}`);
-  return manual(`plugin ${it.name}`, 'JS/TS plugin uses 1.x API `api.command`; 2.x uses `api.keymap`');
+  return manual(`plugin ${it.name}`, localPluginReason(pluginSource(it, home, fsx)));
 }
 
 // Top-level keys of the 1.x config and the files in its agent/command folders, as new items (key names only).
@@ -72,7 +91,7 @@ function configItems(home, ocDir, fsx, rel) {
     else if (k === 'disabled_providers') at(k, translate(row(k), k));
     else if (SAME.has(k)) at(k, translate(row(k), k));
     else if (k === 'keybinds') at(k, verifyRow(row(k), k));
-    else at(k, manual(k, MANUAL_KEYS.has(k) ? 'no verified 2.x key' : 'unknown 1.x key: no verified 2.x key'));
+    else at(k, manual(k, MANUAL_WHY[k] ?? (MANUAL_KEYS.has(k) ? 'no verified 2.x key' : 'unknown 1.x key: no verified 2.x key')));
   }
   for (const d of ['agent', 'agents', 'command', 'commands']) {
     let list = [];
@@ -95,7 +114,7 @@ export function upgradeInventory(inv, { home, fsx = fs, binary = { path: null, v
   const ocDir = j(configHome(home), 'opencode');
   const items = inv.items.map((it) => {
     if (!(it.client === 'opencode' || it.kind === 'skill')) return it;
-    return { ...it, upgrade: classifyItem(it, inv.stopgaps) };
+    return { ...it, upgrade: classifyItem(it, inv.stopgaps, home, fsx) };
   });
   items.push(...configItems(home, ocDir, fsx, rel));
   const mine = items.filter((i) => i.upgrade);
