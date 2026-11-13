@@ -72,13 +72,17 @@ Bootstrap only: `install.sh` / `install.ps1` may run `git clone` or `git fetch` 
 
 Separate from the install-time commands above: code the agents download every time an MCP server starts or a skill is installed. Each one is pinned to an exact version or tag in `core/pins.json`, with the day verified and the CI job that proves it. `--doctor` flags a recorded pin that no longer matches the file.
 
-| Fetch | Pinned in `core/pins.json` | Not pinned |
+| Fetch | Pin key in `core/pins.json` | Not pinned |
 | --- | --- | --- |
-| `npx -y @playwright/mcp@<pin>` (also `--extension`), `npx -y context-mode@<pin>` | yes | |
-| `npx -y codeburn@<pin>`, `npx -y autoskills@<pin>`, `npx -y @opengsd/gsd-core@<pin>`, `@tarquinen/opencode-dcp@<pin>` | yes | |
-| `npx -y skills@<pin>` and the skill sources `owner/repo#<tag>` | yes | |
-| Serena (`uvx --from git+https://github.com/oraios/serena`) | | default branch |
-| RTK, `gh` (brew, winget), the Ponytail plugin, Claude plugin marketplaces | | latest from their source |
+| `npx -y @playwright/mcp@<pin>` (also `--extension`) | `playwright-mcp` | |
+| `npx -y context-mode@<pin>`, the Context Mode Claude plugin (tag and commit) | `context-mode`, `context-mode-plugin` | |
+| `npx -y codeburn@<pin>`, `autoskills@<pin>`, `@opengsd/gsd-core@<pin>`, `@tarquinen/opencode-dcp@<pin>` | `codeburn`, `autoskills`, `gsd-core`, `opencode-dcp` | |
+| `npx -y skills@<pin>` and the skill sources `owner/repo#<commit>` (the tag while a commit is not recorded) | `skills-cli`, `caveman`, `i-have-adhd`, `lean-update`, `orca-cli` | |
+| `@dietrichgebert/ponytail@<pin>` (npm) and the Ponytail plugin (tag), `warp-opencode` | `ponytail`, `ponytail-plugin`, `warp-opencode` | |
+| Serena (`uvx --from git+https://github.com/oraios/serena@<commit>`) | `serena` | |
+| Bun zip and the agent installers (claude.ai, opencode.ai, antigravity.google, cursor.com), checked by SHA256 | `bun`, `claude-installer`, `opencode-installer`, `antigravity-installer`, `cursor-installer` | |
+| Agent CLIs from `--install-agent` (their versions go to the installers); CI-only harness CLIs | `claude-code`, `opencode-v2`, `opencode-v1`, `copilot-cli` | |
+| RTK, `gh` (brew, winget), `uv` | | latest from their source |
 
 A green `ci-latest` run opens one pin-bump PR when upstream ships a newer version; pins change only after you merge it (`skills/update-models`, section "Tool versions").
 

@@ -8,6 +8,14 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 - Release gate: `release.yml` stops before building anything when `docs/audit-<version>.md` is missing or an issue labeled `audit` is still open, so no release ships half audited. Audit findings of medium or higher get the new `audit` label.
 
+### Docs
+
+- Versions: README (EN and ES), `docs/ROADMAP.md` and the spec name 0.8.0 as the latest release (#161). The npm item on the README roadmap is ticked; "Later: 1.0.0" lists #179 to #182.
+- `docs/SECURITY-REVIEW.md` pin table names every key in `core/pins.json`; `tests/security-review-pins.test.mjs` fails when a key is missing (#155).
+- `docs/compatibility.md`: the `lean-update` tag `v0.7.0` exists, and its tagged `skills add` form was checked in a throwaway HOME (#168).
+- README (EN and ES): an "All flags" table covers every flag in `--help`, `--home` included (#167).
+- Install docs (README, `docs/install-with-an-agent.md`, `skills/lean-update/SKILL.md`) use `npx lean-agents@latest` first and state Node.js 22.20+; Context Mode 2 and GSD Core need Node.js 24 via nvm. The bootstraps moved to a fallback section, and the `LEAN_AGENTS_VERSION` example is 0.8.0 (#178).
+
 ## [0.8.0] - 2026-11-12
 
 ### Added

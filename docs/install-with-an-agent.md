@@ -12,12 +12,11 @@ Never read, print or store my API keys or tokens, and never run gh auth login fo
 
 ## Steps the agent follows
 
-1. **Get the engine.** Use the latest release, not a clone of `main`. Run the release bootstrap with the read-only flags of step 2; it checks the download against the release's `SHA256SUMS` and unpacks it to `~/.config/lean-agents/src` (Windows: `%USERPROFILE%\.config\lean-agents\src`). Node.js 22.20 or newer.
-   - macOS, Linux, Git Bash: `curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --doctor --json`
-   - Windows PowerShell: `& ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -Doctor --json`
-   - Once the npm package is published, `npx lean-agents --doctor --json` does the same.
+1. **Get the engine.** Use the latest release, not a clone of `main`. Needs Node.js 22.20+ and git: run `npx -y lean-agents@latest --doctor --json` with the read-only flags of step 2. Only without Node.js, use the fallback bootstrap: it checks git and Node.js 22.20+ (`install.sh` offers `brew install` only when Homebrew is installed, and asks first; otherwise it stops with a download link; `install.ps1` does the same with `winget`), checks the release against its `SHA256SUMS` and unpacks it to `~/.config/lean-agents/src` (Windows: `%USERPROFILE%\.config\lean-agents\src`).
+   - Fallback, macOS, Linux, Git Bash: `curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --doctor --json`
+   - Fallback, Windows PowerShell: `& ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -Doctor --json`
 
-   Later steps run `node scripts/lean.mjs` from that folder.
+   Later steps run `npx -y lean-agents@latest <flags>`, or `node scripts/lean.mjs` from the unpacked folder after the fallback bootstrap.
 2. **Detect the setup.** The step 1 command printed this; run `node scripts/lean.mjs --doctor --json` to repeat it. It prints `{"ok": bool, "rows": [{"item", "status", "detail"}]}`; `status` is `ok`, `changed`, `note`, `error` or `missing`. `missing` on `lean-agents` means a fresh install.
 3. **Ask the user**, one question each, with the answer's flag:
    - Which agents? `--agents claude,opencode-v2,copilot-cli,antigravity,vscode-copilot,cursor`
