@@ -181,7 +181,7 @@ Always start with `--dry-run`: it shows every file and command before anything c
 | Global rules (AGENTS.md) | ✅ | ✅ | ✅ | ✅ | ⚠️ written, load unproven |
 | Subagents by cost tier | ✅ | ✅ | ✅ | ✅ | ✅ flash, pro |
 | RTK (shell output compression) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Context Mode | ✅ plugin | ✅ MCP | ✅ plugin | ✅ plugin | ✅ plugin |
+| Context Mode | ✅ plugin | ✅ MCP | ✅ plugin | ✅ MCP | ➖ skipped (no v2 setup) |
 | Serena + Playwright MCP | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Signed-in browser (opt-in) | ➖ Claude in Chrome | ✅ opt-in | ✅ opt-in | ✅ opt-in | ➖ |
 | Ponytail | ✅ | ✅ | ✅ | ➖ | ➖ |
@@ -407,7 +407,7 @@ Subagents ask for a tier (`fast`, `balanced`, `strong`), not a model ID. Claude 
 - Backs up every file before touching it. `--uninstall` restores them.
 - Never overwrites your `AGENTS.md` or `CLAUDE.md`: it imports or appends a marked block.
 - Never asks for, stores or prints API keys. You log in to providers yourself.
-- No admin rights needed (`--no-admin`), so it works on locked-down work laptops.
+- No admin rights needed, so it works on locked-down work laptops.
 - Reviewable before install: [docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md) is a prompt your agent runs on this repo.
 
 ## Credits
