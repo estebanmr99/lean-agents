@@ -28,19 +28,13 @@ Never read, print or store my API keys or tokens, and never run gh auth login fo
 
 ### Or run it yourself
 
-macOS, Linux or Git Bash. `--dry-run` lists every file and command; nothing changes:
+Needs Node.js 22.20+ and git. `--dry-run` lists every file and command; nothing changes:
 
 ```bash
-curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --dry-run
+npx lean-agents@latest --dry-run
 ```
 
-Windows PowerShell:
-
-```powershell
-& ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -DryRun
-```
-
-Flags, pinning a version, checksums: [Quick start](#quick-start).
+PowerShell takes the same command. No Node.js yet? See [Fallback: bootstraps](#fallback-bootstraps). Flags and pinning: [Quick start](#quick-start).
 
 ### What's new
 
@@ -143,16 +137,22 @@ flowchart LR
    - No free OpenCode models are used.
 5. Check the result:
    ```bash
-   curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --doctor
+   npx lean-agents@latest --doctor
    ```
 
 Claude Desktop and Cursor demo paths come later.
 
 ## Quick start
 
-The commands are at the top: the agent prompt, the install command and the update prompt. The bootstraps download the latest release, check it against the release's `SHA256SUMS`, and only then run it (`LEAN_AGENTS_VERSION=0.7.0` pins a release). Once installed, `--dry-run`, `--doctor` and `--uninstall` need no network. A local checkout (`bash install.sh` from a clone) is trusted as it is; only the release download is checksum-verified.
+Needs Node.js 22.20+ and git (Context Mode 2 and GSD Core need Node.js 24, see the Node.js 24 bullet below). The commands run the latest release from [npm](https://www.npmjs.com/package/lean-agents):
 
-With Node.js 22.20+ and git, [`npx lean-agents@latest`](https://www.npmjs.com/package/lean-agents) runs the same commands (for example `npx lean-agents@latest --doctor`).
+```bash
+npx lean-agents@latest --dry-run     # every file and command; changes nothing
+npx lean-agents@latest               # the real install, after your OK
+npx lean-agents@latest --doctor      # check the install
+npx lean-agents@latest --update      # re-apply with your saved choices
+npx lean-agents@latest --uninstall   # undo everything lean-agents changed
+```
 
 The agent prompts have [a guide](docs/install-with-an-agent.md) with the steps and `--json` output; [the update steps](docs/install-with-an-agent.md#update-with-an-agent) work without the `lean-update` skill too.
 
@@ -167,6 +167,64 @@ Always start with `--dry-run`: it shows every file and command before anything c
 - In PowerShell the common flags are PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`. Any other flag is passed as it is, for example `-DryRun --network off`.
 - Context Mode 2 needs Node.js 24.15 and GSD Core needs Node.js 24 (`engines.node` in `core/pins.json`). On an older active Node, lean-agents runs them on an nvm Node 24 without changing your default (nvm-windows: one already installed) and registers it with its absolute path; on Claude Code that means an MCP server instead of the Context Mode plugin, so its hooks and skills are not installed. Without nvm it skips them with one line. Everything else works on Node.js 22.20 or newer.
 - With Context Mode, the installer also sets up Bun by default (faster `ctx_execute`); add `--no-bun` (`-NoBun` in PowerShell) to skip it. With Antigravity, `--no-app` (`-NoApp`) skips installing the app. See the Bun row in [Install tiers](#install-tiers).
+
+### All flags
+
+Every flag from `--help`. In PowerShell the same flags are PascalCase (`-DryRun`).
+
+| Flag | What it does |
+| --- | --- |
+| `--dry-run` | Show every file change and command; change nothing |
+| `--yes` | Accept defaults without asking |
+| `--agents a,b` | Agents to set up: claude, opencode-v1, opencode-v2, copilot-cli, antigravity, vscode-copilot, cursor (default: the ones installed) |
+| `--tools a,b` | Optional tools on top of RTK and Context Mode: serena, playwright, ponytail, caveman, i-have-adhd, dcp, codeburn, copilot-usage, gsd, autoskills, playwright-extension, coordinate, lean-migrate |
+| `--all-tools` | Every optional tool except gsd, autoskills, playwright-extension, coordinate and lean-migrate |
+| `--no-tools` | No optional tools |
+| `--no-core` | Leave out RTK and Context Mode; install only the `--tools` you list |
+| `--privacy` standard or strict | Same as `--network on` (standard) or `--network off` (strict) |
+| `--network` on or off | Preset for telemetry, auto-updates and other outbound calls |
+| `--telemetry`, `--auto-update`, `--outbound` on or off | One category; overrides the preset |
+| `--profile <name>` | Model profile for OpenCode |
+| `--lang` en or es | Language for rules and replies |
+| `--terminal` warp, orca, both or none | Agent integrations for a terminal you already have (default: the detected ones) |
+| `--gh` / `--no-gh` | Install GitHub CLI (`gh`) if it is missing (default: on) |
+| `--bun` / `--no-bun` | Install Bun for Context Mode (default: on) |
+| `--no-app` | Do not install the Antigravity app (the CLI is still installed when missing) |
+| `--project <dir>` | Write the shared team files into one repository |
+| `--migrate <from>` or `auto` | Copy rules, agents, skills, prompts and MCP servers from another harness; never overwrites |
+| `--adhd-always` | Turn on i-have-adhd for every answer |
+| `--ponytail-mode` lite, full, ultra or off | Ponytail level |
+| `--shell` default or git-bash | OpenCode on Windows: use Git Bash when found (default: git-bash); never overwrites a shell you set yourself |
+| `--json` | With `--dry-run`, `--doctor` or `--adopt`: print one JSON object on stdout |
+| `--feedback-draft` | After a failed install: read the error on stdin and print a redacted issue draft as JSON. Needs `--failed-command` |
+| `--failed-command <text>` | The command that failed, for `--feedback-draft` |
+| `--feedback-kind update` | With `--feedback-draft`: the text is a finding from an update, not an error |
+| `--update` | Re-apply with your saved choices |
+| `--doctor` | Check the install |
+| `--uninstall` | Undo everything lean-agents changed |
+| `--adopt` | List what a hand-built machine already has and what each item is; with `--yes` it applies the plan |
+| `--confirm-removals` | With `--adopt --yes` and no terminal: also remove old npm copies, duplicate skill folders and hand-made stopgaps (all backed up) |
+| `--keep-backup` | Keep the backup after a verified `--adopt --yes` |
+| `--undo` | With `--adopt`: restore what the last `--adopt --yes` changed |
+| `--upgrade-agent opencode` | Dry run for moving OpenCode 1.x to 2.x; changes nothing |
+| `--install-agent a,b` / `--uninstall-agent a,b` | Install or remove agent CLIs that lean-agents installed; plan first, `--yes` runs it; never OpenCode 1.x |
+| `--usage` | Print the Copilot credits left (one `gh` call, no model request) |
+| `--version` | Print the lean-agents version |
+| `--home <dir>` | Treat this folder as your home directory; use a temp folder to try things safely |
+
+### Fallback: bootstraps
+
+Use these only when you have no Node.js 22.20+ yet. They check for git and Node.js 22.20+. If one is missing, `install.sh` offers `brew install` only when Homebrew is installed (it asks first); otherwise it stops with a download link. `install.ps1` does the same with `winget` (it asks first unless you pass `-Yes`). Then they download the latest release, check it against the release's `SHA256SUMS`, and only then run it.
+
+```bash
+curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --dry-run
+```
+
+```powershell
+& ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -DryRun
+```
+
+`LEAN_AGENTS_VERSION=0.8.0` pins a release. Once installed, `--dry-run`, `--doctor` and `--uninstall` need no network. A local checkout (`bash install.sh` from a clone) is trusted as it is; only the release download is checksum-verified.
 
 ## Why
 
@@ -438,8 +496,10 @@ lean-agents is glue. The heavy lifting is done by these projects; please star th
 - [x] Parallel agent sessions (`scripts/parallel.mjs`)
 - [x] Warp and Orca agent integrations for users who already have them
 - [x] Antigravity app and CLI on macOS, Linux and Windows (app loading stays VERIFY)
+- [x] `v0.8.0` (latest): optional agent install and uninstall, the coordinator playbook, adopt a hand-built machine, Node runtime per tool in `--doctor`; Node.js 22.20 or newer
 - [x] `v0.6.0` (includes the planned 0.5.1): fixes from real Windows installs behind a proxy, `--no-core`, pinned MCP and skill versions, migrate from another harness, install with an agent; Node.js 22.20 or newer
-- [ ] Next release (on hold): use-case GIFs, update from verified pins, installable CLI on npm
+- [x] Installable CLI on npm (`npx lean-agents@latest`)
+- [ ] Next release (on hold): use-case GIFs, update from verified pins
 - [ ] `v1.0.0`
 - Later: Codex CLI, Gemini CLI
 

@@ -33,8 +33,7 @@ Repeat the same prompt for each session. Each session must leave the repository 
 - Commits are authored by the owner (`git config user.name/user.email` set to their GitHub no-reply address) with a `Co-Authored-By` trailer for the agent.
 - Since session 6: Node.js 22.20+ (20.12+ before 0.6.0) and one more dependency, `@clack/prompts` (menus only on a real terminal). Network choices live in `scripts/lib/network.mjs` (`options.network` in `state.json`, `privacy` derived from it, so adapters can still read `opts.privacy`); undocumented settings in `scripts/lib/unverified.mjs` are never configured, only saved as user notes under `~/.config/lean-agents/notes/`.
 - Session 7 (2026-11-03): adapters `vscode-copilot` and `cursor`, `--project <dir>` team mode, `docs/claude-with-copilot.md`. Cursor user rules have no file (settings UI only). The VS Code user `mcp.json` path is proven by `code --add-mcp` in `real-vscode` (Linux, macOS); Copilot Chat ships built into VS Code; Cursor skills land in `~/.agents/skills`.
-- 0.6.0 (2026-11-06) holds sessions 16 to 21; 0.5.1 was folded into it, and the minimum Node is now 22.20 (breaking). The owner tags it. Next, on hold: Session 9 and issues #44, #45, #46, #56. `docs/ROADMAP.md` maps each to its issues and release.
-- 0.7.0 (2026-11-12) is built: version and CHANGELOG are ready in the release prep PR, and the owner tags it after that PR merges. Next is 0.8.0: #78, #80, #60, #106, #104 points 4 and 5, and the #124 follow-up (Git Bash as OpenCode's shell).
+- Latest release: 0.8.0 (2026-11-12). Earlier: 0.7.0 and 0.6.0 (2026-11-06, minimum Node 22.20, breaking), 0.5.0 (2026-11-04). On hold: Session 9. `docs/ROADMAP.md` maps each issue to its release; "Later: 1.0.0" lists #103, #179, #180, #181, #182.
 - Private terms are blocked by `scripts/check-private.sh` using the `PRIVATE_DENYLIST` repository secret in CI and a gitignored `.private-denylist` locally.
 
 ## 1. Product
