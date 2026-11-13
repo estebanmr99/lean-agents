@@ -80,12 +80,83 @@ test('dry run writes nothing and never leaks env or header values', { skip }, as
   assert.match(printed.stdout, /dry run/);
 });
 
-test('--undo, --keep-backup and --confirm-removals are parsed but rejected in this release', () => {
+test('--undo, --keep-backup and --confirm-removals need --adopt', () => {
   for (const flag of ['--undo', '--keep-backup', '--confirm-removals']) {
-    const r = spawnSync(process.execPath, [LEAN, '--home', os.tmpdir(), '--adopt', flag], { encoding: 'utf8' });
+    const r = spawnSync(process.execPath, [LEAN, '--home', os.tmpdir(), flag], { encoding: 'utf8' });
     assert.equal(r.status, 1);
-    assert.match(r.stderr, /not in this release yet/);
+    assert.match(r.stderr, /go with --adopt/);
   }
+});
+
+const lean = (home, args) => spawnSync(process.execPath, [LEAN, '--home', home, '--no-exec', '--adopt', ...args], { encoding: 'utf8', env: { ...process.env, NVM_DIR: j(home, '.nvm'), PATH: `${j(home, '.nvm', 'versions', 'node', 'v22.20.0', 'bin')}${path.delimiter}${process.env.PATH}` } });
+
+test('apply re-registers the managed MCPs, keeps user files, and --undo restores every byte', { skip }, async () => {
+  const s = await seeded();
+  const before = treeHash(s.home);
+  const claude = j(s.home, '.claude.json');
+  const dry = lean(s.home, []);
+  assert.equal(dry.status, 0, dry.stderr);
+  assert.equal(treeHash(s.home), before, 'dry run writes nothing');
+
+  const r = lean(s.home, ['--yes', '--keep-backup']);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const servers = JSON.parse(fs.readFileSync(claude, 'utf8')).mcpServers;
+  assert.match(servers['context-mode'].command, /v24\.15\.0/); assert.deepEqual(servers['context-mode'].args.slice(-1), ['server']);
+  assert.match(servers['ctx-link'].command, /v24\.15\.0/);
+  assert.equal(servers.relay.command, 'node'); // the user's own entry
+  assert.ok(fs.existsSync(j(s.home, '.agents', 'skills', 'dup-demo')), 'no --confirm-removals: the duplicate skill stays');
+  assert.ok(fs.existsSync(j(s.home, '.local', 'bin', 'copilot-usage')), 'its managed replacement is not installed: the stopgap stays');
+  const state = JSON.parse(fs.readFileSync(j(s.home, '.config', 'lean-agents', 'state.json'), 'utf8'));
+  assert.ok(state.adopt.files.length >= 2 && fs.existsSync(state.adopt.backupDir));
+  assert.equal(fs.statSync(state.adopt.backupDir).mode & 0o077, 0, 'backup is owner-only');
+
+  const u = lean(s.home, ['--undo']);
+  assert.equal(u.status, 0, u.stdout + u.stderr);
+  const { readdirSync } = fs;
+  assert.deepEqual(readdirSync(j(s.home, '.config')).filter((n) => n.startsWith('lean-agents')), []);
+  // state.json and the backup are gone: only then is the tree the seeded one again
+  assert.equal(treeHash(s.home), before);
+});
+
+test('--confirm-removals deletes the duplicate skill after backing it up, and --undo copies it back', { skip }, async () => {
+  const s = await seeded();
+  const before = treeHash(s.home);
+  const r = lean(s.home, ['--yes', '--keep-backup', '--confirm-removals']);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.ok(!fs.existsSync(j(s.home, '.agents', 'skills', 'dup-demo')));
+  assert.ok(fs.existsSync(j(s.home, '.claude', 'skills', 'dup-demo', 'SKILL.md')));
+  const u = lean(s.home, ['--undo']);
+  assert.equal(u.status, 0, u.stdout + u.stderr);
+  assert.equal(treeHash(s.home), before);
+});
+
+test('a stopgap goes only when its managed replacement is in state.json, after a backup, and --undo brings it back', { skip }, async () => {
+  const s = await seeded();
+  const dir = j(s.home, '.config', 'lean-agents');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(j(dir, 'state.json'), JSON.stringify({ version: '0', options: { migrateOnly: true, agents: [], tools: ['copilot-usage'], terminals: [], privacy: 'standard' }, files: [], commands: [] }));
+  const stop = j(s.home, '.local', 'bin', 'copilot-usage');
+  const orca = j(s.home, '.config', 'opencode', 'plugins', 'orca-status-tui-shim.js');
+  const r = lean(s.home, ['--yes', '--keep-backup', '--confirm-removals']);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.ok(!fs.existsSync(stop)); assert.ok(fs.existsSync(orca), 'Orca is not in state.json: its shim stays');
+  assert.equal(lean(s.home, ['--undo']).status, 0);
+  assert.equal(fs.readFileSync(stop, 'utf8'), '#!/bin/sh\n');
+  assert.equal(JSON.parse(fs.readFileSync(j(dir, 'state.json'), 'utf8')).adopt, undefined);
+});
+
+test('--undo reverts only our keys in a file the user edited since', { skip }, async () => {
+  const s = await seeded();
+  assert.equal(lean(s.home, ['--yes', '--keep-backup']).status, 0);
+  const claude = j(s.home, '.claude.json');
+  const j1 = JSON.parse(fs.readFileSync(claude, 'utf8'));
+  j1.mcpServers.mine = { command: 'mine' };
+  fs.writeFileSync(claude, JSON.stringify(j1));
+  const u = lean(s.home, ['--undo']);
+  assert.equal(u.status, 0, u.stdout + u.stderr);
+  const back = JSON.parse(fs.readFileSync(claude, 'utf8')).mcpServers;
+  assert.equal(back.mine.command, 'mine');
+  assert.equal(back['context-mode'].command, 'npx');
 });
 
 test('an empty HOME has nothing to adopt', { skip }, async () => {

@@ -110,7 +110,9 @@ function parseArgs(argv) {
       case '--uninstall': o.command = 'uninstall'; break;
       case '--doctor': o.command = 'doctor'; break;
       case '--adopt': o.command = 'adopt'; break;
-      case '--undo': case '--keep-backup': case '--confirm-removals': throw new Error(`${a}: not in this release yet (--adopt only previews)`);
+      case '--undo': o.undo = true; break;
+      case '--keep-backup': o.keepBackup = true; break;
+      case '--confirm-removals': o.confirmRemovals = true; break;
       case '--usage': o.command = 'usage'; break;
       case '--skip-agents': case '--no-admin': break; // defaults in v1: agents are never installed, nothing needs admin
       case '--help': case '-h': o.command = 'help'; break;
@@ -161,9 +163,14 @@ const HELP = `Usage: lean-agents [options]
   --update               Re-apply with your saved choices
   --uninstall            Undo everything lean-agents changed
   --doctor               Check the install
-  --adopt                Dry run: list what a hand-built machine already has (MCPs, hooks, plugins, skills, npm copies),
+  --adopt                List what a hand-built machine already has (MCPs, hooks, plugins, skills, npm copies),
                          classify each (managed, user, stale, duplicate, drift, wrong-node) and print the planned
                          actions; changes nothing (with --json: one JSON object). Always pass --home to try it
+  --adopt --yes          Apply it: back up, re-register managed MCPs on one Node, verify, undo by itself on a failure
+  --confirm-removals     With --adopt --yes and no terminal: also remove old npm copies, a duplicate skill folder and
+                         hand-made stopgaps (all backed up; on a terminal a menu asks instead)
+  --keep-backup          Keep the backup after a verified --adopt --yes (--adopt --undo needs it to restore bytes)
+  --undo                 With --adopt: restore what the last --adopt --yes changed
   --version              Print the lean-agents version
   --usage                Print the Copilot credits left (one gh call, no model request)
 `;
@@ -644,7 +651,16 @@ async function main() {
   if (o.command === 'help') return console.log(HELP);
   if (o.command === 'version') return console.log(JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version);
   if (o.command === 'doctor') return process.exit(doctor({ home: o.home, state: readState(o.home), exec: o.exec, nodeVersion: NODE_VERSION, json: o.json }) ? 0 : 1);
-  if (o.command === 'adopt') return process.exit(await adopt({ home: o.home, json: o.json, realHome: REAL_HOME }) ? 0 : 1);
+  if ((o.undo || o.keepBackup || o.confirmRemovals) && o.command !== 'adopt') throw new Error('--undo, --keep-backup and --confirm-removals go with --adopt');
+  if (o.command === 'adopt') {
+    // Removals outside the JSON edits need a yes: a menu on a terminal, --confirm-removals without one.
+    const tty = process.stdin.isTTY && process.stdout.isTTY && !o.json;
+    const p = o.yes && !o.confirmRemovals && tty ? await prompter(false) : null;
+    const confirm = o.confirmRemovals ? async () => true : p ? async (q) => yesNo(await p.ask(q, 'n')) : async () => false;
+    const ok = await adopt({ home: o.home, json: o.json, realHome: REAL_HOME, yes: o.yes, dryRun: o.dryRun, undo: o.undo, keepBackup: o.keepBackup, exec: o.exec, confirm, stateDir: stateDir(o.home) });
+    p?.close();
+    return process.exit(ok ? 0 : 1);
+  }
   if (o.command === 'usage') {
     const network = { ...(o.networkPreset ? preset(o.networkPreset) : fromPrivacy(o.privacy) ?? readState(o.home)?.options.network ?? {}), ...o.networkFlags };
     return console.log(network.outbound === 'off' ? 'usage skipped: outbound calls are off (no request to api.github.com)' : copilotUsage());

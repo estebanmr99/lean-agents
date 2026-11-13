@@ -988,6 +988,46 @@ jobs:
           NVM_SETUP: ${{ runner.temp }}\nvm-setup.exe
         run: ./tests/real-tool-node.ps1
 
+  real-adopt:
+    # --adopt --yes on a hand-built HOME (#106): real nvm with Node 22.20 first and Node 24 installed, real npm and Context Mode. Dry run changes nothing,
+    # apply verifies (initialize, doctor, sessions, user files), --adopt --undo restores every byte. Throwaway HOME.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.20.0
+      - run: npm ci
+      - name: nvm (v0.41.0), Node 22.20 and 24, then the adopt run
+        if: runner.os == 'Linux'
+        run: |
+          bash scripts/ci-download.sh nvm-sh "$RUNNER_TEMP/nvm.sh"
+          NVM_SH="$RUNNER_TEMP/nvm.sh" bash tests/real-adopt.sh
+      - name: Download nvm-windows
+        if: runner.os == 'Windows'
+        run: bash scripts/ci-download.sh nvm-windows-x64-setup "$RUNNER_TEMP/nvm-setup.exe"
+      - name: nvm-windows, Node 22.20 and 24, then the adopt run
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          NVM_SETUP: ${{ runner.temp }}\nvm-setup.exe
+          TOOL_NODE_TEST: real-adopt.sh
+        run: ./tests/real-tool-node.ps1
+
   real-cursor:
     # Real Cursor CLI and real tools, throwaway HOME, no login and no TTY.
     needs: changes

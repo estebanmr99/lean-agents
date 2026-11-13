@@ -106,6 +106,13 @@ export function applyJsonEdits(original, edits, owned = []) {
       applied.push(e);
       continue;
     }
+    if (e.mode === 'remove') {
+      // Drops the key; `previous` (recorded by plan) lets undo write it back.
+      if (current === undefined) continue;
+      text = applyEdits(text, modify(text, e.path, undefined, FORMAT));
+      applied.push(e);
+      continue;
+    }
     if (current !== undefined) {
       if (JSON.stringify(current) === JSON.stringify(e.value)) continue;
       if (e.mode !== 'set' && !(e.mode === 'upgradeIf' && isLegacy(current, e.legacy))) {

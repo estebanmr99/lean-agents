@@ -2,6 +2,7 @@
 // pinned npm packages sit in which nvm Node, and which skill folders are read twice. Never writes; `home`, `env`,
 // `platform` and `fsx` are passed in so tests never read the real machine (#104 points 4-5, #132).
 import fs from 'node:fs';
+import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { PINS } from './pins.mjs';
@@ -132,7 +133,7 @@ const SAFE_NAME = /^[A-Za-z0-9][\w.-]*$/;
 // One hash over the paths and bytes of every file under a skill folder.
 // A file or folder that cannot be read gives the marker 'unreadable' instead of an error, so --doctor never crashes on it.
 const UNREADABLE = 'unreadable';
-function treeSha(dir, fsx) {
+export function treeSha(dir, fsx) {
   const h = createHash('sha256');
   const walk = (d, rel) => {
     for (const e of fsx.readdirSync(d, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1))) {
@@ -164,5 +165,31 @@ export function duplicateSkills(dirs, fsx = fs) {
     const unreadable = shas.includes(UNREADABLE);
     // The load order is not documented and OpenCode 1.19's log shows the "existing" copy changing per skill (#78), so no winner is claimed.
     return { name, dirs: l.map((x) => x.dir), shas, unreadable, differs: unreadable || new Set(shas).size > 1, winner: 'unknown (load order)' };
+  });
+}
+
+// Start one MCP command as written and wait for its `initialize` reply: { ok, name, error }. `expect`: the serverInfo.name wanted.
+// Spawned without a shell and with `env` as given, so the caller decides which Node leads PATH (#104, #106).
+export function probeInitialize(argv, { env = process.env, expect, timeoutMs = 120000, stderr = 'inherit' } = {}) {
+  return new Promise((resolve) => {
+    const [cmd, ...args] = argv;
+    let done = false;
+    let buf = '';
+    const child = spawn(cmd, args, { stdio: ['pipe', 'pipe', stderr], env, windowsHide: true });
+    const end = (r) => { if (done) return; done = true; clearTimeout(timer); child.removeAllListeners('exit'); child.kill(); resolve(r); };
+    const timer = setTimeout(() => end({ ok: false, name: null, error: `no initialize reply in ${timeoutMs / 1000}s` }), timeoutMs);
+    child.on('error', (e) => end({ ok: false, name: null, error: e.message }));
+    child.on('exit', (code) => end({ ok: false, name: null, error: `exited (${code}) before replying to initialize` }));
+    child.stdout.on('data', (d) => {
+      buf += d;
+      for (const line of buf.split('\n')) {
+        let msg; try { msg = JSON.parse(line); } catch { continue; }
+        if (msg?.id !== 1) continue;
+        const name = msg.result?.serverInfo?.name ?? null;
+        end({ ok: expect ? name === expect : Boolean(msg.result), name, error: null });
+      }
+    });
+    child.stdin.on('error', () => {});
+    child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'lean-agents-ci', version: '0' } } })}\n`);
   });
 }

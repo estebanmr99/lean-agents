@@ -176,7 +176,7 @@ echo "seeded: $seed_json"
 out="$(mktemp -d)" # outside HOME, which is hashed
 hash_before="$(node "$fixture" hash "$home")"
 lean --adopt --json --no-exec > "$out/adopt.json" 2> "$out/adopt.err" || { cat "$out/adopt.err"; fail "--adopt --json failed"; }
-lean --adopt --no-exec > "$out/adopt.txt" || fail "--adopt failed"
+lean --adopt --dry-run --no-exec > "$out/adopt.txt" || fail "--adopt failed"
 hash_after="$(node "$fixture" hash "$home")"
 [ "$hash_before" = "$hash_after" ] || fail "--adopt changed the HOME tree"
 node -e "
