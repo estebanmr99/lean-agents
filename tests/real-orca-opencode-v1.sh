@@ -40,17 +40,27 @@ run_case() {
   new_home
   local dir="$XDG_CONFIG_HOME/opencode"
   mkdir -p "$dir/plugins" "$dir/orca-opencode-status-tui"
+  # Orca's managed name, plus two probes with byte-identical content: one under another name (the issue's
+  # finding: a copy loads) and one unrelated (does the worker load plugins from this dir at all?).
   cat > "$dir/plugins/orca-opencode-status.js" <<'JS'
 import fs from 'node:fs';
 // Same shape as Orca's generated file: a default export that is the factory itself when
 // ORCA_OPENCODE_PLUGIN_API=v1 and an { id, server } object otherwise (Orca source, 2026-11).
 const OrcaOpenCodeStatusPlugin = async () => {
-  fs.appendFileSync(process.env.FAKE_ORCA_MARKER, `factory called main=${globalThis.Bun?.isMainThread} pid=${process.pid}\n`);
+  fs.appendFileSync(process.env.FAKE_ORCA_MARKER, `${import.meta.url.split('/').pop()} called main=${globalThis.Bun?.isMainThread} pid=${process.pid}\n`);
   return {};
 };
 export default process.env.ORCA_OPENCODE_PLUGIN_API === 'v1'
   ? OrcaOpenCodeStatusPlugin
   : { id: 'orca-opencode-status', server: OrcaOpenCodeStatusPlugin };
+JS
+  cp "$dir/plugins/orca-opencode-status.js" "$dir/plugins/copy-probe.js"
+  cat > "$dir/plugins/control-probe.js" <<'JS'
+import fs from 'node:fs';
+export default async () => {
+  fs.appendFileSync(process.env.FAKE_ORCA_MARKER, `control-probe.js called main=${globalThis.Bun?.isMainThread} pid=${process.pid}\n`);
+  return {};
+};
 JS
   cat > "$dir/orca-opencode-status-tui/tui.js" <<'JS'
 export default { id: 'orca-opencode-status', tui: async () => {} };
@@ -66,7 +76,8 @@ JS
   : > "$HOME/marker.txt"
   "$PY" "$repo/tests/real-opencode-tui.py" "$(native "$HOME")" >&2
   sed "s/^/  $name: /" "$HOME/marker.txt" >&2
-  wc -l < "$HOME/marker.txt" | tr -d ' '
+  # Only Orca's managed name counts; the probes are diagnostics.
+  { grep -c '^orca-opencode-status.js ' "$HOME/marker.txt" || true; } | tr -d ' '
 }
 
 a="$(run_case A no yes)"
