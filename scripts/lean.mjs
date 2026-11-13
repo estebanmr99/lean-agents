@@ -532,9 +532,28 @@ async function install(o) {
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupDir = path.join(stateDir(o.home), 'backups', stamp);
-  const files = apply(planned, backupDir, o.home, writeRoots(o));
+  const previous = readState(o.home);
+  const files = [];
   const ran = [];
   let failed = 0;
+  // Saved as the run goes, so an error or a killed command still leaves a state --uninstall can undo.
+  const save = () => {
+    const state = {
+      version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version,
+      installedAt: previous?.installedAt ?? new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      pins: pinVersions(),
+      options: o.migrate ? previous?.options ?? { migrateOnly: true, agents: o.agents, tools: [], privacy: o.privacy, network: o.network, gh: false, terminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false, shell: 'git-bash' } : { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, gh: o.gh, terminals: o.terminals, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun, shell: o.shell },
+      ...(o.toolNode && { toolNode: { version: o.toolNode.version, installedByLean: !!o.toolNode.install || (previous?.toolNode?.version === o.toolNode.version && !!previous.toolNode.installedByLean) } }),
+      files: [...(previous?.files ?? []), ...files],
+      // A command that ran again replaces its earlier record, so --uninstall undoes it once.
+      commands: [...(previous?.commands ?? []).filter((c) => !ran.some((r) => r.desc === c.desc)), ...ran],
+    };
+    privateDir(stateDir(o.home), stateDir(o.home));
+    writePrivate(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(state, null, 2)}\n`);
+  };
+  let applied = false;
+  try { apply(planned, backupDir, o.home, writeRoots(o), files); applied = true; } finally { if (applied || files.length) save(); }
   if (o.exec) {
     for (const [i, c] of commands.entries()) {
       // gh is on by default, so having no installer for it (no brew or winget) must not fail the run.
@@ -551,29 +570,20 @@ async function install(o) {
       }
       if (ui) ui.step(i + 1, commands.length, c.desc);
       else console.log(`- ${c.desc}`);
+      // Recorded before it runs, so a command killed midway can still be undone.
+      const rec = { desc: c.desc, ok: false, undo: c.undo, ...(c.env && { env: c.env }) };
+      ran.push(rec);
+      save();
       const ok = c.run.every((argv) => run(argv, { dryRun: false, log: console.log, env: c.env }));
       if (ui) ui.result(ok || c.optional, c.desc);
       else if (!ok && !c.optional) console.log(`  ! failed: ${c.desc}. Run the command above by hand, then --doctor.`);
       // An optional step (Bun) that fails only means Context Mode runs on Node; nothing to undo.
-      if (!ok && c.optional) { console.log(c.tool === 'gh' ? '! gh install failed; install it yourself (--no-gh skips it).' : c.tool === 'lean-update' ? '! lean-update skill failed to install; run the command above by hand later.' : '! Bun install failed; Context Mode will run on Node.'); continue; }
+      if (!ok && c.optional) { console.log(c.tool === 'gh' ? '! gh install failed; install it yourself (--no-gh skips it).' : c.tool === 'lean-update' ? '! lean-update skill failed to install; run the command above by hand later.' : '! Bun install failed; Context Mode will run on Node.'); ran.pop(); save(); continue; }
       if (!ok) failed++;
-      ran.push({ desc: c.desc, ok, undo: c.undo, ...(c.env && { env: c.env }) });
+      rec.ok = ok;
+      save();
     }
   }
-  const previous = readState(o.home);
-  const state = {
-    version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version,
-    installedAt: previous?.installedAt ?? new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    pins: pinVersions(),
-    options: o.migrate ? previous?.options ?? { migrateOnly: true, agents: o.agents, tools: [], privacy: o.privacy, network: o.network, gh: false, terminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false, shell: 'git-bash' } : { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, gh: o.gh, terminals: o.terminals, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun, shell: o.shell },
-    ...(o.toolNode && { toolNode: { version: o.toolNode.version, installedByLean: !!o.toolNode.install || (previous?.toolNode?.version === o.toolNode.version && !!previous.toolNode.installedByLean) } }),
-    files: [...(previous?.files ?? []), ...files],
-    // A command that ran again replaces its earlier record, so --uninstall undoes it once.
-    commands: [...(previous?.commands ?? []).filter((c) => !ran.some((r) => r.desc === c.desc)), ...ran],
-  };
-  privateDir(stateDir(o.home), stateDir(o.home));
-  writePrivate(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(state, null, 2)}\n`);
   if (failed) {
     console.log(`\n${failed} step(s) failed; see the lines marked ! above. Backups: ${backupDir}`);
     ui?.summary('Summary', [`${failed} of ${commands.length} commands failed`, `Backups: ${backupDir}`], false);

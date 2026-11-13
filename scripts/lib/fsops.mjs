@@ -232,9 +232,8 @@ export function describe(planned, home) {
     .join('\n');
 }
 
-// Write planned changes. Returns state entries for uninstall.
-export function apply(planned, backupDir, home, roots = [home]) {
-  const entries = [];
+// Write planned changes. Returns state entries for uninstall; a caller that passes `entries` keeps what was written if a later write throws.
+export function apply(planned, backupDir, home, roots = [home], entries = []) {
   for (const p of planned) {
     if (p.status === 'skip' || p.status === 'unchanged') continue;
     const blocked = unsafe(p.path, roots);
@@ -247,8 +246,8 @@ export function apply(planned, backupDir, home, roots = [home]) {
       writePrivate(backup, p.before);
     }
     fs.mkdirSync(path.dirname(p.path), { recursive: true });
-    fs.writeFileSync(p.path, p.after);
     entries.push({ path: p.path, kind: p.kind, created: p.before === null, backup, hash: sha(p.after), applied: p.applied, noRestore: p.applied?.some((e) => e.upgraded), keepEmpty: p.keepEmpty });
+    fs.writeFileSync(p.path, p.after);
   }
   return entries;
 }
