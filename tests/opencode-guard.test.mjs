@@ -119,7 +119,7 @@ test('the lean-update skill hands the OpenCode 2 upgrade to the user, with a bac
   assert.match(text, /never runs the (OpenCode )?upgrade/i);
 });
 
-test('--install-agent never installs OpenCode 1.x; opencode-v2 plans only the pinned 2.x installer', () => {
+test('--install-agent never installs OpenCode 1.x; opencode-v2 plans only the pinned 2.x installer', { skip: process.platform === 'win32' && 'Windows route is VERIFY' }, () => {
   const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', tmp(), '--install-agent', 'opencode-v1', '--dry-run'], { encoding: 'utf8' });
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /never installed or removed/);

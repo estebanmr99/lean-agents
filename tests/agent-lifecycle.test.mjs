@@ -24,7 +24,7 @@ const quietly = async (fn) => { const log = console.log; const out = []; console
 // 'fake' is not in the public list; the module checks it, so tests name a real agent and swap its table row.
 const asClaude = (home, mode, extra) => ({ ...opts(home, mode, extra), agents: ['claude'], table: { claude: fake(home).fake } });
 
-test('dry run prints the pinned plan for every agent and changes nothing', () => {
+test('dry run prints the pinned plan for every agent and changes nothing', { skip: process.platform === 'win32' && 'Windows offers only Copilot CLI' }, () => {
   const home = tmp();
   const r = lean(home, '--install-agent', LIFECYCLE_AGENTS.join(','), '--dry-run');
   assert.equal(r.status, 0, r.stderr);
