@@ -11,7 +11,16 @@ import time
 cwd = os.path.join(sys.argv[1], "project")
 os.makedirs(cwd, exist_ok=True)
 env = {**os.environ, "TERM": "xterm-256color", "OPENCODE_DISABLE_AUTOUPDATE": "1"}
-seconds = 20
+# Plugins load a few seconds after the TUI starts, slower on a cold Windows runner: stop shortly after the first
+# marker line, or give up at the limit.
+limit = 90
+marker = os.environ.get("FAKE_ORCA_MARKER", "")
+
+
+def started():
+    return bool(marker) and os.path.exists(marker) and os.path.getsize(marker) > 0
+
+
 out = 0
 tail = ""
 
@@ -33,7 +42,11 @@ if os.name == "nt":
             pass
 
     threading.Thread(target=drain, daemon=True).start()
-    time.sleep(seconds)
+    waited = 0
+    while waited < limit and not started():
+        time.sleep(1)
+        waited += 1
+    time.sleep(5)
     print(f"alive at the end: {proc.isalive()}")
     # The process tree, so no opencode worker outlives the case.
     os.system(f"taskkill /F /T /PID {proc.pid} >NUL 2>&1")
@@ -49,8 +62,11 @@ else:
         os.chdir(cwd)
         os.execvpe("opencode", ["opencode"], env)
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
-    end = time.time() + seconds
-    while time.time() < end:
+    end = time.time() + limit
+    settle = None
+    while time.time() < end and (settle is None or time.time() < settle):
+        if settle is None and started():
+            settle = time.time() + 5
         r, _, _ = select.select([fd], [], [], 0.2)
         if r:
             try:
