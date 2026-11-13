@@ -36,7 +36,8 @@ try {
   const out = execFileSync('gh', ['api', 'copilot_internal/user'], { timeout: 15000, encoding: 'utf8', windowsHide: true, shell: process.platform === 'win32', stdio: ['ignore', 'pipe', 'ignore'] });
   line = 'Copilot: ' + formatUsage(JSON.parse(out)) + '\\n';
 } catch { line = 'Copilot: ' + formatUsage(null) + '\\n'; }
-try { fs.writeFileSync(cache, line); } catch {}
+// Shared /tmp: never follow a planted symlink; 'wx' (O_EXCL) refuses any existing path.
+try { fs.rmSync(cache, { force: true }); fs.writeFileSync(cache, line, { flag: 'wx' }); } catch {}
 process.stdout.write(line);
 `;
 
