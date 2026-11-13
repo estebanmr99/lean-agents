@@ -2,8 +2,34 @@
 // and commands are shared with the 2.x adapter, only config keys differ.
 import path from 'node:path';
 import { configPath, localServer, opencodeShared, profileEdits, shellEdit } from './opencode-v2.mjs';
+import { OWNED_MARK } from '../fsops.mjs';
 import { configHome } from '../system.mjs';
 import { npmSpec } from '../pins.mjs';
+
+// OpenCode 1.19's TUI runs server plugins in a Bun worker and never calls the factory in Orca's managed
+// plugins/orca-opencode-status.js, so Orca shows no status. Loading it from a file under another name
+// fixes that (issue #78). Worker only: headless `opencode run` already loads the managed file.
+const ORCA_SHIM = `// ${OWNED_MARK}
+// Lets Orca's status plugin run in OpenCode 1.x's TUI worker (lean-agents#78).
+export const LeanOrcaStatusShim = async (ctx) => {
+  if (typeof Bun === 'undefined' || Bun.isMainThread) return {};
+  try {
+    const mod = await import('./orca-opencode-status.js');
+    // Orca's default export is the factory (ORCA_OPENCODE_PLUGIN_API=v1) or an { id, server } object.
+    const factory = typeof mod.default === 'function' ? mod.default : mod.default?.server ?? mod.OrcaOpenCodeStatusPlugin;
+    return (await factory?.(ctx)) ?? {};
+  } catch {
+    return {};
+  }
+};
+`;
+
+// Windows only: the bug is seen on the Windows work PC and not reproduced on Linux or macOS in CI, where the
+// shim would run Orca's plugin a second time.
+export function orcaShimActions({ dir, terminals, platform = process.platform }) {
+  if (platform !== 'win32' || !terminals?.includes('orca')) return [];
+  return [{ kind: 'file', path: path.join(dir, 'plugins', 'lean-orca-status-shim.js'), content: ORCA_SHIM }];
+}
 
 export function opencodeV1Adapter({ home, core, profile, opts, rulesPath }) {
   const dir = path.join(configHome(home), 'opencode');
@@ -35,6 +61,7 @@ export function opencodeV1Adapter({ home, core, profile, opts, rulesPath }) {
     });
   }
   if (opts.terminals?.includes('warp')) edits.push({ path: ['plugin'], value: npmSpec('warp-opencode'), mode: 'arrayAdd', legacy: ['@warp-dot-dev/opencode-warp', '@warp-dot-dev/opencode-warp@0.1.7'] });
+  actions.push(...orcaShimActions({ dir, terminals: opts.terminals, platform: opts.platform }));
   if (tools.includes('ponytail')) edits.push({ path: ['plugin'], value: npmSpec('ponytail'), mode: 'arrayAdd', legacy: ['@dietrichgebert/ponytail'] });
   if (tools.includes('dcp')) {
     edits.push({ path: ['plugin'], value: npmSpec('opencode-dcp'), mode: 'arrayAdd' });

@@ -751,6 +751,42 @@ jobs:
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - run: bash tests/real-terminals.sh '${{ matrix.agent }}'
 
+  real-orca-opencode-v1:
+    # Orca status on OpenCode 1.19's TUI (#78): real TUI in a pseudo-terminal, fake Orca plugin, throwaway HOME. Orca is not installed.
+    # The Windows leg gets its pty from pywinpty, installed here in a throwaway venv (not a repo dependency).
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
+      - run: npm ci
+      - name: Install OpenCode 1.19
+        run: |
+          npm install -g "$(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('opencode-v1')))")"
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+      - name: Install pywinpty (Windows pty, throwaway venv)
+        if: runner.os == 'Windows'
+        run: |
+          python -m venv "$RUNNER_TEMP/ptyvenv"
+          "$RUNNER_TEMP/ptyvenv/Scripts/python" -m pip install --quiet pywinpty==2.0.15
+          echo "PY=$(cygpath -m "$RUNNER_TEMP/ptyvenv/Scripts/python")" >> "$GITHUB_ENV"
+      - run: bash tests/real-orca-opencode-v1.sh
+
   real-copilot:
     # Real Copilot CLI and real tools, throwaway HOME, no login and no TTY.
     needs: changes
