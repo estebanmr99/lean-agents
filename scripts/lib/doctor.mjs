@@ -169,7 +169,9 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
   const { nodes, skills } = checkInventory({ home, exec, run, env, platform, fsx }, add);
   const left = leftovers(process.cwd());
   if (left.length) add('parallel workers', 'changed', `left in this repo: ${left.join(', ')} (merge them, then run scripts/parallel.mjs clean)`);
-  for (const line of proxyReport()) add('network env', 'ok', line);
+  const netRows = proxyReport();
+  for (const name of ['HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'NODE_EXTRA_CA_CERTS']) if (!netRows.some((l) => l.startsWith(`${name}=`))) netRows.push(`${name}=not set`);
+  for (const line of netRows) add('network env', 'ok', line);
   const ok = !rows.some((r) => r.status === 'error' || r.status === 'missing');
   const behind = state ? behindPins(state) : [];
   if (json) process.stdout.write(`${JSON.stringify({ ok, behind, nodes, skills, rows }, null, 2)}\n`);

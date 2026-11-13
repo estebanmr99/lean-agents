@@ -4,6 +4,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Fixed
+
+- `--doctor` (text and `--json`) and the install preview print only `set` / `not set` for proxy and CA variables, so internal proxy hosts, ports and CA paths no longer reach stdout; `NO_PROXY` also reports whether the loopback entries are present (#172).
+
 ### Changed
 
 - Release gate: `release.yml` stops before building anything when `docs/audit-<version>.md` is missing or an issue labeled `audit` is still open, so no release ships half audited. Audit findings of medium or higher get the new `audit` label.
