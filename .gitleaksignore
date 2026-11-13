@@ -1,0 +1,2 @@
+# Fake fixture values (tests assert they are never printed), committed before the inline gitleaks:allow mark.
+1c15e80e6eb773a8a9fb09550d698dd92f60886f:tests/fixtures/handbuilt.mjs:generic-api-key:29
