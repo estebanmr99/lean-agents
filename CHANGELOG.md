@@ -4,6 +4,8 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-12
+
 ### Added
 
 - Orca status for OpenCode 1.x on Windows (#78): with Orca selected, the installer writes the owned file `~/.config/opencode/plugins/lean-orca-status-shim.js` so Orca's status plugin runs in OpenCode 1.19's TUI worker (`--uninstall` removes it). Not reproduced in CI (new `real-orca-opencode-v1` job), so it rests on the work-PC report; details in `docs/compatibility.md`.

@@ -44,12 +44,18 @@ Scope and order from the architecture checkpoint [`docs/checkpoints/0.7.0.md`](c
 | 65 — How you get it | [#65](https://github.com/estebanmr99/lean-agents/issues/65), [#46](https://github.com/estebanmr99/lean-agents/issues/46) | Bootstraps default to the release tag; `npx lean-agents` from npm |
 | Archive done sessions | — | Finished session blocks move out of `docs/SPEC.md` |
 
-## 0.8.0
+## 0.8.0 (done)
 
-- [#80](https://github.com/estebanmr99/lean-agents/issues/80): agent lifecycle (optional install, uninstall, migrate, guided major upgrades).
+- [#80](https://github.com/estebanmr99/lean-agents/issues/80) part 1: optional agent install and uninstall, `--migrate` to and from Antigravity, `--upgrade-agent opencode` dry run and the `lean-migrate` skill.
 - [#60](https://github.com/estebanmr99/lean-agents/issues/60): the multi-agent coordinator workflow as an opt-in playbook.
-- [#104](https://github.com/estebanmr99/lean-agents/issues/104) points 4 and 5: Node runtime per tool beyond the 0.7.0 engines check.
-- [#106](https://github.com/estebanmr99/lean-agents/issues/106): adopt a hand-built machine (inventory, back up, one Node, keep OpenCode 1.x sessions).
+- [#104](https://github.com/estebanmr99/lean-agents/issues/104) points 4 and 5: Node runtime per tool in `--doctor`.
+- [#106](https://github.com/estebanmr99/lean-agents/issues/106), [#132](https://github.com/estebanmr99/lean-agents/issues/132): adopt a hand-built machine (inventory, back up, one Node, undo, keep OpenCode 1.x sessions).
+- [#124](https://github.com/estebanmr99/lean-agents/issues/124), [#123](https://github.com/estebanmr99/lean-agents/issues/123), [#130](https://github.com/estebanmr99/lean-agents/issues/130), [#78](https://github.com/estebanmr99/lean-agents/issues/78) (Windows shim).
+
+## 0.9.0
+
+- [#80](https://github.com/estebanmr99/lean-agents/issues/80) part 2: guided OpenCode 1.x to 2.x upgrade with `opencode1` side by side, permanent session backup and undo. Needs a new plan: 2.x migrates the shared 1.x db in place (`docs/compatibility.md`).
+- [#103](https://github.com/estebanmr99/lean-agents/issues/103).
 
 ## On hold
 

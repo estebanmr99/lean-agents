@@ -495,7 +495,7 @@ Mark each `[x]` when merged.
 - [x] **Issue #123 — Copilot credits in OpenCode** (0.7.0). PR #125. Sidebar on OpenCode 2.x stays **VERIFY**.
 - [x] **Issue #124 — Windows shell notice** (0.7.0). PR #127. Warning only; making Git Bash the OpenCode shell default is a follow-up.
 - [x] **Issue #60 — Multi-agent coordinator workflow** (0.8.0). PR #131. `docs/agent-workflow.md`, opt-in `coordinate` skill, `coord-watch.sh`, `real-coord-watch` CI job.
-- [ ] **Issue #124 follow-up — Git Bash as OpenCode's default shell** (0.8.0). Branch `session-124b-opencode-shell`. `real-opencode-shell` CI job (windows-latest, OpenCode 1.19.0 and 2.2.5) with a mock OpenAI-compatible LLM proves (or disproves) that the `shell` config key selects Git Bash on Windows; only if proven do the adapters set it by default (`--shell default` opts out).
+- [x] **Issue #124 follow-up — Git Bash as OpenCode's default shell** (0.8.0). PR #133. Branch `session-124b-opencode-shell`. `real-opencode-shell` CI job (windows-latest, OpenCode 1.19.0 and 2.2.5) with a mock OpenAI-compatible LLM proves (or disproves) that the `shell` config key selects Git Bash on Windows; only if proven do the adapters set it by default (`--shell default` opts out).
 - [x] **Issue #126 — README rewrite** (0.7.0). PR #128.
 - [x] **Session 108 — One update channel** (0.7.0). Issue #108. Haiku.
 - [x] **Session 64 — Pin and verify downloaded code** (0.7.0, after 69). Issues #64, #66, #75. Sonnet. PR #115.
@@ -504,6 +504,11 @@ Mark each `[x]` when merged.
 - [x] **Session 44 — Context Mode on Node < 24.15** (0.7.0, after 64). Issues #44 and #104 points 1 to 3 (engines check, `node` field per pin, matching nvm Node with absolute registration). Opus plans, Sonnet builds. #104 points 4 and 5 and #106 go to 0.8.0; #103 later.
 - [x] **Session 65 — How you get it: release tag default, npm package** (0.7.0, after #58, 69 and 44). Issues #65, #46. Opus plans, Sonnet builds.
 - [x] **Archive done sessions** (0.7.0, last, alone). Checkpoint Q3: 18 finished session blocks moved to [`docs/sessions-done.md`](sessions-done.md); one line each stays here. Session 9 stays open. Haiku.
+- [x] **Issue #123 follow-up — Copilot credits on OpenCode 2.x, status lines** (0.8.0). PR #137. Claude `statusLine` only when none is set.
+- [x] **Issue #130 — Code navigation: Serena vs codebase-memory-mcp** (0.8.0). PR #134. Serena stays the default.
+- [x] **Session 106 — Adopt a hand-built machine** (0.8.0). Issues #106, #104 points 4 and 5, #132. PRs #135 (doctor Node per tool), #138 (`--adopt` dry run, `--json`), #140 (apply, undo, backup, `real-adopt`).
+- [x] **Issue #78 — Orca status on OpenCode 1.x** (0.8.0). PR #136. Windows-only shim, `NO_PROXY` and Ctrl+P notes. The bug was not reproduced in CI, so #78 stays open for the work PC.
+- [x] **Session 80 — Agent lifecycle, part 1** (0.8.0). Issue #80. PRs #139 (`--migrate` to and from Antigravity), #141 (`--upgrade-agent opencode` dry run, `lean-migrate` skill), #142 (`--install-agent` / `--uninstall-agent`), #143 (side-by-side spike, manual workflow). The guided upgrade itself (PR B) moves to 0.9.0: the spike showed 2.x migrates the shared 1.x db in place; owner layout note in the 0.9.0 plan.
 
 ### Session 9 — Showcase
 
