@@ -297,7 +297,7 @@ En Windows:
 <details>
 <summary>Qué se copia y qué no</summary>
 
-Copia la configuración que ya tienes en una herramienta a los agentes que elijas (`--agents`), para tu usuario o, con `--project`, dentro de un repositorio. Orígenes: `claude`, `vscode-copilot`, `cursor`, `copilot-cli`, `opencode-v1`, `opencode-v2` o `auto` (todos los que encuentre). Rutas y fuentes oficiales: [notas de compatibilidad](docs/compatibility.md).
+Copia la configuración que ya tienes en una herramienta a los agentes que elijas (`--agents`), para tu usuario o, con `--project`, dentro de un repositorio. Orígenes: `claude`, `vscode-copilot`, `cursor`, `copilot-cli`, `opencode-v1`, `opencode-v2`, `antigravity` (solo a nivel de usuario) o `auto` (todos los que encuentre). Rutas y fuentes oficiales: [notas de compatibilidad](docs/compatibility.md).
 
 | Elemento | Qué pasa |
 | --- | --- |
