@@ -94,6 +94,7 @@ export async function inventory({ home, env = process.env, platform = process.pl
       for (const h of Array.isArray(g?.hooks) ? g.hooks : []) {
         if (typeof h?.command !== 'string') continue;
         const argv = h.command.split(/\s+/).filter(Boolean);
+        if (!argv.length) continue;
         const pin = pinOf(argv);
         const launch = launchOf(argv, { env, platform, fsx });
         const status = [];
@@ -120,7 +121,7 @@ export async function inventory({ home, env = process.env, platform = process.pl
     try { target = spec.startsWith('file://') ? fileURLToPath(spec) : null; } catch { /* not a local file URL */ }
     if (target && !fsx.existsSync(target)) status.push('stale');
     if (/context-mode/.test(spec) && names.has('opencode\0context-mode')) status.push('duplicate'); // plugin and MCP; the MCP row gets the same mark below
-    add({ client: 'opencode', kind: 'plugin', name: spec.replace(/^file:\/\/.*[\\/]/, 'file:').replace(/\/\/[^/@\s]*@/, '//'), file, keyPath: [key], owner: !target && MANAGED_PLUGIN.test(spec) ? 'managed' : 'user', status });
+    add({ client: 'opencode', kind: 'plugin', name: spec.replace(/^file:\/\/.*[\\/]/, 'file:').replace(/\/\/[^/@\s]*@/, '//').replace(/[?#].*$/, ''), file, keyPath: [key], owner: !target && MANAGED_PLUGIN.test(spec) ? 'managed' : 'user', status });
   };
   for (const [file, keys] of [[ocCfg, ['plugin', 'plugins']], [j(ocDir, 'tui.json'), ['plugin']], [j(ocDir, 'tui.jsonc'), ['plugin']]]) {
     const c = readJson(file);

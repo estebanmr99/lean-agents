@@ -93,3 +93,15 @@ test('an empty HOME has nothing to adopt', { skip }, async () => {
   const r = await inventory({ home, env: {}, platform: process.platform, realHome: '/nowhere' });
   assert.deepEqual(r.items, []); assert.equal(r.ok, true); assert.equal(r.opencode.major, null);
 });
+
+test('an empty hook command is skipped and a plugin URL query is not printed', async () => {
+  const home = fs.realpathSync(fs.mkdtempSync(j(os.tmpdir(), 'adopt-edge-')));
+  fs.mkdirSync(j(home, '.claude'), { recursive: true });
+  fs.writeFileSync(j(home, '.claude', 'settings.json'), JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: '  ' }] }] } }));
+  fs.mkdirSync(j(home, '.config', 'opencode'), { recursive: true });
+  fs.writeFileSync(j(home, '.config', 'opencode', 'opencode.json'), JSON.stringify({ plugin: ['https://example.com/p.js?key=qsecret-1'] }));
+  const r = await inventory({ home, env: { PATH: '' }, platform: process.platform, realHome: '/nowhere' });
+  assert.equal(r.items.filter((i) => i.kind === 'hook').length, 0);
+  assert.ok(!JSON.stringify(r).includes('qsecret-1'));
+  fs.rmSync(home, { recursive: true, force: true });
+});
