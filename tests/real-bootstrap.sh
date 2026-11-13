@@ -114,7 +114,57 @@ boot_run "$dist" "${flags[@]}"
 git -C "$srcdir" add -A
 git -C "$srcdir" -c user.name=t -c user.email=t@t commit -q -m old
 boot_run "$dist" "${flags[@]}"
+[[ "$rc" == 1 && "$out" == *"no upstream"* && -d "$srcdir/.git" ]] || fail "clone without upstream: $rc $out"
+git init -q --bare "$work/remote-i.git"
+git -C "$srcdir" remote add origin "$work/remote-i.git"
+git -C "$srcdir" push -q -u origin HEAD 2>/dev/null
+boot_run "$dist" "${flags[@]}"
 [[ "$rc" == 0 && ! -e "$srcdir/.git" && -f "$srcdir/.lean-agents-release" ]] || fail "clean clone was not replaced: $rc $out"
+
+echo "--- (i2) a clone with unpushed work, or at LEAN_AGENTS_SRC, is never deleted"
+gitc() { git -c user.name=t -c user.email=t@t "$@"; }
+# make_clone <dir>: a pushed, clean clone of a local bare remote with an old scripts/lean.mjs.
+make_clone() {
+  local r="$work/remote.git"
+  rm -rf "$r"
+  git init -q --bare "$r"
+  git clone -q "$r" "$1" 2>/dev/null
+  mkdir -p "$1/scripts"
+  echo "// old" > "$1/scripts/lean.mjs"
+  git -C "$1" checkout -q -b main
+  git -C "$1" add -A
+  gitc -C "$1" commit -q -m old
+  git -C "$1" push -q -u origin main
+}
+# expect_kept <label> <reason>: the install stopped, said why, and left the clone and its commit.
+expect_kept() {
+  [[ "$rc" == 1 && "$out" == *"left alone ($2)"* && "$out" == *"Move it away"* ]] || fail "$1: $rc $out"
+  [[ "$(git -C "$srcdir" rev-parse HEAD)" == "$head" && "$(cat "$srcdir/scripts/lean.mjs")" == "// old" ]] || fail "$1: the clone changed"
+}
+for c in unpushed noupstream stash branch env; do
+  new_home
+  srcdir="$HOME/.config/lean-agents/src"
+  make_clone "$srcdir"
+  case "$c" in
+    unpushed) echo new > "$srcdir/new"; git -C "$srcdir" add -A; gitc -C "$srcdir" commit -q -m unpushed
+      head="$(git -C "$srcdir" rev-parse HEAD)"; boot_run "$dist" "${flags[@]}"; expect_kept "$c" "it has commits that are not pushed" ;;
+    noupstream) git -C "$srcdir" branch -q --unset-upstream
+      head="$(git -C "$srcdir" rev-parse HEAD)"; boot_run "$dist" "${flags[@]}"; expect_kept "$c" "it has no upstream branch" ;;
+    stash) echo "// changed" > "$srcdir/scripts/lean.mjs"; gitc -C "$srcdir" stash -q
+      head="$(git -C "$srcdir" rev-parse HEAD)"; boot_run "$dist" "${flags[@]}"; expect_kept "$c" "it has a stash" ;;
+    branch) git -C "$srcdir" branch -q extra
+      head="$(git -C "$srcdir" rev-parse HEAD)"; boot_run "$dist" "${flags[@]}"; expect_kept "$c" "it has more than one local branch" ;;
+    env) head="$(git -C "$srcdir" rev-parse HEAD)"; LEAN_AGENTS_SRC="$srcdir" boot_run "$dist" "${flags[@]}"
+      expect_kept "$c" "LEAN_AGENTS_SRC points at a git clone" ;;
+  esac
+done
+new_home
+srcdir="$HOME/.config/lean-agents/src"
+make_clone "$srcdir"
+boot_run "$dist" "${flags[@]}"
+[[ "$rc" == 0 && ! -e "$srcdir/.git" && -f "$srcdir/.lean-agents-release" ]] || fail "clean pushed clone was not replaced: $rc $out"
+boot_run "$dist" "${flags[@]}"
+[[ "$rc" == 0 && "$out" == *"already installed"* ]] || fail "reinstall over an installer-made src: $rc $out"
 
 echo "--- (j) a checkout reinstalls its dependencies when package-lock.json changes"
 new_home
