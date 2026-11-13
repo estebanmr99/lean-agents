@@ -1,4 +1,5 @@
 // lean-agents never installs or upgrades OpenCode itself, and says so on 1.x. Temp HOME, no external commands.
+// The one exception is opt-in `--install-agent opencode-v2` (pinned 2.x installer); 1.x is never installed (#79).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -116,4 +117,13 @@ test('the lean-update skill hands the OpenCode 2 upgrade to the user, with a bac
   assert.match(text, /upgrading OpenCode is the user's own step/);
   assert.match(text, /opencode\.db/);
   assert.match(text, /never runs the (OpenCode )?upgrade/i);
+});
+
+test('--install-agent never installs OpenCode 1.x; opencode-v2 plans only the pinned 2.x installer', () => {
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', tmp(), '--install-agent', 'opencode-v1', '--dry-run'], { encoding: 'utf8' });
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /never installed or removed/);
+  const plan = lean(tmp(), ['--install-agent', 'opencode-v2', '--dry-run']);
+  assert.match(plan, /opencode-installer\.sh --version 2\.2\.5 --no-modify-path/);
+  assert.ok(!/opencode-ai|opencode upgrade|opencode uninstall/.test(plan), 'plan touches 1.x or the OpenCode uninstaller');
 });

@@ -299,6 +299,8 @@ jobs:
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - name: Install lean-agents and check what OpenCode resolved
         run: bash tests/real-opencode.sh
+      - name: --install-agent and --uninstall-agent (installer script)
+        run: node tests/real-agent-lifecycle.mjs opencode-v2
 
   real-usage-v2:
     # Copilot credits (#123) in the real OpenCode 2 TUI: sidebar box and /copilot-usage toast, fake gh, throwaway HOME.
@@ -570,6 +572,8 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Use the runner's Linuxbrew
         run: echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
+      - name: --install-agent and --uninstall-agent (installer script)
+        run: node tests/real-agent-lifecycle.mjs claude
       - name: Install every tool, check them, uninstall
         run: |
           export HOME="$(mktemp -d)"
@@ -815,6 +819,8 @@ jobs:
         run: echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
       - name: Install, ask Copilot what loaded, doctor, uninstall
         run: bash tests/real-copilot.sh
+      - name: --install-agent and --uninstall-agent (npm)
+        run: node tests/real-agent-lifecycle.mjs copilot-cli
 
   real-copilot-windows:
     # Real Copilot CLI on Windows through install.ps1, throwaway USERPROFILE.
@@ -835,6 +841,8 @@ jobs:
       - name: Install, ask Copilot what loaded, doctor, uninstall
         shell: pwsh
         run: ./tests/real-copilot.ps1
+      - name: --install-agent and --uninstall-agent (npm)
+        run: node tests/real-agent-lifecycle.mjs copilot-cli
 
   real-antigravity:
     # Real Antigravity CLI and real tools, throwaway HOME, no login and no TTY.
@@ -868,6 +876,10 @@ jobs:
         run: echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
       - name: Install, ask agy what loaded, doctor, uninstall
         run: bash tests/real-antigravity.sh
+      # macOS installs through Homebrew (unproven, VERIFY); the script route is Linux.
+      - name: --install-agent and --uninstall-agent (installer script)
+        if: runner.os == 'Linux'
+        run: node tests/real-agent-lifecycle.mjs antigravity
 
   real-antigravity-windows:
     # Real Antigravity CLI on Windows through install.ps1, throwaway USERPROFILE.
@@ -1096,6 +1108,8 @@ jobs:
         run: echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
       - name: Install, ask Cursor what loaded, project mode, doctor, uninstall
         run: bash tests/real-cursor.sh
+      - name: --install-agent and --uninstall-agent (installer script)
+        run: node tests/real-agent-lifecycle.mjs cursor
 
   real-cursor-windows:
     # Real Cursor CLI on Windows (agent.cmd, Git Bash alias block), throwaway USERPROFILE.

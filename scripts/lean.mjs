@@ -24,6 +24,7 @@ import { version as binVersion, gitHint, detectAgents, packageManager, prereqFor
 import { doctor } from './lib/doctor.mjs';
 import { adopt, inventory } from './lib/adopt.mjs';
 import { upgradeInventory, formatUpgrade } from './lib/upgrade.mjs';
+import { agentLifecycle } from './lib/agent-lifecycle.mjs';
 import { copilotUsage } from './lib/copilot-usage.mjs';
 import { draftIssue } from './lib/feedback.mjs';
 import { pinVersions, behindPins, pinTool, nodeRange, npmSpec } from './lib/pins.mjs';
@@ -116,6 +117,7 @@ function parseArgs(argv) {
       case '--undo': o.undo = true; break;
       case '--keep-backup': o.keepBackup = true; break;
       case '--confirm-removals': o.confirmRemovals = true; break;
+      case '--install-agent': case '--uninstall-agent': o.command = 'agent'; o.agentMode = a.slice(2, -6); o.agentList = list(argv[i + 1]?.startsWith('--') ? '' : next() ?? ''); if (!o.agentList.length) throw new Error(`${a} needs an agent list (claude, opencode-v2, copilot-cli, cursor, antigravity)`); break;
       case '--usage': o.command = 'usage'; break;
       case '--skip-agents': case '--no-admin': break; // defaults in v1: agents are never installed, nothing needs admin
       case '--help': case '-h': o.command = 'help'; break;
@@ -176,6 +178,9 @@ const HELP = `Usage: lean-agents [options]
   --upgrade-agent opencode  Dry run: classify the OpenCode 1.x config as managed, translatable to 2.x or manual and print the
                          translation table; changes nothing (with --json: one JSON object). Apply and --undo come later
   --undo                 With --adopt: restore what the last --adopt --yes changed
+  --install-agent a,b / --uninstall-agent a,b
+                         Install (claude, opencode-v2, copilot-cli, cursor, antigravity) or remove the agent CLIs
+                         lean-agents itself installed; plan first, --yes to run. Never OpenCode 1.x
   --version              Print the lean-agents version
   --usage                Print the Copilot credits left (one gh call, no model request)
 `;
@@ -679,6 +684,10 @@ async function main() {
   if (o.command === 'usage') {
     const network = { ...(o.networkPreset ? preset(o.networkPreset) : fromPrivacy(o.privacy) ?? readState(o.home)?.options.network ?? {}), ...o.networkFlags };
     return console.log(network.outbound === 'off' ? 'usage skipped: outbound calls are off (no request to api.github.com)' : copilotUsage());
+  }
+  if (o.command === 'agent') {
+    const p = await prompter(o.yes);
+    try { return await agentLifecycle({ mode: o.agentMode, agents: o.agentList, home: o.home, realHome: REAL_HOME, stateDir: stateDir(o.home), dryRun: o.dryRun, exec: o.exec, yes: o.yes, ask: p.ask, yesNo }); } finally { p.close(); }
   }
   if (o.command === 'feedback') return feedback(o);
   if (o.command === 'uninstall') return uninstall(o);

@@ -38,7 +38,7 @@ function everything() {
 test('every pin carries what verifies it: npm integrity, git/skill/marketplace commit SHA', () => {
   for (const [key, p] of Object.entries(PINS)) {
     if (p.kind === 'npm') assert.match(p.integrity, /^sha512-[A-Za-z0-9+/]+=*$/, `${key} integrity`);
-    else if (p.kind === 'download') for (const h of Object.values(p.sha256)) assert.match(h, /^[0-9a-f]{64}$/, `${key} sha256`);
+    else if (p.kind === 'download') for (const h of typeof p.sha256 === 'string' ? [p.sha256] : Object.values(p.sha256)) assert.match(h, /^[0-9a-f]{64}$/, `${key} sha256`);
     // lean-update has no sha until its release tag exists (set at release).
     else if (key !== 'lean-update') assert.match(p.sha, /^[0-9a-f]{40}$/, `${key} sha`);
   }
