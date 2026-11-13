@@ -16,6 +16,7 @@ export npm_config_cache="$T/npmcache"
 CFG="$HOME/.config/opencode"
 DATA="$HOME/.local/share/opencode"
 B1="" B2=""
+# shellcheck disable=SC2329 # called through the trap
 cleanup() { [ -n "$B2" ] && "$B2" service stop >/dev/null 2>&1; rm -rf "$T"; }
 trap cleanup EXIT
 
@@ -85,7 +86,7 @@ user_path() { powershell.exe -NoProfile -Command "[Environment]::GetEnvironmentV
 is_windows() { case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) return 0 ;; *) return 1 ;; esac; }
 
 echo "== setup: $(uname -s), node $(node -v)"
-cd "$repo"
+cd "$repo" || exit 1
 
 # --- install 1.x (npm, separate prefix) and 2.x (pinned installer) ---
 v1spec="$(node --input-type=module -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('opencode-v1')))")"
@@ -149,7 +150,7 @@ cat > "$CFG/opencode.jsonc" <<'JSON'
   "share": "disabled"
 }
 JSON
-echo '{ "$schema": "https://opencode.ai/tui.json", "theme": "opencode" }' > "$CFG/tui.json"
+printf '%s\n' '{ "$schema": "https://opencode.ai/tui.json", "theme": "opencode" }' > "$CFG/tui.json"
 snap_both S0-seeded
 
 echo "== V1/V2: hashes around the first starts (session list creates the db)"
