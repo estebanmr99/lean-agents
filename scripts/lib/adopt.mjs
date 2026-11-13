@@ -12,7 +12,7 @@ import { PINS, npmSpec, pinVersions } from './pins.mjs';
 import { configHome, envDir } from './system.mjs';
 import { configPath } from './adapters/opencode-v2.mjs';
 import { mcpServers } from './migrate.mjs';
-import { findNvm, resolveToolNodes, minVersion, installedNodes, toolEnv } from './node-runtime.mjs';
+import { findNvm, resolveToolNodes, minVersion, compare, satisfies, installedNodes, toolEnv } from './node-runtime.mjs';
 import { run } from './system.mjs';
 import { doctor } from './doctor.mjs';
 import { clients, launchOf, pinOf, classify, npmCopies, skillDirs, duplicateSkills, treeSha, probeInitialize } from './inventory.mjs';
@@ -179,8 +179,13 @@ export async function inventory({ home, env = process.env, platform = process.pl
   for (const c of copies) byPin.set(c.pin, [...(byPin.get(c.pin) ?? []), c]);
   for (const c of copies) {
     const status = [];
-    if (PINS[c.pin].version !== c.version) status.push('drift');
-    if (byPin.get(c.pin).length > 1) status.push('duplicate');
+    // shortcut: compare() reads "2.1.7-beta" as NaN, so a pre-release copy counts as equal; no pinned tool ships one, revisit if that changes
+    const cmp = compare(c.version, PINS[c.pin].version);
+    if (cmp < 0) status.push('drift');
+    else if (cmp > 0) status.push('newer'); // newer than the pin: nothing to upgrade
+    const dup = byPin.get(c.pin).length > 1;
+    if (dup) status.push('duplicate');
+    if (dup && !satisfies(c.node, PINS[c.pin].node)) status.push('below-floor'); // this copy cannot run: it is a removal, not an upgrade
     add({ client: 'npm', kind: 'npm', name: `${c.name}@${c.version}`, file: c.prefix, owner: 'managed', status, pin: c.pin, wanted: PINS[c.pin].version, extra: { node: c.node } });
   }
 
@@ -192,6 +197,7 @@ export async function inventory({ home, env = process.env, platform = process.pl
     const s = it.status;
     if (it.owner === 'user') it.action = s.includes('stale') || s.includes('duplicate') ? 'ask' : 'keep';
     else if (s.includes('wrong-node')) it.action = 'reinstall';
+    else if (s.includes('below-floor')) it.action = 'remove';
     else if (s.includes('drift')) it.action = 'upgrade';
     else if (s.includes('stale')) it.action = 'remove';
     else if (s.includes('duplicate')) it.action = it.kind === 'skill' || it.kind === 'plugin' || it.kind === 'mcp' ? 'ask' : it.kind === 'npm' ? (tn && it.node !== tn.version ? 'remove' : 'keep') : 'remove';
@@ -212,7 +218,7 @@ export async function adopt(o) {
   console.log(`--adopt (dry run: nothing is changed; --yes applies). Found: ${Object.entries(by).map(([k, n]) => `${n} ${k}`).join(', ') || 'nothing'}`);
   console.log(`tool Node: ${r.toolNode.range ? `${r.toolNode.range} -> ${r.toolNode.node ?? 'no matching Node installed, nvm not found'} (${r.toolNode.source ?? 'none'})` : 'not needed'}`);
   console.log(`OpenCode: major ${r.opencode.major ?? 'none'}, ${r.opencode.dbBytes} bytes of db, sessions ${r.opencode.sessions ?? 'unknown'}${r.opencode.note ? ` (${r.opencode.note})` : ''}`);
-  for (const i of r.items.filter((x) => x.action !== 'keep' || x.owner === 'managed')) console.log(`  ${i.action.padEnd(9)} ${i.owner.padEnd(8)} ${i.client} ${i.kind} ${i.name}${i.status.length ? `  [${i.status.join(', ')}]` : ''}`);
+  for (const i of r.items.filter((x) => x.action !== 'keep' || x.owner === 'managed')) console.log(`  ${i.action.padEnd(9)} ${i.owner.padEnd(8)} ${i.client} ${i.kind} ${i.name}${i.status.length ? `  [${i.status.join(', ')}]` : ''}  (${i.file})`);
   console.log(`  user-owned items kept untouched: ${r.items.filter((i) => i.owner === 'user' && i.action === 'keep').length}`);
   for (const s of r.stopgaps) console.log(`  stopgap   ${s.file}${s.replaceWith ? `: replace with ${s.replaceWith}` : `: ${s.note}`}`);
   console.log(r.plan.length ? `Plan (${r.plan.length} steps; add --yes to apply, --confirm-removals to allow the removals):\n${r.plan.map((l) => `  - ${l}`).join('\n')}` : 'Plan: nothing to change.');

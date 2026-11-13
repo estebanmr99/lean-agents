@@ -6,6 +6,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- `--adopt`: a pinned npm copy newer than the pin is `newer` and kept (not `drift` and `upgrade`); a duplicate copy under a Node below the tool's floor is `below-floor` and removed; each text row ends with its source file, so the same plugin in the server config and `tui.json` reads as two needed entries (#174).
 - `--upgrade-agent opencode`: the `api.command` reason is given only to plugin files that use `api.command` (others say the 2.x plugin API is not proven), `plugins/package.json` and `node_modules` are not listed as plugins, local `tui.json` plugins are named `<folder>/tui.js` instead of `file:tui.js`, and `permission` and `experimental` get a specific **VERIFY** reason (#173).
 - The lifecycle test builds the opencode-v2 and copilot-cli version checks from `core/pins.json`, so a pin bump no longer fails CI (#184).
 - `install.sh` and `install.ps1` no longer delete a git clone in the install folder that holds work not on its remote: they stop and tell you to move it when it has local changes, no upstream, unpushed commits, a stash or more than one local branch, or when `LEAN_AGENTS_SRC` points at a clone (#156).
