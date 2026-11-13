@@ -262,7 +262,7 @@ export function adoptPlan(r, { home, env, platform, realHome, state, fsx = fs })
     if (Array.isArray(entry?.command)) addEdit(file, { path: [...base, 'command'], mode: 'set', value: [tn.node, cli, 'server'] });
     else if (typeof entry?.command === 'string') { addEdit(file, { path: [...base, 'command'], mode: 'set', value: tn.node }); addEdit(file, { path: [...base, 'args'], mode: 'set', value: [cli, 'server'] }); }
     else continue;
-    out.rewritten.push({ client: it.client, name: it.name, file, argv: [tn.node, cli, 'server'] });
+    out.rewritten.push({ client: it.client, name: it.name, file, path: base, argv: [tn.node, cli, 'server'] });
   }
   // Stale keys of ours (a managed MCP whose command is gone, an enabledPlugins entry of ours without its plugin): removed, the old value recorded. A user's own stale key is only listed.
   for (const it of r.items) {
@@ -407,7 +407,14 @@ export async function adoptApply(o) {
   const dr = doctor({ home, state: readState(stateDir), exec: false, env, platform, json: false });
   if (!dr) return fail('--doctor reports problems after the change');
 
-  if (keepBackup) console.log(`Done. Backup kept: ${backupDir}\nUndo: --adopt --undo`);
+  // Read back what is on disk: a skipped write (symlinked or unparsable file) must not pass on the value we meant to write.
+  for (const m of p.rewritten) {
+    const e = walk(readJson(m.file), m.path);
+    const now = Array.isArray(e?.command) ? e.command : [e?.command, ...(e?.args ?? [])];
+    if (JSON.stringify(now) !== JSON.stringify(m.argv)) return fail(`${rel(m.file)} still has the old ${m.name} command (the file was skipped)`);
+  }
+  // A deleted folder comes back only from the backup, so one that removed a folder keeps it.
+  if (keepBackup || adoptState.dirs.length) console.log(`Done. Backup kept: ${backupDir}\nUndo: --adopt --undo`);
   else {
     // The backup is the undo: without it --adopt --undo can only revert our keys.
     dropBackups(backupDir);
@@ -415,7 +422,7 @@ export async function adoptApply(o) {
     for (const f of adoptState.files) f.backup = null;
     for (const d of adoptState.dirs) d.backup = null;
     saveState(stateDir, adoptState);
-    console.log('Done. Verified; backup deleted (use --keep-backup to keep it for --adopt --undo).');
+    console.log('Done. Verified; backup deleted (--keep-backup keeps it for --adopt --undo).');
   }
   return true;
 }
@@ -425,6 +432,7 @@ export async function adoptUndo(o) {
   const st = readState(stateDir);
   const a = st?.adopt;
   if (!a) { console.log('Nothing to undo: no --adopt run is recorded.'); return true; }
+  if (o.dryRun) { console.log(`--adopt --undo --dry-run: would restore ${a.files.length} files, ${a.dirs.length} folders and undo ${a.npm.length} npm steps; nothing was changed.`); return true; }
   let ok = true;
   for (const c of [...a.npm].reverse()) {
     if (!exec) { console.log(`  by hand: ${c.undo.map((u) => u.join(' ')).join(' && ')}`); continue; }
@@ -449,6 +457,7 @@ export async function adoptUndo(o) {
     fs.writeFileSync(f.path, revertJsonEdits(now.toString('utf8'), f.applied ?? []));
     console.log(`  reverted our keys in ${f.path}${sha(now) === f.after ? ' (no backup kept)' : ' (you edited it since)'}`);
   }
+  if (!ok) { console.log(`Undone with problems; the record and backup stay so you can retry: ${a.backupDir ?? '(no backup)'}`); return false; }
   if (a.backupDir) dropBackups(a.backupDir);
   if (st.adoptOnly) fs.rmSync(stateFile(stateDir));
   else { delete st.adopt; writePrivate(stateFile(stateDir), `${JSON.stringify(st, null, 2)}\n`); }

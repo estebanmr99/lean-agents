@@ -111,7 +111,7 @@ if (servers.relay.command !== 'node') { console.log('FAIL  the user relay MCP ch
 const seed = JSON.parse(seedJson);
 const oc = await opencodeInfo(home, process.env);
 console.log(`sessions ${oc.sessions} (seeded ${seed.sessions})`);
-if (seed.sessions !== null && oc.sessions !== seed.sessions) bad++;
+if (seed.sessions === null || oc.sessions !== seed.sessions) { console.log('FAIL  sessions not seeded or changed'); bad++; }
 process.exit(bad ? 1 : 0);
 JS
 lean --doctor --no-exec > "$out/doctor.txt" || { cat "$out/doctor.txt"; fail "--doctor reports problems after --adopt"; }
