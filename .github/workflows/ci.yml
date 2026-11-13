@@ -228,7 +228,7 @@ jobs:
     # The packed tarball from release-build, run with npx and the bootstraps against it, on all three systems. Throwaway HOME and npm folders.
     needs: [changes, release-build]
     if: needs.changes.outputs.code == 'true'
-    timeout-minutes: 25
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -780,7 +780,7 @@ jobs:
     # The Windows leg gets its pty from pywinpty, installed here in a throwaway venv (not a repo dependency).
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    timeout-minutes: 25
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -917,7 +917,7 @@ jobs:
     # Context Mode ctx_execute with Node only, then with Bun (session 11, items 8 and 9). Numbers go to the job summary.
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    timeout-minutes: 25
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -986,7 +986,7 @@ jobs:
     # Bun installed by default for Context Mode, found through the MCP client, plus reuse, --no-bun, fallback and uninstall (session 13).
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    timeout-minutes: 25
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
