@@ -3,8 +3,8 @@
 # Orca itself is GUI-only and not installed: a fake plugin under Orca's managed name (same export shape) writes a
 # marker line when OpenCode calls its factory, and a fake TUI plugin has Orca's id. Used by CI (Linux and Windows
 # through Git Bash); safe locally (temp HOME). PY names the Python with a pty (pywinpty on Windows).
-#   A: Orca's file alone            -> reported: does the TUI worker call it?
-#   B: plus the installer's output  -> on Windows the shim must make the worker call it; elsewhere no shim is written
+#   A: Orca's file alone            -> reported only: on both OSes the worker calls it, so the bug of #78 is not reproduced
+#   B: plus the installer's output  -> Windows: the shim is written and reaches the factory; elsewhere no shim, no second call
 #   C: like A without the TUI entry -> reported, to show whether the id clash matters
 set -euo pipefail
 
