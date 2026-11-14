@@ -6,6 +6,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- `--adopt` and `--upgrade-agent` count OpenCode sessions even when the engine runs on a Node without `node:sqlite` (22.12 and older): the count runs on the same read-only copy in a child process, first on the tool Node (22.13+ or 24.x), then on the engine's Node with `--experimental-sqlite`. When both fail, the note says which were tried (#201).
 - `--adopt` lists the hooks in `~/.cursor/hooks.json` (one item per event and hook, owner `managed` only with the lean-agents mark, action `keep`, nothing written). A PowerShell `-EncodedCommand` hook shows as `<event>:powershell` and its payload is never printed; Orca's status hook is noted (#175).
 - `--adopt` flags a skill one client reads from two folders (OpenCode: `~/.claude/skills` and `~/.agents/skills`; Cursor and Copilot: their own folder and `~/.agents/skills`) as `duplicate`, also when the copies are links to one folder, which the Skills CLI makes and `--adopt` used to hide. Each row names the clients, each folder's short hash (identical or differs) and the fix (keep one folder, delete the other after a backup); `~/.cursor/skills` and `~/.claude/skills` alone are not flagged, and a link target is never auto-deleted (#176).
 - `--adopt` marks a Cursor hook `managed` when its command matches the RTK, Context Mode or GSD name, as the Claude hooks already do, so RTK and GSD hooks in `~/.cursor/hooks.json` read `managed` too. The encoded PowerShell (Orca) hook stays `user` (#199).
