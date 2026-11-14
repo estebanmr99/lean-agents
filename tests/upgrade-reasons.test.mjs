@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { inventory } from '../scripts/lib/adopt.mjs';
-import { upgradeInventory } from '../scripts/lib/upgrade.mjs';
+import { upgradeInventory, formatUpgrade } from '../scripts/lib/upgrade.mjs';
 
 const j = path.join;
 const skip = process.platform === 'win32' && 'the real-upgrade job covers Windows paths';
@@ -23,8 +23,8 @@ async function seed() {
   put('plugins/alpha-tui/tui.js', 'api.command.register({})\n');
   put('plugins/beta-tui/tui.js', 'export default {}\n');
   const url = (f) => pathToFileURL(j(oc, 'plugins', f)).href;
-  put('tui.json', JSON.stringify({ plugin: [url('alpha-tui/tui.js'), url('beta-tui/tui.js')] }));
-  put('opencode.jsonc', '{ "experimental": { "x": 1 }, "permission": { "bash": "ask" } }\n');
+  put('tui.json', JSON.stringify({ plugin: [url('alpha-tui/tui.js'), url('beta-tui/tui.js'), '@tarquinen/opencode-dcp@latest'] }));
+  put('opencode.jsonc', '{ "experimental": { "x": 1 }, "permission": { "bash": "ask" }, "plugin": ["@tarquinen/opencode-dcp@latest"] }\n');
   const inv = await inventory({ home, env: { HOME: home, PATH: '' }, platform: process.platform, realHome: '/nowhere' });
   const r = upgradeInventory(inv, { home });
   fs.rmSync(home, { recursive: true, force: true });
@@ -54,4 +54,11 @@ test('local tui.json plugins are named by folder and stay distinct', { skip }, a
 test('experimental and permission stay user-manual with a stated reason', { skip }, async () => {
   const r = await seed();
   for (const k of ['experimental', 'permission']) { assert.equal(up(r, k).class, 'user-manual'); assert.match(up(r, k).reason, /VERIFY/); }
+});
+
+test('each upgrade row names its own file, so the two opencode-dcp rows read apart (#203)', { skip }, async () => {
+  const r = await seed();
+  const dcp = r.items.filter((i) => i.upgrade && /opencode-dcp/.test(i.name ?? ''));
+  assert.deepEqual(dcp.map((i) => i.file).sort(), ['~/.config/opencode/opencode.jsonc', '~/.config/opencode/tui.json']);
+  for (const line of formatUpgrade(r).split('\n').filter((l) => /opencode-dcp/.test(l))) assert.match(line, /\(~\/\.config\/opencode\/(opencode\.jsonc|tui\.json)\)$/);
 });
