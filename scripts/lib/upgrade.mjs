@@ -143,7 +143,7 @@ export function formatUpgrade(r) {
   const out = [`--upgrade-agent opencode (dry run: nothing is changed; apply is not in this release yet)`,
     `OpenCode: ${u.binary.version ?? 'version unknown'} at ${u.binary.path ?? 'not on PATH'} (${u.binary.via ?? 'n/a'}), major ${u.layout.major ?? 'none'}, sessions ${u.layout.sessions ?? 'unknown'}`,
     `${u.counts.managed} managed, ${u.counts['user-translatable']} translatable, ${u.counts['user-manual']} manual`];
-  for (const i of r.items.filter((x) => x.upgrade)) out.push(`  ${i.upgrade.class.padEnd(16)} ${i.upgrade.before}${i.upgrade.after ? ` -> ${i.upgrade.after}` : ''}${i.upgrade.class === 'user-manual' ? `  (${i.upgrade.reason})` : ''}`);
+  for (const i of r.items.filter((x) => x.upgrade)) out.push(`  ${i.upgrade.class.padEnd(16)} ${i.upgrade.before}${i.upgrade.after ? ` -> ${i.upgrade.after}` : ''}${i.upgrade.class === 'user-manual' ? `  (${i.upgrade.reason})` : ''}  (${i.file})`);
   out.push('Translation table:', ...TRANSLATIONS.map((t) => `  ${t.from} -> ${t.to}  [${t.source}]`));
   return out.join('\n');
 }

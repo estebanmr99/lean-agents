@@ -22,6 +22,14 @@ import { clients, launchOf, pinOf, classify, npmCopies, skillDirs, duplicateSkil
 const j = path.join;
 const MANAGED_SKILLS = new Set(Object.entries(PINS).filter(([, p]) => p.kind === 'skill').map(([k]) => k));
 const MANAGED_HOOK = /\b(rtk|context-mode|gsd)\b/;
+// Shell syntax (GSD's `$(for n in ...; done) file.js`) is named after the first script it runs (#202).
+const SHELL_HEAD = /^(\$\(|\(|\{)|^(for|if|while)$/;
+const SCRIPT_PATH = /[^\s"'();|&]+\.(?:[cm]?js|ts|ps1|sh)(?![\w.])/;
+const cursorHookLabel = (command, argv) => {
+  if (!(SHELL_HEAD.test(argv[0]) || (/^(sh|bash)$/.test(argv[0]) && argv[1] === '-c'))) return path.basename(argv[0]);
+  const script = command.match(SCRIPT_PATH);
+  return script ? path.basename(script[0]) : 'shell';
+};
 const MANAGED_PLUGIN = /context-mode|opencode-dcp|opencode-warp|lean-agents/;
 
 const readJson = (file) => { try { return parse(fs.readFileSync(file, 'utf8'), [], { allowTrailingComma: true }) ?? null; } catch { return null; } };
@@ -147,6 +155,7 @@ export async function inventory({ home, env = process.env, platform = process.pl
   const cursorHooks = j(home, '.cursor', 'hooks.json');
   const ch = readJson(cursorHooks);
   const orcaFile = orcaHooksFound(home).includes(cursorHooks);
+  const seenCursor = new Map();
   for (const [event, hooks] of Object.entries(ch?.hooks && typeof ch.hooks === 'object' ? ch.hooks : {})) {
     for (const h of Array.isArray(hooks) ? hooks : []) {
       if (typeof h?.command !== 'string') continue;
@@ -158,7 +167,11 @@ export async function inventory({ home, env = process.env, platform = process.pl
       const script = !encoded && path.isAbsolute(argv[0]) ? argv[0] : null;
       // RTK and GSD write their own Cursor hooks without the mark, so the name match counts too (#199).
       const managed = !encoded && (MANAGED_HOOK.test(h.command) || (Boolean(script) && fsx.existsSync(script) && hasMark(readJsonText(script) ?? '')));
-      add({ client: 'cursor', kind: 'hook', name: `${event}:${encoded ? 'powershell' : path.basename(argv[0])}`, file: cursorHooks, keyPath: ['hooks', event], owner: managed ? 'managed' : 'user', extra: encoded && orcaFile ? { note: 'Orca agent status hook' } : undefined });
+      const base = `${event}:${encoded ? 'powershell' : cursorHookLabel(h.command, argv)}`;
+      // Same event and label twice (#198): the second gets `#2`, the third `#3`.
+      const n = seenCursor.get(base) ?? 0;
+      seenCursor.set(base, n + 1);
+      add({ client: 'cursor', kind: 'hook', name: n ? `${base}#${n + 1}` : base, file: cursorHooks, keyPath: ['hooks', event], owner: managed ? 'managed' : 'user', extra: encoded && orcaFile ? { note: 'Orca agent status hook' } : undefined });
     }
   }
   const installed = readJson(j(home, '.claude', 'plugins', 'installed_plugins.json')); // VERIFY: name and shape, proven in real-adopt

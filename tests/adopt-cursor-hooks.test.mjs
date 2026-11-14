@@ -111,3 +111,15 @@ test('missing or invalid hooks.json gives no cursor items and no crash', { skip 
     assert.deepEqual(cursor(r), []);
   }
 });
+
+test('a shell-loop GSD hook is named after its script; a duplicate gets #2 (#202)', { skip }, async () => {
+  const GSD_LOOP = '$(for n in C:/nodejs/node.exe node; do [ -x "$n" ] && echo "$n" && break; done) ~/.cursor/hooks/gsd-cursor-demo.js';
+  const s = seeded((home) => JSON.stringify({ version: 1, hooks: {
+    sessionStart: [{ command: GSD_LOOP }, { command: j(home, 'synthetic', 'gsd-cursor-demo.js') }],
+    stop: [{ command: 'sh -c "exit 0"' }],
+  } }));
+  const r = await run(s);
+  const hooks = cursor(r);
+  assert.deepEqual(hooks.map((i) => i.name), ['sessionStart:gsd-cursor-demo.js', 'sessionStart:gsd-cursor-demo.js#2', 'stop:shell']);
+  assert.equal(hooks[0].owner, 'managed');
+});
