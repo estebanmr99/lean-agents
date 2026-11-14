@@ -123,3 +123,20 @@ test('a shell-loop GSD hook is named after its script; a duplicate gets #2 (#202
   assert.deepEqual(hooks.map((i) => i.name), ['sessionStart:gsd-cursor-demo.js', 'sessionStart:gsd-cursor-demo.js#2', 'stop:shell']);
   assert.equal(hooks[0].owner, 'managed');
 });
+
+test('each shell head names its script or falls back to shell; a third duplicate gets #3 (#202)', { skip }, async () => {
+  const cases = [
+    ['(cd /x && node ~/.cursor/hooks/a-demo.mjs)', 'a-demo.mjs'],
+    ['{ node ~/.cursor/hooks/b-demo.cjs; }', 'b-demo.cjs'],
+    ['if true; then bash ~/.cursor/hooks/c-demo.sh; fi', 'c-demo.sh'],
+    ['while false; do :; done', 'shell'],
+    ['bash -c "echo hi"', 'shell'],
+    ['$(node -e 1) ~/.cursor/hooks/d-demo.ps1', 'd-demo.ps1'],
+  ];
+  for (const [command, label] of cases) {
+    const s = seeded(JSON.stringify({ version: 1, hooks: { stop: [{ command }] } }));
+    assert.equal(cursor(await run(s))[0].name, `stop:${label}`, command);
+  }
+  const s = seeded((home) => JSON.stringify({ version: 1, hooks: { stop: [0, 1, 2].map(() => ({ command: j(home, 'synthetic', 'gsd-cursor-demo.js') })) } }));
+  assert.deepEqual(cursor(await run(s)).map((i) => i.name), ['stop:gsd-cursor-demo.js', 'stop:gsd-cursor-demo.js#2', 'stop:gsd-cursor-demo.js#3']);
+});

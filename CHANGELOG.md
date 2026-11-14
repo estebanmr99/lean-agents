@@ -6,7 +6,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
-- `--adopt` names a Cursor hook written as shell syntax (GSD's `$(for n in ...) ~/.cursor/hooks/gsd-cursor-<event>.js` loop) after the first script it runs, so it reads `sessionStart:gsd-cursor-session-start.js` instead of `sessionStart:$(for n in`; a shell command with no script reads `<event>:shell`. A second hook with the same name gets `#2`, a third `#3` (#202).
+- `--adopt` names a Cursor hook written as shell syntax (GSD's `$(for n in ...) ~/.cursor/hooks/gsd-cursor-<event>.js` loop) after the first script it runs, so it reads `sessionStart:gsd-cursor-session-start.js` instead of `sessionStart:$(for n in`; a shell command with no script reads `<event>:shell`. A second Cursor hook with the same event and name gets `#2`, a third `#3`, for shell and non-shell commands alike (#202).
 - `--upgrade-agent opencode` text rows end with the item's file (home-relative), as `--adopt` rows do, so the two `@tarquinen/opencode-dcp@latest` rows (`opencode.jsonc` and `tui.json`) no longer read as a duplicate (#203).
 - `--adopt` and `--upgrade-agent` count OpenCode sessions even when the engine runs on a Node without `node:sqlite` (22.12 and older): the count runs on the same read-only copy in a child process, first on the tool Node (22.13+ or 24.x), then on the engine's Node with `--experimental-sqlite`. When both fail, the note says which were tried (#201).
 - `--adopt` lists the hooks in `~/.cursor/hooks.json` (one item per event and hook, owner `managed` only with the lean-agents mark, action `keep`, nothing written). A PowerShell `-EncodedCommand` hook shows as `<event>:powershell` and its payload is never printed; Orca's status hook is noted (#175).
