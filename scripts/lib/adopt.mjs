@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 import { parse } from 'jsonc-parser';
 import { hasMark, plan as planFiles, revertJsonEdits, sha, writePrivate, privateDir, dropBackups, unsafe } from './fsops.mjs';
 import { PINS, npmSpec, pinVersions } from './pins.mjs';
@@ -40,8 +41,31 @@ const STOPGAPS = [
   { rel: ['.config', 'opencode', 'plugins', 'orca-status-tui-shim.js'], by: 'the managed Orca integration (--terminal orca)', needs: { terminals: 'orca' } },
 ];
 
+// node:sqlite needs no flag from Node 22.13 (24.x too); a tool Node older than that is not tried.
+const sqliteOk = (v) => { const [a, b] = minVersion(`>=${v}`); return a >= 24 || (a === 22 && b >= 13); };
+const COUNT_SCRIPT = "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync(process.argv[1],{readOnly:true});console.log(d.prepare('SELECT count(*) AS n FROM session').get().n)";
+
+// Count in a child Node when this one lacks node:sqlite (#201): the tool Node first, then this Node with the flag. null when neither answers.
+function countInChild(dbCopy, toolNode, home) {
+  const tried = [];
+  const shown = (p) => (p === home || p.startsWith(home + path.sep) ? `~${p.slice(home.length)}` : p);
+  const cands = [
+    ...(toolNode?.node && sqliteOk(toolNode.version) ? [{ node: toolNode.node, flags: [], label: `Node ${toolNode.version}` }] : []),
+    { node: process.execPath, flags: ['--experimental-sqlite'], label: `${shown(process.execPath)} --experimental-sqlite` },
+  ];
+  for (const c of cands) {
+    tried.push(c.label);
+    try {
+      const out = execFileSync(c.node, [...c.flags, '-e', COUNT_SCRIPT, dbCopy], { encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      if (/^\d+$/.test(out)) return { sessions: Number(out) }; // empty output is a failure, not 0
+    } catch { /* next candidate */ }
+  }
+  return { tried };
+}
+
 // OpenCode: major from the config shape (2.x: mcp.servers / plugins; 1.x: flat mcp / plugin), data folder, db size, session count read from a COPY.
-export async function opencodeInfo(home, env, fsx = fs) {
+// `opts.toolNode` ({version, node}): where the count runs when this Node lacks node:sqlite; `opts.sqliteImport` lets tests hide node:sqlite.
+export async function opencodeInfo(home, env, fsx = fs, { toolNode = null, sqliteImport = () => import('node:sqlite') } = {}) {
   const cfgFile = configPath(j(configHome(home), 'opencode'));
   const cfg = readJson(cfgFile);
   const major = !cfg ? null : cfg.mcp?.servers || cfg.plugins ? 2 : 1; // VERIFY with `opencode --version` in real-adopt
@@ -50,11 +74,17 @@ export async function opencodeInfo(home, env, fsx = fs) {
   const dbBytes = dbs.reduce((n, f) => n + fsx.statSync(j(dataDir, f)).size, 0);
   const out = { major, dataDir, dbBytes, sessions: null };
   if (!dbs.includes('opencode.db')) return { ...out, note: 'no opencode.db' };
-  let sqlite;
-  try { sqlite = await import('node:sqlite'); } catch { return { ...out, note: 'node:sqlite is not available on this Node: sessions not counted' }; }
+  let sqlite = null;
+  try { sqlite = await sqliteImport(); } catch { /* counted in a child below */ }
   const tmp = fs.mkdtempSync(j(os.tmpdir(), 'lean-adopt-'));
   try {
     for (const f of dbs) fs.copyFileSync(j(dataDir, f), j(tmp, f));
+    if (!sqlite) {
+      const c = countInChild(j(tmp, 'opencode.db'), toolNode, home);
+      if (c.tried) out.note = `node:sqlite is not available on this Node: sessions not counted (tried ${c.tried.join(', ')})`;
+      else out.sessions = c.sessions;
+      return out;
+    }
     const db = new sqlite.DatabaseSync(j(tmp, 'opencode.db'), { readOnly: true });
     try { out.sessions = Number(db.prepare('SELECT count(*) AS n FROM session').get().n); } finally { db.close(); }
   } catch (e) { out.note = `sessions not counted: ${String(e.message).split('\n')[0]}`; } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
@@ -235,7 +265,7 @@ export async function inventory({ home, env = process.env, platform = process.pl
     else if (s.includes('stale')) it.action = 'remove';
     else if (s.includes('duplicate')) it.action = it.kind === 'skill' || it.kind === 'plugin' || it.kind === 'mcp' ? 'ask' : it.kind === 'npm' ? (tn && it.node !== tn.version ? 'remove' : 'keep') : 'remove';
   }
-  const oc = await opencodeInfo(home, env, fsx);
+  const oc = await opencodeInfo(home, env, fsx, { toolNode: tn });
   const plan = items.filter((i) => i.action !== 'keep').map((i) => `${i.action} ${i.client} ${i.kind} ${i.name} (${i.status.join(', ') || i.owner})`);
   for (const s of stopgaps) if (s.replaceWith) plan.push(`ask ${s.file}: replace with ${s.replaceWith}`);
   return { version: 1, os: platform, toolNode, items, opencode: { ...oc, dataDir: rel(oc.dataDir) }, stopgaps, plan, ok: !items.some((i) => i.action !== 'keep') };
@@ -451,7 +481,7 @@ export async function adoptApply(o) {
   } else console.log('  verify: initialize skipped (--no-exec)');
   const after = userSnapshot(r, home, new Set());
   for (const [k, v] of user) if (after.get(k) !== v) bad.push(`a user-owned item changed: ${k.split('\0')[0].replace(home, '~')}`);
-  const oc = await opencodeInfo(home, env, fs);
+  const oc = await opencodeInfo(home, env, fs, { toolNode: p.tn });
   if (oc.sessions !== sessions) bad.push(`OpenCode sessions ${sessions} -> ${oc.sessions}`);
   if (bad.length) return fail(bad.join('; '));
   const dr = doctor({ home, state: readState(stateDir), exec: false, env, platform, json: false });
