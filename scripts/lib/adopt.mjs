@@ -48,7 +48,7 @@ const COUNT_SCRIPT = "const{DatabaseSync}=require('node:sqlite');const d=new Dat
 // Count in a child Node when this one lacks node:sqlite (#201): the tool Node first, then this Node with the flag. null when neither answers.
 function countInChild(dbCopy, toolNode, home) {
   const tried = [];
-  const shown = (p) => (p.startsWith(home) ? `~${p.slice(home.length)}` : p);
+  const shown = (p) => (p === home || p.startsWith(home + path.sep) ? `~${p.slice(home.length)}` : p);
   const cands = [
     ...(toolNode?.node && sqliteOk(toolNode.version) ? [{ node: toolNode.node, flags: [], label: `Node ${toolNode.version}` }] : []),
     { node: process.execPath, flags: ['--experimental-sqlite'], label: `${shown(process.execPath)} --experimental-sqlite` },
@@ -56,8 +56,8 @@ function countInChild(dbCopy, toolNode, home) {
   for (const c of cands) {
     tried.push(c.label);
     try {
-      const n = Number(execFileSync(c.node, [...c.flags, '-e', COUNT_SCRIPT, dbCopy], { encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'ignore'] }).trim());
-      if (Number.isInteger(n) && n >= 0) return { sessions: n };
+      const out = execFileSync(c.node, [...c.flags, '-e', COUNT_SCRIPT, dbCopy], { encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      if (/^\d+$/.test(out)) return { sessions: Number(out) }; // empty output is a failure, not 0
     } catch { /* next candidate */ }
   }
   return { tried };
