@@ -35,7 +35,7 @@ Needs Node.js 22.20+ and git. `--dry-run` lists every file and command; nothing 
 npx lean-agents@latest --dry-run
 ```
 
-PowerShell takes the same command. No Node.js yet? See [Fallback: bootstraps](#fallback-bootstraps). Flags and pinning: [Quick start](#quick-start).
+PowerShell takes the same command. New machine? See [Fresh Mac or Windows PC](#fresh-mac-or-windows-pc---everything). No Node.js yet? See [Fallback: bootstraps](#fallback-bootstraps). Flags and pinning: [Quick start](#quick-start).
 
 ### What's new
 
@@ -217,6 +217,28 @@ Every flag from `--help`. In PowerShell the same flags are PascalCase (`-DryRun`
 | `--usage` | Print the Copilot credits left (one `gh` call, no model request) |
 | `--version` | Print the lean-agents version |
 | `--home <dir>` | Treat this folder as your home directory; use a temp folder to try things safely |
+
+### Fresh Mac or Windows PC (`--everything`)
+
+One command from a machine with no Node.js, git or Homebrew. It detects what you have, plans, asks once, applies, and you finish with `--doctor`. Plan only first:
+
+```bash
+curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --dry-run --everything
+curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --everything
+```
+
+```powershell
+& ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -DryRun --everything
+& ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) --everything
+```
+
+- **Plans:** only what is missing. Prerequisites first: Xcode Command Line Tools and Homebrew (macOS), nvm and Node.js 24 under nvm (your own Node stays the default), uv, RTK, Bun. Then Claude Code and OpenCode 2 with every optional tool. On Windows it also sets up the Copilot CLI, VS Code Copilot and Antigravity that are already on the PC. `--agents` and `--tools` override it.
+- **Asks:** one question, `Apply these changes?` (`--yes` accepts it). Homebrew's own installer asks for your macOS password. On Windows nothing is meant to need admin (nvm-windows without admin is still **VERIFY**).
+- **Corporate PC or proxy, in five lines:** (1) read [docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md) first; (2) set `HTTPS_PROXY`, `NO_PROXY` and `NODE_EXTRA_CA_CERTS` in your own terminal (never written to disk); (3) add `--network off` for a work PC; (4) `--dry-run` shows every host and command before anything runs; (5) already on OpenCode 1.x? Use `--adopt`, not `--everything`. More: [On a work PC](#on-a-work-pc-proxy-network-and-security-review).
+- **Interrupted?** Run the same command again: finished steps are skipped.
+- **Undo:** `--uninstall` removes what lean-agents changed. Prerequisites you already had stay; Homebrew has no automatic undo (its uninstaller is interactive); `~/.nvm` goes only when every Node under it is v24.
+
+The walkthrough with the prompts and what each step prints: [docs/fresh-machine.md](docs/fresh-machine.md). What CI proves and what stays **VERIFY**: [docs/compatibility.md](docs/compatibility.md).
 
 ### Fallback: bootstraps
 
