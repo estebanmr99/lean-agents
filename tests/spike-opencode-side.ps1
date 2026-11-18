@@ -3,6 +3,7 @@
 # throwaway HOME must stay byte-identical and the new session must land in the frozen copy.
 # Real 1.19 (-Binary, default `opencode` on PATH), a local mock LLM (tests/fixtures/mock-llm.mjs, read only), no login.
 param([string]$Binary = 'opencode')
+$opencodeBin = $Binary
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot
 $root = Join-Path ([IO.Path]::GetTempPath()) "p1-$([guid]::NewGuid())"
@@ -23,7 +24,7 @@ function Get-Tree([string]$dir) {
 # Windows PowerShell 5.1 turns native stderr into a terminating error under 'Stop', so native calls run under 'Continue'.
 function Invoke-OpenCode {
   $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-  try { & $Binary @args 2>&1 | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] } } finally { $ErrorActionPreference = $prev }
+  try { & $opencodeBin @args 2>&1 | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] } } finally { $ErrorActionPreference = $prev }
 }
 function Get-SessionCount {
   $out = Invoke-OpenCode session list --format json | Out-String
