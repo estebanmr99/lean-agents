@@ -281,6 +281,7 @@ Opt-in, plan first. Install downloads the pinned script (`core/pins.json`), chec
 | Copilot CLI | `npm i -g @github/copilot@1.0.105`; `--prefix ~/.local` when `--home` is not your real home | npm global package | real run macOS 2026-11-12; `real-copilot` (ubuntu, macOS off PRs), `real-copilot-windows` | `npm uninstall -g @github/copilot` (documented npm). **VERIFY** upstream page |
 | Cursor CLI | `cursor.com/install` (the script fixes the version, 2026.11.17-f532c45) | `~/.local/bin/{agent,cursor-agent}` (links), `~/.local/share/cursor-agent/` | real run macOS 2026-11-12; `real-cursor` (ubuntu) | **VERIFY** |
 | Antigravity CLI | Linux: `antigravity.google/cli/install.sh`; macOS: `brew install --cask antigravity-cli` (the engine's `antigravityPrereqs`) | `~/.local/bin/agy` and its data dirs on Linux | `real-antigravity` (ubuntu) only; macOS brew route **VERIFY** | **VERIFY** |
+| VS Code Copilot | none: VS Code owns the extension, lean-agents never installs, updates or removes it. `--install-agent vscode-copilot` runs the normal install for this adapter only (tools and terminals as chosen before); `--uninstall-agent` undoes only the files and commands recorded for it in `state.json`; `--upgrade-agent vscode-copilot` reports only | the adapter's files (`~/.copilot` rules and agents when Copilot CLI is not also configured, VS Code user `mcp.json`, strict-privacy `settings.json`) | unit tests with a temp HOME (`tests/agent-lifecycle.test.mjs`); no logged-in VS Code in CI | **VERIFY** whether VS Code loads `~/.copilot` (see the #180 section) |
 | Windows: Claude, OpenCode 2, Cursor, Antigravity | not offered ("not proven yet") | | no Windows proof; install by hand | **VERIFY** (V4 for OpenCode 2) |
 
 Source: real installs in a throwaway HOME, 2026-11-12. OpenCode 1.x is never installed or removed (#79); an `opencode` 1.x on PATH also blocks the 2.x install.
@@ -300,6 +301,7 @@ Checked 2026-11-10 for Session 64 (#64, #66, #75). Every value is read from the 
 | `install.sh` without Homebrew or Node.js (#179 PR3): Node.js tarball `https://nodejs.org/dist/latest-v24.x/node-v<ver>-{darwin,linux}-{arm64,x64}.tar.gz` checked against `SHASUMS256.txt` of the same folder (integrity only; the `.sig` GPG signature is not checked **VERIFY**); official Homebrew installer pinned to commit `e5b3c5834e39` (`raw.githubusercontent.com/Homebrew/install/<commit>/install.sh`, sha256 in `install.sh` and `core/pins.json` `homebrew-installer`, checked before it runs; downloaded as text and read once 2026-11-18: sudo, `git clone` of brew, Command Line Tools via `softwareupdate`, prints the PATH lines and edits no shell profile; upstream moves, so the pin is bumped like the others **VERIFY**) run interactively with stdin from `/dev/tty` (it installs the Xcode Command Line Tools itself; unattended `NONINTERACTIVE=1` needs sudo without a password **VERIFY**; not run on any CI runner, which has Homebrew); curl reads `HTTPS_PROXY`/`https_proxy` and `NO_PROXY`, `NODE_EXTRA_CA_CERTS` becomes `--cacert` only when a proxy variable is set (replaces curl's roots, so right only behind a TLS-inspecting proxy **VERIFY** behind a real one) | [Node.js dist](https://nodejs.org/dist/latest-v24.x/), [Homebrew install](https://docs.brew.sh/Installation), [curl --cacert](https://curl.se/docs/manpage.html#--cacert); `tests/real-bootstrap.sh` (k) to (n) with a stub tarball and stub curl, PATH without node | 2026-11-18 |
 | `--everything` (#179 PR2): runs `scripts/lib/prereqs.mjs` steps through the engine; Homebrew via the pinned installer (`core/pins.json` `homebrew-installer`) with `NONINTERACTIVE=1` and `/opt/homebrew/bin` prepended to PATH for the later `brew install` steps (unattended behavior and PATH pickup **VERIFY**, not run on any CI runner); nvm-windows admin path stays **VERIFY** | this repo, `tests/everything.test.mjs` (plan only, `--no-exec`) | 2026-11-18 |
 | `--everything` team preset (#179 PR5): Windows adds `copilot-cli`, `vscode-copilot`, `antigravity` to the default agents when `detectAgents()` finds them (same detection as the agent menu); nvm undo is a Node one-liner that removes `~/.nvm` only when `versions/node` holds only v24 (a user's own v24 counts as ours: limit) | this repo, `tests/prereqs.test.mjs` (undo run against a synthetic `.nvm`) | 2026-11-18 |
+| Fresh-machine docs (#179 PR7, 2026-11-18): `README.md` / `README.es.md` and `docs/fresh-machine.md` describe `--everything` from the code and `--help`; the plan and prompts were read from a `--no-exec --dry-run --everything` run in a throwaway HOME on a machine that already had most prerequisites, so the install steps themselves were not exercised. Still **VERIFY** on a truly fresh machine: Homebrew installer and Xcode Command Line Tools unattended, nvm-windows and Node without admin, `winget` on corporate images, a TLS-inspecting proxy. `install.ps1` has no `-Everything` switch yet; `--everything` passes through as it is | this repo, `tests/fresh-machine-docs.test.mjs` (flags only) | 2026-11-18 |
 | OpenCode 2 is on npm as `@opencode/cli` (+ `@opencode/cli-<target>`); its installer takes `--version`. CI runs 2.2.5 (2.2.6 is under 14 days old). The installer script is pinned by SHA256 in `tests/ci-downloads.json`; the Antigravity and Cursor installers the same way, so a changed script fails CI until its hash is reviewed. What those installers then download is chosen by them. `tests/real-opencode.sh` was **not** run against 2.2.5 locally: another OpenCode service held the port. The install and `opencode --version` (v2.2.5) worked | `opencode.ai/v2/install --help`, npm registry | 2026-11-10 |
 | VS Code 1.144.0 linux-x64 tarball URL and `sha256hash` | `update.code.visualstudio.com/api/versions/1.144.0/linux-x64/stable` | 2026-11-10 |
 | `real-proxy` keeps `GH_TOKEN`: `tests/real-proxy.sh` calls `gh api /zen` twice | `grep gh tests/real-proxy.sh` | 2026-11-10 |
@@ -593,6 +595,28 @@ Source: `tests/spike-opencode-side.sh` / `.ps1`, job `spike-opencode-side` (now 
 - **Fault injection:** `LEAN_TEST_FAIL_AT=<step>` fails right after that step finished, so its undo is exercised; it needs `LEAN_AGENTS_TEST=1` and is refused otherwise.
 - **VERIFY:** that the upstream 2.x installer never runs `opencode` against the live data folder (apply relies on it; CI asserts the live data hash is unchanged after apply).
 - **VERIFY:** the full apply on Windows and macOS (CI proves Linux only; macOS `real-*` jobs skip PRs, #56); that `opencode session list` on 2.x always migrates the live db (the CI test asserts the db changes before `--undo`); `--undo` after 2.x ran with a DCP plugin installed in the config folder (2.x may add `node_modules` or lock files there, which undo leaves).
+
+## OpenCode 1.x to 2.x: where things live
+
+Source: `--upgrade-agent opencode` translation table (`scripts/lib/opencode-upgrade.mjs`), checked 2026-11-18. "Docs only" means [opencode.ai/docs/migrate-v1](https://opencode.ai/docs/migrate-v1) says so and no binary proved it; the `lean-migrate` skill and `docs/migrate-opencode-v1-to-v2.md` point here.
+
+| 1.x location | 2.x location | Status | Source |
+| --- | --- | --- | --- |
+| `agent.<name>` in `opencode.jsonc` | `agents.<name>` | translated | real 2.2.5 |
+| `plugin[]` (npm spec) | `plugins[]` | translated | `tests/real-opencode.sh` |
+| flat `mcp.<name>` | `mcp.servers.<name>` | translated | real 2.2.5 |
+| `compaction.reserved` | `compaction.buffer` | translated | SPEC 0 |
+| `autoupdate: false` / `true` | `update: "disable"` / `"auto"` | translated | docs only |
+| `disabled_providers[]` | `policies` (deny `provider.use`) | translated | real 2.1.4 accepts `policies` |
+| `instructions`, `default_agent`, `model`, `share`, `shell` | same keys | kept | real 2.2.5 |
+| `tui.json` `plugin[]` (`file://`) | `cli.json` `plugins[]` | **VERIFY** | docs disagree (`cli.json` vs `tui.json`), no binary proof |
+| keybinds | no 2.x file named | **VERIFY**, manual | docs |
+| `agent/`, `agents/`, `command/`, `commands/` folders | same folders | docs only | docs |
+| `skills/`, `~/.agents/skills`, `~/.claude/skills` | same folders | docs only | opencode.ai/docs/skills |
+| `plugins/*.ts` that use `api.command` | no proven 2.x equivalent | manual | upgrade `reason` |
+| sessions: `<data>/opencode/opencode.db`, `storage/`, `snapshot/` | same path, rewritten in place by the first 2.x start (20 to 29 tables) | `opencode1` reads the frozen copy | spike `spike-opencode-side` |
+
+Every item the engine cannot map is listed as `user-manual` with its reason, never dropped.
 
 ## Plugin health (#212, 2026-11-18)
 

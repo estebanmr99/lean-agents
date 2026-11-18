@@ -35,7 +35,7 @@ Necesitas Node.js 22.20+ y git. `--dry-run` lista cada archivo y comando; nada c
 npx lean-agents@latest --dry-run
 ```
 
-PowerShell usa el mismo comando. ¿Aún no tienes Node.js? Ve [Alternativa: bootstraps](#alternativa-bootstraps). Opciones y fijar una versión: [Inicio rápido](#inicio-rápido).
+PowerShell usa el mismo comando. ¿Máquina nueva? Ve [Mac o PC con Windows nuevos](#mac-o-pc-con-windows-nuevos---everything). ¿Aún no tienes Node.js? Ve [Alternativa: bootstraps](#alternativa-bootstraps). Opciones y fijar una versión: [Inicio rápido](#inicio-rápido).
 
 ### Novedades
 
@@ -163,7 +163,7 @@ Empieza siempre con `--dry-run`: muestra cada archivo y comando antes de cambiar
 
 - Opciones útiles: `--all-tools`, `--privacy strict`, `--lang es`, `--profile vertex-gemini`, `--update`, `--uninstall`, `--doctor`, `--json` (con `--dry-run`, `--doctor` o `--adopt`, para agentes) (`--help` las lista todas).
 - `--adopt`: lista lo que ya tiene una máquina armada a mano (servidores MCP, hooks y plugins de Claude, plugins de OpenCode, skills, copias npm bajo cada Node de nvm, número de sesiones de OpenCode), marca cada elemento como managed, user, stale, duplicate, drift o wrong-node e imprime la acción prevista. Solo, no cambia nada; nunca lee valores de env ni de cabeceras. `--adopt --yes` aplica el plan: copia cada archivo que edita a `~/.config/lean-agents/adopt-<hora>/` (solo para ti), registra los MCP administrados como `<Node de la herramienta> <entrada>`, comprueba que cada uno responde a `initialize` y que tus archivos y el número de sesiones de OpenCode no cambian, ejecuta `--doctor` y se deshace solo si algo falla. Quitar una copia npm vieja, una carpeta de skill duplicada o un parche hecho a mano pide confirmación (un menú en terminal, `--confirm-removals` sin terminal); si no, se listan y se dejan. `--keep-backup` conserva la copia tras una ejecución correcta; `--adopt --undo` restaura cada archivo editado byte a byte desde ella.
-- `--upgrade-agent opencode`: simulacro para pasar OpenCode 1.x a 2.x. Ordena tu configuración 1.x en gestionada (lean-agents la reinstala), traducible (una clave 1.x verificada tiene clave 2.x: `agent` a `agents`, `mcp` a `mcp.servers`, `compaction.reserved` a `compaction.buffer`, ...) y manual (sin equivalente 2.x probado, con el motivo); imprime la tabla de traducción; no cambia nada (`--json` para un objeto JSON). `--upgrade-agent opencode --yes` lo aplica después de una copia verificada y `--upgrade-agent opencode --undo --yes` vuelve atrás (más abajo). `--upgrade-agent opencode --backup` (primero el plan, `--yes` para copiar) es el primer paso real: una copia de seguridad permanente de tus sesiones y tu configuración de OpenCode 1.x, con el sha256 de cada archivo comprobado y las sesiones contadas en una copia, y después una copia congelada para un futuro `opencode1`. Solo lee los datos vivos, se niega mientras OpenCode está abierto o si el espacio libre es menor que 2 x tamaño + 1 GB, y nunca borra una copia. La skill opcional `lean-migrate` (`--tools lean-migrate`) guía a un agente por el proceso.
+- `--upgrade-agent opencode`: simulacro para pasar OpenCode 1.x a 2.x. Ordena tu configuración 1.x en gestionada (lean-agents la reinstala), traducible (una clave 1.x verificada tiene clave 2.x: `agent` a `agents`, `mcp` a `mcp.servers`, `compaction.reserved` a `compaction.buffer`, ...) y manual (sin equivalente 2.x probado, con el motivo); imprime la tabla de traducción; no cambia nada (`--json` para un objeto JSON). `--upgrade-agent opencode --yes` lo aplica después de una copia verificada y `--upgrade-agent opencode --undo --yes` vuelve atrás (más abajo). `--upgrade-agent opencode --backup` (primero el plan, `--yes` para copiar) es el primer paso real: una copia de seguridad permanente de tus sesiones y tu configuración de OpenCode 1.x, con el sha256 de cada archivo comprobado y las sesiones contadas en una copia, y después una copia congelada para un futuro `opencode1`. Solo lee los datos vivos, se niega mientras OpenCode está abierto o si el espacio libre es menor que 2 x tamaño + 1 GB, y nunca borra una copia. La skill opcional `lean-migrate` (`--tools lean-migrate`) guía a un agente por el proceso: copia, simulacro, aplicar, doctor, portar a mano lo manual y deshacer si falla. Guía (en inglés): [docs/migrate-opencode-v1-to-v2.md](docs/migrate-opencode-v1-to-v2.md).
 - `--install-agent a,b` / `--uninstall-agent a,b` (opcional): instala un CLI de agente (`claude`, `opencode-v2`, `copilot-cli`, `cursor`, `antigravity`) desde su instalador fijado (se comprueba el SHA256 antes de ejecutarlo; Linux y macOS, y Copilot CLI en Windows) o lo quita. Muestra primero el plan (`--dry-run` se detiene ahí; `--yes` omite la pregunta). La instalación registra los archivos que creó el instalador con su SHA256; la desinstalación borra solo los que siguen iguales, o ejecuta `npm uninstall -g`, nunca el desinstalador del propio agente, y no toca tu configuración ni tus datos. Un agente que instalaste tú se informa como "not installed by lean-agents" y no se toca. OpenCode 1.x nunca se instala ni se quita.
 - En PowerShell las opciones comunes van en PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`. Cualquier otra opción se pasa tal cual, por ejemplo `-DryRun --network off`.
 - Context Mode 2 necesita Node.js 24.15 y GSD Core necesita Node.js 24 (`engines.node` en `core/pins.json`). Con un Node activo más antiguo, lean-agents los ejecuta con un Node 24 de nvm sin cambiar tu Node por defecto (nvm-windows: uno ya instalado) y lo registra con su ruta absoluta; en Claude Code eso significa un servidor MCP en lugar del plugin de Context Mode, así que sus hooks y skills no se instalan. Sin nvm los omite con una línea. Todo lo demás funciona con Node.js 22.20 o superior.
@@ -197,7 +197,7 @@ Cada opción de `--help`. En PowerShell se escriben en PascalCase (`-DryRun`).
 | `--adhd-always` | Activa i-have-adhd en cada respuesta |
 | `--ponytail-mode` lite, full, ultra u off | Nivel de Ponytail |
 | `--shell` default o git-bash | OpenCode en Windows: usa Git Bash si lo encuentra (por defecto: git-bash); nunca sobrescribe un shell que tú elegiste |
-| `--json` | Con `--dry-run`, `--doctor` o `--adopt`: imprime un objeto JSON en stdout |
+| `--json` | Con `--dry-run`, `--doctor`, `--adopt` o `--yes` (una instalación real: `{ ok, files, commands, errors, version }`, ver [docs/install-json.md](docs/install-json.md)): imprime un objeto JSON en stdout |
 | `--feedback-draft` | Tras un fallo de instalación: lee el error por stdin e imprime un borrador de issue sin datos sensibles en JSON. Necesita `--failed-command` |
 | `--failed-command <texto>` | El comando que falló, para `--feedback-draft` |
 | `--feedback-kind update` | Con `--feedback-draft`: el texto es un hallazgo de una actualización, no un error |
@@ -213,10 +213,33 @@ Cada opción de `--help`. En PowerShell se escriben en PascalCase (`-DryRun`).
 | `--upgrade-agent opencode --opencode1 [--yes]` | Después de `--backup`: añade `opencode1`, que ejecuta OpenCode 1.x solo sobre la copia congelada; `--uninstall` lo quita |
 | `--upgrade-agent opencode --yes` | Aplicar, solo con un sello de copia verificada de `--backup --yes`: `opencode1`, OpenCode 2, la configuración traducida, DCP. Cada paso queda en un diario; si uno falla se deshacen los ya hechos |
 | `--upgrade-agent opencode --undo [--yes]` | Volver a 1.x: deshace cada paso, aparta la base migrada por 2.x (nunca se borra), devuelve la copia congelada; la copia y la copia congelada se conservan |
-| `--install-agent a,b` / `--uninstall-agent a,b` | Instala o quita CLIs de agente que lean-agents instaló; primero el plan, `--yes` lo ejecuta; nunca OpenCode 1.x |
+| `--install-agent a,b` / `--uninstall-agent a,b` | Instala o quita CLIs de agente que lean-agents instaló; primero el plan, `--yes` lo ejecuta; nunca OpenCode 1.x. `vscode-copilot` solo escribe o quita sus archivos de configuración: VS Code es dueño de la extensión Copilot |
+| `--upgrade-agent vscode-copilot` | Solo informa: la extensión se actualiza desde VS Code; `--update` refresca los archivos que lean-agents escribió |
 | `--usage` | Imprime los créditos de Copilot que quedan (una llamada a `gh`, sin pedir al modelo) |
 | `--version` | Imprime la versión de lean-agents |
 | `--home <dir>` | Usa esta carpeta como tu carpeta personal; usa una carpeta temporal para probar sin riesgo |
+
+### Mac o PC con Windows nuevos (`--everything`)
+
+Un solo comando desde una máquina sin Node.js, git ni Homebrew. Detecta lo que ya tienes, planifica, pregunta una vez, aplica, y terminas con `--doctor`. Primero solo el plan:
+
+```bash
+curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --dry-run --everything
+curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --everything
+```
+
+```powershell
+& ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -DryRun --everything
+& ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) --everything
+```
+
+- **Planifica:** solo lo que falta. Primero los requisitos: Xcode Command Line Tools y Homebrew (macOS), nvm y Node.js 24 bajo nvm (tu propio Node sigue siendo el predeterminado), uv, RTK, Bun. Luego Claude Code y OpenCode 2 con todas las herramientas opcionales. En Windows también configura el Copilot CLI, VS Code Copilot y Antigravity que ya estén en la PC. `--agents` y `--tools` lo sobrescriben.
+- **Pregunta:** una sola cosa, `Apply these changes?` (`--yes` la acepta). El instalador propio de Homebrew pide tu contraseña de macOS. En Windows nada debería pedir admin (nvm-windows sin admin sigue en **VERIFY**).
+- **PC de empresa o proxy, en cinco líneas:** (1) lee antes [docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md); (2) define `HTTPS_PROXY`, `NO_PROXY` y `NODE_EXTRA_CA_CERTS` en tu propia terminal (nunca se escriben en disco); (3) agrega `--network off` en una PC de trabajo; (4) `--dry-run` muestra cada host y comando antes de ejecutar nada; (5) ¿ya usas OpenCode 1.x? Usa `--adopt`, no `--everything`. Más: [En una PC de trabajo](#en-una-pc-de-trabajo-proxy-red-y-revisión-de-seguridad).
+- **¿Se interrumpió?** Corre el mismo comando otra vez: los pasos terminados se omiten.
+- **Deshacer:** `--uninstall` quita lo que cambió lean-agents. Los requisitos que ya tenías se quedan; Homebrew no tiene deshacer automático (su desinstalador es interactivo); `~/.nvm` se borra solo si todos los Node que contiene son v24.
+
+El recorrido con las preguntas y lo que imprime cada paso: [docs/fresh-machine.md](docs/fresh-machine.md). Qué prueba el CI y qué sigue en **VERIFY**: [docs/compatibility.md](docs/compatibility.md).
 
 ### Alternativa: bootstraps
 

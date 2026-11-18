@@ -30,7 +30,7 @@ import { backupOpencode, backupLayout, listProcesses, opencodeRunning } from './
 import { readBackupStamp } from './lib/backup-stamp.mjs';
 import { isActive, failAt, applyPreflight, verifyBackup, configDrift, createSteps, makeCtx, runApply, runUndo, restoreData } from './lib/opencode-upgrade.mjs';
 import { planOpencode1, installOpencode1, removeOpencode1, layout as opencode1Layout } from './lib/opencode1.mjs';
-import { agentLifecycle, agentTable } from './lib/agent-lifecycle.mjs';
+import { agentLifecycle, agentTable, VSCODE_NOTE } from './lib/agent-lifecycle.mjs';
 import { copilotUsage } from './lib/copilot-usage.mjs';
 import { draftIssue } from './lib/feedback.mjs';
 import { planUpdate, changelogNotes, formatUpdatePlan } from './lib/update-plan.mjs';
@@ -122,13 +122,13 @@ function parseArgs(argv) {
       case '--uninstall': o.command = 'uninstall'; break;
       case '--doctor': o.command = 'doctor'; break;
       case '--adopt': o.command = 'adopt'; break;
-      case '--upgrade-agent': o.command = 'upgrade-agent'; o.upgradeAgent = next(); if (o.upgradeAgent !== 'opencode') throw new Error('--upgrade-agent takes opencode'); break;
+      case '--upgrade-agent': o.command = 'upgrade-agent'; o.upgradeAgent = next(); if (!['opencode', 'vscode-copilot'].includes(o.upgradeAgent)) throw new Error('--upgrade-agent takes opencode or vscode-copilot'); break;
       case '--undo': o.undo = true; break;
       case '--keep-backup': o.keepBackup = true; break;
       case '--backup': o.backup = true; break;
       case '--opencode1': o.opencode1 = true; break;
       case '--confirm-removals': o.confirmRemovals = true; break;
-      case '--install-agent': case '--uninstall-agent': o.command = 'agent'; o.agentMode = a.slice(2, -6); o.agentList = list(argv[i + 1]?.startsWith('--') ? '' : next() ?? ''); if (!o.agentList.length) throw new Error(`${a} needs an agent list (claude, opencode-v2, copilot-cli, cursor, antigravity)`); break;
+      case '--install-agent': case '--uninstall-agent': o.command = 'agent'; o.agentMode = a.slice(2, -6); o.agentList = list(argv[i + 1]?.startsWith('--') ? '' : next() ?? ''); if (!o.agentList.length) throw new Error(`${a} needs an agent list (claude, opencode-v2, copilot-cli, cursor, antigravity, vscode-copilot)`); break;
       case '--usage': o.command = 'usage'; break;
       case '--skip-agents': case '--no-admin': break; // defaults in v1: agents are never installed, nothing needs admin
       case '--help': case '-h': o.command = 'help'; break;
@@ -177,7 +177,7 @@ const HELP = `Usage: lean-agents [options]
                          ({"offer":false} when the network preset forbids it). Needs --failed-command <text>;
                          pass --network on|off when nothing is installed yet. Files nothing.
   --probe-plugins        With --doctor or --adopt: start a short-lived opencode serve (throwaway state dir, loopback) and check a plugin's command registers
-  --json                 With --dry-run or --doctor: print one JSON object on stdout (messages go to stderr)
+  --json                 With --dry-run, --doctor or --yes: print one JSON object on stdout (messages go to stderr)
   --no-app               Do not install the Antigravity app (the CLI is still installed when missing)
   --bun / --no-bun       Install Bun for Context Mode (default: on; faster JS, TypeScript)
   --project <dir>        Write the shared team files into one repository
@@ -215,9 +215,12 @@ const HELP = `Usage: lean-agents [options]
                          After --backup: copy the OpenCode 1.x binary next to the frozen copy and add opencode1, which runs
                          1.x on that copy only (XDG_DATA_HOME + XDG_STATE_HOME), to PATH. --uninstall removes it
   --undo                 With --adopt: restore what the last --adopt --yes changed
+  --upgrade-agent vscode-copilot
+                         Report only: VS Code owns the Copilot extension; --update refreshes the files lean-agents wrote
   --install-agent a,b / --uninstall-agent a,b
                          Install (claude, opencode-v2, copilot-cli, cursor, antigravity) or remove the agent CLIs
-                         lean-agents itself installed; plan first, --yes to run. Never OpenCode 1.x
+                         lean-agents itself installed; plan first, --yes to run. Never OpenCode 1.x.
+                         vscode-copilot: configure or remove only the files lean-agents wrote (VS Code owns the extension)
   --version              Print the lean-agents version
   --usage                Print the Copilot credits left (one gh call, no model request)
 `;
@@ -549,6 +552,19 @@ function printJson(o, planned, commands, migration, behind, prereqs, update) {
   process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
 }
 
+// One JSON object on stdout after a real apply (--json --yes). Field names are a contract: see docs/install-json.md.
+function printApplied(o, files, commands, errors) {
+  const inText = (t) => t.split(o.home).join('~');
+  const rel = (t) => (t.startsWith(o.home + path.sep) ? path.relative(o.home, t).split(path.sep).join('/') : t);
+  process.stdout.write(`${JSON.stringify({
+    ok: errors.length === 0,
+    files: files.map((f) => rel(f.path)),
+    commands: commands.map((c) => ({ ...c, desc: inText(c.desc) })),
+    errors: errors.map(inText),
+    version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version,
+  }, null, 2)}\n`);
+}
+
 function printPlan(o, planned, commands) {
   console.log(`\nlean-agents plan for ${o.agents.join(', ') || 'no agents'}`);
   if (o.project) console.log(`  project: ${o.project}`);
@@ -604,7 +620,7 @@ async function install(o) {
   if (o.command === 'update' && saved.options.migrateOnly) throw new Error('nothing to update: only --migrate ran here');
   const p = await choose(o, saved?.options);
   const { planned, commands: agentCommands, migration } = buildPlan(o);
-  if (migration && !migration.rows.length) { p.close(); console.log('Nothing to migrate: no rules, agents, skills, prompts, MCP servers or hooks found.'); return; }
+  if (migration && !migration.rows.length) { p.close(); console.log('Nothing to migrate: no rules, agents, skills, prompts, MCP servers or hooks found.'); return o.json && printApplied(o, [], [], []); }
   const behind = new Set((saved ? behindPins(saved) : []).map((b) => pinTool(b.tool)));
   const every = o.everything && !migration ? everythingPrereqs(o, readState(o.home)) : null;
   // The planner owns these installs; the per-tool ones below would repeat them.
@@ -613,8 +629,7 @@ async function install(o) {
   const update = saved && o.dryRun ? updateInfo(o, saved) : null;
   const noGit = migration ? null : gitHint(packageManager());
   if (noGit) console.log(noGit);
-  if (o.json) {
-    if (!o.dryRun) throw new Error('--json needs --dry-run (or --doctor)');
+  if (o.json && o.dryRun) {
     p.close();
     return printJson(o, planned, commands, migration, saved ? behindPins(saved) : undefined, every?.steps, update ?? undefined);
   }
@@ -665,18 +680,24 @@ async function install(o) {
     writePrivate(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(state, null, 2)}\n`);
   };
   let applied = false;
-  try { apply(planned, backupDir, o.home, writeRoots(o), files); applied = true; } finally { if (applied || files.length) save(); }
+  try { apply(planned, backupDir, o.home, writeRoots(o), files); applied = true; } catch (e) {
+    if (o.json) printApplied(o, files, [], [e.message]);
+    throw e;
+  } finally { if (applied || files.length) save(); }
+  const report = [];
+  const errors = [];
   if (o.exec) {
     for (const [i, c] of commands.entries()) {
       // gh is on by default, so having no installer for it (no brew or winget) must not fail the run.
-      if (c.manual) { console.log(`! ${c.desc}`); if (!c.optional) failed++; continue; }
+      if (c.manual) { console.log(`! ${c.desc}`); if (!c.optional) { failed++; errors.push(c.desc); } continue; }
       const there = (c.skipIfExists && exists(c.skipIfExists)) || (c.skipIfOutput && quiet(c.skipIfOutput.cmd).ok);
       if (there) {
         if (!behind.has(c.tool)) continue;
         // Installed at an older pin: undo it, then add it again at the new pin.
-        if (!c.undo.every((argv) => run(undoArgv(argv), { dryRun: false, log: console.log, env: c.env }))) {
+        if (!c.undo.every((argv) => run(undoArgv(argv), { dryRun: false, log: console.log, env: c.env, json: o.json }))) {
           console.log(`  ! could not remove the old ${c.desc}; left as it is. Fix it by hand, then --update.`);
           failed++;
+          errors.push(`could not remove the old ${c.desc}`);
           continue;
         }
       }
@@ -686,7 +707,10 @@ async function install(o) {
       const rec = { desc: c.desc, ok: false, undo: c.undo, ...(c.env && { env: c.env }), ...(c.resumeKey && { resumeKey: c.resumeKey }) };
       ran.push(rec);
       save();
-      const ok = c.run.every((argv) => run(argv, { dryRun: false, log: console.log, env: c.env }));
+      const codes = [];
+      const ok = c.run.every((argv) => run(argv, { dryRun: false, log: console.log, env: c.env, json: o.json, codes }));
+      report.push({ desc: c.desc, ok, exit: codes.at(-1) ?? null });
+      if (!ok && !c.optional) errors.push(c.desc);
       if (ui) ui.result(ok || c.optional, c.desc);
       else if (!ok && !c.optional) console.log(`  ! failed: ${c.desc}. Run the command above by hand, then --doctor.`);
       // An optional step (Bun) that fails only means Context Mode runs on Node; nothing to undo.
@@ -700,10 +724,11 @@ async function install(o) {
     console.log(`\n${failed} step(s) failed; see the lines marked ! above. Backups: ${backupDir}`);
     ui?.summary('Summary', [`${failed} of ${commands.length} commands failed`, `Backups: ${backupDir}`], false);
     process.exitCode = 1;
-    return;
+    return o.json && printApplied(o, files, report, errors);
   }
   finished = true;
   save();
+  if (o.json) printApplied(o, files, report, errors);
   console.log(`\nDone. Backups: ${backupDir}`);
   if (o.project) return console.log('Next: review and commit these files. Each teammate runs the installer once for the tools (rtk, context-mode, ...).');
   console.log('Next: restart your agents, log in to your providers, then run --doctor.');
@@ -899,6 +924,38 @@ async function uninstall(o) {
   console.log(drop ? 'Uninstalled. Backups deleted.' : `Uninstalled. Backups are kept in ${backups}.`);
 }
 
+// --install-agent / --uninstall-agent vscode-copilot: the engine's own install, and an undo scoped to this adapter's files.
+function vscodeHooks(o) {
+  const configured = () => !!readState(o.home)?.options.agents.includes('vscode-copilot');
+  const configure = () => {
+    const saved = readState(o.home);
+    // Tools and terminals stay as chosen before (none on a first run): this verb adds the agent only, so it asks nothing about them.
+    return install({ ...o, command: 'install', yes: o.yes || o.dryRun, agents: [...new Set([...(saved?.options.agents ?? []), 'vscode-copilot'])], tools: o.tools ?? saved?.options.tools ?? [], terminals: o.terminals ?? saved?.options.terminals ?? [] });
+  };
+  const uninstallScoped = async () => {
+    const state = readState(o.home);
+    const core = loadCore(ROOT);
+    const planned = vscodeCopilotAdapter({ home: o.home, core, profile: loadProfile(ROOT, FIXED_PROFILE['vscode-copilot']), opts: state.options, rules: '', adhdCommand: adhdCommand(o.home) });
+    const mine = new Set(planned.actions.map((a) => a.path));
+    const files = state.files.filter((f) => mine.has(f.path));
+    const commands = state.commands.filter((c) => c.agent === 'vscode-copilot');
+    console.log(`This restores ${files.length} files and undoes ${commands.length} commands, all written for vscode-copilot.`);
+    const p = await prompter(o.yes);
+    const ok = !o.dryRun && yesNo(await p.ask('Remove the vscode-copilot config?', o.yes ? 'y' : 'n'));
+    p.close();
+    if (!ok) { console.log('Nothing changed.'); return; }
+    if (!o.exec && commands.length) throw new Error('--no-exec cannot undo the commands this install ran; run it without --no-exec');
+    for (const c of o.exec ? [...commands].reverse() : []) {
+      for (const argv of c.undo ?? []) if (!run(argv, { dryRun: false, log: console.log, env: c.env })) { console.log('  ! failed. Run the command above by hand.'); process.exitCode = 1; }
+    }
+    for (const [what, file] of undo(files, writeRoots(o))) console.log(`  ${what.padEnd(20)} ${file}`);
+    const file = path.join(stateDir(o.home), 'state.json');
+    writePrivate(file, `${JSON.stringify({ ...state, options: { ...state.options, agents: state.options.agents.filter((a) => a !== 'vscode-copilot') }, files: state.files.filter((f) => !mine.has(f.path)), commands: state.commands.filter((c) => c.agent !== 'vscode-copilot') }, null, 2)}\n`);
+    console.log('vscode-copilot: removed. Your other config and the extension were not touched.');
+  };
+  return { configured, install: configure, uninstall: uninstallScoped };
+}
+
 // The agent files the issue itself, and only after the user said yes; this only drafts.
 function feedback(o) {
   if (!o.failedCommand) throw new Error('--feedback-draft needs --failed-command <text>');
@@ -941,6 +998,11 @@ async function main() {
     const probe = o.probePlugins && state?.options.agents.some((a) => a.startsWith('opencode')) ? await probePlugins(o.home) : [];
     return process.exit(doctor({ home: o.home, state, exec: o.exec, nodeVersion: NODE_VERSION, json: o.json, probe }) ? 0 : 1);
   }
+  if (o.command === 'upgrade-agent' && o.upgradeAgent === 'vscode-copilot') {
+    if (o.backup || o.opencode1 || o.undo) throw new Error('--upgrade-agent vscode-copilot takes no other flags');
+    console.log(`vscode-copilot: ${VSCODE_NOTE}\nNothing to upgrade here. To refresh the files lean-agents wrote (rules, agents, mcp.json), run --update.`);
+    return;
+  }
   if (o.command === 'upgrade-agent') {
     if (o.backup) {
       if (o.undo) throw new Error('--upgrade-agent opencode --backup has no --undo: the backup is permanent and lean-agents never deletes it');
@@ -977,7 +1039,7 @@ async function main() {
   }
   if (o.command === 'agent') {
     const p = await prompter(o.yes);
-    try { return await agentLifecycle({ mode: o.agentMode, agents: o.agentList, home: o.home, realHome: REAL_HOME, stateDir: stateDir(o.home), dryRun: o.dryRun, exec: o.exec, yes: o.yes, ask: p.ask, yesNo }); } finally { p.close(); }
+    try { return await agentLifecycle({ mode: o.agentMode, agents: o.agentList, home: o.home, realHome: REAL_HOME, stateDir: stateDir(o.home), dryRun: o.dryRun, exec: o.exec, yes: o.yes, ask: p.ask, yesNo, vscode: vscodeHooks(o) }); } finally { p.close(); }
   }
   if (o.command === 'feedback') return feedback(o);
   if (o.command === 'uninstall') return uninstall(o);

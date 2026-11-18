@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { gitHint } from '../scripts/lib/system.mjs';
 import { redactText } from '../scripts/lib/redact.mjs';
 import { draftIssue } from '../scripts/lib/feedback.mjs';
@@ -39,10 +39,37 @@ test('--dry-run --json prints one parseable plan', () => {
   assert.ok(Array.isArray(j.commands) && j.network.outbound === 'on');
 });
 
-test('--json without --dry-run is refused', () => {
-  const r = engine(['--home', tmp('lean-home-'), '--no-exec', '--yes', '--agents', 'claude', '--json']);
-  assert.equal(r.status, 1);
-  assert.match(r.stderr, /--json needs --dry-run/);
+test('--yes --json applies and prints one summary object', () => {
+  const home = tmp('lean-home-');
+  const r = engine(['--home', home, '--no-exec', '--yes', '--json', '--agents', 'claude'], { env: { PATH: process.env.PATH, NVM_DIR: process.env.NVM_DIR, HOME: home } });
+  assert.equal(r.status, 0);
+  const j = JSON.parse(r.stdout);
+  assert.deepEqual(Object.keys(j), ['ok', 'files', 'commands', 'errors', 'version']);
+  assert.equal(j.ok, true);
+  assert.deepEqual(j.errors, []);
+  assert.deepEqual(j.commands, []);
+  assert.ok(j.files.includes('.claude/CLAUDE.md') && j.files.every((f) => !path.isAbsolute(f)));
+  assert.equal(j.version, JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version);
+  assert.ok(!r.stdout.includes(home));
+  assert.ok(fs.existsSync(path.join(home, '.claude', 'CLAUDE.md')));
+  assert.match(r.stderr, /Done\./);
+});
+
+test('--everything --yes --json prints the same shape', () => {
+  const home = tmp('lean-home-');
+  const r = engine(['--home', home, '--no-exec', '--yes', '--json', '--everything', '--agents', 'claude'], { env: { PATH: process.env.PATH, NVM_DIR: process.env.NVM_DIR, HOME: home } });
+  assert.equal(r.status, 0);
+  assert.deepEqual(Object.keys(JSON.parse(r.stdout)), ['ok', 'files', 'commands', 'errors', 'version']);
+});
+
+test('run() records exit codes and keeps child stdout off stdout with json', () => {
+  const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { run } from ${JSON.stringify(pathToFileURL(path.join(ROOT, 'scripts', 'lib', 'system.mjs')).href)};
+const codes = [];
+const ok = run([process.execPath, '-e', 'console.log("child"); process.exit(3)'], { dryRun: false, log: () => {}, json: true, codes });
+console.error(JSON.stringify({ ok, codes }));`], { encoding: 'utf8' });
+  assert.equal(r.stdout, '');
+  assert.match(r.stderr, /child/);
+  assert.match(r.stderr, /"ok":false,"codes":\[3\]/);
 });
 
 test('--doctor --json prints ok and rows', () => {

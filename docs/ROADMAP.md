@@ -68,7 +68,7 @@ Scope and order from the architecture checkpoint [`docs/checkpoints/0.7.0.md`](c
 - [#103](https://github.com/estebanmr99/lean-agents/issues/103): harness benchmark and personal vs enterprise recommendation (later).
 - Close the **VERIFY** items in `docs/compatibility.md` that need a logged-in app (Antigravity rule and skill loading, Copilot `model` format, VS Code reading Copilot CLI hooks).
 - Codex CLI and Gemini CLI adapters.
-- [#179](https://github.com/estebanmr99/lean-agents/issues/179): fresh machine, one command from a clean Mac or Windows PC to the full setup, proven in CI.
+- [#179](https://github.com/estebanmr99/lean-agents/issues/179): fresh machine, one command from a clean Mac or Windows PC to the full setup, proven in CI. Code and nightly CI are in; docs are in `docs/fresh-machine.md` (PR7). Open: the owner runs it once on a truly fresh Mac and PC and reports on the issue.
 - [#180](https://github.com/estebanmr99/lean-agents/issues/180): install with an agent, VS Code Copilot chat (agent mode) as the installing agent for peers.
 - [#181](https://github.com/estebanmr99/lean-agents/issues/181): finish step, local HTML summary, login checklist and an agent verify prompt that files feedback issues.
 - [#182](https://github.com/estebanmr99/lean-agents/issues/182): release train, one command updates everything lean-agents installed, to the release's pins, with version notes.

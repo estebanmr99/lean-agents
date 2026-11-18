@@ -4,9 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-  # The macOS legs run here and on dispatch only: on push to main they waited 20+ minutes for a runner and were cancelled.
-  schedule:
-    - cron: '17 7 * * *'
   # A PR opened with GITHUB_TOKEN triggers no pull_request run; the pin-bump job dispatches this on the PR branch instead.
   workflow_dispatch:
   workflow_call:

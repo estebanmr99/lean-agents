@@ -196,10 +196,12 @@ export function bunInstall(home, dir, platform, pm, arch = process.arch) {
 
 export const bunPresent = (home) => Boolean(which('bun')) || fs.existsSync(path.join(home, '.bun', 'bin', isWin ? 'bun.exe' : 'bun'));
 
-export function run(argv, { dryRun, log, env }) {
+// `codes` collects the exit status; `json` sends the child's stdout to stderr so stdout stays one JSON object.
+export function run(argv, { dryRun, log, env, json, codes }) {
   log(`  $ ${argv.join(' ')}`);
   if (dryRun) return true;
-  const r = spawnSync(argv[0], argv.slice(1), { stdio: 'inherit', shell: useShell(argv[0]), env: { ...allowedEnv(), ...env } });
+  const r = spawnSync(argv[0], argv.slice(1), { stdio: json ? ['inherit', 2, 2] : 'inherit', shell: useShell(argv[0]), env: { ...allowedEnv(), ...env } });
+  codes?.push(r.status ?? -1);
   return r.status === 0;
 }
 
