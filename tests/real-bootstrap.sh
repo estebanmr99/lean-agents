@@ -186,6 +186,8 @@ run_co
 # The bare-PATH cases need symlinks to tools; Git Bash copies them without their DLLs. install.sh is for macOS and Linux (install.ps1 has tests/windows-install.ps1).
 case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) echo "--- (k)-(n) skipped on Windows"; echo "real-bootstrap: all cases passed"; exit 0 ;; esac
 
+# install.sh finds a Homebrew in its usual places, and with it a Node.js, so a bare PATH cannot hide Node.js on a Mac that has Homebrew.
+if [[ -x /opt/homebrew/bin/brew || -x /usr/local/bin/brew ]]; then echo "--- (k)-(n) skipped: Homebrew is installed"; echo "real-bootstrap: all cases passed"; exit 0; fi
 echo "--- (k) no Node.js: a dry run shows the plan, installs nothing and exits 0"
 bare="$work/bare"
 mkdir -p "$bare"

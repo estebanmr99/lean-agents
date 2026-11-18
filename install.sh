@@ -154,6 +154,7 @@ ensure_node() {
   for p in /opt/homebrew/bin/brew /usr/local/bin/brew; do
     if ! have brew && [[ -x "$p" ]]; then eval "$("$p" shellenv)"; fi
   done
+  node_ok && return 0 # a Homebrew Node.js that was not on PATH yet
   if [[ -x "$NODE_DIR/bin/node" ]] && (PATH="$NODE_DIR/bin:$PATH"; node_ok); then use_private_node; return 0; fi
   local found="" mac=false
   have node && found="$(node --version 2>/dev/null || true)"
