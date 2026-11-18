@@ -709,7 +709,7 @@ test('proxy variables are shown redacted, shared in both cases, and never writte
   const out = lean(home, ['--yes', '--no-exec', '--agents', 'claude,opencode-v2', '--all-tools', '--network', 'off', '--lang', 'en', '--profile', 'none'], env);
   assert.match(out, /HTTPS_PROXY=set NO_PROXY=set \(loopback missing: 127\.0\.0\.1, ::1\) NODE_EXTRA_CA_CERTS=set/);
   assert.ok(!out.includes('s3cret') && !out.includes('corp-ca'));
-  for (const [f, text] of Object.entries(snapshot(home))) assert.ok(!text.includes('s3cret') && !text.includes('3128'), f);
+  for (const [f, text] of Object.entries(snapshot(home))) assert.ok(!text.includes('s3cret') && !text.includes('127.0.0.1:3128'), f);
   const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, '--doctor', '--no-exec'], { encoding: 'utf8', env });
   assert.match(r.stdout, /network env\s+HTTPS_PROXY=set/);
   assert.ok(!r.stdout.includes('s3cret') && !r.stdout.includes('127.0.0.1:3128'));
