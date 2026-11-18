@@ -183,6 +183,9 @@ run_co
 [[ "$rc" == 0 && ! -e "$co/node_modules/marker" ]] || fail "changed lockfile did not reinstall: $rc $out"
 [[ "$(cat "$co/node_modules/.lean-agents-lock")" == "$(sha "$co/package-lock.json")" ]] || fail "lock stamp not updated"
 
+# The bare-PATH cases need symlinks to tools; Git Bash copies them without their DLLs. install.sh is for macOS and Linux (install.ps1 has tests/windows-install.ps1).
+case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) echo "--- (k)-(n) skipped on Windows"; echo "real-bootstrap: all cases passed"; exit 0 ;; esac
+
 echo "--- (k) no Node.js: a dry run shows the plan, installs nothing and exits 0"
 bare="$work/bare"
 mkdir -p "$bare"
