@@ -373,7 +373,7 @@ The network question (`--network`, `--telemetry`, `--auto-update`, `--outbound`)
 | Agent or tool | Category | Switch | Source | Checked |
 | --- | --- | --- | --- | --- |
 | Claude Code | telemetry | env `DISABLE_TELEMETRY=1`, `DISABLE_ERROR_REPORTING=1`, `DO_NOT_TRACK=1` | [data usage](https://code.claude.com/docs/en/data-usage), [env vars](https://code.claude.com/docs/en/env-vars) | 2026-11-03 |
-| Claude Code | auto-update | env `DISABLE_AUTOUPDATER=1` (`claude update` still works) | [env vars](https://code.claude.com/docs/en/env-vars) | 2026-11-03 |
+| Claude Code | auto-update | env `DISABLE_AUTOUPDATER=1` (`claude update` still works); written for every managed install (`setIfAbsent`, forced with the category off) since #182 PR5 | [env vars](https://code.claude.com/docs/en/env-vars) | 2026-11-03 |
 | Claude Code | other | env `DISABLE_BUG_COMMAND=1` (now also `DISABLE_FEEDBACK_COMMAND`); `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` turns off updates, telemetry, error reports, feedback and surveys together, so lean-agents sets it only when all three are off | [env vars](https://code.claude.com/docs/en/env-vars) | 2026-11-03 |
 | OpenCode 2 | auto-update | `update: "disable"` | [v2 config](https://opencode.ai/v2/docs/config), real binary 2.2.5 | 2026-11-03 |
 | OpenCode 2 | other | `share: "disabled"`; `policies` deny `provider.use` `opencode` | real binary 2.2.5 (`tests/real-opencode.sh`) | 2026-10-31 |
@@ -640,6 +640,7 @@ Guide only, no code change: `docs/install-with-an-agent.md`, section "VS Code Co
 - **VERIFY (PR3, checked 2026-11-18):** the `*.prompt.md` user folder. Source: [VS Code, Use prompt files](https://code.visualstudio.com/docs/copilot/customization/prompt-files). It says only that the user scope is "Your user data (specific to your VS Code profile)", made with the Agent Customizations editor or **Chat: New Prompt File**; it gives no folder for Windows, macOS or Linux. `agent: agent` in the frontmatter and `/name` in the Chat view are documented. The same page says prompt files run only in the **Local** harness, which is deprecated and removed in February 2027 (new reusable workflows should be skills). So the adapter writes no `/lean-install` prompt file and `tests/real-vscode.sh` asserts none appears. Open question for a logged-in VS Code: which exact folder does **Chat: New Prompt File** create a user prompt in on Windows, macOS and Linux, and will `/lean-install` still run after the Local harness goes away? A skill (`~/.agents/skills`, already written) is the likely successor.
 - **VERIFY:** whether VS Code, not only Copilot CLI, loads `~/.copilot` rules and agents.
 - Antigravity pilot users use the same guide (owner default, 2026-11-18).
+- Logged-in proof: [vscode-agent-checklist.md](vscode-agent-checklist.md) lists, per step, the row above that moves from **VERIFY** to verified (not run yet).
 
 ## Update plan (#182 PR2, 2026-11-18)
 
@@ -672,5 +673,7 @@ Versions of the agent CLIs come from `<bin> --version` run with a scratch HOME (
 ## Agent CLI upgrades within a major (#182 PR3, 2026-11-18)
 
 `--update` runs, after the one confirm, one command per plan row with action `update` for an agent lean-agents installed (`agents.json`): Claude Code `claude-installer.sh <pin>`, OpenCode 2 `opencode-installer.sh --version <pin> --no-modify-path`, Copilot CLI `npm install -g [--prefix] @github/copilot@<pin>`. The installer scripts are the same sha256-pinned ones as `--install-agent`. `state.json` keeps `from` and `reinstall` (the same command at the previous version) next to each command; `--uninstall` does not run it. Never moved: OpenCode 1.x, another major, an agent you installed, the VS Code Copilot extension, Cursor (its installer takes no version) and Antigravity (no pin). Proof: `tests/agent-upgrade.test.mjs` (synthetic rows, temp HOME, no binaries).
+
+`--update --undo` (#278, 2026-11-18, engine tests with stubs only) reinstalls, per agent, the oldest saved `from` with the same installer argv at that version (a pre-release tag is kept as printed by `--version`); the downloaded installer script is removed by a final step even when an earlier step failed. `--uninstall` does not undo agent upgrades.
 
 **VERIFY** (no real binary yet; the nightly proof is PR6): that the Claude and OpenCode installers accept a version older than the installed one (downgrade, needed by the undo) and a newer one over an existing install; that the Windows installers (not offered yet) behave the same; `npm install -g` over an older Copilot CLI behind a proxy.

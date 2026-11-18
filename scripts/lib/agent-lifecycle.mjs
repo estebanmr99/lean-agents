@@ -197,21 +197,32 @@ export function upgradeCommands({ rows, home, platform = process.platform, dir, 
     if (!a || r.action !== 'update') continue;
     const argvs = (ver) => { const row = agentTable({ home, platform, dir, realHome, ver: { [r.tool]: ver } })[a]; return row.manual ? null : row; };
     const to = argvs(r.pinned);
-    const from = argvs(r.installed);
+    const raw = r.raw ?? r.installed;
+    const from = { raw, row: argvs(raw) };
     if (!to) { console.log(`! ${a}: ${agentTable({ home, platform, dir, realHome })[a].manual}`); continue; }
-    // The downloaded installer is removed after a successful run, like --install-agent does.
-    const clean = (row) => (row.download ? [...row.run, [process.execPath, '-e', "require('fs').rmSync(process.argv[1],{force:true})", row.download]] : row.run);
-    out.push({ tool: r.tool, desc: `upgrade ${a} ${r.installed} -> ${r.pinned}`, run: clean(to), undo: [], from: r.installed, reinstall: clean(from) });
+    // The downloaded installer is removed by a final step that runs even when an earlier step failed.
+    const cleanup = (row) => (row.download ? [[process.execPath, '-e', "require('fs').rmSync(process.argv[1],{force:true})", row.download]] : []);
+    out.push({ tool: r.tool, desc: `upgrade ${a} ${from.raw} -> ${r.pinned}`, run: to.run, always: cleanup(to), undo: [], from: from.raw, reinstall: from.row.run, reinstallAlways: cleanup(from.row) });
   }
   return out;
 }
 
-// Reinstalls the version saved by an upgrade. `commands`: the state.json commands; returns false when a reinstall failed.
+// --update --undo: the first saved reinstall per agent. Commands are in run order, so that is the version before the oldest
+// upgrade; replaying every record forward would end on the newest "previous" version. The agent is the 2nd word of the desc.
+export const agentOf = (c) => c.desc.split(' ')[1];
+export function undoPlan(commands) {
+  const seen = new Set();
+  return commands.filter((c) => c.reinstall && !seen.has(agentOf(c)) && seen.add(agentOf(c)));
+}
+
+// Runs each plan step (a failed one is reported and the rest still run). Returns { ok, restored: agents back on their old version }.
 export function undoUpgrades(commands, env = {}) {
-  let ok = true;
-  for (const c of commands.filter((x) => x.reinstall)) {
+  const restored = new Set();
+  for (const c of undoPlan(commands)) {
     console.log(`- reinstall ${c.from} (undo of: ${c.desc})`);
-    if (!c.reinstall.every((argv) => run(argv, { dryRun: false, log: console.log, env }))) { console.log('  ! failed. Run the command above by hand.'); ok = false; }
+    const ok = c.reinstall.every((argv) => run(argv, { dryRun: false, log: console.log, env }));
+    for (const argv of c.reinstallAlways ?? []) run(argv, { dryRun: false, log: console.log, env });
+    if (ok) restored.add(agentOf(c)); else console.log('  ! failed. Run the command above by hand.');
   }
-  return ok;
+  return { ok: undoPlan(commands).every((c) => restored.has(agentOf(c))), restored };
 }

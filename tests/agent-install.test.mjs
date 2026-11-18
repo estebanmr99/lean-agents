@@ -198,3 +198,13 @@ test('redaction review cases: scheme-less proxy creds, env-style names, home pre
   assert.ok(!redactText(`npm_${'a'.repeat(36)}`, o).includes('npm_a'));
   assert.equal(redactText('read /tmp/ali/proj/x', { ...o, home: '/tmp/al' }), 'read /tmp/ali/proj/x');
 });
+
+test('--yes --json for a --project outside the home never prints an absolute path (#278)', () => {
+  const home = tmp('lean-home-');
+  const repo = tmp('lean-repo-');
+  const r = engine(['--home', home, '--no-exec', '--yes', '--json', '--project', repo, '--no-tools', '--lang', 'en'], { env: { PATH: process.env.PATH, NVM_DIR: process.env.NVM_DIR, HOME: home } });
+  assert.equal(r.status, 0, r.stderr);
+  const j = JSON.parse(r.stdout);
+  assert.ok(j.files.length > 0 && j.files.every((f) => f === '<outside-home>'), j.files.join(','));
+  assert.ok(!r.stdout.includes(repo) && !r.stdout.includes(home));
+});
