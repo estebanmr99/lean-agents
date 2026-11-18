@@ -6,6 +6,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Added
 
+- Antigravity pilot (#216): `--doctor` lists `SSL_CERT_FILE` and `NODE_USE_SYSTEM_CA` as set or not set and reports the IDE folders and the `Google.google-antigravity` extension (read-only); `--adopt` lists them too. README "Antigravity pilot" (EN, ES); `docs/compatibility.md` Antigravity rows refreshed from the upstream docs (2026-11-18).
 - `tests/roundtrip.test.mjs`: one table-driven test runs install then `--uninstall` for each of the seven adapters in a temp HOME seeded with user files (a JSONC comment, a user MCP server, an agent and a skill named like managed ones) and asserts every file, path and bytes, equals the pre-install snapshot. Tests only (#164).
 
 ### Fixed
