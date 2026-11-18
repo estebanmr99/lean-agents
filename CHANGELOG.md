@@ -19,6 +19,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - The engine saves `state.json` after writing files and before and after each command, so a write error or an interrupted or failing command no longer leaves files that `--uninstall` cannot undo (#158).
 - `--uninstall` removes only what lean-agents created: the Linux and Windows Bun undo deletes `~/.bun/bin/bun` (`bun.exe`) and then its dirs only if empty, so your Bun cache and global packages stay; the OpenCode vendor undo re-derives the checkout path from your home at undo time and refuses a symlink, an edited `state.json` path or anything outside the home (#157).
 - `--doctor` (text and `--json`) and the install preview print only `set` / `not set` for proxy and CA variables, so internal proxy hosts, ports and CA paths no longer reach stdout; `NO_PROXY` also reports whether the loopback entries are present (#172).
+- The proxy test checks the proxy host and port (`127.0.0.1:3128`) on disk instead of the bare port `3128`, so a temp path or timestamp that contains `3128` no longer fails it (#205).
 
 ### Changed
 
