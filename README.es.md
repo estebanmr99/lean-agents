@@ -445,6 +445,7 @@ Si tu empresa paga GitHub Copilot, la forma oficial de usar Claude como agente e
 | Herramientas opcionales | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0), Codeburn, Copilot usage (créditos restantes en la barra lateral de OpenCode y en la línea de estado de Claude Code, leídos con `gh`; `lean-agents --usage` los imprime) | Se pregunta una por una |
 | Herramientas por elección | GSD Core, AutoSkills (CC BY-NC 4.0: solo uso no comercial), la skill `coordinate` (guía de coordinador, plantilla de prompt y vigilante de workers: [docs/agent-workflow.md](docs/agent-workflow.md)) | Se pregunta una por una, nunca en `--all-tools` |
 | Privacidad estricta | Sin telemetría, sin auto updates, sin compartir sesiones, sin proveedores que entrenan con tus prompts | Apagado, se activa con `--privacy strict` |
+| Self-updaters de los agentes | Apagados en toda instalación gestionada (Claude Code `DISABLE_AUTOUPDATER`, OpenCode `update` / `autoupdate`, Copilot CLI `autoUpdate`), sea cual sea el preset de red: `--update` es la única forma de actualizar agentes. Un valor que ya pusiste se conserva y se avisa; `--uninstall` quita los nuestros | Apagados; `--auto-update on` no los vuelve a encender a la fuerza, pon tu propio valor en la config del agente |
 | Preset de red | Todo apagado (PC de trabajo), todo encendido, o por categoría: telemetría, auto updates, otras salidas. Apagado solo cambia interruptores: las descargas de la instalación y las herramientas elegidas no se bloquean ([privacy.md](docs/privacy.md#what-each-preset-does-not-block)) | Todo encendido; `--network off` (igual que `--privacy strict`) o `--telemetry`, `--auto-update`, `--outbound` |
 | GitHub CLI (`gh`) | Se instala con brew o winget sin admin; tú corres `gh auth login` | Activo si falta; `--no-gh` (`-NoGh` en PowerShell) lo omite |
 | Bun (para Context Mode) | `ctx_execute` más rápido en JavaScript y TypeScript; ver abajo | Activo; `--no-bun` (`-NoBun` en PowerShell) |
@@ -479,7 +480,7 @@ Antigravity tiene tres partes: la CLI (`agy`), el IDE y la extensión de VS Code
 3. **Elige un preset de red.** El instalador pregunta: **todo apagado** (PC de empresa), **todo encendido** (PC personal) o **por categoría**. Para correrlo sin preguntas:
    ```bash
    curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --dry-run --network off                # todo apagado
-   curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --yes --network off --auto-update on   # apagado, pero con auto updates
+   curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --yes --network off --telemetry on     # apagado, pero con telemetría
    ```
    Las opciones por categoría son `--telemetry on|off`, `--auto-update on|off` y `--outbound on|off`. `--network off` es igual que `--privacy strict`. En PowerShell se pasan tal cual, por ejemplo `-DryRun --network off`. Qué apaga cada categoría por agente: [docs/privacy.md](docs/privacy.md). La elección se guarda y `--update` la reutiliza.
 4. **`gh`**: GitHub CLI se instala sin admin si falta (`--no-gh` lo omite); luego corre `gh auth login` tú mismo.

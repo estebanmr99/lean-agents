@@ -445,6 +445,7 @@ If your company pays for GitHub Copilot, the official way to use Claude as an ag
 | Optional tools | Serena, Playwright, Ponytail, Caveman, i-have-adhd, DCP (OpenCode 1.x, AGPL-3.0), Codeburn, Copilot usage (credits left in the OpenCode sidebar and the Claude Code status line, read with `gh`; `lean-agents --usage` prints them) | Asked one by one |
 | Opt-in tools | GSD Core, AutoSkills (CC BY-NC 4.0: non-commercial use only), the `coordinate` skill (coordinator playbook, session prompt and worker watcher: [docs/agent-workflow.md](docs/agent-workflow.md)) | Asked one by one, never in `--all-tools` |
 | Strict privacy | No telemetry, no auto-updates, no session sharing, no providers that train on your prompts | Off, opt in with `--privacy strict` |
+| Agent self-updaters | Off for every managed install (Claude Code `DISABLE_AUTOUPDATER`, OpenCode `update` / `autoupdate`, Copilot CLI `autoUpdate`), whatever the network preset: `--update` is the one way agents get updated. A value you already set is kept and reported; `--uninstall` removes ours | Off; `--auto-update on` does not force it back on, set your own value in the agent's config |
 | Network preset | All off (work PC), all on, or per category: telemetry, auto-updates, other outbound calls. Off sets switches only: install downloads and chosen tools are not blocked ([privacy.md](docs/privacy.md#what-each-preset-does-not-block)) | All on; `--network off` (same as `--privacy strict`) or `--telemetry`, `--auto-update`, `--outbound` |
 | GitHub CLI (`gh`) | Installed with brew or winget at user scope; you run `gh auth login` | On when missing; `--no-gh` (`-NoGh` in PowerShell) skips it |
 | Bun (for Context Mode) | Faster `ctx_execute` JavaScript and TypeScript; see below | On; `--no-bun` (`-NoBun` in PowerShell) |
@@ -479,7 +480,7 @@ Antigravity has three parts: the CLI (`agy`), the IDE and the VS Code extension 
 3. **Pick a network preset.** The installer asks: **all off** (enterprise PC), **all on** (personal PC) or **per category**. For scripted runs:
    ```bash
    curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --dry-run --network off                # everything off
-   curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --yes --network off --auto-update on   # off, but keep auto-updates
+   curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --yes --network off --telemetry on     # off, but keep telemetry
    ```
    The per-category flags are `--telemetry on|off`, `--auto-update on|off` and `--outbound on|off`. `--network off` is the same as `--privacy strict`. In PowerShell they pass as they are, for example `-DryRun --network off`. What each category turns off per agent: [docs/privacy.md](docs/privacy.md). The choice is saved and reused by `--update`.
 4. **`gh`**: GitHub CLI is installed without admin rights when missing (`--no-gh` skips it); then run `gh auth login` yourself.

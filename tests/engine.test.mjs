@@ -652,7 +652,8 @@ test('--network off turns every telemetry, update and outbound switch off and is
 test('--privacy strict equals --network off; --network on and the --yes default set no switch', () => {
   const agents = ['claude', 'opencode-v2', 'copilot-cli'];
   assert.deepEqual(switchesFor(agents, ['--privacy', 'strict']), switchesFor(agents, ['--network', 'off']));
-  const none = { claude: [], 'opencode-v2': { share: undefined, update: undefined, policies: undefined }, 'copilot-cli': undefined };
+  // Self-updaters are off for every managed install, whatever the network choice (#182).
+  const none = { claude: ['DISABLE_AUTOUPDATER'], 'opencode-v2': { share: undefined, update: 'disable', policies: undefined }, 'copilot-cli': false };
   assert.deepEqual(switchesFor(agents, ['--network', 'on']), none);
   assert.deepEqual(switchesFor(agents, []), none);
 });
@@ -696,11 +697,33 @@ test('--network off still plans the tools you pick (privacy.md: the preset sets 
 
 test('one category flag overrides the preset', () => {
   const r = switchesFor(['claude', 'opencode-v2'], ['--network', 'off', '--auto-update', 'on']);
-  assert.deepEqual(r.claude, ['DISABLE_BUG_COMMAND', 'DISABLE_ERROR_REPORTING', 'DISABLE_TELEMETRY', 'DO_NOT_TRACK']);
-  assert.equal(r['opencode-v2'].update, undefined);
-  assert.deepEqual(switchesFor(['claude'], ['--telemetry', 'off']).claude, ['DISABLE_ERROR_REPORTING', 'DISABLE_TELEMETRY', 'DO_NOT_TRACK']);
+  assert.deepEqual(r.claude, ['DISABLE_AUTOUPDATER', 'DISABLE_BUG_COMMAND', 'DISABLE_ERROR_REPORTING', 'DISABLE_TELEMETRY', 'DO_NOT_TRACK']);
+  assert.equal(r['opencode-v2'].update, 'disable');
+  assert.deepEqual(switchesFor(['claude'], ['--telemetry', 'off']).claude, ['DISABLE_AUTOUPDATER', 'DISABLE_ERROR_REPORTING', 'DISABLE_TELEMETRY', 'DO_NOT_TRACK']);
   const bad = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--outbound', 'maybe'], { encoding: 'utf8' });
   assert.match(bad.stderr, /--outbound takes on or off/);
+});
+
+test('self-updaters: off by default for opencode-v1, kept when the user set them, undone on uninstall (#182)', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-net-'));
+  const cfg = path.join(home, '.config', 'opencode', 'opencode.jsonc');
+  fs.mkdirSync(path.dirname(cfg), { recursive: true });
+  fs.writeFileSync(cfg, '{ "autoupdate": true }\n');
+  const out = lean(home, [...NET_BASE, '--agents', 'opencode-v1,claude,copilot-cli']);
+  assert.equal(parse(fs.readFileSync(cfg, 'utf8')).autoupdate, true);
+  assert.match(out, /kept your values for: autoupdate/);
+  lean(home, ['--uninstall', '--yes', '--no-exec']);
+  assert.equal(parse(fs.readFileSync(cfg, 'utf8')).autoupdate, true);
+  const fresh = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-net-'));
+  lean(fresh, [...NET_BASE, '--agents', 'opencode-v1,claude,copilot-cli']);
+  const s = snapshot(fresh);
+  assert.equal(parse(s['.config/opencode/opencode.jsonc']).autoupdate, false);
+  assert.equal(parse(s['.claude/settings.json']).env.DISABLE_AUTOUPDATER, '1');
+  assert.equal(parse(s['.copilot/settings.json']).autoUpdate, false);
+  lean(fresh, ['--uninstall', '--yes', '--no-exec']);
+  const after = snapshot(fresh);
+  const left = Object.keys(after).filter((f) => !f.startsWith('.config/lean-agents/') && /autoupdate/i.test(after[f]));
+  assert.deepEqual(left, [], 'uninstall removes the self-updater switches');
 });
 
 test('--update keeps the network choice of a state file that only has privacy', () => {
