@@ -128,7 +128,8 @@ test('a second install is idempotent; a user file named opencode1 is never overw
 
 test('a copy that reports another version is not kept', () => {
   const f = fixture();
-  const p = planFor(f);
+  const p = planFor(f, { probe: () => '1.19.0' });
+  assert.equal(p.ok, true, p.problems.join('\n'));
   assert.throws(() => doInstall(p, f, { probe: () => '1.18.0', files: [] }), /expected 1\.19\.0/);
   assert.equal(fs.existsSync(p.binary), false);
 });
