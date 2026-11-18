@@ -119,7 +119,7 @@ export async function agentLifecycle(o) {
     if (o.mode === 'install') {
       if (mine) log(`${a}: already installed by lean-agents (${mine.method}); nothing to do.`);
       // #211: a working agy outside PATH (Windows installer folders) counts too; never installed over.
-      else if (a === 'antigravity' && agyCandidates(o.home, o.platform ?? process.platform).some((c) => fs.existsSync(c))) log(`${a}: already installed, not by lean-agents; left alone.`);
+      else if (a === 'antigravity' && agyCandidates(o.home, o.platform ?? process.platform, o.home === o.realHome ? process.env : {}).some((c) => fs.existsSync(c))) log(`${a}: already installed, not by lean-agents; left alone.`);
       else if (row.manual) log(`${a}: ${row.manual}`);
       else if (row.bins.some((b) => fs.existsSync(b)) || ((o.home === o.realHome || row.method === 'brew') && which(row.cmd))) log(`${a}: already installed, not by lean-agents; left alone.`);
       else if (a === 'opencode-v2' && version('opencode')?.startsWith('1.')) log('opencode-v2: OpenCode 1.x is on PATH; lean-agents never installs 2.x next to it here (#79). Nothing done.');

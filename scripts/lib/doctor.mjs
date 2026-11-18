@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { sha } from './fsops.mjs';
 import { PINS, npmSpec, behindPins, nodeRange } from './pins.mjs';
-import { version, quiet, findAgy } from './system.mjs';
+import { version, quiet, findAgy, antigravityFootprint } from './system.mjs';
 import { satisfies, nodeSkipLine, minVersion } from './node-runtime.mjs';
 import { mcpLaunches, classify, duplicateSkills, skillDirs } from './inventory.mjs';
 import { stillNeeded, shellNotice } from './terminals.mjs';
@@ -168,6 +168,7 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
       if (o.tools.includes('autoskills')) add('autoskills runs', q(['npx', '-y', npmSpec('autoskills'), '--help'], 120000).ok ? 'ok' : 'error');
     }
   }
+  checkAntigravityIde(home, add, fsx);
   const { nodes, skills } = checkInventory({ home, exec, run, env, platform, fsx }, add);
   // #212: config listing a plugin is not proof it loads. Read-only; `probe` holds findings of the opt-in --probe-plugins server run.
   if (state?.options.agents.some((a) => a.startsWith('opencode'))) {
@@ -176,13 +177,19 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
   const left = leftovers(process.cwd());
   if (left.length) add('parallel workers', 'changed', `left in this repo: ${left.join(', ')} (merge them, then run scripts/parallel.mjs clean)`);
   const netRows = proxyReport();
-  for (const name of ['HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'NODE_EXTRA_CA_CERTS']) if (!netRows.some((l) => l.startsWith(`${name}=`))) netRows.push(`${name}=not set`);
+  for (const name of ['HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE', 'NODE_USE_SYSTEM_CA']) if (!netRows.some((l) => l.startsWith(`${name}=`))) netRows.push(`${name}=not set`);
   for (const line of netRows) add('network env', 'ok', line);
   const ok = !rows.some((r) => r.status === 'error' || r.status === 'missing');
   const behind = state ? behindPins(state) : [];
   if (json) process.stdout.write(`${JSON.stringify({ ok, behind, nodes, skills, rows }, null, 2)}\n`);
   else print(rows);
   return ok;
+}
+
+// Read-only (#216): a row only when the IDE folders or the extension exist.
+function checkAntigravityIde(home, add, fsx) {
+  const found = antigravityFootprint(home, fsx);
+  if (found.length) add('antigravity ide', 'ok', found.map((f) => f.name).join(', '));
 }
 
 function checkOpenCode(o, add, q) {

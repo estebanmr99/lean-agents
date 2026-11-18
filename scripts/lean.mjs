@@ -666,10 +666,12 @@ function feedback(o) {
 // Below the engines floor, read-only paths still report; anything that writes or runs commands stops.
 function checkNodeFloor(o) {
   const floor = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).engines.node;
-  if (satisfies(NODE_VERSION, floor)) return;
-  const readOnly = ['help', 'version', 'doctor', 'upgrade-agent'].includes(o.command) || o.dryRun || (o.command === 'adopt' && !o.yes && !o.undo);
+  // LEAN_AGENTS_NODE may fake a lower version for tests, never a higher one (#229).
+  const running = [process.versions.node, NODE_VERSION].find((v) => !satisfies(v, floor));
+  if (!running) return;
+  const readOnly = ['help', 'version', 'doctor', 'upgrade-agent', 'usage', 'feedback'].includes(o.command) || o.dryRun || (o.command === 'adopt' && !o.yes && !o.undo);
   const allow = process.env.LEAN_AGENTS_ALLOW_OLD_NODE === '1';
-  console.error(`lean-agents: Node ${NODE_VERSION} is older than ${floor.replace(/^>=/, '')}, which lean-agents needs. Fix: nvm install 22 && nvm use 22, or run install.sh.${readOnly || allow ? '' : ' Set LEAN_AGENTS_ALLOW_OLD_NODE=1 to run anyway.'}`);
+  console.error(`lean-agents: Node ${running} is older than ${floor.replace(/^>=/, '')}, which lean-agents needs. Fix: nvm install 22 && nvm use 22, or run install.sh.${readOnly || allow ? '' : ' Set LEAN_AGENTS_ALLOW_OLD_NODE=1 to run anyway.'}`);
   if (!readOnly && !allow) process.exit(1);
 }
 

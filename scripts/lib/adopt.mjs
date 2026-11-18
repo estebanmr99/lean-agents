@@ -10,7 +10,7 @@ import { execFileSync } from 'node:child_process';
 import { parse } from 'jsonc-parser';
 import { hasMark, plan as planFiles, revertJsonEdits, sha, writePrivate, privateDir, dropBackups, unsafe } from './fsops.mjs';
 import { PINS, npmSpec, pinVersions } from './pins.mjs';
-import { configHome, envDir } from './system.mjs';
+import { configHome, envDir, antigravityFootprint } from './system.mjs';
 import { configPath } from './adapters/opencode-v2.mjs';
 import { mcpServers } from './migrate.mjs';
 import { findNvm, resolveToolNodes, minVersion, compare, satisfies, installedNodes, toolEnv } from './node-runtime.mjs';
@@ -247,6 +247,9 @@ export async function inventory({ home, env = process.env, platform = process.pl
     }
   }
 
+  // --- Antigravity IDE folders and VS Code extension: listed, never changed (#216)
+  for (const f of antigravityFootprint(home, fsx)) add({ client: 'antigravity', kind: 'ide', name: f.name, file: f.file, owner: 'user' });
+
   // --- npm copies under each nvm Node, and the one Node the tools should use
   const nvm = findNvm({ env, home, platform, realHome });
   const copies = nvm ? npmCopies(nvm) : [];
@@ -302,7 +305,7 @@ export async function adopt(o) {
   console.log(`--adopt (dry run: nothing is changed; --yes applies). Found: ${Object.entries(by).map(([k, n]) => `${n} ${k}`).join(', ') || 'nothing'}`);
   console.log(`tool Node: ${r.toolNode.range ? `${r.toolNode.range} -> ${r.toolNode.node ?? 'no matching Node installed, nvm not found'} (${r.toolNode.source ?? 'none'})` : 'not needed'}`);
   console.log(`OpenCode: major ${r.opencode.major ?? 'none'}, ${r.opencode.dbBytes} bytes of db, sessions ${r.opencode.sessions ?? 'unknown'}${r.opencode.note ? ` (${r.opencode.note})` : ''}`);
-  for (const i of r.items.filter((x) => x.action !== 'keep' || x.owner === 'managed' || x.kind === 'hook')) {
+  for (const i of r.items.filter((x) => x.action !== 'keep' || x.owner === 'managed' || x.kind === 'hook' || x.kind === 'ide')) {
     console.log(`  ${i.action.padEnd(9)} ${i.owner.padEnd(8)} ${i.client} ${i.kind} ${i.name}${i.status.length ? `  [${i.status.join(', ')}]` : ''}${i.note ? `  (${i.note})` : ''}  (${i.file})`);
     if (i.kind === 'skill' && i.fix) console.log(`            ${i.clients.join(' and ')} loads it twice: ${Object.entries(i.hashes).map(([d, h]) => `${d} ${h}`).join(', ')} (${i.differs ? 'differs' : 'identical'}); ${i.fix}`);
   }
