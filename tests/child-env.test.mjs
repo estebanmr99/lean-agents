@@ -50,3 +50,44 @@ test('allowedEnv: one key per name, whatever the case', () => {
   const out = allowedEnv({ PATH: 'a', Path: 'b', path: 'c', Home: 'h', HOME: 'g' }, 'linux');
   assert.deepEqual(Object.keys(out).map((k) => k.toUpperCase()).sort(), ['HOME', 'PATH']);
 });
+
+// #163: name -> kept / dropped (by name or by value). Values are synthetic.
+const TOKEN = 'ghp_' + 'a'.repeat(20);
+const cases = [
+  ['NODE_OPTIONS', '--require /x.js', false],
+  ['NODE_OPTIONS', '-r /x.js', false],
+  ['NODE_OPTIONS', '--import /x.mjs', false],
+  ['NODE_OPTIONS', '--use-system-ca --eval x', false],
+  ['NODE_OPTIONS', '--max-old-space-size=abc', false],
+  ['NODE_OPTIONS', '--use-system-ca', true],
+  ['NODE_OPTIONS', '--use-openssl-ca --max-old-space-size=4096', true],
+  ['NODE_OPTIONS', '--use-bundled-ca --dns-result-order=ipv4first', true],
+  ['NODE_PATH', '/x', false],
+  ['GIT_CONFIG_COUNT', '1', false],
+  ['GIT_CONFIG_VALUE_0', 'Authorization: bearer abc', false],
+  ['GIT_ASKPASS', '/x/askpass', false],
+  ['GIT_SSH_COMMAND', 'ssh -i /k', false],
+  ['GIT_PROXY_COMMAND', '/x', false],
+  ['npm_config_//registry.example/:_authToken', 'q', false],
+  ['NPM_CONFIG__AUTH', 'q', false],
+  ['NPM_CONFIG_REGISTRY', 'https://user:pw@example.com/', false],
+  ['NPM_CONFIG_USERCONFIG', TOKEN, false],
+  ['NPM_CONFIG_FOO', 'npm_' + 'b'.repeat(24), false],
+  ['GIT_TERMINAL_PROMPT', '0', true],
+  ['GIT_SSL_CAINFO', '/ca.pem', true],
+  ['NODE_EXTRA_CA_CERTS', '/ca.pem', true],
+  ['NODE_USE_SYSTEM_CA', '1', true],
+  ['NPM_CONFIG_PREFIX', '/p', true],
+  ['NPM_CONFIG_CACHE', '/c', true],
+  ['NPM_CONFIG_REGISTRY', 'https://registry.example/', true],
+  ['NVM_DIR', '/n', true],
+  ['XDG_CONFIG_HOME', '/x', true],
+  ['HTTPS_PROXY', 'http://user:pw@example.com:3128', true],
+  ['https_proxy', 'http://proxy.example:3128', true],
+  ['HTTPS_PROXY', 'http://u:' + TOKEN + '@example.com', true],
+];
+for (const [name, value, kept] of cases) {
+  test(`allowedEnv #163: ${name} is ${kept ? 'kept' : 'dropped'}`, () => {
+    assert.equal(name in allowedEnv({ [name]: value }, 'linux'), kept);
+  });
+}
