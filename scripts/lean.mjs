@@ -22,6 +22,7 @@ import { MIGRATE_SOURCES, MIGRATE_TARGETS, readSource, detectSources, migratePla
 import { adhdCommand } from './lib/adhd.mjs';
 import { version as binVersion, gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPresent, which, run, quiet, exists, isolate, configHome, envDir } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
+import { probePlugins } from './lib/plugin-health.mjs';
 import { adopt, inventory } from './lib/adopt.mjs';
 import { upgradeInventory, formatUpgrade } from './lib/upgrade.mjs';
 import { agentLifecycle } from './lib/agent-lifecycle.mjs';
@@ -92,6 +93,7 @@ function parseArgs(argv) {
       case '--gh': o.gh = true; break;
       case '--no-gh': o.gh = false; break;
       case '--json': o.json = true; break;
+      case '--probe-plugins': o.probePlugins = true; break;
       case '--feedback-draft': o.command = 'feedback'; break;
       case '--failed-command': o.failedCommand = next(); break;
       case '--feedback-kind': o.feedbackKind = next(); break;
@@ -153,6 +155,7 @@ const HELP = `Usage: lean-agents [options]
                          (--feedback-kind update: the text is a finding from an update, not an error)
                          ({"offer":false} when the network preset forbids it). Needs --failed-command <text>;
                          pass --network on|off when nothing is installed yet. Files nothing.
+  --probe-plugins        With --doctor or --adopt: start a short-lived opencode serve (throwaway state dir, loopback) and check a plugin's command registers
   --json                 With --dry-run or --doctor: print one JSON object on stdout (messages go to stderr)
   --no-app               Do not install the Antigravity app (the CLI is still installed when missing)
   --bun / --no-bun       Install Bun for Context Mode (default: on; faster JS, TypeScript)
@@ -684,7 +687,11 @@ async function main() {
   shareProxy();
   if (o.command === 'help') return console.log(HELP);
   if (o.command === 'version') return console.log(JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version);
-  if (o.command === 'doctor') return process.exit(doctor({ home: o.home, state: readState(o.home), exec: o.exec, nodeVersion: NODE_VERSION, json: o.json }) ? 0 : 1);
+  if (o.command === 'doctor') {
+    const state = readState(o.home);
+    const probe = o.probePlugins && state?.options.agents.some((a) => a.startsWith('opencode')) ? await probePlugins(o.home) : [];
+    return process.exit(doctor({ home: o.home, state, exec: o.exec, nodeVersion: NODE_VERSION, json: o.json, probe }) ? 0 : 1);
+  }
   if (o.command === 'upgrade-agent') {
     if (o.undo || (o.yes && !o.dryRun)) throw new Error('--upgrade-agent opencode apply and --undo are not in this release yet; it only lists (dry run)');
     const env = process.env;

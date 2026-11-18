@@ -10,6 +10,7 @@ import { stillNeeded, shellNotice } from './terminals.mjs';
 import { adhdSkillFiles } from './adhd.mjs';
 import { proxyReport, childEnv, fromPrivacy } from './network.mjs';
 import { leftovers } from './parallel.mjs';
+import { pluginHealth } from './plugin-health.mjs';
 
 const CORE_AGENTS = ['debug', 'explore', 'planner', 'research', 'review'];
 const SECRET_KEY = /(key|token|secret|password|auth)/i;
@@ -99,7 +100,7 @@ function checkInventory({ home, exec, run, env, platform, fsx }, add) {
   return { nodes, skills };
 }
 
-export function doctor({ home, state, exec, nodeVersion = process.versions.node, json = false, run = quiet, env = process.env, platform = process.platform, fsx = fs }) {
+export function doctor({ home, state, exec, nodeVersion = process.versions.node, json = false, run = quiet, env = process.env, platform = process.platform, fsx = fs, probe = [] }) {
   const rows = [];
   const add = (item, status, detail = '') => rows.push({ item, status, detail });
   if (!state) {
@@ -169,6 +170,10 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
   }
   checkAntigravityIde(home, add, fsx);
   const { nodes, skills } = checkInventory({ home, exec, run, env, platform, fsx }, add);
+  // #212: config listing a plugin is not proof it loads. Read-only; `probe` holds findings of the opt-in --probe-plugins server run.
+  if (state?.options.agents.some((a) => a.startsWith('opencode'))) {
+    for (const f of [...pluginHealth(home, { fsx }), ...probe]) add(`plugin ${f.plugin || 'probe'} ${f.id}`, ['deps-incomplete', 'command-missing'].includes(f.id) ? 'error' : 'changed', `${f.line}. Fix: ${f.fix}`);
+  }
   const left = leftovers(process.cwd());
   if (left.length) add('parallel workers', 'changed', `left in this repo: ${left.join(', ')} (merge them, then run scripts/parallel.mjs clean)`);
   const netRows = proxyReport();
