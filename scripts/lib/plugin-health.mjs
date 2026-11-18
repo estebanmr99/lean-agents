@@ -86,10 +86,14 @@ function wrapperDirs(root, name, fsx) {
 // A name from config is joined into a path: no `..` segment and nothing absolute (POSIX or drive letter).
 export const safePluginName = (name) => !path.posix.isAbsolute(name) && !path.win32.isAbsolute(name) && !name.split(/[\\/]/).includes('..');
 
-export function checkDepTree(home, name, fsx = fs) {
+// `specs`: the versions the config asks for ('' = unpinned = the `latest` folder). Given, only the wrapper folders OpenCode loads for
+// them are checked: a leftover folder of an older spec (for example `@latest` after the user pinned an exact version) is not loaded.
+export function checkDepTree(home, name, fsx = fs, specs = null) {
   if (!safePluginName(name)) return [];
   const root = cacheDir(home);
-  const wrappers = [path.join(root, 'node_modules'), ...wrapperDirs(root, name, fsx).map((d) => path.join(d, 'node_modules'))];
+  const wanted = specs && new Set([...specs].map((v) => v || 'latest'));
+  const used = (d) => !wanted || wanted.has(path.basename(d).slice(path.basename(d).indexOf('@') + 1));
+  const wrappers = [path.join(root, 'node_modules'), ...wrapperDirs(root, name, fsx).filter(used).map((d) => path.join(d, 'node_modules'))];
   const out = [];
   for (const nm of wrappers) {
     const pkgDir = path.join(nm, ...name.split('/'));
@@ -108,7 +112,7 @@ const PIN_VERSIONS = Object.fromEntries(Object.values(PINS).filter((p) => p.kind
 export function pluginHealth(home, { pins = PIN_VERSIONS, fsx = fs } = {}) {
   const entries = readSpecs(home, fsx);
   const names = [...new Set(entries.map((e) => e.name))];
-  return [...reconcileSpecs(entries, pins), ...names.flatMap((n) => checkDepTree(home, n, fsx))];
+  return [...reconcileSpecs(entries, pins), ...names.flatMap((n) => checkDepTree(home, n, fsx, entries.filter((e) => e.name === n).map((e) => e.version)))];
 }
 
 const freePort = () => new Promise((resolve, reject) => {
