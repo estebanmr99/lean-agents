@@ -197,7 +197,7 @@ Cada opción de `--help`. En PowerShell se escriben en PascalCase (`-DryRun`).
 | `--adhd-always` | Activa i-have-adhd en cada respuesta |
 | `--ponytail-mode` lite, full, ultra u off | Nivel de Ponytail |
 | `--shell` default o git-bash | OpenCode en Windows: usa Git Bash si lo encuentra (por defecto: git-bash); nunca sobrescribe un shell que tú elegiste |
-| `--json` | Con `--dry-run`, `--doctor` o `--adopt`: imprime un objeto JSON en stdout |
+| `--json` | Con `--dry-run`, `--doctor`, `--adopt` o `--yes` (una instalación real: `{ ok, files, commands, errors, version }`, ver [docs/install-json.md](docs/install-json.md)): imprime un objeto JSON en stdout |
 | `--feedback-draft` | Tras un fallo de instalación: lee el error por stdin e imprime un borrador de issue sin datos sensibles en JSON. Necesita `--failed-command` |
 | `--failed-command <texto>` | El comando que falló, para `--feedback-draft` |
 | `--feedback-kind update` | Con `--feedback-draft`: el texto es un hallazgo de una actualización, no un error |

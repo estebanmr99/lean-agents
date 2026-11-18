@@ -177,7 +177,7 @@ const HELP = `Usage: lean-agents [options]
                          ({"offer":false} when the network preset forbids it). Needs --failed-command <text>;
                          pass --network on|off when nothing is installed yet. Files nothing.
   --probe-plugins        With --doctor or --adopt: start a short-lived opencode serve (throwaway state dir, loopback) and check a plugin's command registers
-  --json                 With --dry-run or --doctor: print one JSON object on stdout (messages go to stderr)
+  --json                 With --dry-run, --doctor or --yes: print one JSON object on stdout (messages go to stderr)
   --no-app               Do not install the Antigravity app (the CLI is still installed when missing)
   --bun / --no-bun       Install Bun for Context Mode (default: on; faster JS, TypeScript)
   --project <dir>        Write the shared team files into one repository
@@ -548,6 +548,19 @@ function printJson(o, planned, commands, migration, behind, prereqs, update) {
   process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
 }
 
+// One JSON object on stdout after a real apply (--json --yes). Field names are a contract: see docs/install-json.md.
+function printApplied(o, files, commands, errors) {
+  const inText = (t) => t.split(o.home).join('~');
+  const rel = (t) => (t.startsWith(o.home + path.sep) ? path.relative(o.home, t).split(path.sep).join('/') : t);
+  process.stdout.write(`${JSON.stringify({
+    ok: errors.length === 0,
+    files: files.map((f) => rel(f.path)),
+    commands: commands.map((c) => ({ ...c, desc: inText(c.desc) })),
+    errors: errors.map(inText),
+    version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version,
+  }, null, 2)}\n`);
+}
+
 function printPlan(o, planned, commands) {
   console.log(`\nlean-agents plan for ${o.agents.join(', ') || 'no agents'}`);
   if (o.project) console.log(`  project: ${o.project}`);
@@ -598,7 +611,7 @@ async function install(o) {
   if (o.command === 'update' && saved.options.migrateOnly) throw new Error('nothing to update: only --migrate ran here');
   const p = await choose(o, saved?.options);
   const { planned, commands: agentCommands, migration } = buildPlan(o);
-  if (migration && !migration.rows.length) { p.close(); console.log('Nothing to migrate: no rules, agents, skills, prompts, MCP servers or hooks found.'); return; }
+  if (migration && !migration.rows.length) { p.close(); console.log('Nothing to migrate: no rules, agents, skills, prompts, MCP servers or hooks found.'); return o.json && printApplied(o, [], [], []); }
   const behind = new Set((saved ? behindPins(saved) : []).map((b) => pinTool(b.tool)));
   const every = o.everything && !migration ? everythingPrereqs(o, readState(o.home)) : null;
   // The planner owns these installs; the per-tool ones below would repeat them.
@@ -607,8 +620,7 @@ async function install(o) {
   const update = saved && o.dryRun ? updateInfo(o, saved) : null;
   const noGit = migration ? null : gitHint(packageManager());
   if (noGit) console.log(noGit);
-  if (o.json) {
-    if (!o.dryRun) throw new Error('--json needs --dry-run (or --doctor)');
+  if (o.json && o.dryRun) {
     p.close();
     return printJson(o, planned, commands, migration, saved ? behindPins(saved) : undefined, every?.steps, update ?? undefined);
   }
@@ -659,18 +671,24 @@ async function install(o) {
     writePrivate(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(state, null, 2)}\n`);
   };
   let applied = false;
-  try { apply(planned, backupDir, o.home, writeRoots(o), files); applied = true; } finally { if (applied || files.length) save(); }
+  try { apply(planned, backupDir, o.home, writeRoots(o), files); applied = true; } catch (e) {
+    if (o.json) printApplied(o, files, [], [e.message]);
+    throw e;
+  } finally { if (applied || files.length) save(); }
+  const report = [];
+  const errors = [];
   if (o.exec) {
     for (const [i, c] of commands.entries()) {
       // gh is on by default, so having no installer for it (no brew or winget) must not fail the run.
-      if (c.manual) { console.log(`! ${c.desc}`); if (!c.optional) failed++; continue; }
+      if (c.manual) { console.log(`! ${c.desc}`); if (!c.optional) { failed++; errors.push(c.desc); } continue; }
       const there = (c.skipIfExists && exists(c.skipIfExists)) || (c.skipIfOutput && quiet(c.skipIfOutput.cmd).ok);
       if (there) {
         if (!behind.has(c.tool)) continue;
         // Installed at an older pin: undo it, then add it again at the new pin.
-        if (!c.undo.every((argv) => run(argv, { dryRun: false, log: console.log, env: c.env }))) {
+        if (!c.undo.every((argv) => run(argv, { dryRun: false, log: console.log, env: c.env, json: o.json }))) {
           console.log(`  ! could not remove the old ${c.desc}; left as it is. Fix it by hand, then --update.`);
           failed++;
+          errors.push(`could not remove the old ${c.desc}`);
           continue;
         }
       }
@@ -680,7 +698,10 @@ async function install(o) {
       const rec = { desc: c.desc, ok: false, undo: c.undo, ...(c.env && { env: c.env }), ...(c.resumeKey && { resumeKey: c.resumeKey }) };
       ran.push(rec);
       save();
-      const ok = c.run.every((argv) => run(argv, { dryRun: false, log: console.log, env: c.env }));
+      const codes = [];
+      const ok = c.run.every((argv) => run(argv, { dryRun: false, log: console.log, env: c.env, json: o.json, codes }));
+      report.push({ desc: c.desc, ok, exit: codes.at(-1) ?? null });
+      if (!ok && !c.optional) errors.push(c.desc);
       if (ui) ui.result(ok || c.optional, c.desc);
       else if (!ok && !c.optional) console.log(`  ! failed: ${c.desc}. Run the command above by hand, then --doctor.`);
       // An optional step (Bun) that fails only means Context Mode runs on Node; nothing to undo.
@@ -694,10 +715,11 @@ async function install(o) {
     console.log(`\n${failed} step(s) failed; see the lines marked ! above. Backups: ${backupDir}`);
     ui?.summary('Summary', [`${failed} of ${commands.length} commands failed`, `Backups: ${backupDir}`], false);
     process.exitCode = 1;
-    return;
+    return o.json && printApplied(o, files, report, errors);
   }
   finished = true;
   save();
+  if (o.json) printApplied(o, files, report, errors);
   console.log(`\nDone. Backups: ${backupDir}`);
   if (o.project) return console.log('Next: review and commit these files. Each teammate runs the installer once for the tools (rtk, context-mode, ...).');
   console.log('Next: restart your agents, log in to your providers, then run --doctor.');
