@@ -47,7 +47,7 @@ Open Copilot chat, switch the mode to **Agent**, paste the prompt above. The age
 3. **Terminal tool blocked by policy?** Some companies disable the terminal tool or auto-block commands. Then the agent should not try workarounds: it prints each command, in order, for you to run in your own PowerShell, and asks you to paste the output back. The same steps by hand are in [manual-install.md](manual-install.md).
 4. **Flow.** `--doctor --json` first, then one question per choice (agents, tools, migrate, network, terminal), then `--yes --dry-run --json` and your OK, then the same command without `--dry-run` and `--json`, then `--doctor --json` again. `vscode-copilot` goes in the `--agents` list when you want it.
 
-Not proven yet (**VERIFY**, see [compatibility.md](compatibility.md)): which agent-mode tools your company policy allows, how auto-approve behaves for terminal commands, and whether VS Code loads the rules lean-agents writes under `~/.copilot`.
+Not proven yet (**VERIFY**, see [compatibility.md](compatibility.md)): which agent-mode tools your company policy allows, how auto-approve behaves for terminal commands, and whether VS Code loads the rules lean-agents writes under `~/.copilot`. The [logged-in proof checklist](vscode-agent-checklist.md) closes these on a real work PC.
 
 ## Update with an agent
 

@@ -639,6 +639,7 @@ Guide only, no code change: `docs/install-with-an-agent.md`, section "VS Code Co
 - **VERIFY (PR3, checked 2026-11-18):** the `*.prompt.md` user folder. Source: [VS Code, Use prompt files](https://code.visualstudio.com/docs/copilot/customization/prompt-files). It says only that the user scope is "Your user data (specific to your VS Code profile)", made with the Agent Customizations editor or **Chat: New Prompt File**; it gives no folder for Windows, macOS or Linux. `agent: agent` in the frontmatter and `/name` in the Chat view are documented. The same page says prompt files run only in the **Local** harness, which is deprecated and removed in February 2027 (new reusable workflows should be skills). So the adapter writes no `/lean-install` prompt file and `tests/real-vscode.sh` asserts none appears. Open question for a logged-in VS Code: which exact folder does **Chat: New Prompt File** create a user prompt in on Windows, macOS and Linux, and will `/lean-install` still run after the Local harness goes away? A skill (`~/.agents/skills`, already written) is the likely successor.
 - **VERIFY:** whether VS Code, not only Copilot CLI, loads `~/.copilot` rules and agents.
 - Antigravity pilot users use the same guide (owner default, 2026-11-18).
+- Logged-in proof: [vscode-agent-checklist.md](vscode-agent-checklist.md) lists, per step, the row above that moves from **VERIFY** to verified (not run yet).
 
 ## Update plan (#182 PR2, 2026-11-18)
 
