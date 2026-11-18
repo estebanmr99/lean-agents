@@ -30,9 +30,14 @@ const toolFloor = () => ['context-mode', 'gsd-core'].map((k) => PINS[k]?.node).f
 const floorText = (range) => minVersion(range).join('.');
 
 // nvm's undo is planned only when ~/.nvm did not exist before this run (`nvmDirExisted`), and runs later: it removes ~/.nvm only
-// when every Node under it is one lean-agents installs (the floor's major, v24); otherwise it stays and says why. `node` is
-// resolved from PATH at undo time, not the path of the Node that planned it.
-const nvmUndo = (dir, major) => [['node', '-e',
+// when every Node under it is one lean-agents installs (the floor's major, v24); otherwise it stays and says why. The Node is a
+// placeholder the engine swaps for the Node running it at undo time (`undoArgv`): no bare `node` on PATH, no path stored.
+export const UNDO_NODE = '<lean-node>';
+export const undoArgv = (argv, execPath = process.execPath) => (argv[0] === UNDO_NODE ? [execPath, ...argv.slice(1)] : argv);
+// Did ~/.nvm exist before this run? A resumed run still owns a ~/.nvm that an earlier, unfinished nvm step created (its recorded
+// undo is not empty); one an earlier run recorded with an empty undo existed before lean-agents and stays the user's.
+export const nvmDirExistedBefore = (savedCommands, dirExists) => !(savedCommands ?? []).some((c) => c.resumeKey === 'prereq:nvm' && c.undo?.length) && dirExists;
+const nvmUndo = (dir, major) => [[UNDO_NODE, '-e',
   `const fs=require('fs'),p=require('path'),d=process.argv[1],v=p.join(d,'versions','node'),r=new RegExp('^v${major}\\\\.');`
   + `const o=fs.existsSync(v)?fs.readdirSync(v,{withFileTypes:true}).filter(e=>e.isDirectory()&&!r.test(e.name)).map(e=>e.name):[];`
   + `if(o.length)console.log('kept '+d+': it holds Node versions lean-agents did not install ('+o.join(', ')+')');else fs.rmSync(d,{recursive:true,force:true})`,

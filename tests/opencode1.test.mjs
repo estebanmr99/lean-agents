@@ -165,11 +165,20 @@ test('install: an empty config folder when there is no snapshot, so 1.x never re
 test('Windows: the PATH entry is recorded before the registry write', () => {
   const f = fixture();
   const p = planOpencode1({ home: f.home, platform: 'win32', which: () => f.onPath, probe: () => '1.19.0', shell: '' });
-  const seen = [];
-  const winPath = () => { seen.push(seen.length); throw new Error('killed'); };
+  const winPath = (op) => { if (op === 'has') return 'absent'; throw new Error('killed'); };
   let last = null;
   assert.throws(() => installOpencode1(p, { home: f.home, roots: [f.home], backupDir: j(f.home, 'bk'), apply, platform: 'win32', probe: () => '1.19.0', winPath, onRecord: (r) => { last = { ...r }; } }), /killed/);
   assert.equal(last.pathEntry, true, 'state already names the entry when the write dies');
+});
+
+test('Windows: an HKCU entry the user already had is neither re-added nor recorded as ours', () => {
+  const f = fixture();
+  const p = planOpencode1({ home: f.home, platform: 'win32', which: () => f.onPath, probe: () => '1.19.0', shell: '' });
+  const calls = [];
+  const winPath = (op) => { calls.push(op); return 'present'; };
+  const rec = installOpencode1(p, { home: f.home, roots: [f.home], backupDir: j(f.home, 'bk'), apply, platform: 'win32', probe: () => '1.19.0', winPath });
+  assert.equal(rec.pathEntry, false);
+  assert.deepEqual(calls, ['has']);
 });
 
 test('Windows: cmd + sh shims, no rc block, the HKCU entry is added once and removed only if we added it', () => {
@@ -179,17 +188,17 @@ test('Windows: cmd + sh shims, no rc block, the HKCU entry is added once and rem
   assert.deepEqual(p.actions.map((a) => path.basename(a.path)), ['opencode1.cmd', 'opencode1']);
   assert.equal(path.basename(p.binary), 'opencode.exe');
   const calls = [];
-  const winPath = (op, dir) => { calls.push([op, dir]); return 'changed'; };
+  const winPath = (op, dir) => { calls.push([op, dir]); return op === 'has' ? 'absent' : 'changed'; };
   const files = [];
   const rec = installOpencode1(p, { home: f.home, roots: [f.home], backupDir: j(f.home, 'bk'), apply, files, platform: 'win32', probe: () => '1.19.0', winPath });
   assert.equal(rec.pathEntry, true);
-  assert.deepEqual(calls, [['add', f.L.bin]]);
+  assert.deepEqual(calls, [['has', f.L.bin], ['add', f.L.bin]]);
   assert.match(fs.readFileSync(j(f.L.bin, 'opencode1.cmd'), 'utf8'), /\r\n"[^"]*opencode\.exe" %\*/);
   const report = removeOpencode1(rec, { home: f.home, winPath, platform: 'win32' });
-  assert.deepEqual(calls[1], ['remove', f.L.bin]);
+  assert.deepEqual(calls[2], ['remove', f.L.bin]);
   assert.ok(report.some(([w]) => w === 'removed from user PATH'));
   const kept = removeOpencode1({ ...rec, pathEntry: false }, { home: f.home, winPath, platform: 'win32' });
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3);
   assert.equal(kept.length, 0);
 });
 

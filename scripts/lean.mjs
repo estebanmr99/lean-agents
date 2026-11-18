@@ -24,7 +24,7 @@ import { version as binVersion, gitHint, detectAgents, packageManager, prereqFor
 import { doctor } from './lib/doctor.mjs';
 import { probePlugins } from './lib/plugin-health.mjs';
 import { adopt, inventory } from './lib/adopt.mjs';
-import { planPrereqs, pendingPrereqs, everythingAgents } from './lib/prereqs.mjs';
+import { planPrereqs, pendingPrereqs, everythingAgents, undoArgv, nvmDirExistedBefore } from './lib/prereqs.mjs';
 import { upgradeInventory, formatUpgrade } from './lib/upgrade.mjs';
 import { backupOpencode, backupLayout, listProcesses, opencodeRunning } from './lib/opencode-backup.mjs';
 import { readBackupStamp } from './lib/backup-stamp.mjs';
@@ -504,10 +504,8 @@ function everythingPrereqs(o, saved) {
     brew: !!which('brew'), winget: !!which('winget'), uv: !!which('uv'), rtk: !!which('rtk'), bun: bunPresent(o.home), git: !!which('git'),
     clt: mac && quiet(['xcode-select', '-p']).ok, nvm: !!o.nvm,
   };
-  // A resumed run still owns a ~/.nvm that an earlier, unfinished nvm step created (its recorded undo is not empty).
-  const createdNvm = (saved?.commands ?? []).some((c) => c.resumeKey === 'prereq:nvm' && c.undo?.length);
   const steps = planPrereqs({
-    nvmDirExisted: !createdNvm && fs.existsSync(path.join(o.home, '.nvm')),
+    nvmDirExisted: nvmDirExistedBefore(saved?.commands, fs.existsSync(path.join(o.home, '.nvm'))),
     platform: process.platform, arch: process.arch, home: o.home, tmp: stateDir(o.home), execPath: process.execPath, has,
     nodeActive: NODE_VERSION, nvmNodes: o.nvm ? installedNodes(o.nvm).map((n) => n.version) : [],
     proxyEnv: proxyReport().map((l) => l.split('=')[0]), done: (saved?.commands ?? []).filter((c) => c.ok && c.resumeKey).map((c) => c.resumeKey),
@@ -676,7 +674,7 @@ async function install(o) {
       if (there) {
         if (!behind.has(c.tool)) continue;
         // Installed at an older pin: undo it, then add it again at the new pin.
-        if (!c.undo.every((argv) => run(argv, { dryRun: false, log: console.log, env: c.env }))) {
+        if (!c.undo.every((argv) => run(undoArgv(argv), { dryRun: false, log: console.log, env: c.env }))) {
           console.log(`  ! could not remove the old ${c.desc}; left as it is. Fix it by hand, then --update.`);
           failed++;
           continue;
@@ -848,6 +846,17 @@ async function undoUpgrade(o) {
   return true;
 }
 
+// --uninstall after an applied upgrade: undo the files the opencode1, config and dcp steps wrote (same entry undo as --undo, roots
+// checked there). No 1.x restore, no 2.x uninstall, no data restore: the journal is archived right after.
+async function revertUpgradeFiles(o, S) {
+  const steps = createSteps(upgradeDeps(o, S, () => {}, { stamp: {}, inv: { items: [] } }));
+  const recs = Array.isArray(S.upgrade.steps) ? S.upgrade.steps : [];
+  for (const rec of [...recs].reverse()) {
+    const step = ['opencode1', 'config', 'dcp'].includes(rec?.id) && rec.status !== 'undone' ? steps.find((x) => x.id === rec.id) : null;
+    if (step) await step.undo(rec, null);
+  }
+}
+
 async function uninstall(o) {
   const state = readState(o.home);
   if (!state) { console.log('lean-agents is not installed.'); return; }
@@ -855,7 +864,10 @@ async function uninstall(o) {
   // status is a half-done apply or undo: finish it with --undo first. --uninstall archives the journal, so --undo is gone after it.
   const up = state.upgrade;
   if (isActive(up) && up.status !== 'applied') throw new Error(`an OpenCode upgrade is ${up.status}: run --upgrade-agent opencode --undo first (it restores your 1.x data), then --uninstall`);
-  if (isActive(up)) console.log(`! the OpenCode 2 upgrade stays: --uninstall does not go back to 1.x, and its journal is archived, so --undo is no longer available afterwards.\n  Your data is untouched: the 1.x backup (${up.backup}, see RESTORE.md in it) and the frozen copy are kept. To go back to 1.x, run --upgrade-agent opencode --undo --yes first.`);
+  if (isActive(up)) {
+    const kept = typeof up.backup === 'string' ? `the 1.x backup (${up.backup}, see RESTORE.md in it)` : 'the 1.x backup';
+    console.log(`! the OpenCode 2 upgrade stays: --uninstall does not go back to 1.x, and its journal is archived, so --undo is no longer available afterwards.\n  Removed: what the upgrade added (the opencode1 shim and PATH block, the managed 2.x config and DCP edits).\n  Kept: your data (the live 2.x sessions), ${kept}, the frozen copy and the OpenCode 2 install. To go back to 1.x, run --upgrade-agent opencode --undo --yes first.`);
+  }
   const p = await prompter(o.yes);
   console.log(`This restores ${state.files.length} files and undoes ${state.commands.length} commands.`);
   if (o.dryRun || !yesNo(await p.ask('Uninstall?', o.yes ? 'y' : 'n'))) { p.close(); console.log('Nothing changed.'); return; }
@@ -864,7 +876,7 @@ async function uninstall(o) {
   if (o.exec) {
     for (const c of [...state.commands].reverse()) {
       for (const argv of c.undo ?? []) {
-        if (!run(argv, { dryRun: false, log: console.log, env: c.env })) {
+        if (!run(undoArgv(argv), { dryRun: false, log: console.log, env: c.env })) {
           console.log('  ! failed. Run the command above by hand.');
           process.exitCode = 1;
         }
@@ -872,6 +884,7 @@ async function uninstall(o) {
     }
   }
   if (state.toolNode?.installedByLean) console.log(`Kept Node v${state.toolNode.version} (lean-agents never removes a Node); remove it with \`nvm uninstall ${state.toolNode.version}\`.`);
+  if (isActive(up)) await revertUpgradeFiles(o, state);
   const report = undo(state.files, writeRoots(o));
   if (state.opencode1) report.push(...removeOpencode1(state.opencode1, { home: o.home }));
   for (const [what, file] of report) console.log(`  ${what.padEnd(20)} ${file}`);

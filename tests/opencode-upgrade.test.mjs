@@ -414,6 +414,34 @@ test('lean.mjs: --uninstall refuses while an upgrade is half done, and proceeds 
   fs.rmSync(home, { recursive: true, force: true });
 });
 
+test('lean.mjs: --uninstall after an applied upgrade removes the shim, the PATH block and the managed 2.x config; data, backup, frozen copy and 2.x stay', { skip }, async () => {
+  const m = await machine({ overwrite: false });
+  const r = await applyWith(m);
+  assert.equal(r.ok, true, m.log.join('\n'));
+  const home = m.f.home;
+  const shim = j(home, '.local', 'share', 'lean-agents', 'opencode1', 'bin', 'opencode1');
+  const cfg = j(home, '.config', 'opencode');
+  const dcp = j(cfg, 'dcp.jsonc');
+  const rcs = ['.bashrc', '.zshrc', '.profile', '.bash_profile'].map((n) => j(home, n)).filter((f) => fs.existsSync(f) && /lean-agents/.test(fs.readFileSync(f, 'utf8')));
+  assert.ok(fs.existsSync(shim) && fs.existsSync(dcp) && rcs.length, 'the apply wrote the shim, dcp.jsonc and a PATH block');
+  fs.writeFileSync(j(m.f.L.live, 'opencode.db'), 'migrated by 2.x');
+  const dir = j(home, '.config', 'lean-agents');
+  fs.writeFileSync(j(dir, 'state.json'), JSON.stringify({ version: '0', files: [], commands: [], options: m.S.options, upgrade: r.journal, opencode1: m.S.opencode1 }));
+  const ok = lean(home, ['--no-exec', '--uninstall', '--yes']);
+  assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+  assert.match(ok.stdout, /Removed: what the upgrade added/);
+  assert.equal(fs.existsSync(shim), false, 'the shim is gone');
+  assert.equal(fs.existsSync(dcp), false, 'dcp.jsonc is gone');
+  assert.doesNotMatch(fs.existsSync(j(cfg, 'opencode.jsonc')) ? fs.readFileSync(j(cfg, 'opencode.jsonc'), 'utf8') : '', /opencode-dcp/);
+  for (const f of rcs) assert.doesNotMatch(fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '', /lean-agents/, 'the marked PATH block is gone');
+  assert.equal(fs.readFileSync(j(m.f.L.live, 'opencode.db'), 'utf8'), 'migrated by 2.x', 'live 2.x data untouched');
+  assert.ok(fs.existsSync(r.stamp.dir), 'the backup stays');
+  assert.ok(fs.existsSync(j(m.f.L.frozen, 'opencode', 'opencode.db')), 'the frozen copy stays');
+  assert.equal(fakeProbe(m.ocBin), '2.2.5', 'the 2.x install stays');
+  assert.ok(fs.readdirSync(dir).some((n) => n.startsWith('state.uninstalled-')), 'the journal is archived');
+  fs.rmSync(home, { recursive: true, force: true });
+});
+
 test('undo stops, and keeps the opencode1 copy, when the overwritten 1.x binary cannot be restored (review 1)', { skip }, async () => {
   const m = await machine({ overwrite: true });
   const r = await applyWith(m);

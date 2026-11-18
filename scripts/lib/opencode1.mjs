@@ -90,6 +90,7 @@ $k = Open-Env $false
 try { $raw = [string]$k.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames) } finally { $k.Close() }
 $parts = @($raw -split ';' | Where-Object { $_ })
 $has = @($parts | Where-Object { (Get-Norm $_) -eq (Get-Norm $dir) }).Count -gt 0
+if ($env:LEAN_PATH_OP -eq 'has') { if ($has) { 'present' } else { 'absent' }; exit 0 }
 if ($env:LEAN_PATH_OP -eq 'add') {
   if ($has) { 'present'; exit 0 }
   if (-not $raw) { $new = $dir } elseif ($raw.EndsWith(';')) { $new = "$raw$dir" } else { $new = "$raw;$dir" }
@@ -168,11 +169,14 @@ export function installOpencode1(p, { home, roots, backupDir, apply, files = [],
   try { apply(planned, backupDir, home, roots, files); } finally { onRecord(record); }
   if (!win) fs.chmodSync(p.actions[0].path, 0o755);
   if (win) {
-    // Recorded before the registry write: a kill in between must not leave an HKCU entry --uninstall does not know about.
-    record.pathEntry = true;
+    // Recorded before the registry write (a kill in between must not leave an HKCU entry --uninstall does not know about), but
+    // only when the entry was absent: removing one the user already had would be ours to answer for.
+    record.pathEntry = winPath('has', p.pathDir) === 'absent';
     onRecord(record);
-    record.pathEntry = winPath('add', p.pathDir) === 'changed';
-    onRecord(record);
+    if (record.pathEntry) {
+      record.pathEntry = winPath('add', p.pathDir) === 'changed';
+      onRecord(record);
+    }
   }
   return record;
 }
