@@ -29,6 +29,8 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 - Versions: README (EN and ES), `docs/ROADMAP.md` and the spec name 0.8.0 as the latest release (#161). The npm item on the README roadmap is ticked; "Later: 1.0.0" lists #179 to #182.
 - `docs/SECURITY-REVIEW.md` pin table names every key in `core/pins.json`; `tests/security-review-pins.test.mjs` fails when a key is missing (#155).
+- Bootstrap limit (#162): `SHA256SUMS` comes from the same release as the tarball, so the release check catches corruption, not a tampered release; `docs/compatibility.md` says so and lists attestation and npm provenance as **VERIFY** fixes. The Cursor installer's tarball has no checksum check (#206, **VERIFY** upstream).
+- `docs/compatibility.md` records the repo setting "Allow GitHub Actions to create and approve pull requests" (on, checked 2026-11-18) and PR #210's `action_required` run and dispatch workaround (#165). It records the 0.8.0 release run's sigstore log entry (logIndex 3845258591) and that OIDC publishing is unproven until a release uses it (#160).
 - `docs/compatibility.md`: the `lean-update` tag `v0.7.0` exists, and its tagged `skills add` form was checked in a throwaway HOME (#168).
 - README (EN and ES): an "All flags" table covers every flag in `--help`, `--home` included (#167).
 - Install docs (README, `docs/install-with-an-agent.md`, `skills/lean-update/SKILL.md`) use `npx lean-agents@latest` first and state Node.js 22.20+; Context Mode 2 and GSD Core need Node.js 24 via nvm. The bootstraps moved to a fallback section, and the `LEAN_AGENTS_VERSION` example is 0.8.0 (#178).
