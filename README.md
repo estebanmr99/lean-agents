@@ -201,7 +201,7 @@ Every flag from `--help`. In PowerShell the same flags are PascalCase (`-DryRun`
 | `--feedback-draft` | After a failed install: read the error on stdin and print a redacted issue draft as JSON. Needs `--failed-command` |
 | `--failed-command <text>` | The command that failed, for `--feedback-draft` |
 | `--feedback-kind update` | With `--feedback-draft`: the text is a finding from an update, not an error |
-| `--update` | Re-apply with your saved choices |
+| `--update` | Re-apply with your saved choices; the plan lists `tool: installed -> release pin`, what stays held (OpenCode 1.x, agent CLIs across a major, tools you installed yourself) and the release notes since your version (`--dry-run [--json]` shows it without changing anything) |
 | `--doctor` | Check the install |
 | `--uninstall` | Undo everything lean-agents changed |
 | `--adopt` | List what a hand-built machine already has and what each item is; with `--yes` it applies the plan |
