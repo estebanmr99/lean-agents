@@ -37,6 +37,7 @@ jobs:
     outputs:
       code: ${{ steps.diff.outputs.code }}
       upgrade: ${{ steps.diff.outputs.upgrade }}
+      opencode: ${{ steps.diff.outputs.opencode }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -54,6 +55,10 @@ jobs:
           upgrade=true
           if [ "$EVENT" = pull_request ] && ! git diff --name-only "origin/$BASE...HEAD" | grep -qE '^(scripts/lean\.mjs|scripts/lib/(opencode-backup|adopt|upgrade|fsops|system|pins)\.mjs|tests/real-upgrade-opencode\.(sh|ps1)|tests/fixtures/mock-llm\.mjs|core/pins\.json|\.github/workflows/ci\.yml)$'; then upgrade=false; fi
           echo "upgrade=$upgrade" >> "$GITHUB_OUTPUT"
+          # real-dcp-v2 and spike-opencode-side (ubuntu + windows, up to 25 min) run on a PR only when it touches what they exercise.
+          opencode=true
+          if [ "$EVENT" = pull_request ] && ! git diff --name-only "origin/$BASE...HEAD" | grep -qE '^(tests/spike-opencode-side|tests/real-dcp-v2\.sh$|tests/fixtures/mock-llm\.mjs$|scripts/lib/adapters/opencode|scripts/lib/plugin-health\.mjs$|scripts/lib/opencode-|scripts/lib/doctor\.mjs$|scripts/lib/pins\.mjs$|scripts/ci-download\.sh$|core/pins\.json$|\.github/workflows/ci\.yml$)'; then opencode=false; fi
+          echo "opencode=$opencode" >> "$GITHUB_OUTPUT"
 
   lint:
     timeout-minutes: 5
@@ -448,7 +453,7 @@ jobs:
     # #80 part 2 gate: the pinned DCP loads on the real OpenCode 2.x (/api/command lists dcp-compress) and prunes once
     # past its 220K max limit. Throwaway HOME, mock LLM reporting 250K prompt tokens; proves the mechanism, not savings.
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && needs.changes.outputs.opencode == 'true'
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -537,9 +542,9 @@ jobs:
     # the isolation proof for `opencode1` (#80 part 2, P1): 1.19 on a frozen copy under XDG_DATA_HOME + XDG_STATE_HOME leaves the
     # live dirs byte-identical (asserted), OPENCODE_DB + OPENCODE_CONFIG_DIR is printed as evidence, plus what a stdio MCP child
     # inherits and whether 2.x migrates the db on --version / debug config. Windows also runs the native PowerShell half.
-    # macOS stays VERIFY (real-* jobs skip PRs, #56).
+    # macOS stays VERIFY (macOS real-* legs run only off pull requests, #56).
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && needs.changes.outputs.opencode == 'true'
     timeout-minutes: 25
     strategy:
       fail-fast: false
