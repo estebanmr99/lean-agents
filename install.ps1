@@ -346,7 +346,10 @@ if ($Uninstall -and -not $DryRun -and $code -eq 0) {
   if (Write-UserPathWithout $rtkDir) { Write-Output "Removed $rtkDir from your user PATH." }
   if (Test-Path $nodeStamp) {
     Write-UserPathWithout $nodeHome | Out-Null
-    Remove-Item -Recurse -Force $nodeHome
+    # The engine's node.exe may still be closing (or being scanned); a locked file is retried before it is an error.
+    for ($try = 1; $try -le 5; $try++) {
+      try { Remove-Item -Recurse -Force $nodeHome -ErrorAction Stop; break } catch { if ($try -eq 5) { throw }; Start-Sleep -Seconds 2 }
+    }
     Write-Output "Removed the Node.js that this installer put in $nodeHome."
   }
 }
