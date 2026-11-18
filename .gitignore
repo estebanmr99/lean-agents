@@ -11,5 +11,5 @@ node_modules/
 *.log
 tmp/
 dist/
-*-e
+*.md-e
 *.orig

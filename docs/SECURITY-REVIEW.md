@@ -82,7 +82,8 @@ Separate from the install-time commands above: code the agents download every ti
 | Serena (`uvx --from git+https://github.com/oraios/serena@<commit>`) | `serena` | |
 | Bun zip and the agent installers (claude.ai, opencode.ai, antigravity.google, cursor.com), the Homebrew installer (pinned by commit, run only on a Mac without Homebrew), checked by SHA256. Cursor's installer downloads a tarball that is not checked (#206) | `bun`, `claude-installer`, `opencode-installer`, `antigravity-installer`, `cursor-installer`, `homebrew-installer` | |
 | Agent CLIs from `--install-agent` (their versions go to the installers); CI-only harness CLIs | `claude-code`, `opencode-v2`, `opencode-v1`, `copilot-cli` | |
-| RTK, `gh` (brew, winget), `uv` | | latest from their source |
+| RTK, `gh` (brew, winget), `uv` | `rtk`, `uv`, `gh` | latest from their source; the pin is a known-good version and a minimum, never forced (#182) |
+| Antigravity CLI cask (`brew install --cask antigravity-cli`) | `antigravity-cask` | Homebrew cannot pin or hash-check it (#147); the pin records the version checked, reported only |
 
 A green `ci-latest` run opens one pin-bump PR when upstream ships a newer version; pins change only after you merge it (`skills/update-models`, section "Tool versions").
 

@@ -141,7 +141,7 @@ export function upgradeInventory(inv, { home, fsx = fs, binary = { path: null, v
 
 export function formatUpgrade(r) {
   const u = r.upgrade;
-  const out = [`--upgrade-agent opencode (dry run: nothing is changed; apply is not in this release yet)`,
+  const out = [`--upgrade-agent opencode (dry run: nothing is changed; --yes applies once --backup --yes made a verified backup)`,
     `OpenCode: ${u.binary.version ?? 'version unknown'} at ${u.binary.path ?? 'not on PATH'} (${u.binary.via ?? 'n/a'}), major ${u.layout.major ?? 'none'}, sessions ${u.layout.sessions ?? 'unknown'}`,
     `${u.counts.managed} managed, ${u.counts['user-translatable']} translatable, ${u.counts['user-manual']} manual`];
   for (const i of r.items.filter((x) => x.upgrade)) out.push(`  ${i.upgrade.class.padEnd(16)} ${i.upgrade.before}${i.upgrade.after ? ` -> ${i.upgrade.after}` : ''}${i.upgrade.class === 'user-manual' ? `  (${i.upgrade.reason})` : ''}${i.file ? `  (${i.file})` : ''}`);
@@ -203,7 +203,7 @@ export const backupVerified = (stamp) => Boolean(stamp && stamp.verified === tru
 // Apply the translation to the live 2.x config dir. `adapter` is the v2 adapter plan ({ actions }); its config action is merged
 // with the translation edits so the file is written once. Writes only under the XDG config home, never the 1.x data folder.
 // Returns { planned, entries } (entries are the fsops state records an undo needs).
-export function upgradeApply({ home, inv, adapter, backupDir, stamp = readBackupStamp(home), dryRun = false, fsx = fs }) {
+export function upgradeApply({ home, inv, adapter, backupDir, stamp = readBackupStamp(home), dryRun = false, fsx = fs, entries = [] }) {
   if (!backupVerified(stamp)) throw new Error('refusing to apply: no verified session backup (run --upgrade-agent opencode --backup first)');
   const ocDir = j(configHome(home), 'opencode');
   const file = configPath(ocDir);
@@ -219,5 +219,6 @@ export function upgradeApply({ home, inv, adapter, backupDir, stamp = readBackup
   if (stray) throw new Error(`refusing to write outside ${cfgHome}: ${stray.path}`);
   const planned = plan(actions, [cfgHome]);
   if (dryRun) return { planned, entries: [], text: describe(planned, home) };
-  return { planned, entries: apply(planned, backupDir, home, [cfgHome]), text: describe(planned, home) };
+  // `entries` is filled as files are written, so a caller that passes it still holds what an error midway wrote.
+  return { planned, entries: apply(planned, backupDir, home, [cfgHome], entries), text: describe(planned, home) };
 }

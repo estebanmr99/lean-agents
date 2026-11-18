@@ -31,6 +31,13 @@ test('incomplete cached tree names the missing dependencies, transitive ones inc
   assert.match(f[0].fix, /move that cache folder aside/);
 });
 
+test('a leftover @latest wrapper is not reported when the config pins an exact version (it is not loaded)', () => {
+  const h = home({ server: [`${DCP}@3.1.15`], tui: [`${DCP}@3.1.15`] });
+  assert.deepEqual(pluginHealth(h, { pins: {} }).filter((x) => x.id === 'deps-incomplete'), []);
+  const live = home({ server: [DCP], tui: [`${DCP}@latest`] });
+  assert.equal(pluginHealth(live, { pins: {} }).filter((x) => x.id === 'deps-incomplete').length, 1);
+});
+
 test('complete tree and absent cache give no finding', () => {
   assert.deepEqual(checkDepTree(home({ full: true }), DCP), []);
   assert.deepEqual(checkDepTree(fs.mkdtempSync(path.join(os.tmpdir(), 'lean-ph-')), DCP), []);
