@@ -9,10 +9,10 @@ const label = (c) => cursorHookLabel(c, argvOf(c));
 const managed = (c) => cursorNameManaged(c, argvOf(c));
 
 test('label: Windows backslash and posix paths give the bare file name', () => {
-  assert.equal(label('"C:\\Users\\synthetic\\hooks\\run.exe" --x'), 'run.exe');
-  assert.equal(label('C:/Users/synthetic/hooks/run.exe'), 'run.exe');
+  assert.equal(label('"D:\\tools\\hooks\\run.exe" --x'), 'run.exe');
+  assert.equal(label('D:/tools/hooks/run.exe'), 'run.exe');
   assert.equal(label('/home/u/hooks/run.sh'), 'run.sh');
-  assert.equal(label('$(for n in a b; do echo $n; done) C:\\Users\\synthetic\\gsd-cursor-x.js'), 'gsd-cursor-x.js');
+  assert.equal(label('$(for n in a b; do echo $n; done) D:\\tools\\gsd-cursor-x.js'), 'gsd-cursor-x.js');
   assert.equal(label('sh -c "echo hi"'), 'shell');
 });
 
