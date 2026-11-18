@@ -127,3 +127,35 @@ test('--install-agent never installs OpenCode 1.x; opencode-v2 plans only the pi
   assert.match(plan, /opencode-installer\.sh --version 2\.2\.5 --no-modify-path/);
   assert.ok(!/opencode-ai|opencode upgrade|opencode uninstall/.test(plan), 'plan touches 1.x or the OpenCode uninstaller');
 });
+
+test('the upgrade apply plans no OpenCode install or upgrade and needs a verified backup stamp (#80 part 2)', async () => {
+  const { opencodeV2Adapter } = await import('../scripts/lib/adapters/opencode-v2.mjs');
+  const { loadCore } = await import('../scripts/lib/render.mjs');
+  const { upgradeApply } = await import('../scripts/lib/upgrade.mjs');
+  const home = tmp();
+  const tools = ['serena', 'playwright', 'ponytail', 'caveman', 'i-have-adhd', 'dcp', 'context-mode', 'rtk'];
+  const adapter = opencodeV2Adapter({ home, core: loadCore(ROOT), profile: null, opts: { tools, network: {}, terminals: [], platform: 'linux', env: {}, shell: 'default' }, rulesPath: path.join(home, 'rules.md') });
+  assert.ok(adapter.commands.length >= 2, 'plan has commands to check');
+  assert.deepEqual(offenders(adapter.commands), []);
+  assert.throws(() => upgradeApply({ home, inv: { items: [] }, adapter, backupDir: path.join(home, 'bk') }), /no verified session backup/);
+});
+
+test('agentLifecycle installs 2.x next to a 1.x on PATH only from the upgrade flow', { skip: process.platform === 'win32' && 'stub binary is a shell script' }, async () => {
+  const { agentLifecycle } = await import('../scripts/lib/agent-lifecycle.mjs');
+  const bin = tmp();
+  fs.writeFileSync(path.join(bin, 'opencode'), '#!/bin/sh\necho 1.19.0\n', { mode: 0o755 });
+  const run = async (fromUpgrade) => {
+    const lines = [];
+    const { log } = console; const { PATH } = process.env;
+    console.log = (l) => lines.push(String(l)); process.env.PATH = `${bin}${path.delimiter}${PATH}`;
+    try {
+      const home = tmp();
+      await agentLifecycle({ mode: 'install', agents: ['opencode-v2'], home, realHome: '/nowhere', stateDir: path.join(home, 's'), dryRun: true, exec: false, yes: true, fromUpgrade, ask: async () => 'y', yesNo: () => true });
+    } finally { console.log = log; process.env.PATH = PATH; }
+    return lines.join('\n');
+  };
+  assert.match(await run(false), /never installs 2\.x next to it/);
+  const up = await run(true);
+  assert.doesNotMatch(up, /never installs 2\.x next to it/);
+  assert.match(up, /opencode-installer\.sh --version/);
+});

@@ -1,7 +1,7 @@
 // OpenCode 1.x adapter (>=1.18.29). Keys checked against the 1.19.0 config schema; files
 // and commands are shared with the 2.x adapter, only config keys differ.
 import path from 'node:path';
-import { configPath, localServer, opencodeShared, profileEdits, shellEdit } from './opencode-v2.mjs';
+import { configPath, dcpConfigAction, localServer, opencodeShared, profileEdits, shellEdit } from './opencode-v2.mjs';
 import { OWNED_MARK } from '../fsops.mjs';
 import { configHome } from '../system.mjs';
 import { npmSpec } from '../pins.mjs';
@@ -65,16 +65,7 @@ export function opencodeV1Adapter({ home, core, profile, opts, rulesPath }) {
   if (tools.includes('ponytail')) edits.push({ path: ['plugin'], value: npmSpec('ponytail'), mode: 'arrayAdd', legacy: ['@dietrichgebert/ponytail'] });
   if (tools.includes('dcp')) {
     edits.push({ path: ['plugin'], value: npmSpec('opencode-dcp'), mode: 'arrayAdd' });
-    const contextWindow = profile?.context_window ?? 200000;
-    actions.push({
-      kind: 'json',
-      path: path.join(dir, 'dcp.jsonc'),
-      edits: [
-        { path: ['$schema'], value: 'https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json', mode: 'setIfAbsent' },
-        { path: ['compress', 'minContextLimit'], value: Math.round(contextWindow * 0.5), mode: 'setIfAbsent' },
-        { path: ['compress', 'maxContextLimit'], value: Math.round(contextWindow * 0.8), mode: 'setIfAbsent' },
-      ],
-    });
+    actions.push(dcpConfigAction(dir, profile));
   }
   const net = opts.network;
   if (net.outbound === 'off') edits.push({ path: ['share'], value: 'disabled', mode: 'set' });

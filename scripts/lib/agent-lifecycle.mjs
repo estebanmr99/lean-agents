@@ -103,7 +103,7 @@ export function removeRecorded(home, rec) {
 const stateFile = (stateDir) => path.join(stateDir, 'agents.json');
 const readAgents = (stateDir) => (fs.existsSync(stateFile(stateDir)) ? JSON.parse(fs.readFileSync(stateFile(stateDir), 'utf8')) : { agents: {} });
 
-// o: { mode: 'install'|'uninstall', agents, home, realHome, platform, stateDir, dryRun, exec, yes, ask, yesNo }
+// o: { mode: 'install'|'uninstall', fromUpgrade (only --upgrade-agent may install 2.x next to 1.x), agents, home, realHome, platform, stateDir, dryRun, exec, yes, ask, yesNo }
 export async function agentLifecycle(o) {
   const log = console.log;
   for (const a of o.agents) {
@@ -122,7 +122,7 @@ export async function agentLifecycle(o) {
       else if (a === 'antigravity' && agyCandidates(o.home, o.platform ?? process.platform, o.home === o.realHome ? process.env : {}).some((c) => fs.existsSync(c))) log(`${a}: already installed, not by lean-agents; left alone.`);
       else if (row.manual) log(`${a}: ${row.manual}`);
       else if (row.bins.some((b) => fs.existsSync(b)) || ((o.home === o.realHome || row.method === 'brew') && which(row.cmd))) log(`${a}: already installed, not by lean-agents; left alone.`);
-      else if (a === 'opencode-v2' && version('opencode')?.startsWith('1.')) log('opencode-v2: OpenCode 1.x is on PATH; lean-agents never installs 2.x next to it here (#79). Nothing done.');
+      else if (a === 'opencode-v2' && !o.fromUpgrade && version('opencode')?.startsWith('1.')) log('opencode-v2: OpenCode 1.x is on PATH; lean-agents never installs 2.x next to it here (#79). Nothing done.');
       else todo.push(a);
     } else if (!mine) log(`${a}: not installed by lean-agents; nothing done.`);
     else todo.push(a);

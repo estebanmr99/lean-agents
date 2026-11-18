@@ -43,6 +43,20 @@ export function localServer(core, name) {
   return { type: 'local', command, enabled: true };
 }
 
+// dcp.jsonc thresholds, shared by 1.x and 2.x. setIfAbsent keeps any value the user already set.
+export function dcpConfigAction(dir, profile) {
+  const contextWindow = profile?.context_window ?? 200000;
+  return {
+    kind: 'json',
+    path: path.join(dir, 'dcp.jsonc'),
+    edits: [
+      { path: ['$schema'], value: 'https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json', mode: 'setIfAbsent' },
+      { path: ['compress', 'minContextLimit'], value: Math.round(contextWindow * 0.5), mode: 'setIfAbsent' },
+      { path: ['compress', 'maxContextLimit'], value: Math.round(contextWindow * 0.8), mode: 'setIfAbsent' },
+    ],
+  };
+}
+
 // MCP entry edit. `shape` turns a command array into this agent's entry. A server with `legacy` commands in core/mcp.json
 // (Context Mode: other versions, with or without `server`, npx or an nvm Node; `*` is a wildcard) has those entries replaced
 // by a rerun, so the npx and absolute forms flip either way. Anything else the user has is kept.
@@ -166,6 +180,10 @@ export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
     if (tools.includes(name)) edits.push(mcpEdit(['mcp', 'servers', name], (command) => ({ type: 'local', command, enabled: true }), localServer(core, name).command, core.mcp[name].legacy));
   }
   if (tools.includes('ponytail')) edits.push({ path: ['plugins'], value: npmSpec('ponytail'), mode: 'arrayAdd', legacy: ['@dietrichgebert/ponytail'] });
+  if (tools.includes('dcp')) {
+    edits.push({ path: ['plugins'], value: npmSpec('opencode-dcp'), mode: 'arrayAdd' });
+    actions.push(dcpConfigAction(dir, profile));
+  }
   if (opts.terminals?.includes('warp')) edits.push({ path: ['plugins'], value: npmSpec('warp-opencode'), mode: 'arrayAdd', legacy: ['@warp-dot-dev/opencode-warp'] });
   if (opts.network.outbound === 'off') edits.push({ path: ['share'], value: 'disabled', mode: 'set' });
   if (opts.network.autoUpdate === 'off') edits.push({ path: ['update'], value: 'disable', mode: 'set' });
