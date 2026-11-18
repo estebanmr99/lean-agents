@@ -54,7 +54,6 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
   edits.unshift({ path: ['model'], value: profile?.main_model ?? 'sonnet', mode: 'setIfAbsent' });
   const net = opts.network;
   const off = [
-    ...(net.autoUpdate === 'off' ? ['DISABLE_AUTOUPDATER'] : []),
     ...(net.telemetry === 'off' ? ['DISABLE_TELEMETRY', 'DISABLE_ERROR_REPORTING'] : []),
     ...(net.outbound === 'off' ? ['DISABLE_BUG_COMMAND'] : []),
     // Also stops updates and telemetry, so only when every category is off.
@@ -62,6 +61,8 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
     ...(net.telemetry === 'off' ? ['DO_NOT_TRACK'] : []),
   ];
   for (const k of off) edits.push({ path: ['env', k], value: '1', mode: 'set' });
+  // Managed installs update through --update: off unless the user already chose a value (network off forces it).
+  edits.push({ path: ['env', 'DISABLE_AUTOUPDATER'], value: '1', mode: net.autoUpdate === 'off' ? 'set' : 'setIfAbsent' });
   if (tools.includes('copilot-usage')) {
     // Only when the user has no statusLine (setIfAbsent); uninstall removes it only while it is still ours. Forward slashes: Claude runs it through bash, also on Windows.
     const script = path.join(dir, 'lean-copilot-usage-statusline.mjs');
