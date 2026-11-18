@@ -214,7 +214,7 @@ Every flag from `--help`. In PowerShell the same flags are PascalCase (`-DryRun`
 
 ### Fallback: bootstraps
 
-Use these only when you have no Node.js 22.20+ yet. They check for git and Node.js 22.20+. If one is missing, `install.sh` offers `brew install` only when Homebrew is installed (it asks first); otherwise it stops with a download link. `install.ps1` does the same with `winget` (it asks first unless you pass `-Yes`). Then they download the latest release, check it against the release's `SHA256SUMS`, and only then run it.
+Use these only when you have no Node.js 22.20+ yet. They check for Node.js 22.20+ (git is not needed to run the release). If it is missing, `install.sh --dry-run` prints the plan and stops. Otherwise `install.sh` shows the options and asks first: on macOS `brew install node`, or the official Homebrew installer (it asks for your password and installs the Xcode Command Line Tools) when Homebrew is missing, or a Node.js download from nodejs.org checked against its `SHASUMS256.txt` into `~/.config/lean-agents/node` (no admin; `--yes` accepts only this one; remove the folder to undo). A Node.js you already have, even an old one, is never replaced. `install.ps1` does the same with `winget` (it asks first unless you pass `-Yes`). Downloads honor `HTTPS_PROXY`, `NO_PROXY` and `NODE_EXTRA_CA_CERTS` from your shell and write none of them to disk. Then they download the latest release, check it against the release's `SHA256SUMS`, and only then run it.
 
 ```bash
 curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --dry-run

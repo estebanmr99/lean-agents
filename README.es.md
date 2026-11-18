@@ -214,7 +214,7 @@ Cada opción de `--help`. En PowerShell se escriben en PascalCase (`-DryRun`).
 
 ### Alternativa: bootstraps
 
-Úsalos solo si aún no tienes Node.js 22.20+. Comprueban git y Node.js 22.20+. Si falta uno, `install.sh` ofrece `brew install` solo cuando Homebrew está instalado (pregunta antes); si no, se detiene con un enlace de descarga. `install.ps1` hace lo mismo con `winget` (pregunta antes salvo que pases `-Yes`). Luego descargan el último release, lo comprueban con el `SHA256SUMS` del release y solo entonces lo ejecutan.
+Úsalos solo si aún no tienes Node.js 22.20+. Comprueban Node.js 22.20+ (git no hace falta para ejecutar el release). Si falta, `install.sh --dry-run` muestra el plan y se detiene. Si no, `install.sh` muestra las opciones y pregunta antes: en macOS `brew install node`, o el instalador oficial de Homebrew (pide tu contraseña e instala las Xcode Command Line Tools) cuando falta Homebrew, o una descarga de Node.js desde nodejs.org comprobada con su `SHASUMS256.txt` en `~/.config/lean-agents/node` (sin admin; `--yes` acepta solo esta; borra la carpeta para deshacer). Un Node.js que ya tengas, aunque sea viejo, nunca se reemplaza. `install.ps1` hace lo mismo con `winget` (pregunta antes salvo que pases `-Yes`). Las descargas respetan `HTTPS_PROXY`, `NO_PROXY` y `NODE_EXTRA_CA_CERTS` de tu shell y no escriben ninguna en disco. Luego descargan el último release, lo comprueban con el `SHA256SUMS` del release y solo entonces lo ejecutan.
 
 ```bash
 curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --dry-run
