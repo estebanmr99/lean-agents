@@ -34,13 +34,35 @@ const ENV_EXACT = new Set(['PATH', 'HOME', 'USER', 'LOGNAME', 'USERNAME', 'SHELL
 const ENV_WINDOWS = ['SystemRoot', 'SystemDrive', 'windir', 'ComSpec', 'PATHEXT', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'ProgramData', 'ProgramFiles', 'ProgramFiles(x86)', 'ProgramW6432', 'CommonProgramFiles', 'HOMEDRIVE', 'HOMEPATH', 'OS', 'PROCESSOR_ARCHITECTURE', 'NUMBER_OF_PROCESSORS', 'PSModulePath', 'ALLUSERSPROFILE', 'PUBLIC', 'COMPUTERNAME'];
 const ENV_PREFIX = ['LC_', 'XDG_', 'NPM_CONFIG_', 'NODE_', 'NVM_', 'FNM_', 'VOLTA_', 'HOMEBREW_', 'UV_', 'GIT_', 'BUN_', 'OPENCODE_'];
 
+// Names that run code or carry a credential inside a prefix we otherwise pass (#163). `:` and `//` are npm per-registry keys (`//host/:_authToken`).
+const ENV_DROP = /^(NODE_PATH|GIT_CONFIG.*|GIT_ASKPASS|GIT_SSH|GIT_SSH_COMMAND|GIT_PROXY_COMMAND|GIT_EXEC_PATH|GIT_EDITOR|GIT_PAGER|GIT_EXTERNAL_DIFF|NPM_CONFIG_SCRIPT_SHELL)$|:|\/\//i;
+// Values that hold a credential whatever the name: `://user:pass@` or `://token@`, GitHub and npm tokens.
+const SECRET_VALUE = /:\/\/[^/\s@]+@|\b(gh[pousr]_|github_pat_)[A-Za-z0-9_]{16,}|\bnpm_[A-Za-z0-9]{20,}/;
+
+// NODE_OPTIONS passes only when every token is a CA, proxy, memory or DNS setting a corporate proxy setup needs; --require, --import and the like can run code.
+const SAFE_NODE_FLAG = /^--(use-(system|openssl|bundled)-ca|use-env-proxy|max-old-space-size=\d+|dns-result-order=\w+)$/;
+const SPACE_VALUE = { '--max-old-space-size': /^\d+$/, '--dns-result-order': /^\w+$/ };
+function safeNodeOptions(v) {
+  const t = v.trim().split(/\s+/);
+  for (let i = 0; i < t.length; i++) {
+    if (SAFE_NODE_FLAG.test(t[i])) continue;
+    const value = SPACE_VALUE[t[i]];
+    if (!value || !value.test(t[i + 1] ?? '')) return false;
+    i++;
+  }
+  return true;
+}
+
 export function allowedEnv(env = process.env, platform = process.platform) {
   const exact = new Set([...ENV_EXACT, ...PROXY_VARS, ...CA_VARS, ...(platform === 'win32' ? ENV_WINDOWS : [])].map((n) => n.toUpperCase()));
   const out = {};
   const seen = new Set(); // Windows keeps one key per name in any case; a plain object could hold both
   for (const [name, value] of Object.entries(env)) {
     const up = name.toUpperCase();
-    if (value == null || SECRET_NAME.test(name) || seen.has(up)) continue;
+    if (up === 'NODE_OPTIONS' && value && !safeNodeOptions(value)) continue;
+    if (value == null || SECRET_NAME.test(name) || ENV_DROP.test(name) || seen.has(up)) continue;
+    // A corporate proxy URL may carry user:pass on purpose; the child needs it.
+    if (!exact.has(up) && SECRET_VALUE.test(PROXY_VARS.includes(up) ? value.replace(/:\/\/[^/\s@]*@/, '://') : value)) continue;
     if (exact.has(up) || ENV_PREFIX.some((p) => up.startsWith(p))) { out[name] = value; seen.add(up); }
   }
   return out;
