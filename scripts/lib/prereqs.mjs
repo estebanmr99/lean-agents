@@ -29,19 +29,32 @@ const toolFloor = () => ['context-mode', 'gsd-core'].map((k) => PINS[k]?.node).f
   .reduce((a, b) => (compare(minVersion(b), minVersion(a)) > 0 ? b : a));
 const floorText = (range) => minVersion(range).join('.');
 
-// nvm's undo is planned only when ~/.nvm did not exist before this run (`nvmDirExisted`), and runs later: it removes ~/.nvm only
-// when every Node under it is one lean-agents installs (the floor's major, v24); otherwise it stays and says why. The Node is a
+// nvm's undo is planned only when ~/.nvm did not exist before this run (`nvmDirExisted`), and runs later: it removes exactly the ~/.nvm
+// of the home the state recorded, and only when every Node under it is one lean-agents installs (the floor's major, v24) and none
+// holds a global package beyond npm, corepack and the npm tools lean-agents installs; otherwise it stays and says why. The Node is a
 // placeholder the engine swaps for the Node running it at undo time (`undoArgv`): no bare `node` on PATH, no path stored.
 export const UNDO_NODE = '<lean-node>';
 export const undoArgv = (argv, execPath = process.execPath) => (argv[0] === UNDO_NODE ? [execPath, ...argv.slice(1)] : argv);
 // Did ~/.nvm exist before this run? A resumed run still owns a ~/.nvm that an earlier, unfinished nvm step created (its recorded
 // undo is not empty); one an earlier run recorded with an empty undo existed before lean-agents and stays the user's.
 export const nvmDirExistedBefore = (savedCommands, dirExists) => !(savedCommands ?? []).some((c) => c.resumeKey === 'prereq:nvm' && c.undo?.length) && dirExists;
-const nvmUndo = (dir, major) => [[UNDO_NODE, '-e',
-  `const fs=require('fs'),p=require('path'),d=process.argv[1],v=p.join(d,'versions','node'),r=new RegExp('^v${major}\\\\.');`
-  + `const o=fs.existsSync(v)?fs.readdirSync(v,{withFileTypes:true}).filter(e=>e.isDirectory()&&!r.test(e.name)).map(e=>e.name):[];`
-  + `if(o.length)console.log('kept '+d+': it holds Node versions lean-agents did not install ('+o.join(', ')+')');else fs.rmSync(d,{recursive:true,force:true})`,
-  dir]];
+// Runs under `node -e`: argv is [dir, home, major, recorded packages as JSON].
+const NVM_UNDO = [
+  "const fs=require('fs'),p=require('path'),[d,h,m,a]=process.argv.slice(1),ok=new Set(['npm','corepack',...JSON.parse(a)]);",
+  "const keep=w=>{console.log('kept '+d+': '+w);process.exit()};",
+  "if(p.resolve(d)!==p.resolve(h,'.nvm'))keep('it is not the .nvm of the home this install recorded');",
+  "let s;try{s=fs.lstatSync(d)}catch{process.exit()}",
+  "if(!s.isDirectory())keep('it is not a plain directory');",
+  "const ls=x=>{try{return fs.readdirSync(x,{withFileTypes:true})}catch{return[]}},v=p.join(d,'versions','node'),vs=ls(v).filter(e=>e.isDirectory()).map(e=>e.name);",
+  "const o=vs.filter(n=>!new RegExp('^v'+m+'[.]').test(n));",
+  "if(o.length)keep('it holds Node versions lean-agents did not install ('+o.join(', ')+')');",
+  "const g=[];for(const n of vs){const nm=p.join(v,n,'lib','node_modules');for(const e of ls(nm).filter(e=>e.name[0]!=='.')){const q=e.name.startsWith('@')?ls(p.join(nm,e.name)).map(c=>e.name+'/'+c.name):[e.name];for(const x of q)if(!ok.has(x))g.push(x+' ('+n+')')}}",
+  "if(g.length)keep('a Node under it has global packages lean-agents did not install ('+g.join(', ')+')');",
+  'fs.rmSync(d,{recursive:true,force:true})',
+].join('');
+// The npm tools lean-agents may install globally under that Node (CI-only agent pins excluded).
+const recordedPackages = () => Object.values(PINS).filter((p) => p.kind === 'npm' && !p.ciOnly).map((p) => p.source);
+const nvmUndo = (dir, home, major) => [[UNDO_NODE, '-e', NVM_UNDO, dir, home, String(major), JSON.stringify(recordedPackages())]];
 
 // The agents --everything configures: Claude Code and OpenCode 2 everywhere; on Windows the team preset adds the ones found
 // (Copilot CLI, VS Code Copilot, Antigravity) and lists the missing ones so the plan says what it skipped.
@@ -107,7 +120,7 @@ export function planPrereqs(probe) {
       id: 'nvm', label: 'nvm', why: 'Node manager: lets the tools get Node 24 without touching your Node.',
       // PROFILE=/dev/null keeps the installer away from the shell profile; the engine finds $NVM_DIR itself. Script hash VERIFY.
       commands: [fetch(NVM_INSTALL_URL, script), ['env', `NVM_DIR=${nvmDir}`, 'PROFILE=/dev/null', 'bash', script]],
-      undo: nvmDirExisted ? [] : nvmUndo(nvmDir, minVersion(floor)[0]),
+      undo: nvmDirExisted ? [] : nvmUndo(nvmDir, home, minVersion(floor)[0]),
       skipIf: has.nvm ? 'nvm is installed' : null,
     });
   }

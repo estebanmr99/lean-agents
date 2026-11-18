@@ -136,7 +136,7 @@ function parseArgs(argv) {
       case '--confirm-removals': o.confirmRemovals = true; break;
       case '--install-agent': case '--uninstall-agent': o.command = 'agent'; o.agentMode = a.slice(2, -6); o.agentList = list(argv[i + 1]?.startsWith('--') ? '' : next() ?? ''); if (!o.agentList.length) throw new Error(`${a} needs an agent list (claude, opencode-v2, copilot-cli, cursor, antigravity, vscode-copilot)`); break;
       case '--usage': o.command = 'usage'; break;
-      case '--skip-agents': case '--no-admin': break; // defaults in v1: agents are never installed, nothing needs admin
+      case '--skip-agents': case '--no-admin': console.error(`! ${a} does nothing (agents are never installed, nothing needs admin) and will be removed in the next release.`); break;
       case '--help': case '-h': o.command = 'help'; break;
       case '--version': o.command = 'version'; break;
       default: throw new Error(`unknown option ${a} (see --help)`);
@@ -182,6 +182,7 @@ const HELP = `Usage: lean-agents [options]
                          (--feedback-kind update: the text is a finding from an update, not an error)
                          ({"offer":false} when the network preset forbids it). Needs --failed-command <text>;
                          pass --network on|off when nothing is installed yet. Files nothing.
+  --no-exec              Run no external command (no installs, no version probes); --uninstall refuses it when commands need undoing
   --probe-plugins        With --doctor or --adopt: start a short-lived opencode serve (throwaway state dir, loopback) and check a plugin's command registers
   --json                 With --dry-run, --doctor or --yes: print one JSON object on stdout (messages go to stderr)
   --no-app               Do not install the Antigravity app (the CLI is still installed when missing)
@@ -998,13 +999,14 @@ async function uninstall(o) {
   if (o.dryRun || !yesNo(await p.ask('Uninstall?', o.yes ? 'y' : 'n'))) { p.close(); console.log('Nothing changed.'); return; }
   p.close();
   if (!o.exec && state.commands.length) throw new Error('--no-exec cannot undo the commands this install ran; run --uninstall without it');
+  const failed = new Map();
   if (o.exec) {
     for (const c of [...state.commands].reverse()) {
-      for (const argv of c.undo ?? []) {
-        if (!run(undoArgv(argv), { dryRun: false, log: console.log, env: c.env })) {
-          console.log('  ! failed. Run the command above by hand.');
-          process.exitCode = 1;
-        }
+      const bad = (c.undo ?? []).filter((argv) => !run(undoArgv(argv), { dryRun: false, log: console.log, env: c.env }));
+      if (bad.length) {
+        console.log('  ! failed. Run the command above by hand.');
+        process.exitCode = 1;
+        failed.set(c, bad);
       }
     }
   }
@@ -1014,7 +1016,15 @@ async function uninstall(o) {
   if (state.opencode1) report.push(...removeOpencode1(state.opencode1, { home: o.home }));
   for (const [what, file] of report) console.log(`  ${what.padEnd(20)} ${file}`);
   if (report.some(([what]) => what === 'left (symlink)')) console.log('  ! Paths marked "left (symlink)" were not touched; remove our lines there by hand.');
-  fs.renameSync(path.join(stateDir(o.home), 'state.json'), path.join(stateDir(o.home), `state.uninstalled-${Date.now()}.json`));
+  const stateFile = path.join(stateDir(o.home), 'state.json');
+  if (failed.size) {
+    // Files are already restored; keep only the failed undo argvs, so a second --uninstall retries them.
+    const commands = state.commands.filter((c) => failed.has(c)).map((c) => ({ ...c, undo: failed.get(c) }));
+    writePrivate(stateFile, `${JSON.stringify({ ...state, files: [], commands, opencode1: undefined, upgrade: undefined }, null, 2)}\n`);
+    console.log(`Not finished: ${failed.size} undo command(s) failed and stay recorded. Fix the cause (or run them by hand), then run --uninstall again.`);
+    return;
+  }
+  renameRetry(stateFile, path.join(stateDir(o.home), `state.uninstalled-${Date.now()}.json`));
   // Backups are the only undo for edits we cannot revert, so they stay unless the user says yes (--yes keeps them).
   const backups = path.join(stateDir(o.home), 'backups');
   const q = await prompter(o.yes);
@@ -1046,7 +1056,7 @@ function vscodeHooks(o) {
     if (!ok) { console.log('Nothing changed.'); return; }
     if (!o.exec && commands.length) throw new Error('--no-exec cannot undo the commands this install ran; run it without --no-exec');
     for (const c of o.exec ? [...commands].reverse() : []) {
-      for (const argv of c.undo ?? []) if (!run(argv, { dryRun: false, log: console.log, env: c.env })) { console.log('  ! failed. Run the command above by hand.'); process.exitCode = 1; }
+      for (const argv of c.undo ?? []) if (!run(undoArgv(argv), { dryRun: false, log: console.log, env: c.env })) { console.log('  ! failed. Run the command above by hand.'); process.exitCode = 1; }
     }
     for (const [what, file] of undo(files, writeRoots(o))) console.log(`  ${what.padEnd(20)} ${file}`);
     const file = path.join(stateDir(o.home), 'state.json');

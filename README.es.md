@@ -192,6 +192,8 @@ Cada opción de `--help`. En PowerShell se escriben en PascalCase (`-DryRun`).
 | `--gh` / `--no-gh` | Instala GitHub CLI (`gh`) si falta (por defecto: sí) |
 | `--bun` / `--no-bun` | Instala Bun para Context Mode (por defecto: sí) |
 | `--no-app` | No instala la app de Antigravity (el CLI sí, si falta) |
+| `--no-exec` | No ejecuta ningún comando externo (ni instalaciones ni sondeos de versión); `--uninstall` lo rechaza si hay comandos que deshacer |
+| `--probe-plugins` | Con `--doctor` o `--adopt`: arranca un `opencode serve` efímero (directorio de estado desechable, loopback) y comprueba que el comando de un plugin se registra |
 | `--project <dir>` | Escribe los archivos compartidos del equipo en un repositorio |
 | `--migrate <desde>` o `auto` | Copia reglas, agentes, skills, prompts y servidores MCP de otro harness; nunca sobrescribe |
 | `--adhd-always` | Activa i-have-adhd en cada respuesta |

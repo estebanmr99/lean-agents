@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { parseTask, tierOf, tierModel, buildWorkerCommand, start, status, merge, clean, leftovers } from '../scripts/lib/parallel.mjs';
+import { loadWorkers, parseTask, tierOf, tierModel, buildWorkerCommand, start, status, merge, clean, leftovers } from '../scripts/lib/parallel.mjs';
 
 const tmp = () => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'lean-par-')));
 const sh = (cwd, ...a) => { const r = spawnSync('git', a, { cwd, encoding: 'utf8' }); assert.equal(r.status, 0, r.stderr); return r.stdout.trim(); };
@@ -113,4 +113,16 @@ test('merge refuses unfinished workers; clean keeps unmerged ones', noWin, () =>
   assert.throws(() => merge(dir, 'one'), /not done/);
   assert.deepEqual(clean(dir), { removed: [], kept: ['one'] });
   assert.ok(fs.existsSync(`${dir}.lean/one`));
+});
+
+test('loadWorkers refuses a hand-edited worker name that could escape the state dir', () => {
+  const dir = tmp();
+  const write = (workers) => fs.writeFileSync(path.join(dir, 'workers.json'), JSON.stringify({ base: 'main', workers }));
+  assert.deepEqual(loadWorkers(dir), { base: null, workers: [] }, 'no file: empty');
+  write([{ name: 'good-1' }]);
+  assert.equal(loadWorkers(dir).workers.length, 1);
+  for (const name of ['..', '../x', 'a/b', 'Bad', '-x', '', 7]) {
+    write([{ name }]);
+    assert.throws(() => loadWorkers(dir), /not a valid worker list/, String(name));
+  }
 });
