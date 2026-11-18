@@ -24,7 +24,7 @@ import { version as binVersion, gitHint, detectAgents, packageManager, prereqFor
 import { doctor } from './lib/doctor.mjs';
 import { probePlugins } from './lib/plugin-health.mjs';
 import { adopt, inventory } from './lib/adopt.mjs';
-import { planPrereqs, pendingPrereqs } from './lib/prereqs.mjs';
+import { planPrereqs, pendingPrereqs, everythingAgents } from './lib/prereqs.mjs';
 import { upgradeInventory, formatUpgrade } from './lib/upgrade.mjs';
 import { backupOpencode } from './lib/opencode-backup.mjs';
 import { planOpencode1, installOpencode1, removeOpencode1, layout as opencode1Layout } from './lib/opencode1.mjs';
@@ -136,7 +136,6 @@ function parseArgs(argv) {
   }
   if (o.everything && !o.migrate) {
     // Preset for a fresh machine: every default is taken, so the plan is the only question.
-    o.agents ??= ['claude', 'opencode-v2'];
     o.tools ??= [...MINIMAL_TOOLS, ...OPTIONAL_TOOLS];
     o.gh ??= true;
     o.bun ??= true;
@@ -286,6 +285,11 @@ async function choose(o, saved) {
   // --everything answers every question with its default; install() asks the one plan question.
   const p = await prompter(o.yes || o.everything);
   if (o.migrate) return chooseMigration(o, p);
+  if (!o.agents && o.everything) {
+    const team = everythingAgents({ platform: process.platform, project: !!o.project, detected: process.platform === 'win32' ? detectAgents() : {} }); // detection only matters for the Windows team preset
+    o.agents = team.agents;
+    if (team.skipped.length) o.agentNotes = [`not found, skipped: ${team.skipped.join(', ')} (install them, then rerun --everything)`];
+  }
   if (!o.agents) {
     o.agents = saved?.agents ?? [];
     if (!saved) {
@@ -498,7 +502,7 @@ function everythingPrereqs(o, saved) {
     proxyEnv: proxyReport().map((l) => l.split('=')[0]), done: (saved?.commands ?? []).filter((c) => c.ok && c.resumeKey).map((c) => c.resumeKey),
   });
   const commands = pendingPrereqs(steps).map((s) => s.commands.length
-    ? { tool: s.id === 'node-24' ? 'node' : s.id, desc: `prerequisite: ${s.label}`, run: s.commands, undo: s.id === 'nvm' && fs.existsSync(path.join(o.home, '.nvm')) ? [] : s.undo ?? [], optional: s.id === 'bun', resumeKey: s.resumeKey, ...(s.id === 'node-24' && o.nvm && { env: nvmEnv(o.nvm.dir) }) }
+    ? { tool: s.id === 'node-24' ? 'node' : s.id, desc: `prerequisite: ${s.label}`, run: s.commands, undo: s.undo ?? [], optional: s.id === 'bun', resumeKey: s.resumeKey, ...(s.id === 'node-24' && o.nvm && { env: nvmEnv(o.nvm.dir) }) }
     : { tool: s.id, desc: `${s.label} is missing: install it from ${s.manual}`, run: [], undo: [], manual: true, optional: true, resumeKey: s.resumeKey });
   return { steps, commands };
 }
@@ -526,7 +530,7 @@ function printJson(o, planned, commands, migration, behind, prereqs, update) {
   const inText = (t) => t.split(o.home).join('~');
   const plan = {
     agents: o.agents, tools: o.tools, privacy: o.privacy, lang: o.lang, profile: o.profile ?? null, terminals: o.terminals,
-    ...(o.everything && { afterNvm: o.deferred ?? [] }), gh: !!o.gh, bun: !!o.bun, network: o.network, migrate: migration ? migration.names : null,
+    ...(o.everything && { afterNvm: o.deferred ?? [], agentNotes: o.agentNotes ?? [] }), gh: !!o.gh, bun: !!o.bun, network: o.network, migrate: migration ? migration.names : null,
     files: planned.map((f) => ({ status: f.status, path: rel(f.path), note: f.note ?? null })),
     commands: commands.map((c) => ({ desc: inText(c.desc), agent: c.agent ?? null, run: c.run.map((a) => a.map(inText)) })),
     ...(behind && { behind }),
@@ -539,6 +543,7 @@ function printJson(o, planned, commands, migration, behind, prereqs, update) {
 function printPlan(o, planned, commands) {
   console.log(`\nlean-agents plan for ${o.agents.join(', ') || 'no agents'}`);
   if (o.project) console.log(`  project: ${o.project}`);
+  for (const n of o.agentNotes ?? []) console.log(`  agents ${n}`);
   console.log(`  tools: ${o.tools.join(', ') || 'none'} | privacy: ${o.privacy} | lang: ${o.lang} | profile: ${o.profile ?? 'none'}`);
   if (o.terminals.length) console.log(`  terminals: ${o.terminals.join(', ')}`);
   if (o.network.telemetry === 'off') for (const n of terminalPrivacyNotes(o.terminals, { orcaEnvSet: orcaEnvSet({ system: o.home === REAL_HOME }) })) console.log(`  ${n}`);

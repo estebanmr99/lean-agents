@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { planPrereqs, pendingPrereqs } from '../scripts/lib/prereqs.mjs';
+import { planPrereqs, pendingPrereqs, everythingAgents } from '../scripts/lib/prereqs.mjs';
 
 // Synthetic probes: platform is injected, so every table runs on every OS and nothing touches the machine.
 const bare = (platform, extra = {}) => ({ platform, arch: 'x64', home: platform === 'win32' ? 'D:\\tools\\home' : '/tmp/x', has: {}, ...extra });
@@ -36,7 +36,8 @@ test('user Node >=22.20 is kept: Node 24 is added under nvm, never replaced', ()
 test('Mac without nvm: installer keeps the shell profile alone and undo removes only the nvm dir', () => {
   const nvm = by(planPrereqs(bare('darwin')), 'nvm');
   assert.ok(nvm.commands[1].includes('PROFILE=/dev/null'));
-  assert.deepEqual(nvm.undo, [['rm', '-rf', '/tmp/x/.nvm']]);
+  assert.equal(nvm.undo[0].at(-1), '/tmp/x/.nvm');
+  assert.ok(!nvm.undo[0].includes('rm'));
 });
 
 test('Linux: no Xcode or Homebrew, uv by script, rtk manual, bun by pinned zip', () => {
@@ -111,4 +112,43 @@ test('Homebrew installer is the commit-pinned script, hash-checked before it run
   assert.match(fetchCmd.at(-1), /Homebrew\/install\/[0-9a-f]{40}\/install\.sh$/);
   assert.match(verify.at(-1), /^[0-9a-f]{64}$/);
   assert.equal(run[0], 'env');
+});
+
+// The nvm undo script, run for real against a synthetic ~/.nvm in a temp dir.
+test('nvm undo removes a partial or lean-only ~/.nvm and keeps one with the user\'s own Node', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const undo = (home) => by(planPrereqs({ platform: 'linux', home, has: {}, execPath: process.execPath }), 'nvm').undo[0];
+  const make = (...versions) => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-nvm-'));
+    for (const v of versions) fs.mkdirSync(path.join(home, '.nvm', 'versions', 'node', v), { recursive: true });
+    fs.mkdirSync(path.join(home, '.nvm'), { recursive: true });
+    return home;
+  };
+  const run = (home) => spawnSync(undo(home)[0], undo(home).slice(1), { encoding: 'utf8' });
+  const partial = make();
+  run(partial);
+  assert.equal(fs.existsSync(path.join(partial, '.nvm')), false);
+  const ours = make('v24.15.0');
+  run(ours);
+  assert.equal(fs.existsSync(path.join(ours, '.nvm')), false);
+  const mixed = make('v24.15.0', 'v20.11.0');
+  const r = run(mixed);
+  assert.equal(fs.existsSync(path.join(mixed, '.nvm', 'versions', 'node', 'v20.11.0')), true);
+  assert.match(r.stdout, /kept .*v20\.11\.0/);
+  for (const h of [partial, ours, mixed]) fs.rmSync(h, { recursive: true, force: true });
+});
+
+test('--everything agents: Claude Code + OpenCode 2; Windows adds the team agents found and lists the rest', () => {
+  assert.deepEqual(everythingAgents({ platform: 'darwin', detected: { 'copilot-cli': '1' } }), { agents: ['claude', 'opencode-v2'], skipped: [] });
+  assert.deepEqual(everythingAgents({ platform: 'win32', detected: { 'copilot-cli': '1', antigravity: '1' } }),
+    { agents: ['claude', 'opencode-v2', 'copilot-cli', 'antigravity'], skipped: ['vscode-copilot'] });
+  assert.deepEqual(everythingAgents({ platform: 'win32' }).skipped, ['copilot-cli', 'vscode-copilot', 'antigravity']);
+});
+
+test('--everything team preset leaves Antigravity out of a --project run', () => {
+  const r = everythingAgents({ platform: 'win32', detected: { antigravity: '1', 'copilot-cli': '1' }, project: true });
+  assert.deepEqual(r, { agents: ['claude', 'opencode-v2', 'copilot-cli'], skipped: ['vscode-copilot'] });
 });
