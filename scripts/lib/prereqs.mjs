@@ -32,7 +32,7 @@ const floorText = (range) => minVersion(range).join('.');
 const WINGET = (id) => ['winget', 'install', '--id', id, '-e', '--scope', 'user', '--accept-source-agreements', '--accept-package-agreements'];
 
 // probe: { platform, arch, home, tmp, execPath, has: { brew, winget, uv, rtk, bun, git, clt, nvm }, nodeActive: '22.20.0' | null,
-//   nvmNodes: ['24.15.0'], proxyEnv: ['HTTPS_PROXY'] (names only), needsGit: false, done: ['prereq:nvm'] (resume stamps) }
+//   nvmNodes: ['24.15.0'], proxyEnv: ['HTTPS_PROXY'] (names only), needsGit: false, done: ['prereq:nvm'] (resume stamps), bunInstall: stub for tests }
 export function planPrereqs(probe) {
   const { platform, arch = 'x64', home, has = {}, nodeActive = null, nvmNodes = [], proxyEnv = [], needsGit = false, done = [] } = probe;
   const win = platform === 'win32', mac = platform === 'darwin';
@@ -108,10 +108,13 @@ export function planPrereqs(probe) {
     route(['brew', 'install', 'rtk'], 'rtk-ai.rtk', 'https://github.com/rtk-ai/rtk#installation'),
     pm === 'brew' ? { undo: [['brew', 'uninstall', 'rtk']] } : pm === 'winget' ? { undo: [['winget', 'uninstall', '--id', 'rtk-ai.rtk', '-e']] } : {});
 
-  const bun = bunInstall(home, tmp, platform, pm, arch);
+  const bun = (probe.bunInstall ?? bunInstall)(home, tmp, platform, pm, arch); // probe.bunInstall: tests only
   add({
     id: 'bun', label: 'Bun', why: 'Lets Context Mode run JS and TS.', skipIf: has.bun ? 'bun is on PATH' : null,
-    commands: bun ? [...(mac ? [] : [[node, '-e', 'require("fs").mkdirSync(process.argv[1], { recursive: true })', tmp]]), ...bun.run] : [], // the zip lands in tmp undo: bun?.undo ?? null, ...(bun ? {} : { manual: 'https://bun.sh/docs/installation' }),
+    // the zip lands in tmp
+    commands: bun ? [...(mac ? [] : [[node, '-e', 'require("fs").mkdirSync(process.argv[1], { recursive: true })', tmp]]), ...bun.run] : [],
+    undo: bun?.undo ?? null,
+    ...(bun ? {} : { manual: 'https://bun.sh/docs/installation' }),
   });
 
   return steps.map((s) => {

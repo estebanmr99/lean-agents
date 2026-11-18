@@ -50,6 +50,11 @@ Pick the tier by the work, not by the session's size. Tiers, not model IDs: map 
 
 On a usage limit or a sleep error the worker stops silently. Wait for the reset, then send: "continue from where you stopped (check git status first)". The watcher reports `limit` or `error` so you know.
 
+## Measuring CI
+
+`node scripts/ci-timing.mjs [N] [--json]` reads the last N (default 30) completed pull_request `ci.yml` runs with `gh` and prints the median and p90 wall-clock, the job that finished last and the 5 jobs that waited longest for a runner.
+Run it after a CI-scheduling change lands and compare with the 2026-11-18 baseline in `docs/compatibility.md` (median 5.0 min, p75 about 9.5, worst 15.4).
+
 ## When to stop and ask the owner
 
 Ask before: a new dependency, a write outside the files the project allows, anything irreversible (push, deploy, migration, bulk delete) that the session prompt did not allow, and tags or releases. If a worker fails the same step three times, stop it, name the assumption that may be wrong, and replan instead of retrying.
