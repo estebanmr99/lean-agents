@@ -4,6 +4,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Added
+
+- `tests/roundtrip.test.mjs`: one table-driven test runs install then `--uninstall` for each of the seven adapters in a temp HOME seeded with user files (a JSONC comment, a user MCP server, an agent and a skill named like managed ones) and asserts every file, path and bytes, equals the pre-install snapshot. Tests only (#164).
+
 ### Fixed
 
 - `scripts/lean.mjs` checks the `engines.node` floor (22.20) when run directly from a clone: below it, one stderr line names the running Node and the fix (`nvm use`, `install.sh`). `--help`, `--version`, `--doctor`, `--dry-run`, `--upgrade-agent` and `--adopt` without `--yes` keep working; install, uninstall, migrate and `--yes` exit 1 unless `LEAN_AGENTS_ALLOW_OLD_NODE=1` is set (#208).
