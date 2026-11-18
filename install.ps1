@@ -99,7 +99,7 @@ function Get-File($Base, $Name, $Out) {
 function Get-PathWith($Raw, $Dir) {
   $parts = @($Raw -split ';' | Where-Object { $_ })
   $same = @($parts | Where-Object { [Environment]::ExpandEnvironmentVariables($_).TrimEnd('\') -eq $Dir.TrimEnd('\') })
-  if ($same.Count) { $Raw } elseif (-not $Raw) { $Dir } elseif ($Raw.EndsWith(';')) { "$Raw$Dir" } else { "$Raw;$Dir" }
+  if ($same.Count) { $Raw } elseif (-not $Raw) { $Dir } elseif ($Raw.EndsWith(';')) { "$Raw$Dir;" } else { "$Raw;$Dir" }
 }
 function Get-PathWithout($Raw, $Dir) {
   @($Raw -split ';' | Where-Object { -not $_ -or [Environment]::ExpandEnvironmentVariables($_).TrimEnd('\') -ne $Dir.TrimEnd('\') }) -join ';'
