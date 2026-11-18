@@ -14,8 +14,9 @@ import { privateDir } from './fsops.mjs';
 
 const j = path.join;
 const GIB = 1024 ** 3;
-const DB_FILES = ['opencode.db', 'opencode.db-wal', 'opencode.db-shm'];
-const DATA_DIRS = ['storage', 'snapshot'];
+export const DB_FILES = ['opencode.db', 'opencode.db-wal', 'opencode.db-shm'];
+export const DATA_DIRS = ['storage', 'snapshot'];
+export const STAMP_FILE = 'STAMP.json';
 
 export const stamp = (d = new Date()) => d.toISOString().replace(/\.\d+Z$/, 'Z').replace(/[-:]/g, '');
 // Backup + frozen copy are two full copies; keep 1 GiB spare (plan 80b, decision 2).
@@ -28,6 +29,13 @@ export function listProcesses(platform = process.platform) {
   const win = platform === 'win32';
   const out = execFileSync(win ? 'tasklist' : 'ps', win ? ['/FO', 'CSV', '/NH'] : ['-A', '-o', 'comm='], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   return out.split(/\r?\n/).map((l) => (win ? /^"([^"]*)"/.exec(l)?.[1] ?? '' : l)).filter(Boolean);
+}
+
+// Written last, atomically, once every check passed: backup-stamp.mjs reads it to open the apply gate.
+function writeStamp(dir, info) {
+  const tmp = j(dir, `${STAMP_FILE}.tmp`);
+  fs.writeFileSync(tmp, `${JSON.stringify({ version: 1, verified: true, ...info }, null, 2)}\n`, { mode: 0o600 });
+  fs.renameSync(tmp, j(dir, STAMP_FILE));
 }
 
 export function backupLayout(home, ts) {
@@ -144,6 +152,7 @@ export function backupOpencode({ home, dryRun = false, log = console.log, now = 
 
   const part = `${L.backup}.partial`;
   const fpart = `${L.frozen}.partial`;
+  let manifestCount = 0;
   try {
     fs.rmSync(part, { recursive: true, force: true });
     fs.rmSync(fpart, { recursive: true, force: true });
@@ -152,6 +161,7 @@ export function backupOpencode({ home, dryRun = false, log = console.log, now = 
       ...copyVerified(L.live, j(part, 'data'), src.data).map((m) => ({ ...m, rel: `data/${m.rel}` })),
       ...copyVerified(L.config, j(part, 'config'), src.config).map((m) => ({ ...m, rel: `config/${m.rel}` })),
     ];
+    manifestCount = manifest.length;
     fs.writeFileSync(j(part, 'MANIFEST.sha256'), manifest.map((m) => `${m.sha}  ${m.rel}`).join('\n') + '\n', { mode: 0o600 });
     fs.writeFileSync(j(part, 'RESTORE.md'), restoreText(L, ts, sessions), { mode: 0o600 });
     fs.renameSync(part, L.backup);
@@ -171,6 +181,7 @@ export function backupOpencode({ home, dryRun = false, log = console.log, now = 
     if (frozen !== sessions) throw new Error(`session count differs: ${sessions} live, ${frozen} in the frozen copy`);
     fs.renameSync(fpart, L.frozen);
     log(`frozen copy: every file sha256 equals the backup, ${frozen} sessions`);
+    writeStamp(L.backup, { ts, sessions, files: manifestCount });
   } catch (e) {
     fs.rmSync(fpart, { recursive: true, force: true });
     log(`failed: ${e.message}\nthe permanent backup is kept at ${L.backup}; the live data was only read`);

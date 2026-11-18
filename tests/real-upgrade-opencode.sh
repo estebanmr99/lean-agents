@@ -5,7 +5,11 @@
 # count (on a temp copy) is 3, and leaves everything outside ~/.local/share/lean-agents byte-identical; a second apply and a
 # run while `opencode serve` is up are refused. Then `--opencode1`: the binary copy and the shim report 1.19.0, a new session made
 # through `opencode1` lands in the frozen copy (3 -> 4) while the live data hash stays equal, and `--uninstall` removes the shim,
-# the copy and the PATH entry but keeps the backup and the frozen copy. Needs `opencode` 1.x on PATH and node:sqlite on this Node.
+# the copy and the PATH entry but keeps the backup and the frozen copy. Then apply and `--undo` (P6): an apply without a backup stamp is
+# refused; on Linux the full apply (the pinned 2.x installer, config translation, DCP) and `--undo` give the 1.x state back (a 2.x
+# start in between migrates the db; it is moved aside, never deleted), and one injected failure per step (LEAN_TEST_FAIL_AT, test
+# guard LEAN_AGENTS_TEST=1) rolls back to a byte-identical live tree; on Windows the 2.x install is manual (VERIFY), so the apply
+# fails at that step and rolls back. Needs `opencode` 1.x on PATH and node:sqlite on this Node.
 # Used by CI (ubuntu, windows via Git Bash); safe locally because HOME is a temp directory.
 set -uo pipefail
 
@@ -60,7 +64,18 @@ const files = (dir, skip) => {
   walk('');
   return out;
 };
-if (mode === 'tree') {
+// paths <p>...: one hash over every file under the given files or folders (a missing one counts as absent), for the live-tree checks.
+if (mode === 'paths') {
+  const lines = [];
+  for (const p of process.argv.slice(3)) {
+    if (!fs.existsSync(p)) { lines.push(`${p}:absent`); continue; }
+    if (fs.statSync(p).isFile()) { lines.push(`${p}:${sha(p)}`); continue; }
+    for (const [k, v] of Object.entries(files(p))) lines.push(`${p}/${k}:${v}`);
+  }
+  console.log(crypto.createHash('sha256').update(lines.sort().join('\n')).digest('hex'));
+} else if (mode === 'sha') {
+  console.log(sha(a));
+} else if (mode === 'tree') {
   console.log(crypto.createHash('sha256').update(JSON.stringify(Object.entries(files(a, b)).sort())).digest('hex'));
 } else if (mode === 'same') {
   const keep = (m) => Object.fromEntries(Object.entries(m).filter(([k]) => (c === 'all' && !/(^|\/)node_modules\//.test(k)) || /^(opencode\.db(-wal|-shm)?$|storage\/|snapshot\/)/.test(k)));
@@ -79,6 +94,16 @@ if (mode === 'tree') {
 }
 JS
 tree() { node "$T/h.mjs" tree "$HOME" ".local/share/lean-agents"; }
+# The live tree the upgrade must give back: config, the 2.x installer's folder and the rc files that get the opencode1 PATH block.
+ltree() { node "$T/h.mjs" paths "$CFG" "$HOME/.opencode" "$HOME/.profile" "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.bash_profile"; }
+dtree() { node "$T/h.mjs" tree "$LIVE"; }
+shaf() { node "$T/h.mjs" sha "$1"; }
+# --version of an opencode binary on throwaway XDG dirs (2.x migrates a db it finds; --version itself does not, but stay clear).
+ver() { XDG_DATA_HOME="$T/scratch" XDG_STATE_HOME="$T/scratch" XDG_CACHE_HOME="$T/scratch" XDG_CONFIG_HOME="$T/scratch" "$1" --version 2>/dev/null | tail -n 1; }
+# The upgrade command (apply; or --undo with --undo --yes); lean_fail runs it with the test guard and a failure after one step.
+leanu() { node "$repo/scripts/lean.mjs" --home "$HOME" --upgrade-agent opencode "$@"; }
+lean_fail() { env LEAN_AGENTS_TEST=1 LEAN_TEST_FAIL_AT="$1" node "$repo/scripts/lean.mjs" --home "$HOME" --upgrade-agent opencode --yes; }
+jstatus() { node -e "try{console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).upgrade?.status??'none')}catch{console.log('none')}" "$HOME/.config/lean-agents/state.json"; }
 count() { node "$T/h.mjs" count "$1" 2>/dev/null; }
 lean1() { node "$repo/scripts/lean.mjs" --home "$HOME" --upgrade-agent opencode --opencode1 "$@"; }
 lean() { node "$repo/scripts/lean.mjs" --home "$HOME" --no-exec --upgrade-agent opencode --backup "$@"; }
@@ -145,6 +170,15 @@ check "dry run names 3 sessions" grep -q '3 sessions' "$T/dry.out"
 check "whole HOME tree hash unchanged by the dry run" test "$(tree)" = "$live_tree"
 check "no lean-agents folder after the dry run" test ! -e "$LEAN"
 
+echo "== upgrade apply without a backup stamp is refused (P6)"
+pre_ns="$(tree)"
+leanu --yes >"$T/nostamp.out" 2>&1; rc=$?
+sed 's/^/  /' "$T/nostamp.out"
+check "apply without a stamp exits 1" test "$rc" = 1
+check "it names the missing stamp" grep -q 'no verified session backup' "$T/nostamp.out"
+check "whole HOME tree unchanged by the refused apply" test "$(tree)" = "$pre_ns"
+check "no lean-agents folder after the refused apply" test ! -e "$LEAN"
+
 echo "== apply: permanent backup + frozen copy"
 lean --yes >"$T/apply.out" 2>&1; rc=$?
 sed 's/^/  /' "$T/apply.out"
@@ -205,6 +239,112 @@ if [ "$is_win" = 0 ]; then refute "PATH block removed from the rc files" grep -r
 check "frozen copy kept (4 sessions)" test "$(count "$frozen")" = 4
 check "backup kept" test -s "$bk/MANIFEST.sha256"
 check "live data hash still unchanged" test "$(node "$T/h.mjs" tree "$LIVE")" = "$live_data_tree"
+
+echo "== upgrade apply, injected failures and --undo (P6)"
+ocbin="$HOME/.opencode/bin/opencode"
+[ "$is_win" = 1 ] && ocbin="$HOME/.opencode/bin/opencode.exe"
+mkdir -p "$T/scratch"
+# kill_oc: lean-agents only refuses while an opencode runs (it never kills what it did not start); the test stops what it started.
+kill_oc() {
+  wait_procs 0 && return 0
+  if [ -n "${CI:-}" ]; then
+    if [ "$is_win" = 1 ]; then taskkill //F //T //IM opencode.exe >/dev/null 2>&1; else pkill -x opencode 2>/dev/null; fi
+    wait_procs 0 && return 0
+  fi
+  return 1
+}
+# first_dir <glob...>: the first folder the glob matched (a no-match stays a literal and is not a folder).
+first_dir() { local d; for d in "$@"; do if [ -d "$d" ]; then echo "$d"; return 0; fi; done; return 1; }
+LIVE_STATE="$(ltree)"
+LIVE_DATA="$(dtree)"
+# round <step>: the apply fails right after <step>, which is undone with every step before it.
+round() {
+  local step=$1
+  lean_fail "$step" >"$T/inj-$step.out" 2>&1; rc=$?
+  tail -n 12 "$T/inj-$step.out" | sed 's/^/  /'
+  check "failure after $step: exit 1" test "$rc" = 1
+  check "failure after $step: the journal says rolled-back" test "$(jstatus)" = rolled-back
+  check "failure after $step: config, rc files and ~/.opencode byte-identical" test "$(ltree)" = "$LIVE_STATE"
+  check "failure after $step: live data byte-identical" test "$(dtree)" = "$LIVE_DATA"
+  check "failure after $step: no shim folder left" test ! -e "$OC1/bin"
+  check "failure after $step: backup and frozen copy kept" test -s "$bk/MANIFEST.sha256" -a -s "$frozen/opencode.db"
+  check "failure after $step: a 1.x opencode still runs" test "$(opencode --version 2>/dev/null | tail -n 1)" = "1.19.0"
+}
+# LEAN_TEST_FAIL_AT without the guard is refused before anything runs.
+env LEAN_TEST_FAIL_AT=config node "$repo/scripts/lean.mjs" --home "$HOME" --upgrade-agent opencode --yes >"$T/guard.out" 2>&1; rc=$?
+check "LEAN_TEST_FAIL_AT without LEAN_AGENTS_TEST=1 is refused" test "$rc" = 1
+check "and the live tree is unchanged" test "$(ltree)" = "$LIVE_STATE"
+
+if [ "$is_win" = 1 ]; then
+  # The 2.x install on Windows is not automated (VERIFY): the apply stops at that step and undoes what it did before.
+  for step in backup opencode1; do round "$step"; done
+  leanu --yes >"$T/win-apply.out" 2>&1; rc=$?
+  tail -n 12 "$T/win-apply.out" | sed 's/^/  /'
+  check "windows apply: stops at install2x (exit 1)" test "$rc" = 1
+  check "windows apply: names the manual 2.x install" grep -q 'not proven yet' "$T/win-apply.out"
+  check "windows apply: rolled back, live tree byte-identical" test "$(jstatus)" = rolled-back -a "$(ltree)" = "$LIVE_STATE" -a "$(dtree)" = "$LIVE_DATA"
+else
+  for step in backup opencode1 install2x config dcp; do round "$step"; done
+
+  echo "-- full apply (1.x on PATH, 2.x from the pinned installer)"
+  leanu --yes >"$T/up.out" 2>&1; rc=$?
+  tail -n 25 "$T/up.out" | sed 's/^/  /'
+  check "apply exits 0" test "$rc" = 0
+  check "journal says applied" test "$(jstatus)" = applied
+  check "the 2.x binary reports 2.x" test "$(ver "$ocbin" | cut -d. -f1)" = 2
+  check "opencode1 still reports 1.19.0" test "$(ver "$OC1/bin/opencode1")" = "1.19.0"
+  check "DCP is in the 2.x config" grep -q 'opencode-dcp' "$CFG/opencode.jsonc"
+  check "dcp.jsonc written" test -s "$CFG/dcp.jsonc"
+  check "the mock provider (a user key) is kept" grep -q '"mock"' "$CFG/opencode.jsonc"
+  check "apply never touched the live data" test "$(dtree)" = "$LIVE_DATA"
+  refute "a second apply is refused (already applied)" leanu --yes
+  refute "--uninstall is refused while the upgrade is applied" node "$repo/scripts/lean.mjs" --home "$HOME" --no-exec --uninstall --yes
+
+  echo "-- the first 2.x start migrates the live db; opencode must be closed before --undo"
+  # An empty config folder: 2.x must not install DCP into the real one; the data folder is the live one, which is the point.
+  run_to 120 env XDG_CONFIG_HOME="$T/cfg2x" "$ocbin" session list >"$T/2x-list.out" 2>&1; echo "  2.x session list: exit $? ($(tail -n 1 "$T/2x-list.out" | cut -c1-60))"
+  check "the 2.x start changed the live db (migration)" test "$(dtree)" != "$LIVE_DATA"
+  if wait_procs 1; then
+    leanu --undo --yes >"$T/undo-busy.out" 2>&1; rc=$?
+    check "--undo refuses while an opencode process runs" test "$rc" = 1 -a "$(jstatus)" = applied
+    kill_oc || echo "  (an opencode process is still running)"
+  else
+    echo "  (no 2.x background process to refuse on: skipped)"
+    kill_oc || true
+  fi
+  leanu --undo --yes >"$T/undo.out" 2>&1; rc=$?
+  tail -n 25 "$T/undo.out" | sed 's/^/  /'
+  check "--undo exits 0" test "$rc" = 0
+  check "journal says undone" test "$(jstatus)" = undone
+  check "no 2.x binary left" test ! -e "$ocbin"
+  check "opencode --version = 1.19.0" test "$(opencode --version 2>/dev/null | tail -n 1)" = "1.19.0"
+  check "live data is the frozen copy again: backup 3 + 1 made by opencode1 = 4 sessions" test "$(count "$LIVE")" = 4
+  check "live data sha256 = frozen copy" node "$T/h.mjs" same "$LIVE" "$frozen" data
+  check "the 2.x db was moved aside, not deleted" test -s "$(first_dir "$LEAN"/backups/opencode2-db-*)/opencode.db"
+  check "config restored (sha256 = the 1.x snapshot in the backup)" node "$T/h.mjs" same "$CFG" "$bk/config" all
+  check "no shim folder, backup and frozen copy kept" test ! -e "$OC1/bin" -a -s "$bk/MANIFEST.sha256" -a "$(count "$frozen")" = 4
+  check "the backup still has 3 sessions" test "$(count "$bk/data")" = 3
+  check "a second --undo has nothing to do (exit 0)" leanu --undo --yes
+
+  echo "-- full apply with the 1.x binary in ~/.opencode/bin (the installer overwrites it), then --undo"
+  src1x="$(node --input-type=module -e "import { candidates } from '$repo/scripts/lib/opencode1.mjs'; console.log(candidates({ home: process.argv[1], whichPath: process.argv[2] })[0] ?? '')" "$HOME" "$(command -v opencode)")"
+  mkdir -p "$HOME/.opencode/bin"
+  cp "$src1x" "$ocbin" && chmod 755 "$ocbin"
+  check "the copy in ~/.opencode/bin reports 1.19.0" test "$(ver "$ocbin")" = "1.19.0"
+  sha_1x="$(shaf "$ocbin")"
+  leanu --yes >"$T/up2.out" 2>&1; rc=$?
+  tail -n 25 "$T/up2.out" | sed 's/^/  /'
+  check "apply exits 0" test "$rc" = 0
+  check "the binary in ~/.opencode/bin is 2.x now" test "$(ver "$ocbin" | cut -d. -f1)" = 2
+  leanu --undo --yes >"$T/undo2.out" 2>&1; rc=$?
+  tail -n 25 "$T/undo2.out" | sed 's/^/  /'
+  check "--undo exits 0" test "$rc" = 0
+  check "the 1.x binary is back at ~/.opencode/bin (sha256 equal)" test "$(shaf "$ocbin")" = "$sha_1x"
+  check "the 2.x binary was moved aside" test -s "$(first_dir "$LEAN"/backups/opencode2-bin-*)/opencode"
+  check "live data is the frozen copy again (4 sessions)" test "$(count "$LIVE")" = 4
+  check "config restored again" node "$T/h.mjs" same "$CFG" "$bk/config" all
+  rm -f "$ocbin"; rmdir "$HOME/.opencode/bin" "$HOME/.opencode" 2>/dev/null
+fi
 
 echo "== refused while an opencode process runs"
 opencode serve --port $((20000 + RANDOM % 40000)) --hostname 127.0.0.1 >"$T/serve.log" 2>&1 &

@@ -52,9 +52,9 @@ jobs:
           code=true
           if [ "$EVENT" = pull_request ] && ! git diff --name-only "origin/$BASE...HEAD" | grep -qvE '^(docs/|assets/)|^[^/]*\.md$'; then code=false; fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
-          # real-upgrade-opencode (#80 part 2, P3 + P4): on a PR only when the files it exercises change; always on push to main and dispatch.
+          # real-upgrade-opencode (#80 part 2, P3 + P4 + P6): on a PR only when the files it exercises change; always on push to main and dispatch.
           upgrade=true
-          if [ "$EVENT" = pull_request ] && ! git diff --name-only "origin/$BASE...HEAD" | grep -qE '^(scripts/lean\.mjs|scripts/lib/(opencode-backup|opencode1|adopt|upgrade|fsops|system|pins)\.mjs|tests/real-upgrade-opencode\.(sh|ps1)|tests/fixtures/mock-llm\.mjs|core/pins\.json|\.github/workflows/ci\.yml)$'; then upgrade=false; fi
+          if [ "$EVENT" = pull_request ] && ! git diff --name-only "origin/$BASE...HEAD" | grep -qE '^(scripts/lean\.mjs|scripts/lib/(opencode-backup|opencode-upgrade|opencode1|backup-stamp|agent-lifecycle|adopt|upgrade|fsops|system|pins)\.mjs|tests/real-upgrade-opencode\.(sh|ps1)|tests/fixtures/mock-llm\.mjs|core/pins\.json|\.github/workflows/ci\.yml)$'; then upgrade=false; fi
           echo "upgrade=$upgrade" >> "$GITHUB_OUTPUT"
           # real-dcp-v2 and spike-opencode-side (ubuntu + windows, up to 25 min) run on a PR only when it touches what they exercise.
           opencode=true
@@ -482,12 +482,14 @@ jobs:
         run: bash tests/real-dcp-v2.sh
 
   real-upgrade-opencode:
-    # #80 part 2, P3 + P4 (--opencode1: binary copy, shim, PATH, undo): real OpenCode 1.19 with 3 sessions seeded through the mock LLM, then `--upgrade-agent opencode --backup`:
+    # #80 part 2, P3 + P4 + P6 (--opencode1: binary copy, shim, PATH, undo): real OpenCode 1.19 with 3 sessions seeded through the mock LLM, then `--upgrade-agent opencode --backup`:
     # the dry run leaves the HOME tree unchanged; backup and frozen copy equal the live files (sha256) and hold 3 sessions;
-    # a run while `opencode serve` is up is refused. Throwaway HOME. Path-filtered on PRs, always on push to main and dispatch.
+    # a run while `opencode serve` is up is refused. P6: apply without a stamp is refused; on Linux the full apply (real 2.x from the pinned
+    # installer) and --undo restore 1.x, and one injected failure per step rolls back to an identical live tree; Windows rolls back at the manual 2.x step.
+    # Throwaway HOME. Path-filtered on PRs, always on push to main and dispatch.
     needs: changes
     if: needs.changes.outputs.code == 'true' && needs.changes.outputs.upgrade == 'true'
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -508,9 +510,9 @@ jobs:
       - run: npm ci
       - name: Install OpenCode 1.19
         run: npm install -g "$(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('opencode-v1')))")"
-      - name: Backup, frozen copy and opencode1 (Git Bash)
+      - name: Backup, frozen copy, opencode1, apply and undo (Git Bash)
         run: bash tests/real-upgrade-opencode.sh
-      - name: Backup, frozen copy and opencode1 (PowerShell 5.1)
+      - name: Backup, frozen copy, opencode1, apply and undo (PowerShell 5.1)
         if: runner.os == 'Windows'
         shell: powershell
         run: ./tests/real-upgrade-opencode.ps1
