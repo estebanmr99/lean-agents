@@ -31,6 +31,21 @@ function Get-SessionCount {
   try { return @($out | ConvertFrom-Json).Count } catch { return -1 }
 }
 
+# DIAG (temporary): where did 1.19 put files? names + sizes only, last 5 minutes.
+function Show-Diag([string]$case, [string]$runOut) {
+  Write-Output "DIAG ${case}: run output tail: $((($runOut -split '\r?\n' | Where-Object { $_ } | Select-Object -Last 5) -join ' / '))"
+  Write-Output "DIAG ${case}: debug paths:"
+  Invoke-OpenCode debug paths | ForEach-Object { Write-Output "DIAG   $_" }
+  $since = (Get-Date).AddMinutes(-5)
+  $roots = [ordered]@{ frozen = $frozen; live = $live; realUSERPROFILE = $saved['USERPROFILE']; APPDATA = $env:APPDATA; LOCALAPPDATA = $env:LOCALAPPDATA; TEMPopencode = (Join-Path ([IO.Path]::GetTempPath()) 'opencode') }
+  foreach ($r in $roots.Keys) {
+    if (-not $roots[$r] -or -not (Test-Path $roots[$r])) { continue }
+    Get-ChildItem $roots[$r] -Recurse -File -Force -ErrorAction SilentlyContinue |
+      Where-Object { $_.LastWriteTime -gt $since -and $_.FullName -notmatch 'node_modules|\\npm\\|\\p1-[0-9a-f-]+\\mock' } |
+      Select-Object -First 60 | ForEach-Object { Write-Output "DIAG ${case} [$r] $($_.FullName.Replace($roots[$r], '<' + $r + '>')) $($_.Length)" }
+  }
+}
+
 $mockLog = Join-Path $root 'mock.log'
 $env:MOCK_LLM_PORT = '0'; $env:MOCK_LLM_COMMAND = 'echo p1'; $env:MOCK_LLM_TOOL = 'bash'
 $mock = Start-Process node -ArgumentList "`"$repo\tests\fixtures\mock-llm.mjs`"" -RedirectStandardOutput $mockLog -NoNewWindow -PassThru
@@ -68,8 +83,9 @@ try {
     $env:XDG_DATA_HOME = "$frozen\data"; $env:XDG_STATE_HOME = "$frozen\state"
     $env:XDG_CONFIG_HOME = $(if ($case -eq 'a1') { "$frozen\config" } else { $null })
     $n0 = Get-SessionCount
-    Invoke-OpenCode run "p1 seed $case" --model mock/mock-model | Out-Null
+    $runOut = Invoke-OpenCode run "p1 seed $case" --model mock/mock-model | Out-String
     $n1 = Get-SessionCount
+    Show-Diag $case $runOut
     Use-Env @{ XDG_DATA_HOME = $null; XDG_STATE_HOME = $null; XDG_CONFIG_HOME = $null }
     $changed = @(foreach ($k in $liveDirs.Keys) { if ((Get-Tree $liveDirs[$k]) -ne $before[$k]) { $k } })
     $ok = ($changed.Count -eq 0) -and ($n0 -eq $liveCount) -and ($n1 -eq $n0 + 1)
