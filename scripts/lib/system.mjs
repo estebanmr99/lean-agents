@@ -18,7 +18,7 @@ export function which(bin) {
 const useShell = (bin) => isWin && !/\.exe$/i.test(bin) && !/\.exe$/i.test(which(bin) ?? '');
 
 export function version(bin, args = ['--version'], env = {}) {
-  if (!which(bin)) return null;
+  if (!path.isAbsolute(bin) && !which(bin)) return null;
   const r = spawnSync(bin, args, { encoding: 'utf8', shell: useShell(bin), timeout: 20000, env: { ...allowedEnv(), ...env } });
   const m = `${r.stdout}${r.stderr}`.match(/(\d+)\.(\d+)\.(\d+)/);
   return m ? m[0] : 'unknown';
@@ -46,6 +46,20 @@ export function isolate(home) {
   Object.assign(process.env, env, { HOME: home, USERPROFILE: home });
 }
 
+// Where `agy` lives when it is not on PATH. install.sh: $HOME/.local/bin (--dir changes it, unknowable here);
+// install.ps1: %LOCALAPPDATA%\agy\bin; ~/.gemini/bin/agy.exe was seen on Windows in #211 (who writes it: VERIFY).
+export function agyCandidates(home, platform = process.platform, env = process.env) {
+  if (platform !== 'win32') return [path.posix.join(home, '.local', 'bin', 'agy')];
+  return [env.LOCALAPPDATA && path.win32.join(env.LOCALAPPDATA, 'agy', 'bin', 'agy.exe'), path.win32.join(home, '.gemini', 'bin', 'agy.exe')].filter(Boolean);
+}
+
+// PATH first, then the candidates above. Returns a command that can be spawned, or null.
+export function findAgy(home, platform = process.platform, env = process.env) {
+  return which('agy') ? 'agy' : agyCandidates(home, platform, env).find(exists) ?? null;
+}
+
+export const agyVersion = (home) => { const a = findAgy(home); return a && version(a); };
+
 export function detectAgents() {
   const found = {};
   const claude = version('claude');
@@ -54,7 +68,7 @@ export function detectAgents() {
   if (oc) found[oc.startsWith('1.') ? 'opencode-v1' : 'opencode-v2'] = oc;
   const copilot = version('copilot');
   if (copilot) found['copilot-cli'] = copilot;
-  const agy = version('agy');
+  const agy = agyVersion(os.homedir());
   if (agy) found.antigravity = agy;
   const code = version('code');
   if (code) found['vscode-copilot'] = code;
@@ -106,12 +120,15 @@ export function gitHint(pm, present = which('git')) {
 
 // Antigravity CLI and app, only when the user picked Antigravity. Only ids checked upstream (2026-11-03) run;
 // the rest print the vendor link. Windows CLI: `Google.AntigravityCLI` has no documented scope, so install.ps1 stays manual.
+// #147: Homebrew installs whatever version the cask has today; it cannot install an older one or a cask from a URL.
+export const BREW_AGY_LIMIT = 'Homebrew cannot pin or verify this cask: you get its current version, unpinned by lean-agents. VERIFY';
+
 export function antigravityPrereqs(pm, platform, home, app = true) {
   const out = [];
   const winApp = pm === 'winget' && platform === 'win32';
-  if (!which('agy')) {
+  if (!findAgy(home, platform)) {
     out.push(platform === 'darwin' && pm === 'brew'
-      ? { desc: 'install agy', run: [['brew', 'install', '--cask', 'antigravity-cli']] }
+      ? { desc: `install agy (${BREW_AGY_LIMIT})`, run: [['brew', 'install', '--cask', 'antigravity-cli']] }
       : { desc: `agy is missing: install it from https://antigravity.google/docs/getting-started`, run: [], manual: true });
   }
   if (!app) return out;
