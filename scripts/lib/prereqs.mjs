@@ -19,8 +19,9 @@ const NVM_WIN = {
   url: 'https://github.com/coreybutler/nvm-windows/releases/download/v2.0.1/nvm-2.0.1-x64-setup.exe',
   sha256: '2ba6ab6290fdc7d1e608e76c97577ca6e1df772b2d59ab8ebc01e10788de8e57',
 };
-// Official Homebrew and uv installers: unpinned, current script. VERIFY (unattended behaviour, no published hash)
-const BREW_INSTALL_URL = 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh';
+// Homebrew installer: commit and sha256 pinned in core/pins.json. VERIFY (unattended behaviour).
+// The uv installer is unpinned (current script). VERIFY
+const BREW = PINS['homebrew-installer'];
 const UV_INSTALL_URL = 'https://astral.sh/uv/install.sh';
 
 // Newest `engines.node` floor among the pinned tools; Node 24 is installed under nvm only when nothing meets it.
@@ -53,7 +54,7 @@ export function planPrereqs(probe) {
     });
     add({
       id: 'homebrew', label: 'Homebrew', why: 'Package manager lean-agents uses for rtk, uv and bun on macOS.',
-      commands: [fetch(BREW_INSTALL_URL, P.join(tmp, 'brew-install.sh')), ['env', 'NONINTERACTIVE=1', '/bin/bash', P.join(tmp, 'brew-install.sh')]],
+      commands: [fetch(BREW.url, P.join(tmp, 'brew-install.sh')), [node, VERIFY_SHA, P.join(tmp, 'brew-install.sh'), BREW.sha256], ['env', 'NONINTERACTIVE=1', '/bin/bash', P.join(tmp, 'brew-install.sh')]],
       skipIf: has.brew ? 'brew is on PATH' : null, // undo: Homebrew's uninstaller is interactive, so none
     });
   }

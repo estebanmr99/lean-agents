@@ -105,3 +105,10 @@ test('bun step keeps the undo of the install it plans, and a manual hint when th
   assert.equal(none.undo, null);
   assert.match(none.manual, /^https:\/\/bun\.sh\//);
 });
+
+test('Homebrew installer is the commit-pinned script, hash-checked before it runs', () => {
+  const [fetchCmd, verify, run] = by(planPrereqs(bare('darwin')), 'homebrew').commands;
+  assert.match(fetchCmd.at(-1), /Homebrew\/install\/[0-9a-f]{40}\/install\.sh$/);
+  assert.match(verify.at(-1), /^[0-9a-f]{64}$/);
+  assert.equal(run[0], 'env');
+});
