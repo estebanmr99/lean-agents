@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Installs OLD pins into a throwaway HOME with the real npm, runs --update with the current pins, and checks the
 # old -> new line, the new versions on disk, `--doctor --json` (nothing behind) and a full --uninstall.
+# With CI_LATEST=true (nightly/dispatch) it then repeats the cycle from the last published release's pins (N-1 -> N).
 # Used by CI; safe locally because HOME and the npm prefix are temp directories.
 set -euo pipefail
 
@@ -67,3 +68,28 @@ diff "$work/before.txt" "$work/after.txt"
 refute grep -qs lean-update "$HOME/.agents/.skill-lock.json"
 refute test -e "$HOME/.agents/skills/lean-update"
 echo "real-update: $oldv -> $newv OK"
+
+# N-1 -> N (nightly/dispatch only): every pin the last published release shared with this checkout goes back to that
+# release's version, is installed, then --update moves it to the current pins; --doctor is clean and --uninstall leaves nothing.
+if [ "${CI_LATEST:-}" = true ]; then
+  rel="$(npm view lean-agents version)"
+  prev="$work/prev-src"
+  node -e "require('node:fs').cpSync(process.argv[1], process.argv[2], { recursive: true, filter: (p) => !/(^|[\\\\/])(node_modules|\.git)([\\\\/]|$)/.test(p) })" "$repo" "$prev"
+  ln -s "$repo/node_modules" "$prev/node_modules"
+  curl -fsSL "https://raw.githubusercontent.com/estebanmr99/lean-agents/v$rel/core/pins.json" -o "$work/release-pins.json"
+  node -e "const fs=require('node:fs'),[f,r]=process.argv.slice(1),j=JSON.parse(fs.readFileSync(f,'utf8')),o=JSON.parse(fs.readFileSync(r,'utf8'));for(const [k,p] of Object.entries(j.pins)){const q=o.pins?.[k];if(q&&q.version&&!p.hold)p.version=q.version}fs.writeFileSync(f,JSON.stringify(j,null,2))" "$prev/core/pins.json" "$work/release-pins.json"
+  prevv="$(node -p "require('$prev/core/pins.json').pins['context-mode'].version")"
+  node "$prev/scripts/lean.mjs" --home "$HOME" "${flags[@]}" </dev/null 2>&1 | tee "$work/n1-install.txt"
+  refute grep -qE '^ *! ' "$work/n1-install.txt"
+  test "$(installed)" = "$prevv"
+  node "$repo/scripts/lean.mjs" --home "$HOME" --update --yes </dev/null 2>&1 | tee "$work/n1-update.txt"
+  refute grep -qE '^ *! ' "$work/n1-update.txt"
+  test "$(installed)" = "$newv"
+  node "$repo/scripts/lean.mjs" --home "$HOME" --doctor --json --no-exec </dev/null > "$work/n1-doctor.json" 2>"$work/n1-doctor.err" || true
+  node -e "const d=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));if(!d.ok||d.behind.length)throw new Error(JSON.stringify(d.behind))" "$work/n1-doctor.json"
+  node "$repo/scripts/lean.mjs" --home "$HOME" --uninstall --yes </dev/null 2>&1 | tee "$work/n1-uninstall.txt"
+  refute grep -qE '^ *! ' "$work/n1-uninstall.txt"
+  files > "$work/n1-after.txt"
+  diff "$work/before.txt" "$work/n1-after.txt"
+  echo "real-update N-1 ($rel) -> N OK"
+fi
