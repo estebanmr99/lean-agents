@@ -8,4 +8,6 @@ Update one thing at a time and check after each step.
 4. Tools: `brew upgrade rtk uv` (Windows: `winget upgrade rtk-ai.rtk astral-sh.uv`), `npm update -g context-mode`, `claude plugin update <name>`, `git -C ~/.config/opencode/vendor/i-have-adhd pull --ff-only`.
 5. Check: `node ~/.config/lean-agents/src/scripts/lean.mjs --doctor`, then `/status` in OpenCode.
 
+To go back after `--update` moved an agent CLI: `--update --undo` shows the plan (the version each agent had before its first upgrade); add `--yes` to run it. `--uninstall` leaves those agent CLIs as they are.
+
 Read release notes before crossing a major version.

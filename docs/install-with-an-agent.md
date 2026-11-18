@@ -71,4 +71,16 @@ Only if a step failed, and only if the network preset allows outbound calls (`--
 3. Check duplicates: `gh issue list --repo estebanmr99/lean-agents --search "<title words>"`. If one matches, show it and stop.
 4. Show the full draft. Only after the user says yes, run `gh issue create --repo estebanmr99/lean-agents --title "<title>" --body-file <draft>`.
 
+## Verify prompt (after the install)
+
+`scripts/lib/verify-prompt.mjs` holds the text (English and `--lang es`) that the finish step prints and the summary page copies. The agent:
+
+1. runs `--doctor --json` and reports every row that is not `ok`;
+2. fixes problems inside the install plan, asking before each change;
+3. for each problem it cannot fix, runs `--feedback-draft --feedback-kind verify --failed-command "<item>"` with `status: detail` on stdin, searches open issues for a duplicate (`gh issue list --state open --search`), and shows the redacted draft;
+4. asks "File this issue? yes/no" **per issue**; only after a yes does it run `gh issue create`; one yes never covers a second issue;
+5. writes each link back (recorded in `state.json` as `filedIssues`: `item`, `title`, `url`, `filedAt`) and re-runs the summary command.
+
+With `--privacy strict`, `--network off` or `--outbound off` the prompt has no filing steps at all: the agent shows the doctor row as text for you to copy. The engine itself never calls the network or `gh issue`.
+
 The draft holds OS, versions, the failing command and the error. Employer names cannot be detected, so the user reads the draft before anything is sent.
