@@ -169,6 +169,7 @@ const plugin = {
   // OpenCode 2.x TUI plugin (docs: https://opencode.ai/docs/build/plugins/cli): context.ui.slot, context.keymap.layer, context.ui.toast.show.
   setup: async (context) => {
     const t = context.theme;
+    const offs = [];
     await start({
       solid: solidModule,
       theme: () => ({ text: t.text.base, textMuted: t.text.muted, borderSubtle: t.border.base, success: "#98c379", warning: "#e5c07b", error: "#e06c75" }),
@@ -176,8 +177,10 @@ const plugin = {
       toast: (m) => context.ui.toast.show(m),
       slot: (fn) => context.ui.slot({ append: "sidebar.content", render: fn }),
       command: (run) => context.keymap.layer(() => ({ mode: "global", commands: [{ id: COMMAND.value, title: COMMAND.title, group: COMMAND.category, palette: true, slash: COMMAND.slash, run }] })),
-      onIdle: () => {},
+      // A finished turn is the 2.x idle signal (the 2.1.4 binary also names `session.idle`; not verified to fire); data.on returns an unsubscribe.
+      onIdle: (fn) => offs.push(context.data?.on?.("session.execution.succeeded", fn)),
     });
+    return () => offs.forEach((off) => off?.());
   },
 };
 
