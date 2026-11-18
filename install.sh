@@ -144,7 +144,12 @@ use_private_node() {
   export PATH="$NODE_DIR/bin:$PATH"
   export LEAN_AGENTS_BOOTSTRAP_NODE="$NODE_DIR"
   # Global npm installs (agent CLIs, tools) must not land in the private folder, which `remove it to undo` deletes.
-  [[ -n "${NPM_CONFIG_PREFIX:-}${npm_config_prefix:-}" ]] || export NPM_CONFIG_PREFIX="$HOME/.local"
+  # Only when npm would use the private folder as its prefix: a prefix the user set in .npmrc stays theirs.
+  if [[ -z "${NPM_CONFIG_PREFIX:-}${npm_config_prefix:-}" ]]; then
+    case "$(npm config get prefix 2>/dev/null || true)" in
+      ""|"$NODE_DIR"|"$NODE_DIR"/*) export NPM_CONFIG_PREFIX="$HOME/.local" ;;
+    esac
+  fi
 }
 
 # Never replaces a Node.js the user has: an old one is left alone and the private one is used for the engine.

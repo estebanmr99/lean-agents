@@ -133,7 +133,7 @@ function parseArgs(argv) {
       default: throw new Error(`unknown option ${a} (see --help)`);
     }
   }
-  if (o.everything) {
+  if (o.everything && !o.migrate) {
     // Preset for a fresh machine: every default is taken, so the plan is the only question.
     o.agents ??= ['claude', 'opencode-v2'];
     o.tools ??= [...MINIMAL_TOOLS, ...OPTIONAL_TOOLS];
