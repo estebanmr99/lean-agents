@@ -27,12 +27,13 @@ test('footprint: empty HOME finds nothing, seeded HOME finds folders and the ext
 test('adopt lists them as user-owned, keep, and writes nothing', async () => {
   const home = tmp();
   seed(home);
-  const before = fs.readdirSync(j(home, '.gemini')).join();
+  const tree = () => fs.readdirSync(home, { recursive: true }).sort().join();
+  const before = tree();
   const r = await inventory({ home, env: { PATH: '' }, platform: process.platform, realHome: '/nowhere' });
   const ide = r.items.filter((i) => i.kind === 'ide');
   assert.equal(ide.length, 4);
   assert.ok(ide.every((i) => i.owner === 'user' && i.action === 'keep' && i.client === 'antigravity'));
-  assert.equal(fs.readdirSync(j(home, '.gemini')).join(), before);
+  assert.equal(tree(), before);
 });
 
 function doctorRows(home) {

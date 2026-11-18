@@ -167,7 +167,7 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
       if (o.tools.includes('autoskills')) add('autoskills runs', q(['npx', '-y', npmSpec('autoskills'), '--help'], 120000).ok ? 'ok' : 'error');
     }
   }
-  checkAntigravityIde(home, add);
+  checkAntigravityIde(home, add, fsx);
   const { nodes, skills } = checkInventory({ home, exec, run, env, platform, fsx }, add);
   const left = leftovers(process.cwd());
   if (left.length) add('parallel workers', 'changed', `left in this repo: ${left.join(', ')} (merge them, then run scripts/parallel.mjs clean)`);
@@ -182,8 +182,8 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
 }
 
 // Read-only (#216): a row only when the IDE folders or the extension exist.
-function checkAntigravityIde(home, add) {
-  const found = antigravityFootprint(home);
+function checkAntigravityIde(home, add, fsx) {
+  const found = antigravityFootprint(home, fsx);
   if (found.length) add('antigravity ide', 'ok', found.map((f) => f.name).join(', '));
 }
 
