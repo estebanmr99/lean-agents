@@ -43,3 +43,14 @@ test('--everything resumes: a prerequisite finished in a saved run is skipped', 
   assert.equal(nvm.status, 'skip');
   assert.equal(nvm.skipIf, 'finished in an earlier run');
 });
+
+test('tools that wait for Node 24 are listed as "after nvm", not dropped silently', () => {
+  const home = tmpHome();
+  const r = spawnSync(process.execPath, [LEAN, '--home', home, '--no-exec', '--dry-run', '--yes', '--everything', '--json'], {
+    encoding: 'utf8', input: '', env: { PATH: process.env.PATH, NVM_DIR: path.join(home, 'no-nvm'), HOME: home, LEAN_AGENTS_NODE: '22.20.0' },
+  });
+  assert.equal(r.status, 0, r.stderr);
+  const plan = JSON.parse(r.stdout);
+  assert.ok(plan.afterNvm.includes('context-mode'));
+  assert.ok(!plan.tools.includes('context-mode'));
+});

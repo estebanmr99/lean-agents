@@ -317,6 +317,7 @@ async function choose(o, saved) {
   const resolved = resolveToolNodes({ pins: needs, active: NODE_VERSION, nvm, latest: (major) => nvmLatest(nvm, major, { run: quiet }) });
   for (const s of resolved.skipped) console.log(s.line);
   o.tools = o.tools.filter((t) => !resolved.skipped.some((s) => s.tool === t));
+  o.deferred = resolved.skipped.map((s) => s.tool);
   o.toolNode = resolved.toolNode && { ...resolved.toolNode, nvmDir: nvm.dir };
   if (o.toolNode && o.agents.includes('claude') && o.tools.includes('context-mode')) console.log('Context Mode on Claude Code runs as an MCP server on its own Node: its hooks and skills (the plugin) are not installed.');
   if (o.project) o.terminals = [];
@@ -519,7 +520,7 @@ function printJson(o, planned, commands, migration, behind, prereqs) {
   const inText = (t) => t.split(o.home).join('~');
   const plan = {
     agents: o.agents, tools: o.tools, privacy: o.privacy, lang: o.lang, profile: o.profile ?? null, terminals: o.terminals,
-    gh: !!o.gh, bun: !!o.bun, network: o.network, migrate: migration ? migration.names : null,
+    ...(o.everything && { afterNvm: o.deferred ?? [] }), gh: !!o.gh, bun: !!o.bun, network: o.network, migrate: migration ? migration.names : null,
     files: planned.map((f) => ({ status: f.status, path: rel(f.path), note: f.note ?? null })),
     commands: commands.map((c) => ({ desc: inText(c.desc), agent: c.agent ?? null, run: c.run.map((a) => a.map(inText)) })),
     ...(behind && { behind }),
@@ -534,6 +535,7 @@ function printPlan(o, planned, commands) {
   console.log(`  tools: ${o.tools.join(', ') || 'none'} | privacy: ${o.privacy} | lang: ${o.lang} | profile: ${o.profile ?? 'none'}`);
   if (o.terminals.length) console.log(`  terminals: ${o.terminals.join(', ')}`);
   if (o.network.telemetry === 'off') for (const n of terminalPrivacyNotes(o.terminals, { orcaEnvSet: orcaEnvSet({ system: o.home === REAL_HOME }) })) console.log(`  ${n}`);
+  if (o.everything && o.deferred?.length) console.log(`  after nvm: run lean-agents --update to add ${o.deferred.join(', ')} (they need Node 24, which the prerequisites install under nvm)`);
   if (o.tools.includes('context-mode')) console.log(`  bun: ${o.bun ? `on${bunPresent(o.home) ? ' (already installed)' : ''}` : 'off'}`);
   console.log(`  network: ${CATEGORIES.map((c) => `${c} ${o.network[c]}`).join(', ')}`);
   const net = proxyReport();
@@ -583,7 +585,7 @@ async function install(o) {
   if (o.dryRun) { p.close(); console.log('Dry run: nothing was changed.'); return; }
   // The one question of --everything: the choose() prompter answers by default, so ask on a real one.
   const q = o.everything && !o.yes ? await prompter(false) : p;
-  p.close();
+  if (q !== p) p.close();
   try { if (!yesNo(await q.ask('Apply these changes?', 'y'))) { console.log('Cancelled.'); return; } } finally { q.close(); }
   // A Homebrew that this run installs is not on this process's PATH yet.
   if (every && process.platform === 'darwin' && pendingPrereqs(every.steps).some((s) => s.id === 'homebrew')) process.env.PATH = `/opt/homebrew/bin${path.delimiter}/usr/local/bin${path.delimiter}${process.env.PATH ?? ''}`;
