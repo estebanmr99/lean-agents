@@ -16,6 +16,7 @@ CFG="$HOME/.config/opencode"
 mkdir -p "$CFG"
 
 pids=""
+# shellcheck disable=SC2329 # run by the EXIT trap below
 cleanup() {
   for p in $pids; do kill "$p" 2>/dev/null || true; done
   rm -rf "$T" 2>/dev/null || true
