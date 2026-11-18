@@ -613,3 +613,17 @@ Guide only, no code change: `docs/install-with-an-agent.md`, section "VS Code Co
 | Same, installed by the user (not in `agents.json`) | `own` | never |
 
 Versions of the agent CLIs come from `<bin> --version` run with a scratch HOME (`opencode --version` writes a log under HOME). The notes need `CHANGELOG.md` in the package: it is now in the `files` list of `package.json` (checked with `tests/update-plan.test.mjs` against the repo copy; **VERIFY** with `npm pack --dry-run` at release). Cursor and Antigravity have no version pin, so no row.
+
+## Fresh-machine workflow (#179 PR6, 2026-11-18)
+
+`.github/workflows/fresh-machine.yml` runs nightly (05:23 UTC) and on `workflow_dispatch` only, never on a pull request. It packs the release files once, then runs the real `install.sh` / `install.ps1 --everything --yes` and `--doctor` (must exit 0) from `LEAN_AGENTS_DIST`, into a throwaway HOME, on `macos-latest`, `windows-latest` and an `ubuntu:24.04` container. A failure opens or comments one `version-watch` issue, "Fresh-machine install breaks". `force-fail` tests the report.
+
+| Leg | What is hidden | How |
+| --- | --- | --- |
+| macOS | brew, Node.js, npm, git, gh, nvm | `/opt/homebrew` and `/usr/local/Homebrew` are renamed (throwaway VM); PATH is `/usr/bin:/bin:/usr/sbin:/sbin`, `env -i` |
+| Windows | Node.js, npm, git, gh, nvm | PATH entries matching them are dropped; `USERPROFILE` is a temp folder |
+| Linux | everything | the stock image has none; only `curl` and CA certificates are added for `install.sh` |
+
+**Limit:** this is a PATH trick on a runner image, not a bare machine. `/usr/bin/git` (the Xcode shim) stays on macOS, winget and the Windows system tools stay, and a per-user install on the runner could still be found by absolute path. Corporate proxy and TLS inspection are only provable on the owner's PC.
+
+**VERIFY** (first nightly runs decide): Homebrew's pinned installer unattended on macOS runners (including the Xcode CLT step); nvm-windows without admin on `windows-latest`; `--everything` as root in the Ubuntu container; `actions/download-artifact` inside the container. Not run locally: no real binaries on the owner's machine.

@@ -1,0 +1,147 @@
+name: Fresh machine
+
+# `install.sh` / `install.ps1 --everything` on a runner with brew, Node.js, git, gh and nvm hidden, into a throwaway HOME,
+# ending with `--doctor`. Nightly and on demand only: it never runs on a pull request, so it costs PRs no time.
+# A failure opens or updates one `version-watch` issue. Hiding tools by PATH is not a truly bare image (see docs/compatibility.md).
+on:
+  schedule:
+    - cron: '23 5 * * *'
+  workflow_dispatch:
+    inputs:
+      force-fail:
+        description: Fail on purpose to test the issue report
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  dist:
+    # The packed release files, built once; the legs below use them through LEAN_AGENTS_DIST and need no Node.js to get them.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - run: npm ci --omit=dev
+      - run: node scripts/release.mjs "$(node -p "require('./package.json').version")" </dev/null
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  macos:
+    needs: dist
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist
+          path: dist
+      - name: Install everything with a system-only PATH
+        run: |
+          set -euo pipefail
+          # The runner VM is thrown away after the job; moving the Homebrew prefix aside makes install.sh and the engine see no brew.
+          for p in /opt/homebrew /usr/local/Homebrew; do
+            if [ -d "$p" ]; then sudo mv "$p" "$p.hidden"; fi
+          done
+          home="$(mktemp -d)"
+          lean() { env -i HOME="$home" TERM=dumb PATH=/usr/bin:/bin:/usr/sbin:/sbin LEAN_AGENTS_DIST="$PWD/dist" bash "$PWD/dist/install.sh" "$@"; }
+          for c in brew node npm git gh nvm; do
+            if env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin sh -c "command -v $c" | grep -v '^/usr/bin/git$'; then echo "$c is still visible"; exit 1; fi
+          done
+          lean --yes --everything
+          lean --doctor
+
+  windows:
+    needs: dist
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist
+          path: dist
+      - name: Install everything with Node.js, git, gh and nvm off PATH
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:Path = (($env:Path -split ';') | Where-Object { $_ -and $_ -notmatch '(?i)nodejs|\\Git\\|GitHub CLI|nvm|npm' }) -join ';'
+          foreach ($c in 'node', 'npm', 'git', 'gh', 'nvm') {
+            if (Get-Command $c -ErrorAction SilentlyContinue) { throw "$c is still visible" }
+          }
+          $home2 = Join-Path $env:RUNNER_TEMP 'fresh-home'
+          New-Item -ItemType Directory -Path $home2 | Out-Null
+          $env:USERPROFILE = $home2
+          $env:LEAN_AGENTS_DIST = (Resolve-Path dist).Path
+          & (Join-Path $env:LEAN_AGENTS_DIST 'install.ps1') -Yes --everything
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          & (Join-Path $env:LEAN_AGENTS_DIST 'install.ps1') -Doctor
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          exit 0
+
+  linux:
+    needs: dist
+    runs-on: ubuntu-latest
+    container: ubuntu:24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist
+          path: dist
+      - name: Install everything on a bare Ubuntu
+        run: |
+          set -euo pipefail
+          # The image has no curl: install.sh needs it, and nothing else (no Node.js, git or gh).
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends curl ca-certificates
+          for c in node npm git gh nvm; do
+            if command -v "$c"; then echo "$c is still visible"; exit 1; fi
+          done
+          home="$(mktemp -d)"
+          lean() { env -i HOME="$home" TERM=dumb PATH=/usr/bin:/bin:/usr/sbin:/sbin LEAN_AGENTS_DIST="$PWD/dist" bash "$PWD/dist/install.sh" "$@"; }
+          lean --yes --everything
+          lean --doctor
+
+  forced:
+    if: inputs.force-fail
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: echo 'forced failure' && exit 1
+
+  report:
+    needs: [dist, macos, windows, linux, forced]
+    if: always() && contains(needs.*.result, 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+    steps:
+      - name: Open or update the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title='Fresh-machine install breaks'
+          failed="$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json jobs -q '.jobs[] | select(.conclusion == "failure") | "- " + .name')"
+          body="$(printf 'The nightly fresh-machine run failed: %s\n\nFailed jobs:\n%s\n\nIt runs `install.sh` and `install.ps1 --everything` with brew, Node.js, git, gh and nvm hidden, then `--doctor`. PRs are not affected.\n<!-- fresh-machine:%s -->' "$RUN_URL" "$failed" "$RUN_ID")"
+          gh label create version-watch --color ededed --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
+          n="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --label version-watch --json number,title -q ".[] | select(.title == \"$title\") | .number" | head -n 1)"
+          if [ -n "$n" ]; then
+            gh issue comment "$n" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --label version-watch --body "$body"
+          fi
