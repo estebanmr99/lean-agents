@@ -11,6 +11,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ### Fixed
 
 - The child env no longer passes `GIT_CONFIG*`, `GIT_ASKPASS`, `GIT_SSH`, `GIT_SSH_COMMAND`, `GIT_PROXY_COMMAND`, `GIT_EXEC_PATH`, `GIT_EDITOR`, `GIT_PAGER`, `GIT_EXTERNAL_DIFF`, `NPM_CONFIG_SCRIPT_SHELL`, `NODE_PATH` or npm per-registry keys (`//host/:_authToken`), and drops a kept variable whose value has URL userinfo (`://user:pass@`, `://token@`) or starts like a `ghp_`, `github_pat_` or `npm_` token (not `PATH`, the basics or proxy and CA names; proxy URLs may keep their own `user:pass`). `NODE_OPTIONS` passes only when every token is `--use-system-ca`, `--use-openssl-ca`, `--use-bundled-ca`, `--use-env-proxy`, `--max-old-space-size=N` (or `N` as the next token) or `--dns-result-order=X` (or `X` as the next token); `--require`, `--import` and the like drop it (#163).
+- `--adopt` review follow-ups (#213): Cursor hook names split Windows backslash paths on every OS; `managed` is matched on the basename of any argument, never a folder (`npx -y context-mode hook cursor` and `env FOO=1 rtk hook cursor` are `managed`; `node /opt/rtk-fork/hook.js` stays `user`); the sqlite child times out after 5 s per candidate; PowerShell `-e` and `-ec` count as encoded payloads; the sqlite note prints `Node <version> --experimental-sqlite` and never a path; Node 23.4+ counts as having `node:sqlite`; `--upgrade-agent` text rows no longer end with `(undefined)`; a copy version with build metadata (`2.1.7+build`) compares by its numeric core instead of NaN (#219).
 - `scripts/lean.mjs` checks the `engines.node` floor (22.20) when run directly from a clone: below it, one stderr line names the running Node and the fix (`nvm use`, `install.sh`). `--help`, `--version`, `--doctor`, `--dry-run`, `--upgrade-agent` and `--adopt` without `--yes` keep working; install, uninstall, migrate and `--yes` exit 1 unless `LEAN_AGENTS_ALLOW_OLD_NODE=1` is set (#208).
 - Antigravity: an `agy` that is not on PATH is found in the installer folders (`~/.local/bin`; Windows `%LOCALAPPDATA%\agy\bin` and `~/.gemini/bin` (**VERIFY**)) by detection, `--doctor` and `--install-agent`, which run it by that path and never install over it (#211).
 - Antigravity `--uninstall` removes only the skill folders lean-agents installed (recorded in state.json or absent before the install); a user skill with the same name, such as `i-have-adhd`, is kept and never overwritten (#148).
@@ -33,6 +34,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Changed
 
+- The `--adopt` text report now prints every hook row and a `(note)`; linked skill copies are never auto-deleted and print a detail line (#213).
 - Release gate: `release.yml` stops before building anything when `docs/audit-<version>.md` is missing or an issue labeled `audit` is still open, so no release ships half audited. Audit findings of medium or higher get the new `audit` label.
 - The Cursor CLI installer pin moves to `cursor.com/install` as of 2026-11-13 (reviewed: one download from `downloads.cursor.com`, no sudo or eval), which fixes the `real-cursor` sha256 mismatch (#193).
 
