@@ -183,4 +183,76 @@ run_co
 [[ "$rc" == 0 && ! -e "$co/node_modules/marker" ]] || fail "changed lockfile did not reinstall: $rc $out"
 [[ "$(cat "$co/node_modules/.lean-agents-lock")" == "$(sha "$co/package-lock.json")" ]] || fail "lock stamp not updated"
 
+# The bare-PATH cases need symlinks to tools; Git Bash copies them without their DLLs. install.sh is for macOS and Linux (install.ps1 has tests/windows-install.ps1).
+case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) echo "--- (k)-(n) skipped on Windows"; echo "real-bootstrap: all cases passed"; exit 0 ;; esac
+
+echo "--- (k) no Node.js: a dry run shows the plan, installs nothing and exits 0"
+bare="$work/bare"
+mkdir -p "$bare"
+for c in bash sh env curl cp mkdir mktemp rm grep head cut tar mv dirname uname cat sed tr sha256sum shasum gzip ls date wc; do
+  if p="$(command -v "$c" 2>/dev/null)" && [[ -x "$p" ]]; then ln -sf "$p" "$bare/$c"; fi
+done
+refute env PATH="$bare" bash -c 'command -v node'
+new_home
+PATH="$bare" boot_run "$dist" --dry-run "${flags[@]}"
+[[ "$rc" == 0 && "$out" == *"Node.js 22.20 or newer is needed"* && "$out" == *"Dry run: nothing was installed"* ]] || fail "bare dry run: $rc $out"
+[[ "$(uname -s)" != Darwin || "$out" == *"official installer"* ]] || fail "no Homebrew option on macOS: $out"
+[[ -z "$(ls -A "$HOME")" ]] || fail "bare dry run wrote to HOME: $(ls -A "$HOME")"
+
+echo "--- (l) no Node.js: --yes downloads the checked tarball into its own folder, reruns reuse it"
+case "$(uname -s)" in Darwin) nos=darwin ;; *) nos=linux ;; esac
+case "$(uname -m)" in arm64|aarch64) narch=arm64 ;; *) narch=x64 ;; esac
+nd="$work/nodedist/latest-v24.x"
+ntop="node-v24.0.0-$nos-$narch"
+mkdir -p "$nd" "$work/nodebuild/$ntop/bin"
+printf '#!/bin/sh\nexec "%s" "$@"\n' "$(command -v node)" > "$work/nodebuild/$ntop/bin/node"
+chmod +x "$work/nodebuild/$ntop/bin/node"
+tar -czf "$nd/$ntop.tar.gz" -C "$work/nodebuild" "$ntop"
+printf '%s  %s\n' "$(sha "$nd/$ntop.tar.gz")" "$ntop.tar.gz" > "$nd/SHASUMS256.txt"
+new_home
+PATH="$bare" LEAN_AGENTS_NODE_DIST="$work/nodedist" boot_run "$dist" "${flags[@]}"
+[[ "$rc" == 0 && "$out" == *"LEAN_AGENTS_NODE_DIST is set"* ]] || fail "bare install: $rc $out"
+[[ -x "$HOME/.config/lean-agents/node/bin/node" && -f "$HOME/.config/lean-agents/src/scripts/lean.mjs" ]] || fail "private Node or engine missing"
+PATH="$bare" LEAN_AGENTS_NODE_DIST="$work/missing" boot_run "$dist" "${flags[@]}"
+[[ "$rc" == 0 && "$out" == *"already installed"* && "$out" != *"LEAN_AGENTS_NODE_DIST is set"* ]] || fail "bare rerun did not reuse the private Node: $rc $out"
+
+echo "--- (m) no Node.js: a bad Node.js checksum exits 1 and installs nothing"
+badn="$work/badnode"
+mkdir -p "$badn/latest-v24.x"
+cp "$nd/$ntop.tar.gz" "$badn/latest-v24.x/"
+printf '%s  %s\n' "$(printf '0%.0s' $(seq 64))" "$ntop.tar.gz" > "$badn/latest-v24.x/SHASUMS256.txt"
+new_home
+PATH="$bare" LEAN_AGENTS_NODE_DIST="$badn" boot_run "$dist" "${flags[@]}"
+[[ "$rc" == 1 && "$out" == *"checksum mismatch"* ]] || fail "bad node sum: $rc $out"
+[[ ! -e "$HOME/.config/lean-agents" ]] || fail "bad node sum left files: $(ls -A "$HOME/.config/lean-agents")"
+
+echo "--- (n) downloads pass the proxy and the company CA to curl, by name and path only"
+stub="$work/stubcurl"
+mkdir -p "$stub"
+cat > "$stub/curl" <<'STUB'
+#!/bin/sh
+# Records its arguments and the proxy variable, then serves the file from $STUB_DIST.
+printf '%s|%s\n' "$*" "${HTTPS_PROXY:-}" >> "$STUB_LOG"
+url=""; dest=""
+while [ $# -gt 0 ]; do
+  case "$1" in https://*) url="$1" ;; -o) shift; dest="$1" ;; esac
+  shift
+done
+cp "$STUB_DIST/${url##*/}" "$dest"
+STUB
+chmod +x "$stub/curl"
+echo "company ca" > "$work/ca.pem"
+new_home
+: > "$work/curl.log"
+PATH="$stub:$PATH" STUB_LOG="$work/curl.log" STUB_DIST="$dist" HTTPS_PROXY=http://proxy.example:8080 NODE_EXTRA_CA_CERTS="$work/ca.pem" \
+  boot_run "https://mirror.example/dist" --dry-run "${flags[@]}"
+[[ "$rc" == 0 ]] || fail "proxy dry run: $rc $out"
+grep -q -- "--cacert $work/ca.pem .*|http://proxy.example:8080\$" "$work/curl.log" || fail "curl did not get the CA and proxy: $(cat "$work/curl.log")"
+[[ -z "$(ls -A "$HOME")" ]] || fail "proxy dry run wrote to HOME: $(ls -A "$HOME")"
+: > "$work/curl.log"
+PATH="$stub:$PATH" STUB_LOG="$work/curl.log" STUB_DIST="$dist" NODE_EXTRA_CA_CERTS="$work/ca.pem" CURL_CA_BUNDLE="$work/ca.pem" \
+  boot_run "https://mirror.example/dist" --dry-run "${flags[@]}"
+[[ "$rc" == 0 ]] || fail "CURL_CA_BUNDLE dry run: $rc $out"
+refute grep -q -- "--cacert" "$work/curl.log"
+
 echo "real-bootstrap: all cases passed"
