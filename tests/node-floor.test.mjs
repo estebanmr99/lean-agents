@@ -47,3 +47,22 @@ test('at the floor, nothing is printed', () => {
   assert.equal(r.status, 0);
   assert.doesNotMatch(r.stderr, /older than/);
 });
+
+test('below the floor, --usage and --feedback-draft run and warn', () => {
+  for (const args of [['--usage', '--outbound', 'off'], ['--feedback-draft', '--failed-command', 'x']]) {
+    const r = run('22.12.0', args);
+    assert.equal(r.status, 0, `${args[0]}: ${r.stderr}`);
+    assert.match(r.stderr, /older than/);
+  }
+});
+
+// A user cannot fake a higher Node: the real (here preloaded as old) version still trips the guard.
+test('LEAN_AGENTS_NODE=99.0.0 on an old real Node still stops writing paths', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-floor-'));
+  const fake = "data:text/javascript,Object.defineProperty(process.versions,'node',{value:'22.12.0'})";
+  const env = { PATH: process.env.PATH, NVM_DIR: process.env.NVM_DIR ?? '', HOME: home, LEAN_AGENTS_NODE: '99.0.0' };
+  const r = spawnSync(process.execPath, ['--import', fake, path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, '--no-exec', '--yes', '--agents', 'claude'], { encoding: 'utf8', env });
+  fs.rmSync(home, { recursive: true, force: true });
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.stderr, /Node 22\.12\.0 is older than/);
+});
