@@ -22,6 +22,8 @@ import { clients, launchOf, pinOf, classify, npmCopies, skillDirs, duplicateSkil
 const j = path.join;
 const MANAGED_SKILLS = new Set(Object.entries(PINS).filter(([, p]) => p.kind === 'skill').map(([k]) => k));
 const MANAGED_HOOK = /\b(rtk|context-mode|gsd)\b/;
+// A pre-release sorts below its release (#204). shortcut: two pre-releases of one core compare equal, no -beta.2 vs -beta.10 order; upgrade when a pinned tool ships two.
+const cmpVersion = (a, b) => compare(String(a).split('-')[0], String(b).split('-')[0]) || (String(b).includes('-') - String(a).includes('-'));
 // Shell syntax (GSD's `$(for n in ...; done) file.js`) is named after the first script it runs (#202).
 const SHELL_HEAD = /^(\$\(|\(|\{)|^(for|if|while)$/;
 const SCRIPT_PATH = /[^\s"'();|&]+\.(?:[cm]?js|ts|ps1|sh)(?![\w.])/;
@@ -255,8 +257,7 @@ export async function inventory({ home, env = process.env, platform = process.pl
   for (const c of copies) byPin.set(c.pin, [...(byPin.get(c.pin) ?? []), c]);
   for (const c of copies) {
     const status = [];
-    // shortcut: compare() reads "2.1.7-beta" as NaN, so a pre-release copy counts as equal; no pinned tool ships one, revisit if that changes
-    const cmp = compare(c.version, PINS[c.pin].version);
+    const cmp = cmpVersion(c.version, PINS[c.pin].version);
     if (cmp < 0) status.push('drift');
     else if (cmp > 0) status.push('newer'); // newer than the pin: nothing to upgrade
     const dup = byPin.get(c.pin).length > 1;
