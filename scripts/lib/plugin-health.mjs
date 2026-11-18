@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { parse } from 'jsonc-parser';
 import { configHome, envDir } from './system.mjs';
 import { configPath } from './adapters/opencode-v2.mjs';
@@ -83,7 +83,11 @@ function wrapperDirs(root, name, fsx) {
 }
 
 // Cached wrapper(s) of `name` whose dependency tree is incomplete. No cached copy: nothing to report.
+// A name from config is joined into a path: no `..` segment and nothing absolute (POSIX or drive letter).
+export const safePluginName = (name) => !path.posix.isAbsolute(name) && !path.win32.isAbsolute(name) && !name.split(/[\\/]/).includes('..');
+
 export function checkDepTree(home, name, fsx = fs) {
+  if (!safePluginName(name)) return [];
   const root = cacheDir(home);
   const wrappers = [path.join(root, 'node_modules'), ...wrapperDirs(root, name, fsx).map((d) => path.join(d, 'node_modules'))];
   const out = [];
@@ -111,22 +115,41 @@ const freePort = () => new Promise((resolve, reject) => {
   const s = net.createServer().on('error', reject).listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); });
 });
 
+// Copies of the user's config and cache are capped: a runaway node_modules must not fill the disk of a read-only check.
+const COPY_CAP_BYTES = 256 * 1024 * 1024;
+const capped = (fsx) => { let bytes = 0; return (src) => { try { bytes += fsx.lstatSync(src).size; } catch { /* the copy reports it */ } if (bytes > COPY_CAP_BYTES) throw new Error('copy exceeds the size cap'); return true; }; };
+
+// Windows children need these to start at all; the rest points at the throwaway dir. SystemRoot and ComSpec are the OS's, not the user's.
+const winEnv = (tmp, env) => ({ SystemRoot: env.SystemRoot, ComSpec: env.ComSpec, APPDATA: tmp, LOCALAPPDATA: tmp, TEMP: tmp, TMP: tmp });
+
 // Opt-in (--probe-plugins): a short-lived `opencode serve` on loopback with a throwaway state dir. It gets COPIES of the user's OpenCode config and
 // of the cached wrapper of each plugin we know a command for, so nothing of the user's is written. GET /command (1.x) or /api/command (2.x) must list it.
-export async function probePlugins(home, { bin = 'opencode', fsx = fs, spawnFn = spawn, fetchFn = fetch, timeoutMs = 30000, env = process.env } = {}) {
+// Windows: `cmd /c` runs an npm `.cmd` shim, and taskkill /T ends the grandchildren that child.kill() would leave.
+export async function probePlugins(home, { bin = 'opencode', fsx = fs, spawnFn = spawn, spawnSyncFn = spawnSync, fetchFn = fetch, timeoutMs = 30000, env = process.env, platform = process.platform } = {}) {
   const wanted = [...new Set(readSpecs(home, fsx).map((e) => e.name))].filter((n) => COMMANDS[n]);
   if (!wanted.length) return [];
+  const win = platform === 'win32';
   const tmp = fsx.mkdtempSync(path.join(os.tmpdir(), 'lean-probe-'));
   const xdg = { XDG_CONFIG_HOME: path.join(tmp, 'config'), XDG_CACHE_HOME: path.join(tmp, 'cache'), XDG_DATA_HOME: path.join(tmp, 'data'), XDG_STATE_HOME: path.join(tmp, 'state') };
+  const stop = (c) => {
+    if (win && c.pid) { try { const r = spawnSyncFn('taskkill', ['/pid', String(c.pid), '/T', '/F'], { stdio: 'ignore' }); if (!r?.error && !r?.status) return; } catch { /* fall back to kill */ } }
+    c.kill();
+  };
   let child;
   try {
-    fsx.cpSync(path.join(configHome(home), 'opencode'), path.join(xdg.XDG_CONFIG_HOME, 'opencode'), { recursive: true });
-    const root = cacheDir(home);
-    for (const n of wanted) for (const d of wrapperDirs(root, n, fsx)) fsx.cpSync(d, path.join(xdg.XDG_CACHE_HOME, 'opencode', path.relative(root, d)), { recursive: true });
+    try {
+      const filter = capped(fsx);
+      fsx.cpSync(path.join(configHome(home), 'opencode'), path.join(xdg.XDG_CONFIG_HOME, 'opencode'), { recursive: true, filter });
+      const root = cacheDir(home);
+      for (const n of wanted) for (const d of wrapperDirs(root, n, fsx)) fsx.cpSync(d, path.join(xdg.XDG_CACHE_HOME, 'opencode', path.relative(root, d)), { recursive: true, filter });
+    } catch (e) {
+      return [{ id: 'probe-failed', plugin: '', line: `could not copy the config or plugin cache for the probe (${e.code ?? e.message}), so the command check was skipped`, fix: 'check for broken symlinks or a very large node_modules in the OpenCode cache; then run --doctor --probe-plugins again' }];
+    }
     const port = await freePort();
     const password = `probe-${process.pid}-${port}`;
-    child = spawnFn(bin, ['serve', '--hostname', '127.0.0.1', '--port', String(port)], {
-      cwd: tmp, stdio: 'ignore', env: { PATH: env.PATH, HOME: tmp, USERPROFILE: tmp, ...xdg, OPENCODE_SERVER_PASSWORD: password },
+    const serve = ['serve', '--hostname', '127.0.0.1', '--port', String(port)];
+    child = spawnFn(win ? env.ComSpec ?? 'cmd.exe' : bin, win ? ['/d', '/c', bin, ...serve] : serve, {
+      cwd: tmp, stdio: 'ignore', env: { PATH: env.PATH, HOME: tmp, USERPROFILE: tmp, ...(win ? winEnv(tmp, env) : {}), ...xdg, OPENCODE_SERVER_PASSWORD: password },
     });
     let spawnError = null;
     child.on?.('error', (e) => { spawnError = e; }); // opencode not on PATH: a finding, not a crash
@@ -142,17 +165,23 @@ export async function probePlugins(home, { bin = 'opencode', fsx = fs, spawnFn =
       }
       return null;
     };
+    // The first answer can come before plugins register, so keep asking until every command is listed or the deadline passes.
     const end = Date.now() + timeoutMs;
     let got = null;
-    while (got === null && !spawnError && Date.now() < end) { got = await names(); if (got === null) await new Promise((r) => setTimeout(r, 500)); }
+    for (;;) {
+      const now = await names();
+      if (now !== null) got = now;
+      if ((got !== null && wanted.every((n) => got.includes(COMMANDS[n]))) || spawnError || Date.now() >= end) break;
+      await new Promise((r) => setTimeout(r, 500));
+    }
     if (got === null) return [{ id: 'probe-failed', plugin: '', line: spawnError ? `could not start ${bin}: ${spawnError.code ?? spawnError.message}, so the command check was skipped` : 'a short-lived `opencode serve` did not answer in time, so the command check was skipped', fix: 'run --doctor --probe-plugins again; if it repeats, start `opencode serve` by hand and GET /command' }];
     return wanted.filter((n) => !got.includes(COMMANDS[n])).map((n) => ({ id: 'command-missing', plugin: n, line: `${n}: a fresh server does not list /${COMMANDS[n]}; the plugin is configured but not operational`,
       fix: 'check the dependency finding above, or pin an exact older version in both config files; then restart OpenCode' }));
   } finally {
     // wait for the exit so the server cannot write into the folder while it is removed
     if (child?.on && child.exitCode === null && child.signalCode === null) {
-      await new Promise((r) => { child.on('exit', r); setTimeout(r, 3000); try { child.kill(); } catch { r(); } });
-    } else { try { child?.kill(); } catch { /* already gone */ } }
+      await new Promise((r) => { child.on('exit', r); setTimeout(r, 3000); try { stop(child); } catch { r(); } });
+    } else { try { if (child) stop(child); } catch { /* already gone */ } }
     try { fsx.rmSync(tmp, { recursive: true, force: true }); } catch { /* best effort */ }
   }
 }

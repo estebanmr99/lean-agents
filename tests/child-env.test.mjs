@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { quiet, run } from '../scripts/lib/system.mjs';
-import { allowedEnv, childEnv, preset } from '../scripts/lib/network.mjs';
+import { allowedEnv, childEnv, preset, resetDropWarnings } from '../scripts/lib/network.mjs';
 
 // Probes live in files: `node -e` loses its quotes in the Windows shell.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-env-'));
@@ -120,4 +120,21 @@ test('allowedEnv: dropped variables are reported by name, never by value (#235)'
   let called = false;
   allowedEnv({ PATH: '/bin' }, 'linux', () => { called = true; });
   assert.equal(called, false);
+});
+
+test('allowedEnv warns once per name on stderr, and resetDropWarnings starts over', () => {
+  const lines = [];
+  const orig = console.error;
+  console.error = (m) => lines.push(m);
+  try {
+    resetDropWarnings();
+    allowedEnv({ GIT_CONFIG_COUNT: '1' }, 'linux');
+    allowedEnv({ GIT_CONFIG_COUNT: '1' }, 'linux');
+    allowedEnv({ GIT_CONFIG_COUNT: '1', GIT_ASKPASS: 'x' }, 'linux');
+    assert.equal(lines.length, 2);
+    assert.match(lines[1], /GIT_ASKPASS$/);
+    resetDropWarnings();
+    allowedEnv({ GIT_CONFIG_COUNT: '1' }, 'linux');
+    assert.equal(lines.length, 3);
+  } finally { console.error = orig; }
 });
