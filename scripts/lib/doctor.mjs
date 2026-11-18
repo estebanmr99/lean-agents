@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { sha } from './fsops.mjs';
 import { PINS, npmSpec, behindPins, nodeRange } from './pins.mjs';
-import { version, quiet } from './system.mjs';
+import { version, quiet, findAgy } from './system.mjs';
 import { satisfies, nodeSkipLine, minVersion } from './node-runtime.mjs';
 import { mcpLaunches, classify, duplicateSkills, skillDirs } from './inventory.mjs';
 import { stillNeeded, shellNotice } from './terminals.mjs';
@@ -49,14 +49,14 @@ function checkCursor(o, add, q) {
   }
 }
 
-function checkAntigravity(o, core, add, q, withMcp) {
-  const agents = q(['agy', 'agents']).out;
+function checkAntigravity(o, core, add, q, withMcp, agy = 'agy') {
+  const agents = q([agy, 'agents']).out;
   add('agy subagents loaded', core.every((a) => agents.includes(a)) ? 'ok' : 'error');
-  const mcp = withMcp ? q(['agy', 'mcp', 'list']) : { ok: false, out: '' };
+  const mcp = withMcp ? q([agy, 'mcp', 'list']) : { ok: false, out: '' };
   for (const s of ['serena', 'playwright'].filter((t) => withMcp && o.tools.includes(t))) {
     add(`agy mcp ${s}`, mcp.ok && mcp.out.includes(s) ? 'ok' : 'error', mcp.ok ? '' : 'agy mcp list failed');
   }
-  const plugins = q(['agy', 'plugin', 'list', '--json']).out;
+  const plugins = q([agy, 'plugin', 'list', '--json']).out;
   for (const t of ['rtk'].filter((p) => o.tools.includes(p))) {
     add(`agy plugin ${t}`, plugins.includes(`"${t}"`) ? 'ok' : 'error');
   }
@@ -142,8 +142,9 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
       for (const [bin, tool] of [['claude', 'claude'], ['opencode', 'opencode-v1'], ['opencode', 'opencode-v2'], ['copilot', 'copilot-cli'], ['agy', 'antigravity'], ['rtk', 'rtk'], ['context-mode', 'context-mode'], ['uvx', 'serena']]) {
         const needed = o.agents.includes(tool) || o.tools.includes(tool);
         if (!needed) continue;
-        const v = version(bin, undefined, childEnv(network));
-        add(`${bin} on PATH`, v ? 'ok' : 'error', v ?? 'not found');
+        const at = bin === 'agy' ? findAgy(home, platform, env) ?? bin : bin;
+        const v = version(at, undefined, childEnv(network));
+        add(at === bin ? `${bin} on PATH` : `${bin} found outside PATH`, v ? 'ok' : 'error', v ?? 'not found');
       }
       for (const [bin, agent] of [['code', 'vscode-copilot'], ['cursor-agent', 'cursor']]) {
         if (!o.agents.includes(agent)) continue;
@@ -160,7 +161,7 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
       }
       if (o.agents.some((a) => a.startsWith('opencode'))) checkOpenCode(o, add, q);
       if (o.agents.includes('copilot-cli')) checkCopilot(o, add, q, withMcp);
-      if (o.agents.includes('antigravity')) checkAntigravity(o, CORE_AGENTS, add, q, withMcp);
+      if (o.agents.includes('antigravity')) checkAntigravity(o, CORE_AGENTS, add, q, withMcp, findAgy(home, platform, env) ?? 'agy');
       // npx may have to download, which takes longer than a local check.
       if (o.tools.includes('codeburn')) add('codeburn runs', q(['npx', '-y', npmSpec('codeburn'), '--version'], 120000).ok ? 'ok' : 'error');
       if (o.tools.includes('autoskills')) add('autoskills runs', q(['npx', '-y', npmSpec('autoskills'), '--help'], 120000).ok ? 'ok' : 'error');
