@@ -4,9 +4,14 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Added
+
+- `tests/roundtrip.test.mjs`: one table-driven test runs install then `--uninstall` for each of the seven adapters in a temp HOME seeded with user files (a JSONC comment, a user MCP server, an agent and a skill named like managed ones) and asserts every file, path and bytes, equals the pre-install snapshot. Tests only (#164).
+
 ### Fixed
 
 - The child env no longer passes `GIT_CONFIG*`, `GIT_ASKPASS`, `GIT_SSH`, `GIT_SSH_COMMAND`, `GIT_PROXY_COMMAND`, `GIT_EXEC_PATH`, `GIT_EDITOR`, `GIT_PAGER`, `GIT_EXTERNAL_DIFF`, `NPM_CONFIG_SCRIPT_SHELL`, `NODE_PATH` or npm per-registry keys (`//host/:_authToken`), and drops a kept variable whose value has URL userinfo (`://user:pass@`, `://token@`) or starts like a `ghp_`, `github_pat_` or `npm_` token (not `PATH`, the basics or proxy and CA names; proxy URLs may keep their own `user:pass`). `NODE_OPTIONS` passes only when every token is `--use-system-ca`, `--use-openssl-ca`, `--use-bundled-ca`, `--use-env-proxy`, `--max-old-space-size=N` (or `N` as the next token) or `--dns-result-order=X` (or `X` as the next token); `--require`, `--import` and the like drop it (#163).
+- `scripts/lean.mjs` checks the `engines.node` floor (22.20) when run directly from a clone: below it, one stderr line names the running Node and the fix (`nvm use`, `install.sh`). `--help`, `--version`, `--doctor`, `--dry-run`, `--upgrade-agent` and `--adopt` without `--yes` keep working; install, uninstall, migrate and `--yes` exit 1 unless `LEAN_AGENTS_ALLOW_OLD_NODE=1` is set (#208).
 - Antigravity: an `agy` that is not on PATH is found in the installer folders (`~/.local/bin`; Windows `%LOCALAPPDATA%\agy\bin` and `~/.gemini/bin` (**VERIFY**)) by detection, `--doctor` and `--install-agent`, which run it by that path and never install over it (#211).
 - Antigravity `--uninstall` removes only the skill folders lean-agents installed (recorded in state.json or absent before the install); a user skill with the same name, such as `i-have-adhd`, is kept and never overwritten (#148).
 - `--install-agent antigravity` on macOS says the Homebrew cask cannot be pinned or verified and asks before installing it; #147 stays open (**VERIFY** pin by tarball).
