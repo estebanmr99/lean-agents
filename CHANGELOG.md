@@ -23,6 +23,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- CI: a push to main is no longer cancelled by the next merge, so the macOS and other main-only jobs finish for every merge (only pull request runs are cancelled by a newer push).
 - `--everything` no longer fills in default agents and tools when `--migrate` is given, and `install.sh` keeps a global npm prefix that the user set in `.npmrc` instead of forcing `~/.local` (review 6, #253 items 1 and 4).
 - `install.ps1 -Uninstall` retries removing the Node.js it installed when a file is still in use, instead of failing on a locked `node.exe` (seen once on main's Windows run).
 - `install.sh` uses the Node.js that Homebrew already has, instead of reporting that Node.js is missing when Homebrew exists but is not on `PATH` yet (found by the macOS run on main after #241).
