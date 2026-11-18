@@ -35,7 +35,7 @@ Necesitas Node.js 22.20+ y git. `--dry-run` lista cada archivo y comando; nada c
 npx lean-agents@latest --dry-run
 ```
 
-PowerShell usa el mismo comando. ¿Aún no tienes Node.js? Ve [Alternativa: bootstraps](#alternativa-bootstraps). Opciones y fijar una versión: [Inicio rápido](#inicio-rápido).
+PowerShell usa el mismo comando. ¿Máquina nueva? Ve [Mac o PC con Windows nuevos](#mac-o-pc-con-windows-nuevos---everything). ¿Aún no tienes Node.js? Ve [Alternativa: bootstraps](#alternativa-bootstraps). Opciones y fijar una versión: [Inicio rápido](#inicio-rápido).
 
 ### Novedades
 
@@ -217,6 +217,28 @@ Cada opción de `--help`. En PowerShell se escriben en PascalCase (`-DryRun`).
 | `--usage` | Imprime los créditos de Copilot que quedan (una llamada a `gh`, sin pedir al modelo) |
 | `--version` | Imprime la versión de lean-agents |
 | `--home <dir>` | Usa esta carpeta como tu carpeta personal; usa una carpeta temporal para probar sin riesgo |
+
+### Mac o PC con Windows nuevos (`--everything`)
+
+Un solo comando desde una máquina sin Node.js, git ni Homebrew. Detecta lo que ya tienes, planifica, pregunta una vez, aplica, y terminas con `--doctor`. Primero solo el plan:
+
+```bash
+curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --dry-run --everything
+curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/install.sh | bash -s -- --everything
+```
+
+```powershell
+& ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -DryRun --everything
+& ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) --everything
+```
+
+- **Planifica:** solo lo que falta. Primero los requisitos: Xcode Command Line Tools y Homebrew (macOS), nvm y Node.js 24 bajo nvm (tu propio Node sigue siendo el predeterminado), uv, RTK, Bun. Luego Claude Code y OpenCode 2 con todas las herramientas opcionales. En Windows también configura el Copilot CLI, VS Code Copilot y Antigravity que ya estén en la PC. `--agents` y `--tools` lo sobrescriben.
+- **Pregunta:** una sola cosa, `Apply these changes?` (`--yes` la acepta). El instalador propio de Homebrew pide tu contraseña de macOS. En Windows nada debería pedir admin (nvm-windows sin admin sigue en **VERIFY**).
+- **PC de empresa o proxy, en cinco líneas:** (1) lee antes [docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md); (2) define `HTTPS_PROXY`, `NO_PROXY` y `NODE_EXTRA_CA_CERTS` en tu propia terminal (nunca se escriben en disco); (3) agrega `--network off` en una PC de trabajo; (4) `--dry-run` muestra cada host y comando antes de ejecutar nada; (5) ¿ya usas OpenCode 1.x? Usa `--adopt`, no `--everything`. Más: [En una PC de trabajo](#en-una-pc-de-trabajo-proxy-red-y-revisión-de-seguridad).
+- **¿Se interrumpió?** Corre el mismo comando otra vez: los pasos terminados se omiten.
+- **Deshacer:** `--uninstall` quita lo que cambió lean-agents. Los requisitos que ya tenías se quedan; Homebrew no tiene deshacer automático (su desinstalador es interactivo); `~/.nvm` se borra solo si todos los Node que contiene son v24.
+
+El recorrido con las preguntas y lo que imprime cada paso: [docs/fresh-machine.md](docs/fresh-machine.md). Qué prueba el CI y qué sigue en **VERIFY**: [docs/compatibility.md](docs/compatibility.md).
 
 ### Alternativa: bootstraps
 
