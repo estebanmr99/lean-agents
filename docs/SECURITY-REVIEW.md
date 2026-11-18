@@ -80,7 +80,7 @@ Separate from the install-time commands above: code the agents download every ti
 | `npx -y skills@<pin>` and the skill sources `owner/repo#<commit>` (the tag while a commit is not recorded) | `skills-cli`, `caveman`, `i-have-adhd`, `lean-update`, `orca-cli` | |
 | `@dietrichgebert/ponytail@<pin>` (npm) and the Ponytail plugin (tag), `warp-opencode` | `ponytail`, `ponytail-plugin`, `warp-opencode` | |
 | Serena (`uvx --from git+https://github.com/oraios/serena@<commit>`) | `serena` | |
-| Bun zip and the agent installers (claude.ai, opencode.ai, antigravity.google, cursor.com), checked by SHA256. Cursor's installer downloads a tarball that is not checked (#206) | `bun`, `claude-installer`, `opencode-installer`, `antigravity-installer`, `cursor-installer` | |
+| Bun zip and the agent installers (claude.ai, opencode.ai, antigravity.google, cursor.com), the Homebrew installer (pinned by commit, run only on a Mac without Homebrew), checked by SHA256. Cursor's installer downloads a tarball that is not checked (#206) | `bun`, `claude-installer`, `opencode-installer`, `antigravity-installer`, `cursor-installer`, `homebrew-installer` | |
 | Agent CLIs from `--install-agent` (their versions go to the installers); CI-only harness CLIs | `claude-code`, `opencode-v2`, `opencode-v1`, `copilot-cli` | |
 | RTK, `gh` (brew, winget), `uv` | | latest from their source |
 

@@ -84,11 +84,16 @@ get_from() {
   fi
 }
 
+# Pinned by commit and sha256 (core/pins.json "homebrew-installer" must match; tests/install-sh-pins.test.mjs checks it).
+BREW_INSTALL_URL="https://raw.githubusercontent.com/Homebrew/install/e5b3c5834e3932c8aaa42deef4794076c9b0cbf0/install.sh"
+BREW_INSTALL_SHA256="5f333bbe53bc490e51e7ccb1df8779b3dd6ee73a1a7379efda216edb08ccb148"
+
 # The official Homebrew installer needs a terminal (it asks for your password), so stdin comes from /dev/tty.
 install_homebrew() {
   local t p
   t="$(mktemp -d)"
-  fetch https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh -o "$t/brew-install.sh" || { rm -rf "$t"; die "could not download the Homebrew installer."; }
+  fetch "$BREW_INSTALL_URL" -o "$t/brew-install.sh" || { rm -rf "$t"; die "could not download the Homebrew installer."; }
+  [[ "$(sha256_of "$t/brew-install.sh")" == "$BREW_INSTALL_SHA256" ]] || { rm -rf "$t"; die "checksum mismatch for the Homebrew installer. Nothing was run."; }
   /bin/bash "$t/brew-install.sh" </dev/tty || { rm -rf "$t"; die "the Homebrew installer failed."; }
   rm -rf "$t"
   for p in /opt/homebrew/bin/brew /usr/local/bin/brew; do
