@@ -27,6 +27,8 @@ grep -q 'lean-agents:start' "$HOME/.copilot/copilot-instructions.md"
 grep -q '^model: claude-opus-5.5$' "$HOME/.copilot/agents/planner.agent.md"
 test -f "$HOME/.agents/skills/caveman/SKILL.md"
 grep -q '"telemetry.telemetryLevel": "off"' "$user/settings.json"
+# The user prompts folder is not verified upstream (compatibility.md, #180 PR3): nothing may be written there.
+refute test -e "$user/prompts"
 
 # VS Code writes its own server into the user mcp.json: ours must be in the same file, beside it.
 "$code_bin" --add-mcp '{"name":"probe","command":"node","args":["--version"]}' </dev/null
