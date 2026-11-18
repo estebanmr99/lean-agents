@@ -2,7 +2,7 @@
 
 What comes next, in order. Each step is one build session in `docs/SPEC.md` section 14 and one PR. A step is done when its CI job with real binaries is green and its issues are closed.
 
-Latest release: [`v0.8.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.8.0) (2026-11-12). Earlier: [`v0.7.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.7.0) and [`v0.6.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.6.0) (2026-11-06, which raised the minimum Node to 22.20), and [`v0.5.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.5.0) (2026-11-04).
+Latest release: [`v1.0.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v1.0.0) (2026-11-18; the owner tags it). Earlier: [`v0.8.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.8.0) (2026-11-12), [`v0.7.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.7.0) and [`v0.6.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.6.0) (2026-11-06, which raised the minimum Node to 22.20), and [`v0.5.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.5.0) (2026-11-04).
 
 ## Done in 0.6.0: fixes from real installs (planned as 0.5.1)
 
@@ -52,10 +52,9 @@ Scope and order from the architecture checkpoint [`docs/checkpoints/0.7.0.md`](c
 - [#106](https://github.com/estebanmr99/lean-agents/issues/106), [#132](https://github.com/estebanmr99/lean-agents/issues/132): adopt a hand-built machine (inventory, back up, one Node, undo, keep OpenCode 1.x sessions).
 - [#124](https://github.com/estebanmr99/lean-agents/issues/124), [#123](https://github.com/estebanmr99/lean-agents/issues/123), [#130](https://github.com/estebanmr99/lean-agents/issues/130), [#78](https://github.com/estebanmr99/lean-agents/issues/78) (Windows shim).
 
-## 0.9.0
+## 0.9.0 (folded into 1.0.0)
 
-- [#80](https://github.com/estebanmr99/lean-agents/issues/80) part 2: guided OpenCode 1.x to 2.x upgrade with `opencode1` side by side, permanent session backup and undo. Needs a new plan: 2.x migrates the shared 1.x db in place (`docs/compatibility.md`).
-- [#103](https://github.com/estebanmr99/lean-agents/issues/103).
+No 0.9.0 release was cut: its scope (the guided OpenCode 1.x to 2.x upgrade, [#80](https://github.com/estebanmr99/lean-agents/issues/80) part 2, and the 0.8.0 audit fixes) shipped in 1.0.0.
 
 ## On hold
 
@@ -63,16 +62,23 @@ Scope and order from the architecture checkpoint [`docs/checkpoints/0.7.0.md`](c
 | --- | --- | --- |
 | 9 — Showcase | — | Logo, one short GIF per use case (dry run, uninstall, all-off preset, team mode), "who it is for" in the README |
 
-## Later: 1.0.0
+## 1.0.0 (current)
 
-- [#103](https://github.com/estebanmr99/lean-agents/issues/103): harness benchmark and personal vs enterprise recommendation (later).
+Details in `CHANGELOG.md` and [`audit-1.0.0.md`](audit-1.0.0.md). Closed: the 0.8.0 audit issues ([#155](https://github.com/estebanmr99/lean-agents/issues/155) to [#169](https://github.com/estebanmr99/lean-agents/issues/169) except [#160](https://github.com/estebanmr99/lean-agents/issues/160)), [#181](https://github.com/estebanmr99/lean-agents/issues/181) and the review follow-ups. Code and docs are merged for these; they stay open for proof only the owner can give (see the audit, "Owner-only gates"):
+
+- [#80](https://github.com/estebanmr99/lean-agents/issues/80) part 2: guided OpenCode 1.x to 2.x upgrade with `opencode1` side by side, permanent session backup, undo and rollback. Open: the work-PC trial ([#145](https://github.com/estebanmr99/lean-agents/issues/145)).
+- [#179](https://github.com/estebanmr99/lean-agents/issues/179): fresh machine, `--everything` from a clean Mac or Windows PC, nightly CI. Open: fresh Mac and PC runs by the owner.
+- [#180](https://github.com/estebanmr99/lean-agents/issues/180): install with the VS Code Copilot chat agent. Open: a logged-in run (`docs/vscode-agent-checklist.md`).
+- [#182](https://github.com/estebanmr99/lean-agents/issues/182): release train: update plan, agent CLI upgrades inside a major, `--update --undo`, self-updaters off.
+- [#160](https://github.com/estebanmr99/lean-agents/issues/160): npm publish through trusted publishing only. Open until the tag run proves it.
+- Launch: run `docs/launch.md` after the tag.
+
+## After 1.0.0
+
+- [#103](https://github.com/estebanmr99/lean-agents/issues/103): harness benchmark and personal vs enterprise recommendation (needs an inference budget).
 - Close the **VERIFY** items in `docs/compatibility.md` that need a logged-in app (Antigravity rule and skill loading, Copilot `model` format, VS Code reading Copilot CLI hooks).
 - Codex CLI and Gemini CLI adapters.
-- [#179](https://github.com/estebanmr99/lean-agents/issues/179): fresh machine, one command from a clean Mac or Windows PC to the full setup, proven in CI. Code and nightly CI are in; docs are in `docs/fresh-machine.md` (PR7). Open: the owner runs it once on a truly fresh Mac and PC and reports on the issue.
-- [#180](https://github.com/estebanmr99/lean-agents/issues/180): install with an agent, VS Code Copilot chat (agent mode) as the installing agent for peers.
-- [#181](https://github.com/estebanmr99/lean-agents/issues/181): finish step, local HTML summary, login checklist and an agent verify prompt that files feedback issues. Code is in (PR1-PR3: data, verify prompt, `--summary` page); open: the owner opens the page once on a real machine.
-- [#182](https://github.com/estebanmr99/lean-agents/issues/182): release train, one command updates everything lean-agents installed, to the release's pins, with version notes.
-- Tag `v1.0.0` and run the full launch in `docs/launch.md`.
+- Open issues and why they do not gate 1.0: `audit-1.0.0.md`.
 
 ## Promotion
 

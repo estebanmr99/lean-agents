@@ -27,13 +27,13 @@ Repeat the same prompt for each session. Each session must leave the repository 
 - Negative checks in test scripts must not start with `! `: `set -e` ignores that. Use `refute` or `if`.
 - OpenCode 1 facts verified on 1.19.0: singular `agent` and `plugin`, flat `mcp`, `compaction.reserved`, `autoupdate`, `disabled_providers`. `opencode debug config` prints one object; `opencode agent list` lists agents. DCP now also installs on OpenCode 2, but lean-agents keeps it 1.x only; the notes in sections 6 and 14 saying it has no V2 release are out of date.
 - OpenCode 2 facts verified on 2.2.5: native keys are `agents` (not `agent`), top-level `policies`, `plugins`, `mcp.servers`, `compaction.buffer`, `update`, `share`. `opencode debug config` prints a JSON array of config sources (`{type, path, info}`); `opencode debug agents` lists agents.
-- The owner dropped the before/after savings claim (2026-11-03): the repo cannot show one, so the README "Why" has no numbers. `docs/launch.md`, `release.yml`, the banner, the demo GIF and the `assets` workflow exist. `1.0.0`, the tag and the release still need the owner's separate go.
+- The owner dropped the before/after savings claim (2026-11-03): the repo cannot show one, so the README "Why" has no numbers. `docs/launch.md`, `release.yml`, the banner, the demo GIF and the `assets` workflow exist. The 1.0.0 tag and release are the owner's step (checklist in the release prep PR).
 - Session 8 research is done (2026-11-03, Orca `v1.4.247`): `docs/compatibility.md` "Terminals". Orca's default permission mode adds no bypass flag; only Yolo adds one. Session 8 (2026-11-04): terminal integrations for users who already have Warp or Orca; the apps are never installed.
 - Testing policy: the owner does not test on their working machines. Every claim is proven in CI with throwaway HOME directories and real binaries (`tests/real-opencode.sh`).
 - Commits are authored by the owner (`git config user.name/user.email` set to their GitHub no-reply address) with a `Co-Authored-By` trailer for the agent.
 - Since session 6: Node.js 22.20+ (20.12+ before 0.6.0) and one more dependency, `@clack/prompts` (menus only on a real terminal). Network choices live in `scripts/lib/network.mjs` (`options.network` in `state.json`, `privacy` derived from it, so adapters can still read `opts.privacy`); undocumented settings in `scripts/lib/unverified.mjs` are never configured, only saved as user notes under `~/.config/lean-agents/notes/`.
 - Session 7 (2026-11-03): adapters `vscode-copilot` and `cursor`, `--project <dir>` team mode, `docs/claude-with-copilot.md`. Cursor user rules have no file (settings UI only). The VS Code user `mcp.json` path is proven by `code --add-mcp` in `real-vscode` (Linux, macOS); Copilot Chat ships built into VS Code; Cursor skills land in `~/.agents/skills`.
-- Latest release: 0.8.0 (2026-11-12). Earlier: 0.7.0 and 0.6.0 (2026-11-06, minimum Node 22.20, breaking), 0.5.0 (2026-11-04). On hold: Session 9. `docs/ROADMAP.md` maps each issue to its release; "Later: 1.0.0" lists #103, #179, #180, #181, #182.
+- Latest release: 1.0.0 (2026-11-18, the owner tags it). Earlier: 0.8.0 (2026-11-12), 0.7.0 and 0.6.0 (2026-11-06, minimum Node 22.20, breaking), 0.5.0 (2026-11-04). On hold: Session 9. `docs/ROADMAP.md` maps each issue to its release; "After 1.0.0" lists #103; the 1.0.0 gates are in `docs/audit-1.0.0.md`.
 - Private terms are blocked by `scripts/check-private.sh` using the `PRIVATE_DENYLIST` repository secret in CI and a gitignored `.private-denylist` locally.
 
 ## 1. Product
@@ -508,6 +508,10 @@ Mark each `[x]` when merged.
 - [x] **Session 106 — Adopt a hand-built machine** (0.8.0). Issues #106, #104 points 4 and 5, #132. PRs #135 (doctor Node per tool), #138 (`--adopt` dry run, `--json`), #140 (apply, undo, backup, `real-adopt`).
 - [x] **Issue #78 — Orca status on OpenCode 1.x** (0.8.0). PR #136. Windows-only shim, `NO_PROXY` and Ctrl+P notes. The bug was not reproduced in CI, so #78 stays open for the work PC.
 - [x] **Session 80 — Agent lifecycle, part 1** (0.8.0). Issue #80. PRs #139 (`--migrate` to and from Antigravity), #141 (`--upgrade-agent opencode` dry run, `lean-migrate` skill), #142 (`--install-agent` / `--uninstall-agent`), #143 (side-by-side spike, manual workflow). The guided upgrade itself (PR B) moves to 0.9.0: the spike showed 2.x migrates the shared 1.x db in place; owner layout note in the 0.9.0 plan.
+- [x] **0.8.0 audit fixes** (1.0.0). Issues #155 to #168 (except #160 and #169 as owner steps; #169 done), PRs #183 to #188, #191, #192, #217, #222, #224, #225, #230. `docs/audit-1.0.0.md` lists each issue with its PR.
+- [x] **Reviews 1 to 9** (1.0.0). Issues #213, #219, #229, #235, #238, #253, #268, #278, #282, #284; fixes in #221, #231, #237, #240, #255, #272, #281, #283, #285. Open follow-ups are in the audit.
+- [x] **Issue #181 — Summary page** (1.0.0). Issue #181, PRs #275, #276, #286.
+- [ ] **Release 1.0.0 gates** (the owner). Issues #160 (OIDC proof), #145 (work-PC trial), #179 (fresh Mac and PC runs), #180 (logged-in VS Code agent run); the sessions for #80 part 2, #179, #180 and #182 are merged in code and docs, so the issues stay open for that proof. Tag and publish are the owner's; mark `[x]` when the tag run is green.
 
 ### Session 9 — Showcase
 

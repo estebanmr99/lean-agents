@@ -4,6 +4,19 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-18
+
+First stable release. Highlights since 0.8.0:
+
+- **Fresh machine:** `--everything` plans and installs the prerequisites (Node.js, git, Homebrew or winget, nvm) and the full setup from a clean Mac or Windows PC; `install.sh` and `install.ps1` work without Homebrew, Node.js, git or winget. A nightly workflow runs it ([#179](https://github.com/estebanmr99/lean-agents/issues/179)).
+- **OpenCode 1.x to 2.x, guided:** `--upgrade-agent opencode` backs up the 1.x sessions to a permanent frozen copy, installs 2.x next to the 1.x binary (`opencode1`), translates the config, and has an undo and a rollback ([#80](https://github.com/estebanmr99/lean-agents/issues/80)).
+- **Install by VS Code Copilot agent mode:** a guide, a `--json` summary and the VS Code Copilot adapter in the agent lifecycle ([#180](https://github.com/estebanmr99/lean-agents/issues/180)).
+- **Update plan and undo:** `--update --dry-run` shows what moves and the release notes, `--update` also moves the agent CLIs inside a major, and `--update --undo` restores the previous versions ([#182](https://github.com/estebanmr99/lean-agents/issues/182)).
+- **Antigravity and Cursor:** Antigravity pilot (IDE and extension detection, proxy variables in `--doctor`), more pins (Antigravity cask, Bun, rtk, uv, gh), and the Cursor installer re-pinned twice.
+- **Summary page:** the finish step writes a local HTML page with the log-ins to do, an agent verify prompt and next steps ([#181](https://github.com/estebanmr99/lean-agents/issues/181)).
+- **CI:** macOS legs and the slow Windows legs skip pull requests (macOS runs nightly and on dispatch); the release workflow publishes to npm through trusted publishing only ([#160](https://github.com/estebanmr99/lean-agents/issues/160)).
+- **Hardening:** eight independent reviews and the 0.8.0 audit are fixed or tracked in [`docs/audit-1.0.0.md`](docs/audit-1.0.0.md).
+
 ### Added
 - Summary page (#181 PR3, closes #181): `scripts/lib/summary-html.mjs` renders one self-contained HTML (inline CSS and JS, no network; EN and ES; light and dark; word budget tested): red Action needed (log-ins, the verify prompt with a copy button), Summary, Next steps, How to use, Updates. The finish step and `--summary` write it as an owned `summary.html` in the state dir (`--uninstall` removes it) and print its path; the browser opens only after a yes, never under CI, `--yes`, `--json` or `--no-open`. `--filed-issue "item=issue url"` records an issue the verify prompt filed.
 - `docs/vscode-agent-checklist.md` (#180 PR5, docs only): one-time manual checklist for a real work PC (VS Code Copilot agent mode behind a proxy): paste the prompt, answers, blocked terminal tool, `--doctor`, undo, and the exact `compatibility.md` VERIFY row each step moves, with the fields to record.
