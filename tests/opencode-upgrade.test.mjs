@@ -47,6 +47,9 @@ function liveTree(home) {
   return out.sort().join('\n');
 }
 
+// 1.x writes its state folder while it runs: once it has, the frozen copy may differ from the backup.
+const ran1x = (L) => { fs.mkdirSync(j(L.lean, 'opencode1', 'state'), { recursive: true }); fs.writeFileSync(j(L.lean, 'opencode1', 'state', 'log'), 'x'); };
+
 function fixture({ withBackup = true } = {}) {
   const home = fs.realpathSync(fs.mkdtempSync(j(os.tmpdir(), 'lean-upg-')));
   seedWorkPc(home);
@@ -98,9 +101,12 @@ test('preflight: no stamp, a running opencode, a changed backup, changed live da
   assert.match(pre({ upgrade: { status: 'applied' } }).join(), /already applied/);
   assert.deepEqual(pre({ upgrade: { status: 'rolled-back' } }), [], 'a finished rollback allows a new apply');
   fs.writeFileSync(j(f.L.live, 'storage', 's1.json'), '{"id":"s1","new":true}');
+  fs.writeFileSync(j(f.L.frozen, 'opencode', 'storage', 's1.json'), '{"id":"s1"}');
   assert.match(pre().join(), /live data changed since the backup.*storage\/s1\.json/);
   // Live data that differs from the backup but equals the frozen copy (the state --undo leaves) is fine; the baseline says which.
   fs.writeFileSync(j(f.L.frozen, 'opencode', 'storage', 's1.json'), '{"id":"s1","new":true}');
+  assert.match(pre().join(), /not trusted/, 'a frozen copy that differs from the backup, with no 1.x run on it, is refused');
+  ran1x(f.L);
   assert.deepEqual(pre(), []);
   assert.equal(applyPreflight({ home: f.home, stamp, upgrade: null, list: none, opencodeRunning: () => false }).baseline, 'frozen');
   fs.writeFileSync(j(f.L.live, 'storage', 's1.json'), '{"id":"s1"}');
@@ -113,6 +119,7 @@ test('preflight: no stamp, a running opencode, a changed backup, changed live da
 test('restoreData: the frozen copy comes back, the 2.x db is moved aside, backup and frozen copy are kept, other files stay', { skip }, () => {
   const f = fixture();
   const stamp = readBackupStamp(f.home);
+  ran1x(f.L);
   fs.writeFileSync(j(f.L.frozen, 'opencode', 'opencode.db'), '4'); // a 1.x session made through opencode1
   const frozenSha = sha256File(j(f.L.frozen, 'opencode', 'opencode.db'));
   fs.writeFileSync(j(f.L.live, 'opencode.db'), 'migrated by 2.x');
@@ -286,6 +293,7 @@ for (const overwrite of [true, false]) {
     assert.equal(liveDiffers(m.f.L, r.stamp.dir), null, 'apply never touches the live data');
     // The user starts 2.x and it migrates the db; then they use opencode1 once.
     fs.writeFileSync(j(m.f.L.live, 'opencode.db'), 'migrated by 2.x');
+    ran1x(m.f.L);
     fs.writeFileSync(j(m.f.L.frozen, 'opencode', 'opencode.db'), '4');
     const un = await runUndo({ steps: r.steps, journal: r.journal, save: quiet, ctx: r.ctx, log: quiet, restore: r.restore });
     assert.equal(un, true, m.log.join('\n'));
@@ -332,6 +340,7 @@ test('apply on Windows-like manual 2.x install fails at install2x and rolls back
 test('apply after an earlier --undo (live data equals the frozen copy, not the backup): same rollback, no data move', { skip }, async () => {
   const m = await machine({ overwrite: false });
   fs.writeFileSync(j(m.f.L.live, 'storage', 's1.json'), '{"id":"s1","after":"undo"}');
+  ran1x(m.f.L);
   fs.writeFileSync(j(m.f.L.frozen, 'opencode', 'storage', 's1.json'), '{"id":"s1","after":"undo"}');
   const start = liveTree(m.f.home);
   const r = await applyWith(m, 'dcp');
@@ -409,4 +418,57 @@ test('undo stops, and keeps the opencode1 copy, when the overwritten 1.x binary 
   assert.equal(r.journal.status, 'undo-failed');
   assert.match(r.journal.error, /not restored; the opencode1 copy is kept/);
   assert.ok(fs.existsSync(copy));
+});
+
+test('restoreData: a frozen copy that no longer equals the backup (no 1.x run on it) is not used; the backup is the source', { skip }, () => {
+  const f = fixture();
+  const stamp = readBackupStamp(f.home);
+  fs.writeFileSync(j(f.L.frozen, 'opencode', 'opencode.db'), '9');
+  fs.writeFileSync(j(f.L.live, 'opencode.db'), 'migrated');
+  const logs = [];
+  const r = restoreData({ home: f.home, backupDir: stamp.dir, count, statfs: roomy, log: (l) => logs.push(l) });
+  assert.equal(r.source, j(stamp.dir, 'data'));
+  assert.match(logs.join('\n'), /differs from the backup: not used/);
+});
+
+test('runUndo: a journal saved to disk with a step still running is read back and undone (kill midway)', async () => {
+  const calls = [];
+  const onDisk = JSON.parse(JSON.stringify({ status: 'applying', backup: '/opt/x/b', steps: [{ id: 'a', status: 'done' }, { id: 'b', status: 'running' }] }));
+  const ok = await runUndo({ steps: fakeSteps(calls), journal: onDisk, save: quiet, ctx: ctxFor(), log: quiet, restore: async () => ({ sessions: 3, aside: '/opt/x/aside' }) });
+  assert.equal(ok, true);
+  assert.deepEqual(calls, ['undo b', 'undo a']);
+  assert.equal(onDisk.status, 'undone');
+});
+
+test('a journal that cannot be saved does not hide the way out: ROLLBACK STOPPED / undone still reported', async () => {
+  const logs = [];
+  const journal = {};
+  let n = 0;
+  const save = () => { if (n++ >= 3) throw new Error('EPERM: rename'); };
+  const ok = await runApply({ steps: fakeSteps([], { failRun: 'a' }), journal, save, ctx: ctxFor(), log: (l) => logs.push(l), restore: async () => {} });
+  assert.equal(ok, false);
+  assert.match(logs.join('\n'), /could not save the journal \(EPERM/);
+  assert.match(logs.join('\n'), /ROLLBACK STOPPED.*RESTORE\.md/s);
+});
+
+test('restoreData: a rename that fails on the second item puts the old data back (put-back branch)', { skip }, () => {
+  const f = fixture();
+  const stamp = readBackupStamp(f.home);
+  fs.writeFileSync(j(f.L.live, 'opencode.db'), 'migrated');
+  fs.writeFileSync(j(f.L.live, 'storage', 'only2x.json'), '{}');
+  let calls = 0;
+  const rename = (a, b) => { if (++calls === 4) throw Object.assign(new Error('EPERM: rename'), { code: 'EPERM' }); fs.renameSync(a, b); };
+  assert.throws(() => restoreData({ home: f.home, backupDir: stamp.dir, count, statfs: roomy, rename, log: quiet }), /EPERM.*the old data was put back/);
+  assert.equal(fs.readFileSync(j(f.L.live, 'opencode.db'), 'utf8'), 'migrated');
+  assert.equal(fs.existsSync(j(f.L.live, 'storage', 'only2x.json')), true);
+  assert.equal(fs.readFileSync(j(f.L.live, 'auth.json'), 'utf8'), 'synthetic secret');
+  assert.equal(fs.readFileSync(j(f.L.frozen, 'opencode', 'opencode.db'), 'utf8'), '3', 'frozen copy untouched');
+});
+
+test('the opencode1 step saves its entries on every push (a kill after the shim write leaves them in the journal)', { skip }, async () => {
+  const m = await machine({ overwrite: false });
+  const snaps = [];
+  m.d.save = () => snaps.push(JSON.stringify(m.S.upgrade?.steps?.find((x) => x.id === 'opencode1')?.entries ?? []));
+  await applyWith(m, 'opencode1');
+  assert.ok(snaps.some((x) => JSON.parse(x).length > 0), 'entries were saved while the step ran');
 });
