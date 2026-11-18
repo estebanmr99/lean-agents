@@ -26,8 +26,12 @@ export const pinSpec = (key) => (pin(key).kind === 'git' ? gitSpec(key) : npmSpe
 export const nodeRange = (key) => pin(key).node;
 export const bunPin = () => pin('bun');
 export const skillsCli = () => npmSpec('skills-cli');
-// `download` pins (Bun) are verified by SHA256 at install time and not tracked in state.json.
-const tracked = (p) => !p.ciOnly && p.kind !== 'download';
+// `download` pins (Bun) are verified by SHA256 at install time; `tool` (rtk, uv, gh) and `cask` (Antigravity) pins are
+// package-manager installs we cannot pin, so they are a minimum and a known-good version, not something state.json records.
+const tracked = (p) => !p.ciOnly && !['download', 'tool', 'cask'].includes(p.kind);
+// [{ key, source, via, version, min }] for the tools the update plan reports against: rtk, uv, gh, the Antigravity cask and Bun.
+export const toolPins = () => Object.entries(PINS).filter(([, p]) => ['tool', 'cask'].includes(p.kind) || p.tagPrefix)
+  .map(([key, p]) => ({ key, source: p.source, via: p.via ?? p.kind, version: p.version, min: p.min ?? null }));
 export const pinVersions = () => Object.fromEntries(Object.entries(PINS).filter(([, p]) => tracked(p)).map(([k, p]) => [k, p.version]));
 
 // Pin keys that differ from the tool name lean-agents saves in state.json options.tools.

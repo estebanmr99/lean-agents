@@ -19,7 +19,9 @@ export function isNewer(current, next) {
 }
 
 export function notesUrl(p, version) {
-  return p.kind === 'npm' ? `https://www.npmjs.com/package/${p.source}/v/${version}` : `https://github.com/${p.source}/releases/tag/${version}`;
+  if (p.kind === 'npm') return `https://www.npmjs.com/package/${p.source}/v/${version}`;
+  if (p.kind === 'cask') return `https://formulae.brew.sh/cask/${p.source}`;
+  return `https://github.com/${p.source}/releases/tag/${p.tagPrefix ?? ''}${version}`;
 }
 
 function render(key, p, version) {
@@ -55,8 +57,12 @@ export function plan(pins, latest, issues) {
 
 export async function latestVersion(p, get) {
   if (p.kind === 'npm') return (await get(`https://registry.npmjs.org/${p.source.replace('/', '%2F')}/latest`)).version;
+  // Homebrew cask (Antigravity): its version is "1.5.11,<build>"; only the part before the comma is the release.
+  if (p.kind === 'cask') return (await get(`https://formulae.brew.sh/api/cask/${p.source}.json`)).version.split(',')[0];
   // shortcut: first 100 tags only, enough for repos that tag per release; page if a repo outgrows that.
-  const tags = (await get(`https://api.github.com/repos/${p.source}/tags?per_page=100`)).map((t) => t.name).filter((n) => STABLE.test(n));
+  // tagPrefix: Bun tags `bun-v1.4.4`; the prefix is dropped so versions compare as x.y.z.
+  const pre = p.tagPrefix ?? '';
+  const tags = (await get(`https://api.github.com/repos/${p.source}/tags?per_page=100`)).map((t) => t.name).filter((n) => n.startsWith(pre)).map((n) => n.slice(pre.length)).filter((n) => STABLE.test(n));
   return tags.reduce((best, n) => (!best || isNewer(best, n) ? n : best), null);
 }
 

@@ -56,7 +56,8 @@ export async function bump({ text, get, now = Date.now(), today = new Date(now).
   const pins = JSON.parse(text).pins;
   const changes = [];
   for (const [key, p] of Object.entries(pins)) {
-    if (SKIP.has(key) || p.kind === 'download') continue;
+    // Bun's sha256 map is copied by hand; a cask has no release date for the 14-day rule: both are reported by version-watch.
+    if (SKIP.has(key) || p.kind === 'download' || p.kind === 'cask') continue;
     if (p.hold) { log(`held: ${key} ${p.version} (${p.hold})`); continue; }
     try {
       const pick = await pickVersion(p, get, now);
