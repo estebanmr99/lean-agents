@@ -32,7 +32,10 @@ import { isActive, failAt, applyPreflight, verifyBackup, configDrift, createStep
 import { planOpencode1, installOpencode1, removeOpencode1, layout as opencode1Layout } from './lib/opencode1.mjs';
 import { agentLifecycle, agentTable, upgradeCommands, undoPlan, undoUpgrades, agentOf, installedAgents, VSCODE_NOTE } from './lib/agent-lifecycle.mjs';
 import { copilotUsage } from './lib/copilot-usage.mjs';
-import { draftIssue } from './lib/feedback.mjs';
+import { draftIssue, addFiledIssue } from './lib/feedback.mjs';
+import { buildSummary } from './lib/summary-data.mjs';
+import { loginRows } from './lib/logins.mjs';
+import { renderSummary, canOffer, openArgv } from './lib/summary-html.mjs';
 import { planUpdate, changelogNotes, formatUpdatePlan } from './lib/update-plan.mjs';
 import { PINS, pinVersions, behindPins, pinTool, nodeRange, npmSpec } from './lib/pins.mjs';
 import { findNvm, installedNodes, resolveToolNodes, nvmLatest, nvmInstallArgv, nvmEnv, toolEnv, satisfies } from './lib/node-runtime.mjs';
@@ -121,6 +124,9 @@ function parseArgs(argv) {
       case '--update': o.command = 'update'; break;
       case '--uninstall': o.command = 'uninstall'; break;
       case '--doctor': o.command = 'doctor'; break;
+      case '--summary': o.command = 'summary'; break;
+      case '--no-open': o.noOpen = true; break;
+      case '--filed-issue': (o.filedIssues ??= []).push(next()); break;
       case '--adopt': o.command = 'adopt'; break;
       case '--upgrade-agent': o.command = 'upgrade-agent'; o.upgradeAgent = next(); if (!['opencode', 'vscode-copilot'].includes(o.upgradeAgent)) throw new Error('--upgrade-agent takes opencode or vscode-copilot'); break;
       case '--undo': o.undo = true; break;
@@ -196,6 +202,8 @@ const HELP = `Usage: lean-agents [options]
                          upgraded agent CLIs alone; use --uninstall-agent for ones lean-agents installed
   --uninstall            Undo everything lean-agents changed
   --doctor               Check the install
+  --summary              Write the summary page (summary.html in the state dir; --uninstall removes it) and ask before opening it.
+                         --filed-issue "item=issue url" records an issue you filed; --no-open only prints the path
   --adopt                List what a hand-built machine already has (MCPs, hooks, plugins, skills, npm copies),
                          classify each (managed, user, stale, duplicate, drift, wrong-node) and print the planned
                          actions; changes nothing (with --json: one JSON object). Always pass --home to try it
@@ -741,6 +749,7 @@ async function install(o) {
   save();
   if (o.json) printApplied(o, files, report, errors);
   console.log(`\nDone. Backups: ${backupDir}`);
+  if (!o.project) await summaryPage(o, { updated: o.command === 'update' ? report.filter((r) => r.ok).map((r) => r.desc) : [] });
   if (o.project) return console.log('Next: review and commit these files. Each teammate runs the installer once for the tools (rtk, context-mode, ...).');
   console.log('Next: restart your agents, log in to your providers, then run --doctor.');
   const shell = shellNotice();
@@ -918,6 +927,54 @@ async function revertUpgradeFiles(o, S) {
   }
 }
 
+// The finish-step page (#181): an owned file in the state dir (--uninstall removes it). Returns its path, or null when nothing was written.
+async function summaryPage(o, { updated = [] } = {}) {
+  const state = readState(o.home);
+  if (!state) return null;
+  const rows = [];
+  doctor({ home: o.home, state, exec: o.exec, nodeVersion: NODE_VERSION, collect: rows });
+  const network = state.options.network ?? o.network;
+  const lang = o.lang ?? state.options.lang ?? 'en';
+  const model = buildSummary({
+    state, rows, updated, home: [o.home, os.homedir()], lang,
+    applied: { ok: true, version: state.version, files: state.files.map((f) => f.path), commands: state.commands.map((c) => ({ desc: c.desc, ok: c.ok })), errors: [] },
+    logins: loginRows({ agents: state.options.agents, gh: !!state.options.gh, exec: o.exec, outbound: network.outbound }),
+  });
+  const file = path.join(stateDir(o.home), 'summary.html');
+  const content = renderSummary({ model, filed: state.filedIssues, network, home: [o.home, os.homedir()] });
+  const [planned] = plan([{ kind: 'file', path: file, content }], writeRoots(o), state.files);
+  if (planned.status === 'skip') { console.log(`Summary page not written: ${file} ${planned.note}.`); return null; }
+  const [entry] = apply([planned], path.join(stateDir(o.home), 'backups', 'summary'), o.home, writeRoots(o));
+  if (entry) {
+    // A rewrite keeps the first record (created, backup), so --uninstall still removes the file.
+    const first = state.files.find((f) => f.path === file);
+    state.files = [...state.files.filter((f) => f !== first), { ...entry, ...(first && { created: first.created, backup: first.backup }) }];
+    writePrivate(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(state, null, 2)}\n`);
+  }
+  console.log(`Summary page: ${file}`);
+  if (canOffer({ noOpen: o.noOpen, yes: o.yes, json: o.json, tty: process.stdin.isTTY && process.stdout.isTTY })) {
+    const p = await prompter(false);
+    try { if (yesNo(await p.ask('Open it in your browser?', 'n'))) quiet(openArgv(process.platform, file), 15000); } finally { p.close(); }
+  }
+  return file;
+}
+
+// --summary: rebuild the page from state.json, after recording the issues the verify prompt filed (--filed-issue "item=url").
+async function summaryCommand(o) {
+  const state = readState(o.home);
+  if (!state) { console.log('lean-agents is not installed: nothing to summarize.'); process.exitCode = 1; return; }
+  if (o.filedIssues?.length) {
+    const home = [o.home, os.homedir()];
+    for (const f of o.filedIssues) {
+      const at = f.lastIndexOf('=');
+      if (at < 1) throw new Error('--filed-issue takes "item=issue url"');
+      state.filedIssues = addFiledIssue(state.filedIssues, { item: f.slice(0, at), title: f.slice(0, at), url: f.slice(at + 1) }, { home });
+    }
+    writePrivate(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(state, null, 2)}\n`);
+  }
+  if (!(await summaryPage(o))) process.exitCode = 1;
+}
+
 async function uninstall(o) {
   const state = readState(o.home);
   if (!state) { console.log('lean-agents is not installed.'); return; }
@@ -1080,6 +1137,7 @@ async function main() {
     try { return await agentLifecycle({ mode: o.agentMode, agents: o.agentList, home: o.home, realHome: REAL_HOME, stateDir: stateDir(o.home), dryRun: o.dryRun, exec: o.exec, yes: o.yes, ask: p.ask, yesNo, vscode: vscodeHooks(o) }); } finally { p.close(); }
   }
   if (o.command === 'feedback') return feedback(o);
+  if (o.command === 'summary') return summaryCommand(o);
   if (o.command === 'uninstall') return uninstall(o);
   return install(o);
 }
