@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { upgradeCommands, undoUpgrades, undoPlan } from '../scripts/lib/agent-lifecycle.mjs';
+import { upgradeCommands, undoUpgrades, undoPlan, agentOf } from '../scripts/lib/agent-lifecycle.mjs';
 import { PINS } from '../scripts/lib/pins.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -141,9 +141,10 @@ test('--update --undo: --no-exec is not done, --json is refused, --dry-run only 
 });
 
 test('undo skips records of agents that are not installed; --uninstall-agent drops that agent\'s records', POSIX, () => {
-  assert.deepEqual(undoPlan([{ desc: 'upgrade a 1 -> 2', reinstall: [] }, { desc: 'upgrade b 1 -> 2', reinstall: [] }], ['b']).map((c) => c.desc), ['upgrade b 1 -> 2']);
+  assert.deepEqual(undoPlan([{ desc: 'upgrade a 1 -> 2', reinstall: [] }, { desc: 'upgrade b 1 -> 2', reinstall: [] }], { b: 'T1' }).map((c) => c.desc), ['upgrade b 1 -> 2']);
   const { dir, lean, state } = stubHome(OLD.copilot);
   lean(['--update', '--yes']);
+  assert.ok(state().commands.filter((c) => c.reinstall).every((c) => typeof c.owner === 'string'), 'records carry the agents.json stamp');
   const agents = JSON.parse(fs.readFileSync(path.join(dir, 'agents.json'), 'utf8'));
   // copilot-cli removed by hand from agents.json: its record is stale and must not be replayed.
   delete agents.agents['copilot-cli'];
@@ -171,4 +172,17 @@ test('--update --dry-run lists the Copilot CLI upgrade for an agent lean-agents 
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /copilot-cli: 1\.0\.1 -> /);
   assert.match(r.stdout, /upgrade copilot-cli 1\.0\.1 -> /);
+});
+
+test('undo keys on "uninstalled or reinstalled since", not on membership; both undo paths agree (#284)', () => {
+  const ok = [process.execPath, '-e', 'process.exit(0)'];
+  const rec = (a, owner) => ({ desc: `upgrade ${a} 1 -> 2`, from: '1', owner, reinstall: [ok] });
+  const cmds = [rec('own', null), rec('same', 'T1'), rec('gone', 'T1'), rec('again', 'T1'), rec('claimed', null)];
+  const stamps = { same: 'T1', again: 'T2', claimed: 'T3' };
+  // own: the user's CLI, still not ours -> undoable. gone: uninstalled since. again: reinstalled since. claimed: lean-agents installed it since.
+  assert.deepEqual(undoPlan(cmds, stamps).map(agentOf), ['own', 'same']);
+  const [r, out] = quietly(() => undoUpgrades(cmds, {}, stamps));
+  assert.deepEqual([...r.restored].sort(), ['own', 'same']);
+  assert.doesNotMatch(out, /gone|again|claimed/);
+  assert.deepEqual(undoPlan([{ desc: 'upgrade old 1 -> 2', reinstall: [] }], {}).map(agentOf), [], 'a record without owner needs the agent in agents.json');
 });

@@ -30,7 +30,7 @@ import { backupOpencode, backupLayout, listProcesses, opencodeRunning } from './
 import { readBackupStamp } from './lib/backup-stamp.mjs';
 import { isActive, failAt, applyPreflight, verifyBackup, configDrift, createSteps, makeCtx, runApply, runUndo, restoreData } from './lib/opencode-upgrade.mjs';
 import { planOpencode1, installOpencode1, removeOpencode1, layout as opencode1Layout } from './lib/opencode1.mjs';
-import { agentLifecycle, agentTable, upgradeCommands, undoPlan, undoUpgrades, agentOf, installedAgents, VSCODE_NOTE } from './lib/agent-lifecycle.mjs';
+import { agentLifecycle, agentTable, upgradeCommands, undoPlan, undoUpgrades, agentOf, agentStamps, VSCODE_NOTE } from './lib/agent-lifecycle.mjs';
 import { copilotUsage } from './lib/copilot-usage.mjs';
 import { draftIssue, addFiledIssue } from './lib/feedback.mjs';
 import { buildSummary } from './lib/summary-data.mjs';
@@ -388,6 +388,7 @@ async function choose(o, saved) {
 const NETWORK_INFO = { telemetry: 'telemetry and error reports', autoUpdate: 'auto-updates', outbound: 'other outbound calls (session sharing, feedback, built-in providers)' };
 
 async function chooseNetwork(o, saved, p) {
+  let perCategory = null;
   let base = o.networkPreset ? preset(o.networkPreset) : fromPrivacy(o.privacy) ?? saved?.network ?? fromPrivacy(saved?.privacy);
   if (!base && !Object.keys(o.networkFlags).length) {
     const a = await p.select({
@@ -404,9 +405,12 @@ async function chooseNetwork(o, saved, p) {
     else if (a === 'choose') {
       base = {};
       for (const c of CATEGORIES) base[c] = yesNo(await p.ask(`Keep ${NETWORK_INFO[c]} on?`, 'y')) ? 'on' : 'off';
+      perCategory = base;
     } else throw new Error(`network takes off, on or choose, not "${a}"`);
   }
   o.network = { ...(base ?? preset('on')), ...o.networkFlags };
+  // Updates the user asked for (flag, per-category menu, or the saved choice) keep the agent's own updater; a plain "on" preset does not.
+  o.keepUpdater = o.network.autoUpdate === 'on' && (o.networkFlags.autoUpdate === 'on' || perCategory?.autoUpdate === 'on' || (!o.networkPreset && !!saved?.keepUpdater));
   o.privacy = privacyOf(o.network);
 }
 
@@ -589,6 +593,8 @@ function printPlan(o, planned, commands) {
   if (o.everything && o.deferred?.length) console.log(`  after nvm: run lean-agents --update to add ${o.deferred.join(', ')} (they need Node 24, which the prerequisites install under nvm)`);
   if (o.tools.includes('context-mode')) console.log(`  bun: ${o.bun ? `on${bunPresent(o.home) ? ' (already installed)' : ''}` : 'off'}`);
   console.log(`  network: ${CATEGORIES.map((c) => `${c} ${o.network[c]}`).join(', ')}`);
+  const owned = o.agents.filter((a) => /^(claude|copilot-cli|opencode-v[12])$/.test(a));
+  if (o.network.autoUpdate === 'on' && !o.keepUpdater && owned.length) console.log(`  auto-update: ${owned.join(', ')} keep their own updater off because --update owns updates (--auto-update on leaves it alone)`);
   const net = proxyReport();
   if (net.length) console.log(`  proxy and CA (passed to every command): ${net.join(' ')}`);
   if (o.tools.includes('playwright-extension')) console.log(`  signed-in browser: ${EXTENSION_NOTE}`);
@@ -643,7 +649,7 @@ async function install(o) {
   // The planner owns these installs; the per-tool ones below would repeat them.
   const owned = new Set(pendingPrereqs(every?.steps ?? []).map((s) => (s.id === 'node-24' ? 'node' : s.id)));
   const update = saved && (o.dryRun || o.exec) ? updateInfo(o, saved) : null;
-  const upgrades = update && o.exec ? upgradeCommands({ rows: update.rows, home: o.home, dir: stateDir(o.home), realHome: REAL_HOME }) : [];
+  const upgrades = update && o.exec ? upgradeCommands({ rows: update.rows, home: o.home, dir: stateDir(o.home), realHome: REAL_HOME, stamps: agentStamps(stateDir(o.home)) }) : [];
   const commands = [...(o.exec ? [...every?.commands ?? [], ...prereqCommands(o, behind).filter((c) => !owned.has(c.tool))] : []), ...agentCommands, ...upgrades];
   const noGit = migration ? null : gitHint(packageManager());
   if (noGit) console.log(noGit);
@@ -686,7 +692,7 @@ async function install(o) {
       installedAt: previous?.installedAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       pins: pinVersions(),
-      options: o.migrate ? previous?.options ?? { migrateOnly: true, agents: o.agents, tools: [], privacy: o.privacy, network: o.network, gh: false, terminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false, shell: 'git-bash' } : { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, gh: o.gh, terminals: o.terminals, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun, shell: o.shell },
+      options: o.migrate ? previous?.options ?? { migrateOnly: true, agents: o.agents, tools: [], privacy: o.privacy, network: o.network, gh: false, terminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false, shell: 'git-bash' } : { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, keepUpdater: !!o.keepUpdater, gh: o.gh, terminals: o.terminals, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun, shell: o.shell },
       ...(o.toolNode && { toolNode: { version: o.toolNode.version, installedByLean: !!o.toolNode.install || (previous?.toolNode?.version === o.toolNode.version && !!previous.toolNode.installedByLean) } }),
       files: [...(previous?.files ?? []), ...files],
       ...(previous?.opencode1 && { opencode1: previous.opencode1 }),
@@ -722,7 +728,7 @@ async function install(o) {
       if (ui) ui.step(i + 1, commands.length, c.desc);
       else console.log(`- ${c.desc}`);
       // Recorded before it runs, so a command killed midway can still be undone.
-      const rec = { desc: c.desc, ok: false, undo: c.undo, ...(c.reinstall && { from: c.from, reinstall: c.reinstall, reinstallAlways: c.reinstallAlways }), ...(c.env && { env: c.env }), ...(c.resumeKey && { resumeKey: c.resumeKey }) };
+      const rec = { desc: c.desc, ok: false, undo: c.undo, ...(c.reinstall && { from: c.from, owner: c.owner, reinstall: c.reinstall, reinstallAlways: c.reinstallAlways }), ...(c.env && { env: c.env }), ...(c.resumeKey && { resumeKey: c.resumeKey }) };
       ran.push(rec);
       save();
       const codes = [];
@@ -781,7 +787,8 @@ async function install(o) {
 // Plan first; the answer (or --yes) runs it. A failed step is reported and the rest still run; --uninstall never does this.
 async function undoAgentUpgrades(o) {
   const S = readState(o.home);
-  const todo = undoPlan(S?.commands ?? [], installedAgents(stateDir(o.home)));
+  const stamps = agentStamps(stateDir(o.home));
+  const todo = undoPlan(S?.commands ?? [], stamps);
   if (!todo.length) { console.log('nothing to undo: no agent CLI upgrade by lean-agents is recorded'); return true; }
   console.log('lean-agents --update --undo plan (the oldest saved version per agent):');
   for (const c of todo) {
@@ -794,7 +801,7 @@ async function undoAgentUpgrades(o) {
   const p = await prompter(o.yes);
   try { if (!yesNo(await p.ask('Reinstall these versions?', o.yes ? 'y' : 'n'))) { console.log('Cancelled.'); return true; } } finally { p.close(); }
   Object.assign(process.env, childEnv(S.options.network));
-  const { ok, restored } = undoUpgrades(todo);
+  const { ok, restored } = undoUpgrades(todo, {}, stamps);
   // A restored agent's records are spent; a failed one keeps them so the next --update --undo retries it.
   S.commands = S.commands.filter((c) => !(c.reinstall && restored.has(agentOf(c))));
   S.updatedAt = new Date().toISOString();
@@ -837,7 +844,7 @@ function upgradeDeps(o, S, save, extra) {
   // The adapter's file and JSON actions only: its commands (npx skill installs, git clones) are not run by an upgrade.
   const adapterFor = (tools) => {
     const saved = S.options ?? {};
-    const opts = { tools, network: saved.network ?? {}, terminals: [], platform: process.platform, env: process.env, shell: 'default', ponytailMode: saved.ponytailMode ?? 'lite', adhdAlways: false };
+    const opts = { tools, network: saved.network ?? {}, keepUpdater: !!saved.keepUpdater, terminals: [], platform: process.platform, env: process.env, shell: 'default', ponytailMode: saved.ponytailMode ?? 'lite', adhdAlways: false };
     const r = opencodeV2Adapter({ home: o.home, core: loadCore(ROOT), profile: null, opts, rulesPath: rulesPath.split(path.sep).join('/') });
     if (r.commands.length) console.log(`  ${r.commands.length} adapter command(s) not run by the upgrade; --update runs them`);
     // No rules file (lean-agents never installed the rules here): do not point `instructions` at a missing file.

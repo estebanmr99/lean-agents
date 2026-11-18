@@ -9,6 +9,7 @@ import { tierFor, modelFor } from '../render.mjs';
 import { configHome } from '../system.mjs';
 import { gitBashPath } from '../terminals.mjs';
 import { PINS, npmSpec, skillSource, skillsCli } from '../pins.mjs';
+import { updaterMode } from '../network.mjs';
 
 const PERMISSIONS = {
   'read-only': ['  edit: deny', '  bash: deny'],
@@ -187,7 +188,7 @@ export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
   if (opts.terminals?.includes('warp')) edits.push({ path: ['plugins'], value: npmSpec('warp-opencode'), mode: 'arrayAdd', legacy: ['@warp-dot-dev/opencode-warp'] });
   if (opts.network.outbound === 'off') edits.push({ path: ['share'], value: 'disabled', mode: 'set' });
   // Managed installs update through --update: off unless the user already set `update` (network off forces it).
-  edits.push({ path: ['update'], value: 'disable', mode: opts.network.autoUpdate === 'off' ? 'set' : 'setIfAbsent' });
+  if (updaterMode(opts)) edits.push({ path: ['update'], value: 'disable', mode: updaterMode(opts) });
   if (opts.network.outbound === 'off') {
     if (profile?.provider !== 'opencode') {
       edits.push({ path: ['policies'], value: { effect: 'deny', action: 'provider.use', resource: 'opencode' }, mode: 'arrayAdd' });

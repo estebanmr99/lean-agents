@@ -3,7 +3,7 @@
 import path from 'node:path';
 import { OWNED_MARK } from '../fsops.mjs';
 import { tierFor, modelFor } from '../render.mjs';
-import { privacyOf } from '../network.mjs';
+import { privacyOf, updaterMode } from '../network.mjs';
 import { statuslineScript } from '../copilot-usage.mjs';
 import { marketplaceSource, skillSource, skillsCli } from '../pins.mjs';
 
@@ -62,7 +62,9 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
   ];
   for (const k of off) edits.push({ path: ['env', k], value: '1', mode: 'set' });
   // Managed installs update through --update: off unless the user already chose a value (network off forces it).
-  edits.push({ path: ['env', 'DISABLE_AUTOUPDATER'], value: '1', mode: net.autoUpdate === 'off' ? 'set' : 'setIfAbsent' });
+  // A DISABLE_AUTOUPDATER already in the environment is the user's own choice, so it is respected too.
+  const updater = updaterMode(opts);
+  if (updater && !(updater === 'setIfAbsent' && (opts.env ?? process.env).DISABLE_AUTOUPDATER !== undefined)) edits.push({ path: ['env', 'DISABLE_AUTOUPDATER'], value: '1', mode: updater });
   if (tools.includes('copilot-usage')) {
     // Only when the user has no statusLine (setIfAbsent); uninstall removes it only while it is still ours. Forward slashes: Claude runs it through bash, also on Windows.
     const script = path.join(dir, 'lean-copilot-usage-statusline.mjs');

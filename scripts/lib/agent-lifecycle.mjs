@@ -106,7 +106,8 @@ export function removeRecorded(home, rec) {
 }
 
 const stateFile = (stateDir) => path.join(stateDir, 'agents.json');
-export const installedAgents = (stateDir) => Object.keys(readAgents(stateDir).agents);
+// agent -> installedAt of its agents.json entry: the stamp an upgrade record is tied to (#284).
+export const agentStamps = (stateDir) => Object.fromEntries(Object.entries(readAgents(stateDir).agents).map(([a, r]) => [a, r.installedAt ?? '']));
 // --install-agent / --uninstall-agent end the version history of an agent: its upgrade records would undo onto a stale install.
 function dropUpgradeRecords(stateDir, a) {
   const file = path.join(stateDir, 'state.json');
@@ -201,7 +202,7 @@ export async function agentLifecycle(o) {
 // installer at the version it had, saved in state.json next to the command; undoUpgrades() runs it.
 // Cursor and Antigravity have no version pin, so they never get a row and are not moved (VERIFY in docs/compatibility.md).
 const UPGRADE = { 'claude-code': 'claude', 'opencode-v2': 'opencode-v2', 'copilot-cli': 'copilot-cli' };
-export function upgradeCommands({ rows, home, platform = process.platform, dir, realHome }) {
+export function upgradeCommands({ rows, home, platform = process.platform, dir, realHome, stamps = {} }) {
   const out = [];
   for (const r of rows) {
     const a = UPGRADE[r.tool];
@@ -213,7 +214,7 @@ export function upgradeCommands({ rows, home, platform = process.platform, dir, 
     if (!to) { console.log(`! ${a}: ${agentTable({ home, platform, dir, realHome })[a].manual}`); continue; }
     // The downloaded installer is removed by a final step that runs even when an earlier step failed.
     const cleanup = (row) => (row.download ? [[process.execPath, '-e', "require('fs').rmSync(process.argv[1],{force:true})", row.download]] : []);
-    out.push({ tool: r.tool, desc: `upgrade ${a} ${from.raw} -> ${r.pinned}`, run: to.run, always: cleanup(to), undo: [], from: from.raw, reinstall: from.row.run, reinstallAlways: cleanup(from.row) });
+    out.push({ tool: r.tool, desc: `upgrade ${a} ${from.raw} -> ${r.pinned}`, run: to.run, always: cleanup(to), undo: [], from: from.raw, owner: stamps[a] ?? null, reinstall: from.row.run, reinstallAlways: cleanup(from.row) });
   }
   return out;
 }
@@ -221,20 +222,24 @@ export function upgradeCommands({ rows, home, platform = process.platform, dir, 
 // --update --undo: the first saved reinstall per agent. Commands are in run order, so that is the version before the oldest
 // upgrade; replaying every record forward would end on the newest "previous" version. The agent is the 2nd word of the desc.
 export const agentOf = (c) => c.desc.split(' ')[1];
-// `installed`: the agents in agents.json. A record of an agent that is gone (or reinstalled since) must not bring it back.
-export function undoPlan(commands, installed = null) {
+// `stamps`: agentStamps(). A record keeps `owner`, the agents.json stamp when it was made (null: the user's own install). It
+// replays only while that is still true: an agent lean-agents uninstalled or reinstalled since must not be brought back, but an
+// upgrade of a CLI the user already had stays undoable. Records from before `owner` existed fall back to membership.
+export function undoPlan(commands, stamps = null) {
   const seen = new Set();
-  return commands.filter((c) => c.reinstall && (!installed || installed.includes(agentOf(c))) && !seen.has(agentOf(c)) && seen.add(agentOf(c)));
+  const current = (c) => (!stamps || ('owner' in c ? (c.owner ?? null) === (stamps[agentOf(c)] ?? null) : agentOf(c) in stamps));
+  return commands.filter((c) => c.reinstall && current(c) && !seen.has(agentOf(c)) && seen.add(agentOf(c)));
 }
 
 // Runs each plan step (a failed one is reported and the rest still run). Returns { ok, restored: agents back on their old version }.
-export function undoUpgrades(commands, env = {}) {
+export function undoUpgrades(commands, env = {}, stamps = null) {
   const restored = new Set();
-  for (const c of undoPlan(commands)) {
+  const plan = undoPlan(commands, stamps);
+  for (const c of plan) {
     console.log(`- reinstall ${c.from} (undo of: ${c.desc})`);
     const ok = c.reinstall.every((argv) => run(argv, { dryRun: false, log: console.log, env }));
     for (const argv of c.reinstallAlways ?? []) run(argv, { dryRun: false, log: console.log, env });
     if (ok) restored.add(agentOf(c)); else console.log('  ! failed. Run the command above by hand.');
   }
-  return { ok: undoPlan(commands).every((c) => restored.has(agentOf(c))), restored };
+  return { ok: plan.every((c) => restored.has(agentOf(c))), restored };
 }
