@@ -545,6 +545,7 @@ Source: `tests/spike-opencode-side.sh` / `.ps1`, job `spike-opencode-side` (now 
 - **Not proven here:** `OPENCODE_DB` on 2.x; XDG honoring on macOS in CI.
 
 - **Antigravity skill undo scope (#229, item 3): VERIFY.** `skills remove` runs without `-a` (`remove -a` keeps `~/.agents/skills`), so if the skills CLI uses a shared canonical folder it could delete a copy another adapter installed. Needs the real skills CLI layout (`tests/real-antigravity.sh`); behavior unchanged until proven (2026-11-18).
+- Fresh-machine prerequisites planner (#179 PR1, `scripts/lib/prereqs.mjs`, plan only, nothing runs yet): nvm `v0.41.0` `install.sh` and nvm-windows `v2.0.1` setup (sha256 from `tests/ci-downloads.json`); Homebrew `install.sh` from `HEAD`, uv `install.sh` and `xcode-select --install` are unpinned. **VERIFY:** the nvm `install.sh` hash, Homebrew's unattended install and a headless Xcode CLT install on macOS runners, nvm-windows without admin, `nvm install 24` on nvm-windows, rtk on Linux (manual link only), winget ids `Git.Git` (`--scope user`), `astral-sh.uv`, `rtk-ai.rtk` and brew `uv`, `rtk`, `oven-sh/bun/bun` on a bare machine. Sources: [nvm](https://github.com/nvm-sh/nvm#installing-and-updating), [nvm-windows](https://github.com/coreybutler/nvm-windows), [Homebrew](https://docs.brew.sh/Installation), [uv](https://docs.astral.sh/uv/getting-started/installation/), checked 2026-11-18.
 
 ## Plugin health (#212, 2026-11-18)
 
