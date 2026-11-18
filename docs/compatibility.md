@@ -593,6 +593,28 @@ Source: `tests/spike-opencode-side.sh` / `.ps1`, job `spike-opencode-side` (now 
 - **VERIFY:** that the upstream 2.x installer never runs `opencode` against the live data folder (apply relies on it; CI asserts the live data hash is unchanged after apply).
 - **VERIFY:** the full apply on Windows and macOS (CI proves Linux only; macOS `real-*` jobs skip PRs, #56); that `opencode session list` on 2.x always migrates the live db (the CI test asserts the db changes before `--undo`); `--undo` after 2.x ran with a DCP plugin installed in the config folder (2.x may add `node_modules` or lock files there, which undo leaves).
 
+## OpenCode 1.x to 2.x: where things live
+
+Source: `--upgrade-agent opencode` translation table (`scripts/lib/opencode-upgrade.mjs`), checked 2026-11-18. "Docs only" means [opencode.ai/docs/migrate-v1](https://opencode.ai/docs/migrate-v1) says so and no binary proved it; the `lean-migrate` skill and `docs/migrate-opencode-v1-to-v2.md` point here.
+
+| 1.x location | 2.x location | Status | Source |
+| --- | --- | --- | --- |
+| `agent.<name>` in `opencode.jsonc` | `agents.<name>` | translated | real 2.2.5 |
+| `plugin[]` (npm spec) | `plugins[]` | translated | `tests/real-opencode.sh` |
+| flat `mcp.<name>` | `mcp.servers.<name>` | translated | real 2.2.5 |
+| `compaction.reserved` | `compaction.buffer` | translated | SPEC 0 |
+| `autoupdate: false` / `true` | `update: "disable"` / `"auto"` | translated | docs only |
+| `disabled_providers[]` | `policies` (deny `provider.use`) | translated | real 2.1.4 accepts `policies` |
+| `instructions`, `default_agent`, `model`, `share`, `shell` | same keys | kept | real 2.2.5 |
+| `tui.json` `plugin[]` (`file://`) | `cli.json` `plugins[]` | **VERIFY** | docs disagree (`cli.json` vs `tui.json`), no binary proof |
+| keybinds | no 2.x file named | **VERIFY**, manual | docs |
+| `agent/`, `agents/`, `command/`, `commands/` folders | same folders | docs only | docs |
+| `skills/`, `~/.agents/skills`, `~/.claude/skills` | same folders | docs only | opencode.ai/docs/skills |
+| `plugins/*.ts` that use `api.command` | no proven 2.x equivalent | manual | upgrade `reason` |
+| sessions: `<data>/opencode/opencode.db`, `storage/`, `snapshot/` | same path, rewritten in place by the first 2.x start (20 to 29 tables) | `opencode1` reads the frozen copy | spike `spike-opencode-side` |
+
+Every item the engine cannot map is listed as `user-manual` with its reason, never dropped.
+
 ## Plugin health (#212, 2026-11-18)
 
 `--doctor` / `--adopt` read-only checks in `scripts/lib/plugin-health.mjs`. A plugin listed in config is not proof it loads: `opencode debug config` succeeded on a cache with missing dependencies.
