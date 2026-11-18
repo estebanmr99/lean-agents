@@ -155,7 +155,7 @@ npx lean-agents@latest --update      # vuelve a aplicar con tus opciones guardad
 npx lean-agents@latest --uninstall   # deshace todo lo que lean-agents cambió
 ```
 
-Los prompts para el agente tienen [una guía](docs/install-with-an-agent.md) con los pasos y la salida `--json`; [los pasos de actualización](docs/install-with-an-agent.md#update-with-an-agent) funcionan también sin el skill `lean-update`. ¿Tienes VS Code con Copilot en modo agente en un PC de trabajo? Ejecuta una vez la [lista de comprobación](docs/vscode-agent-checklist.md) (en inglés).
+Los prompts para el agente tienen [una guía](docs/install-with-an-agent.md) con los pasos y la salida `--json`; [los pasos de actualización](docs/install-with-an-agent.md#update-with-an-agent) funcionan también sin el skill `lean-update`. El skill planifica con `--update --dry-run`, pregunta, aplica y revisa con `--doctor`. ¿Tienes VS Code con Copilot en modo agente en un PC de trabajo? Ejecuta una vez la [lista de comprobación](docs/vscode-agent-checklist.md) (en inglés).
 
 Usa `--lang es` para que las reglas y las respuestas queden en español.
 
