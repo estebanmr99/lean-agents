@@ -119,6 +119,7 @@ grep '^tools:' "$T/mock.err" | sort | uniq -c || true
 n1="$(dcp_log | grep -c 'Compression #1' || true)"
 n2="$(dcp_log | grep -c 'Compression #2' || true)"
 if [ "$n1" = "1" ] && [ "$n2" = "0" ]; then ok "one compression in the DCP debug log"; else bad "expected one compression in the DCP debug log, found #1 x$n1, #2 x$n2"; fi
-if dcp_log | grep -q 'Injected compress summary'; then ok "compress summary injected back into the context"; else bad "no injected compress summary in the DCP debug log"; fi
+# Windows interleaves the log writer, so the start of that line can be cut: summaryLength= is its tail.
+if dcp_log | grep -qE 'Injected compress summary|summaryLength=[0-9]+'; then ok "compress summary injected back into the context"; else bad "no injected compress summary in the DCP debug log"; fi
 
 exit "$fail"
