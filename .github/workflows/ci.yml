@@ -439,6 +439,37 @@ jobs:
           opencode debug config > "$HOME/resolved.txt"
           grep -q lean-agents "$HOME/resolved.txt"
 
+  real-dcp-v2:
+    # #80 part 2 gate: the pinned DCP loads on the real OpenCode 2.x (/api/command lists dcp-compress) and prunes once
+    # past its 220K max limit. Throwaway HOME, mock LLM reporting 250K prompt tokens; proves the mechanism, not savings.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
+      - run: npm ci
+      - name: Install OpenCode 2
+        run: |
+          bash scripts/ci-install-opencode-v2.sh
+          echo "${USERPROFILE:-$HOME}/.opencode/bin" >> "$GITHUB_PATH"
+      - name: DCP prunes on OpenCode 2
+        run: bash tests/real-dcp-v2.sh
+
   real-opencode-v1:
     # Real OpenCode 1.x binary, throwaway HOME: proves the 1.x keys are accepted.
     needs: changes

@@ -29,6 +29,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Docs
 
+- Adds CI job `real-dcp-v2` (ubuntu, windows; `tests/real-dcp-v2.sh`) checks that the pinned DCP loads on the real OpenCode 2.2.5 (`dcp-compress` in `GET /api/command`) and prunes once after its 220K max-limit nudge, using a mock LLM that reports 250K prompt tokens (#80 part 2). `tests/fixtures/mock-llm.mjs` gained `MOCK_LLM_PROMPT_TOKENS` and `MOCK_LLM_COMPRESS`. lean-agents still installs DCP on OpenCode 1.x only.
 - Versions: README (EN and ES), `docs/ROADMAP.md` and the spec name 0.8.0 as the latest release (#161). The npm item on the README roadmap is ticked; "Later: 1.0.0" lists #179 to #182.
 - `docs/SECURITY-REVIEW.md` pin table names every key in `core/pins.json`; `tests/security-review-pins.test.mjs` fails when a key is missing (#155).
 - `docs/compatibility.md`: the `lean-update` tag `v0.7.0` exists, and its tagged `skills add` form was checked in a throwaway HOME (#168).
