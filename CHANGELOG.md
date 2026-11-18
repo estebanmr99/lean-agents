@@ -28,6 +28,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- DCP health (`--adopt`, `--doctor`) no longer reports a leftover `@latest` cache folder as broken when the config pins an exact version: OpenCode loads only the folder of the spec in config (seen on the work PC, where `@latest` 3.2.1 had been replaced by a 3.1.15 pin).
 - CI: `real-opencode-shell` asks the OS for a free port instead of a random one, which hit Windows reserved ranges (`EACCES`) twice on main.
 - CI: the macOS legs run nightly (and on manual dispatch) instead of on every push to main, where they queued for 20+ minutes for a runner and were cancelled, leaving main red. Pull requests and pushes run the Ubuntu and Windows legs.
 - CI: a push to main is no longer cancelled by the next merge, so the macOS and other main-only jobs finish for every merge (only pull request runs are cancelled by a newer push).
