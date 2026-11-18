@@ -53,12 +53,15 @@ function safeNodeOptions(v) {
   return true;
 }
 
-// One stderr line per run, names only: a dropped NODE_OPTIONS or GIT_CONFIG_* would otherwise vanish without a trace (#235).
-let warnedDrop = false;
+// One stderr line per new name, names only: a dropped NODE_OPTIONS or GIT_CONFIG_* would otherwise vanish without a trace (#235).
+// resetDropWarnings lets a test start from a clean slate, so stderr does not depend on test order.
+const warnedDrop = new Set();
+export const resetDropWarnings = () => warnedDrop.clear();
 function warnDropped(names) {
-  if (warnedDrop) return;
-  warnedDrop = true;
-  console.error(`lean-agents: not passed to child processes (unsafe or carries a credential): ${names.join(', ')}`);
+  const fresh = names.filter((n) => !warnedDrop.has(n));
+  if (!fresh.length) return;
+  fresh.forEach((n) => warnedDrop.add(n));
+  console.error(`lean-agents: not passed to child processes (unsafe or carries a credential): ${fresh.join(', ')}`);
 }
 
 // onDrop gets the names of variables that would have passed but were dropped; never their values.

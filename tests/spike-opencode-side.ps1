@@ -90,7 +90,7 @@ try {
 } finally {
   Restore-Env
   Set-Location $repo
-  if ($mock -and -not $mock.HasExited) { Stop-Process -Id $mock.Id -Force }
+  if ($mock -and -not $mock.HasExited) { & taskkill /PID $mock.Id /T /F | Out-Null } # /T: the whole tree, Stop-Process leaves grandchildren
   Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue
 }
 if ($failed) { throw 'isolation proof failed (see the P1 lines above)' }
