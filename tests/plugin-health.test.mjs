@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { checkDepTree, reconcileSpecs, readSpecs, pluginHealth, probePlugins } from '../scripts/lib/plugin-health.mjs';
+import { checkDepTree, safePluginName, reconcileSpecs, readSpecs, pluginHealth, probePlugins } from '../scripts/lib/plugin-health.mjs';
 import { doctor } from '../scripts/lib/doctor.mjs';
 
 const DCP = '@tarquinen/opencode-dcp';
@@ -79,9 +79,9 @@ function stubs(commands) {
 test('probe: command listed is healthy, missing is reported; throwaway dirs and server are cleaned up', async () => {
   const h = home({ full: true });
   const good = stubs(['dcp-compress']);
-  assert.deepEqual(await probePlugins(h, { ...good, timeoutMs: 2000 }), []);
+  assert.deepEqual(await probePlugins(h, { ...good, timeoutMs: 2000, platform: 'linux' }), []);
   const bad = stubs(['init']);
-  const f = await probePlugins(h, { ...bad, timeoutMs: 2000 });
+  const f = await probePlugins(h, { ...bad, timeoutMs: 600, platform: 'linux' });
   assert.equal(f[0].id, 'command-missing');
   const c = bad.spawned[0];
   assert.ok(c.killed);
@@ -117,4 +117,61 @@ test('probe: a missing binary is a finding, not a crash; scoped cache wrapper is
   const fsx = { ...fs, cpSync: (a, b, o) => { if (String(a).includes('opencode-dcp@')) copied = b; return real(a, b, o); } };
   await probePlugins(h, { ...s, fsx, timeoutMs: 2000 });
   assert.match(copied, /packages[\\/]@tarquinen[\\/]opencode-dcp@latest$/);
+});
+
+test('checkDepTree rejects plugin names that climb out of node_modules or are absolute', () => {
+  const h = home({ full: true });
+  fs.writeFileSync(path.join(h, '.cache', 'opencode', 'package.json'), JSON.stringify({ name: 'outside', version: '1.0.0', dependencies: { nope: '1' } }));
+  for (const bad of ['../..', '@x/../..', '/opt/x', 'D:\\tools\\x', '..\\..']) {
+    assert.equal(safePluginName(bad), false, bad);
+    assert.deepEqual(checkDepTree(h, bad), [], bad);
+  }
+  assert.equal(safePluginName(DCP), true);
+  assert.equal(safePluginName('left-pad'), true);
+});
+
+test('probe: a failing copy (dangling symlink) is a probe-failed finding, not a crash; the folder is still removed', async () => {
+  const h = home({ full: true });
+  const s = stubs(['dcp-compress']);
+  const fsx = { ...fs, cpSync: () => { throw Object.assign(new Error('no such file'), { code: 'ENOENT' }); } };
+  const f = await probePlugins(h, { ...s, fsx, timeoutMs: 600 });
+  assert.equal(f.length, 1);
+  assert.equal(f[0].id, 'probe-failed');
+  assert.match(f[0].line, /could not copy.*ENOENT/);
+  assert.equal(s.spawned.length, 0);
+});
+
+test('probe: a copy past the size cap is stopped by the filter', async () => {
+  const h = home({ full: true });
+  const s = stubs(['dcp-compress']);
+  const fsx = { ...fs, lstatSync: () => ({ size: 300 * 1024 * 1024 }) };
+  const f = await probePlugins(h, { ...s, fsx, timeoutMs: 600 });
+  assert.equal(f[0].id, 'probe-failed');
+  assert.match(f[0].line, /size cap/);
+});
+
+test('probe: a first answer without the command is retried until it shows up', async () => {
+  const h = home({ full: true });
+  let calls = 0;
+  const s = stubs([]);
+  const fetchFn = async (url) => (url.endsWith('/command') ? { ok: true, json: async () => (++calls < 2 ? [{ name: 'init' }] : [{ name: 'init' }, { name: 'dcp-compress' }]) } : { ok: false });
+  assert.deepEqual(await probePlugins(h, { ...s, fetchFn, timeoutMs: 5000, platform: 'linux' }), []);
+  assert.ok(calls >= 2);
+});
+
+test('probe on Windows: cmd /c runs the shim, env points at the throwaway dir, taskkill /T ends the tree', async () => {
+  const h = home({ full: true });
+  const s = stubs(['init']);
+  const killed = [];
+  const spawnFn = (bin, args, opts) => { const c = { bin, args, opts, pid: 4242, kill() { killed.push('kill'); }, on() {} }; s.spawned.push(c); return c; };
+  const spawnSyncFn = (cmd, args) => { killed.push([cmd, ...args].join(' ')); return { status: 0 }; };
+  const env = { PATH: 'D:\\tools\\bin', SystemRoot: 'D:\\Windows', ComSpec: 'D:\\Windows\\cmd.exe' };
+  await probePlugins(h, { ...s, spawnFn, spawnSyncFn, env, timeoutMs: 600, platform: 'win32' });
+  const c = s.spawned[0];
+  assert.equal(c.bin, 'D:\\Windows\\cmd.exe');
+  assert.deepEqual(c.args.slice(0, 4), ['/d', '/c', 'opencode', 'serve']);
+  const tmp = c.opts.cwd;
+  assert.deepEqual([c.opts.env.APPDATA, c.opts.env.LOCALAPPDATA, c.opts.env.TEMP, c.opts.env.TMP], [tmp, tmp, tmp, tmp]);
+  assert.equal(c.opts.env.SystemRoot, 'D:\\Windows');
+  assert.deepEqual(killed, ['taskkill /pid 4242 /T /F']);
 });

@@ -31,11 +31,13 @@ env:
 jobs:
   # Docs-only PRs skip the real-binary jobs. lint, test and the Secret scan always run.
   # macOS real-* legs run only off pull requests: five at once per PR run left some without a runner (#56).
+  # CI-1: the macOS legs of test and package, and the Windows legs of real-orca-opencode-v1, real-bun, real-tool-node and real-adopt, also run only off pull requests.
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       code: ${{ steps.diff.outputs.code }}
+      opencode: ${{ steps.diff.outputs.opencode }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -49,6 +51,10 @@ jobs:
           code=true
           if [ "$EVENT" = pull_request ] && ! git diff --name-only "origin/$BASE...HEAD" | grep -qvE '^(docs/|assets/)|^[^/]*\.md$'; then code=false; fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
+          # real-dcp-v2 and spike-opencode-side (ubuntu + windows, up to 25 min) run on a PR only when it touches what they exercise.
+          opencode=true
+          if [ "$EVENT" = pull_request ] && ! git diff --name-only "origin/$BASE...HEAD" | grep -qE '^(tests/spike-opencode-side|tests/real-dcp-v2\.sh$|tests/fixtures/mock-llm\.mjs$|scripts/lib/adapters/opencode|scripts/lib/plugin-health\.mjs$|scripts/lib/opencode-|scripts/lib/doctor\.mjs$|scripts/lib/pins\.mjs$|scripts/ci-download\.sh$|core/pins\.json$|\.github/workflows/ci\.yml$)'; then opencode=false; fi
+          echo "opencode=$opencode" >> "$GITHUB_OUTPUT"
 
   lint:
     timeout-minutes: 5
@@ -90,7 +96,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest","windows-latest"]' || '["ubuntu-latest","macos-latest","windows-latest"]') }}
         node: [22]
     runs-on: ${{ matrix.os }}
     env:
@@ -232,7 +238,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest","windows-latest"]' || '["ubuntu-latest","macos-latest","windows-latest"]') }}
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -443,7 +449,7 @@ jobs:
     # #80 part 2 gate: the pinned DCP loads on the real OpenCode 2.x (/api/command lists dcp-compress) and prunes once
     # past its 220K max limit. Throwaway HOME, mock LLM reporting 250K prompt tokens; proves the mechanism, not savings.
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && needs.changes.outputs.opencode == 'true'
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -498,9 +504,9 @@ jobs:
     # the isolation proof for `opencode1` (#80 part 2, P1): 1.19 on a frozen copy under XDG_DATA_HOME + XDG_STATE_HOME leaves the
     # live dirs byte-identical (asserted), OPENCODE_DB + OPENCODE_CONFIG_DIR is printed as evidence, plus what a stdio MCP child
     # inherits and whether 2.x migrates the db on --version / debug config. Windows also runs the native PowerShell half.
-    # macOS stays VERIFY (real-* jobs skip PRs, #56).
+    # macOS stays VERIFY (macOS real-* legs run only off pull requests, #56).
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && needs.changes.outputs.opencode == 'true'
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -828,7 +834,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["ubuntu-latest","windows-latest"]') }}
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -1042,7 +1048,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["ubuntu-latest","windows-latest"]') }}
     runs-on: ${{ matrix.os }}
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1
@@ -1070,7 +1076,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["ubuntu-latest","windows-latest"]') }}
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -1109,7 +1115,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["ubuntu-latest","windows-latest"]') }}
     runs-on: ${{ matrix.os }}
     defaults:
       run:

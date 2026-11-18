@@ -93,3 +93,15 @@ test('downloads create their folder and the Node 24 step carries NVM_DIR', () =>
   assert.ok(by(steps, 'node-24').commands[0].includes('NVM_DIR=/tmp/x/.nvm'));
   assert.equal(by(steps, 'bun').commands[0][1], '-e'); // mkdir of the download folder runs before the bun download
 });
+
+test('bun step keeps the undo of the install it plans, and a manual hint when there is no route', () => {
+  for (const platform of ['darwin', 'linux', 'win32']) {
+    const b = by(planPrereqs(bare(platform, { has: { winget: true } })), 'bun');
+    assert.ok(b.undo.length > 0, `${platform}: undo`);
+    assert.equal(b.manual, undefined);
+  }
+  const none = by(planPrereqs(bare('linux', { bunInstall: () => null })), 'bun');
+  assert.deepEqual(none.commands, []);
+  assert.equal(none.undo, null);
+  assert.match(none.manual, /^https:\/\/bun\.sh\//);
+});

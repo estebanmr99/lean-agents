@@ -18,8 +18,12 @@ export npm_config_cache="$T/npmcache"
 CFG="$HOME/.config/opencode"
 DATA="$HOME/.local/share/opencode"
 B1="" B2="" MOCK_PID=""
+# OpenCode's service is found by port, not by HOME: on a real machine `service stop` could stop the owner's own 2.x service, so only CI stops it (a local run leaves its own 2.x service for you to stop).
+svc_stop() {
+  if [ "${CI:-}" = true ] || [ -n "${GITHUB_ACTIONS:-}" ]; then "$B2" service stop >/dev/null 2>&1; else echo "  (not CI: would run: $B2 service stop)"; fi
+}
 # shellcheck disable=SC2329 # called through the trap
-cleanup() { [ -n "$MOCK_PID" ] && { kill "$MOCK_PID"; wait "$MOCK_PID"; } 2>/dev/null; [ -n "$B2" ] && "$B2" service stop >/dev/null 2>&1; rm -rf "$T"; }
+cleanup() { [ -n "$MOCK_PID" ] && { kill "$MOCK_PID"; wait "$MOCK_PID"; } 2>/dev/null; [ -n "$B2" ] && svc_stop; rm -rf "$T"; }
 trap cleanup EXIT
 
 # tree.mjs snap <label> <dir> <out.json> | diff <label> <a.json> <b.json>: sha256 manifests, short output.
@@ -220,7 +224,7 @@ snapdiff "V3 data after probes (vs S3)" S3-after-1x-again-data S4-after-probes-d
 
 # ===== P1 (#80 part 2): can `opencode1` (1.19) run on a frozen copy while the live dirs stay untouched? =====
 # Fresh HOME so the B0 runs above (which left 2.x-migrated data) do not leak in. "Live" = the default dirs of this HOME.
-"$B2" service stop >/dev/null 2>&1
+svc_stop
 HOME="$T/p1home"; export HOME
 mkdir -p "$HOME/AppData/Roaming" "$T/proj"
 if command -v cygpath >/dev/null 2>&1; then USERPROFILE="$(cygpath -w "$HOME")"; APPDATA="$(cygpath -w "$HOME/AppData/Roaming")"; export USERPROFILE APPDATA; fi
@@ -354,7 +358,7 @@ node "$T/dbinfo.mjs" "$v2/data/opencode/opencode.db" "  db before" "$T/dbcopy-be
 v2step version --version
 v2step debug-config debug config
 v2step session-list session list
-( export "${P1ENV[@]}"; "$B2" service stop >/dev/null 2>&1 )
+( export "${P1ENV[@]}"; svc_stop )
 
 [ "$fail" -eq 0 ] && echo "SPIKE OK: both binaries ran --version, the XDG isolation proof held" || echo "FAIL: see the lines above (a --version, or an isolation check)"
 exit "$fail"
