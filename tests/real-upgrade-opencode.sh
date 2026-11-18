@@ -99,7 +99,8 @@ ltree() { node "$T/h.mjs" paths "$CFG" "$HOME/.opencode" "$HOME/.profile" "$HOME
 dtree() { node "$T/h.mjs" tree "$LIVE"; }
 shaf() { node "$T/h.mjs" sha "$1"; }
 # --version of an opencode binary on throwaway XDG dirs (2.x migrates a db it finds; --version itself does not, but stay clear).
-ver() { XDG_DATA_HOME="$T/scratch" XDG_STATE_HOME="$T/scratch" XDG_CACHE_HOME="$T/scratch" XDG_CONFIG_HOME="$T/scratch" "$1" --version 2>/dev/null | tail -n 1; }
+# Both streams: a 2.x binary may print its version on stderr; the first x.y.z found is the version.
+ver() { XDG_DATA_HOME="$T/scratch" XDG_STATE_HOME="$T/scratch" XDG_CACHE_HOME="$T/scratch" XDG_CONFIG_HOME="$T/scratch" "$1" --version 2>&1 | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1; }
 # The upgrade command (apply; or --undo with --undo --yes); lean_fail runs it with the test guard and a failure after one step.
 leanu() { node "$repo/scripts/lean.mjs" --home "$HOME" --upgrade-agent opencode "$@"; }
 lean_fail() { env LEAN_AGENTS_TEST=1 LEAN_TEST_FAIL_AT="$1" node "$repo/scripts/lean.mjs" --home "$HOME" --upgrade-agent opencode --yes; }

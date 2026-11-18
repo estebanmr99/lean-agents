@@ -9,7 +9,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { backupLayout, listSource, copyVerified, countCopy, sha256File, stamp as stampTs, DB_FILES, DATA_DIRS } from './opencode-backup.mjs';
-import { layout as layout1, probeVersion, removeOpencode1 } from './opencode1.mjs';
+import { spawnSync } from 'node:child_process';
+import { layout as layout1, removeOpencode1 } from './opencode1.mjs';
 import { upgradeApply } from './upgrade.mjs';
 import { undo as undoEntries, privateDir } from './fsops.mjs';
 import { configHome } from './system.mjs';
@@ -291,7 +292,17 @@ export function makeCtx({ home, stamp, journal }) {
 // --- the real steps ---
 
 // Runs `bin --version` with throwaway data and state dirs: a 2.x binary migrates a db it finds, so never the real or frozen one.
-export function versionIn(bin, { probe = probeVersion, env = process.env } = {}) {
+// A 2.x binary may print its version on stderr (the CI log of the first run showed no stdout version): read both, and keep what it
+// printed when it fails, so the error names the cause. Returns the first x.y.z found.
+export function probeBoth(bin, env) {
+  const r = spawnSync(bin, ['--version'], { env, encoding: 'utf8', timeout: 30000, windowsHide: true });
+  const out = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim();
+  const m = /(\d+\.\d+\.\d+)/.exec(out);
+  if (m) return m[1];
+  throw new Error(r.error ? first(r.error) : `exit ${r.status}, printed: ${out.slice(0, 120) || 'nothing'}`);
+}
+
+export function versionIn(bin, { probe = probeBoth, env = process.env } = {}) {
   const scratch = fs.mkdtempSync(j(os.tmpdir(), 'lean-probe-'));
   try { return probe(bin, { ...env, XDG_DATA_HOME: scratch, XDG_STATE_HOME: scratch, XDG_CACHE_HOME: scratch, XDG_CONFIG_HOME: scratch }); } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
 }
@@ -302,9 +313,15 @@ export function createSteps(d) {
   const win = (d.platform ?? process.platform) === 'win32';
   const ocBin = j(d.home, '.opencode', 'bin', `opencode${win ? '.exe' : ''}`);
   const cfgRoot = configHome(d.home);
+  const tried = [];
   const find2x = () => {
+    tried.length = 0;
     for (const c of [ocBin, d.which?.('opencode')].filter((x) => x && fs.existsSync(x))) {
-      try { const v = versionIn(c, { probe: d.probe }); if (/^2\./.test(v)) return { path: c, version: v }; } catch { /* not runnable: next */ }
+      try {
+        const v = versionIn(c, { probe: d.probe });
+        if (/^2\./.test(v)) return { path: c, version: v };
+        tried.push(`${c}: version ${v}, not 2.x`);
+      } catch (e) { tried.push(`${c}: ${first(e)}`); }
     }
     return null;
   };
@@ -359,7 +376,7 @@ export function createSteps(d) {
         d.save();
         await d.installAgent();
         const now = find2x();
-        if (!now) throw new Error(`the OpenCode 2 install did not leave a working 2.x binary at ${ocBin}`);
+        if (!now) throw new Error(`the OpenCode 2 install did not leave a working 2.x binary at ${ocBin}${tried.length ? ` (${tried.join('; ')})` : ''}`);
         rec.version = now.version;
       },
       async undo(rec, ctx) {
