@@ -598,3 +598,17 @@ Guide only, no code change: `docs/install-with-an-agent.md`, section "VS Code Co
 - **VERIFY:** the `*.prompt.md` user folder (`<VS Code user dir>/prompts`); no `/lean-install` prompt file is written until it is proven.
 - **VERIFY:** whether VS Code, not only Copilot CLI, loads `~/.copilot` rules and agents.
 - Antigravity pilot users use the same guide (owner default, 2026-11-18).
+
+## Update plan (#182 PR2, 2026-11-18)
+
+`--update` prints one row per pinned tool in use whose saved version differs from `core/pins.json` (`tool: installed -> pin`), then what it will not move, then the `CHANGELOG.md` sections after the saved lean-agents version (`scripts/lib/update-plan.mjs`; `--dry-run --json` has `update.rows` and `update.notes`).
+
+| Case | Shown as | Moved by `--update` |
+| --- | --- | --- |
+| Pinned tool in use, behind the pin | `update` | yes (as before) |
+| OpenCode 1.x on PATH | `held` | never |
+| Agent CLI (claude, opencode 2, copilot) behind its pin, same major, installed by lean-agents | `report` | not yet (later #182 PR) |
+| Same, pin is another major | `major` | never |
+| Same, installed by the user (not in `agents.json`) | `own` | never |
+
+Versions of the agent CLIs come from `<bin> --version` run with a scratch HOME (`opencode --version` writes a log under HOME). The notes need `CHANGELOG.md` in the package: it is now in the `files` list of `package.json` (checked with `tests/update-plan.test.mjs` against the repo copy; **VERIFY** with `npm pack --dry-run` at release). Cursor and Antigravity have no version pin, so no row.

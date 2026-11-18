@@ -31,7 +31,8 @@ import { planOpencode1, installOpencode1, removeOpencode1, layout as opencode1La
 import { agentLifecycle } from './lib/agent-lifecycle.mjs';
 import { copilotUsage } from './lib/copilot-usage.mjs';
 import { draftIssue } from './lib/feedback.mjs';
-import { pinVersions, behindPins, pinTool, nodeRange, npmSpec } from './lib/pins.mjs';
+import { planUpdate, changelogNotes, formatUpdatePlan } from './lib/update-plan.mjs';
+import { PINS, pinVersions, behindPins, pinTool, nodeRange, npmSpec } from './lib/pins.mjs';
 import { findNvm, installedNodes, resolveToolNodes, nvmLatest, nvmInstallArgv, nvmEnv, toolEnv, satisfies } from './lib/node-runtime.mjs';
 import { leanUpdateCommands, coordinateCommands, leanMigrateCommands } from './lib/lean-update.mjs';
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
@@ -520,7 +521,7 @@ function printMigration(o, m, commands) {
 }
 
 // Agents parse this instead of scraping the text plan. Paths use ~ so no home directory leaks.
-function printJson(o, planned, commands, migration, behind, prereqs) {
+function printJson(o, planned, commands, migration, behind, prereqs, update) {
   const rel = (t) => (t.startsWith(o.home + path.sep) || t === o.home ? `~${t.slice(o.home.length)}` : t);
   const inText = (t) => t.split(o.home).join('~');
   const plan = {
@@ -529,6 +530,7 @@ function printJson(o, planned, commands, migration, behind, prereqs) {
     files: planned.map((f) => ({ status: f.status, path: rel(f.path), note: f.note ?? null })),
     commands: commands.map((c) => ({ desc: inText(c.desc), agent: c.agent ?? null, run: c.run.map((a) => a.map(inText)) })),
     ...(behind && { behind }),
+    ...(update && { update }),
     ...(prereqs && { prereqs: prereqs.map((s) => ({ id: s.id, label: s.label, why: s.why, status: s.skipIf ? 'skip' : s.commands.length ? 'install' : 'manual', skipIf: s.skipIf, manual: s.manual ?? null })) }),
   };
   process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
@@ -560,6 +562,22 @@ function printPlan(o, planned, commands) {
   console.log('');
 }
 
+// --update: rows `tool: installed -> pin` plus the shipped CHANGELOG sections after the installed lean-agents version.
+function updateInfo(o, saved) {
+  const agentsFile = path.join(stateDir(o.home), 'agents.json');
+  const owned = fs.existsSync(agentsFile) ? Object.keys(JSON.parse(fs.readFileSync(agentsFile, 'utf8')).agents ?? {}) : [];
+  // A scratch HOME: `opencode --version` writes a log under HOME, and a dry run must leave --home untouched.
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-probe-'));
+  const env = { HOME: scratch, USERPROFILE: scratch };
+  const probe = (b) => binVersion(b, ['--version'], env);
+  const installed = { claude: probe('claude'), opencode: probe('opencode'), copilot: probe('copilot') };
+  fs.rmSync(scratch, { recursive: true, force: true });
+  const rows = planUpdate({ saved, pins: PINS, owned, installed });
+  const log = path.join(ROOT, 'CHANGELOG.md');
+  const current = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
+  return { rows, notes: changelogNotes(fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '', saved.version ?? '0.0.0', current) };
+}
+
 async function install(o) {
   if (o.json && !o.yes) throw new Error('--json needs --yes: the menus would write questions to stdout');
   const saved = o.command === 'update' ? readState(o.home) : null;
@@ -573,20 +591,24 @@ async function install(o) {
   // The planner owns these installs; the per-tool ones below would repeat them.
   const owned = new Set(pendingPrereqs(every?.steps ?? []).map((s) => (s.id === 'node-24' ? 'node' : s.id)));
   const commands = [...(o.exec ? [...every?.commands ?? [], ...prereqCommands(o, behind).filter((c) => !owned.has(c.tool))] : []), ...agentCommands];
+  const update = saved && o.dryRun ? updateInfo(o, saved) : null;
   const noGit = migration ? null : gitHint(packageManager());
   if (noGit) console.log(noGit);
   if (o.json) {
     if (!o.dryRun) throw new Error('--json needs --dry-run (or --doctor)');
     p.close();
-    return printJson(o, planned, commands, migration, saved ? behindPins(saved) : undefined, every?.steps);
+    return printJson(o, planned, commands, migration, saved ? behindPins(saved) : undefined, every?.steps, update ?? undefined);
   }
   if (migration) printMigration(o, migration, o.exec ? commands : []);
   else {
     if (every) printPrereqs(every.steps, o.exec);
     printPlan(o, planned, commands);
   }
-  if (saved && behindPins(saved).length) console.log('Pins that will change (old -> new):');
-  if (saved) for (const b of behindPins(saved)) console.log(`${b.tool}: ${b.installed} -> ${b.pinned}`);
+  if (update) { const text = formatUpdatePlan(update.rows, update.notes); if (text) console.log(text); }
+  else if (saved) {
+    if (behindPins(saved).length) console.log('Pins that will change (old -> new):');
+    for (const b of behindPins(saved)) console.log(`${b.tool}: ${b.installed} -> ${b.pinned}`);
+  }
   if (o.dryRun) { p.close(); console.log('Dry run: nothing was changed.'); return; }
   // The one question of --everything: the choose() prompter answers by default, so ask on a real one.
   const q = o.everything && !o.yes ? await prompter(false) : p;

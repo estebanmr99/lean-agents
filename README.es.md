@@ -201,7 +201,7 @@ Cada opción de `--help`. En PowerShell se escriben en PascalCase (`-DryRun`).
 | `--feedback-draft` | Tras un fallo de instalación: lee el error por stdin e imprime un borrador de issue sin datos sensibles en JSON. Necesita `--failed-command` |
 | `--failed-command <texto>` | El comando que falló, para `--feedback-draft` |
 | `--feedback-kind update` | Con `--feedback-draft`: el texto es un hallazgo de una actualización, no un error |
-| `--update` | Vuelve a aplicar con tus opciones guardadas |
+| `--update` | Vuelve a aplicar con tus opciones guardadas; el plan lista `herramienta: instalada -> pin de la versión`, lo que queda retenido (OpenCode 1.x, CLIs de agentes que cambian de major, herramientas que instalaste tú) y las notas de versión desde la tuya (`--dry-run [--json]` lo muestra sin cambiar nada) |
 | `--doctor` | Revisa la instalación |
 | `--uninstall` | Deshace todo lo que lean-agents cambió |
 | `--adopt` | Lista lo que ya tiene una máquina armada a mano y qué es cada cosa; con `--yes` aplica el plan |
