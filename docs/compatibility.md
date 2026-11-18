@@ -522,3 +522,5 @@ Spike for #80 (job `spike-opencode-side`, PR #143, CI run 43350726437, 2026-11-1
 - **V4 installer:** the v2 installer wrote only `~/.opencode/bin/opencode` (+ its data dir logs). With `--no-modify-path` it did not touch `.bashrc`, `.zshrc` or `.profile`; on Windows the HKCU user Path was unchanged.
 - **Note:** 2.x migrates the shared 1.x db in place (owner decision pending for 0.9.0; PR B is deferred).
 - **Layout answer: I (isolate).** Config could be shared, but 2.x migrates the shared 1.x database, so a 1.x user's sessions cannot be left untouched without giving 1.x its own data dir. Next (PR B): prove isolation (`XDG_DATA_HOME` or equivalent for the `opencode1` shim) before any upgrade path ships.
+
+- **Antigravity skill undo scope (#229, item 3): VERIFY.** `skills remove` runs without `-a` (`remove -a` keeps `~/.agents/skills`), so if the skills CLI uses a shared canonical folder it could delete a copy another adapter installed. Needs the real skills CLI layout (`tests/real-antigravity.sh`); behavior unchanged until proven (2026-11-18).

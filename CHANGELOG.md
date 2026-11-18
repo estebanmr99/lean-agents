@@ -6,10 +6,12 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Added
 
+- Tests (#229): the round trip seeds Antigravity's real skills folder, compares directories (not only files) and checks every kept backup is a copy of a user file; a unit test covers `antigravityAdapter` with `opts.prior` set and unset; the node-floor tests cover `--usage`, `--feedback-draft` and a faked higher `LEAN_AGENTS_NODE`. README tables (EN, ES) gain a row each for Antigravity skill ownership and the Node floor.
 - `tests/roundtrip.test.mjs`: one table-driven test runs install then `--uninstall` for each of the seven adapters in a temp HOME seeded with user files (a JSONC comment, a user MCP server, an agent and a skill named like managed ones) and asserts every file, path and bytes, equals the pre-install snapshot. Tests only (#164).
 
 ### Fixed
 
+- `checkNodeFloor` (`scripts/lean.mjs`): the floor uses the lower of the running Node and `LEAN_AGENTS_NODE`, so the variable can fake a lower version for tests but not a higher one; `--usage` and `--feedback-draft` run below the floor like the other read-only paths. The `--install-agent antigravity` check for an installed `agy` ignores the real `LOCALAPPDATA` when `--home` is a temp folder (#229).
 - `scripts/lean.mjs` checks the `engines.node` floor (22.20) when run directly from a clone: below it, one stderr line names the running Node and the fix (`nvm use`, `install.sh`). `--help`, `--version`, `--doctor`, `--dry-run`, `--upgrade-agent` and `--adopt` without `--yes` keep working; install, uninstall, migrate and `--yes` exit 1 unless `LEAN_AGENTS_ALLOW_OLD_NODE=1` is set (#208).
 - Antigravity: an `agy` that is not on PATH is found in the installer folders (`~/.local/bin`; Windows `%LOCALAPPDATA%\agy\bin` and `~/.gemini/bin` (**VERIFY**)) by detection, `--doctor` and `--install-agent`, which run it by that path and never install over it (#211).
 - Antigravity `--uninstall` removes only the skill folders lean-agents installed (recorded in state.json or absent before the install); a user skill with the same name, such as `i-have-adhd`, is kept and never overwritten (#148).
