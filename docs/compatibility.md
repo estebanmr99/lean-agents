@@ -673,3 +673,16 @@ Versions of the agent CLIs come from `<bin> --version` run with a scratch HOME (
 `--update` runs, after the one confirm, one command per plan row with action `update` for an agent lean-agents installed (`agents.json`): Claude Code `claude-installer.sh <pin>`, OpenCode 2 `opencode-installer.sh --version <pin> --no-modify-path`, Copilot CLI `npm install -g [--prefix] @github/copilot@<pin>`. The installer scripts are the same sha256-pinned ones as `--install-agent`. `state.json` keeps `from` and `reinstall` (the same command at the previous version) next to each command; `--uninstall` does not run it. Never moved: OpenCode 1.x, another major, an agent you installed, the VS Code Copilot extension, Cursor (its installer takes no version) and Antigravity (no pin). Proof: `tests/agent-upgrade.test.mjs` (synthetic rows, temp HOME, no binaries).
 
 **VERIFY** (no real binary yet; the nightly proof is PR6): that the Claude and OpenCode installers accept a version older than the installed one (downgrade, needed by the undo) and a newer one over an existing install; that the Windows installers (not offered yet) behave the same; `npm install -g` over an older Copilot CLI behind a proxy.
+
+## Login checks (#181 PR1, 2026-11-18)
+
+Read-only status by exit code only (the output can hold an account name, so it is dropped). Never run under `--no-exec` or outbound off.
+
+| Tool | Login command shown | Status command | Source | Date |
+| --- | --- | --- | --- | --- |
+| GitHub CLI | `gh auth login` | `gh auth status` (exit 1 when an account has auth problems; may refresh a token) | [manual](https://cli.github.com/manual/gh_auth_status) | 2026-11-18 |
+| Claude Code | `claude auth login` | `claude auth status` (JSON; exit 0 logged in, 1 not) | [CLI reference](https://code.claude.com/docs/en/cli-reference) | 2026-11-18 |
+| OpenCode 1.x / 2.x | `opencode`, then `/connect` | none used: **VERIFY** a read-only status command (`opencode auth list` reads the stored credential file, so it is not used) | | |
+| Copilot CLI | `copilot`, then `/login` | none documented: **VERIFY** | [docs](https://docs.github.com/en/copilot/how-tos/copilot-cli/cli-getting-started) | 2026-11-18 |
+| Antigravity (`agy`) | `agy` | none: **VERIFY** | | |
+| VS Code Copilot | sign in from the Accounts menu | no CLI: text only | | |
