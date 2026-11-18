@@ -100,7 +100,7 @@ function checkInventory({ home, exec, run, env, platform, fsx }, add) {
   return { nodes, skills };
 }
 
-export function doctor({ home, state, exec, nodeVersion = process.versions.node, json = false, run = quiet, env = process.env, platform = process.platform, fsx = fs, probe = [] }) {
+export function doctor({ home, state, exec, nodeVersion = process.versions.node, json = false, run = quiet, env = process.env, platform = process.platform, fsx = fs, probe = [], collect = null }) {
   const rows = [];
   const add = (item, status, detail = '') => rows.push({ item, status, detail });
   if (!state) {
@@ -183,6 +183,7 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
   const ok = !rows.some((r) => r.status === 'error' || r.status === 'missing');
   const behind = state ? behindPins(state) : [];
   if (json) process.stdout.write(`${JSON.stringify({ ok, behind, nodes, skills, rows }, null, 2)}\n`);
+  else if (collect) collect.push(...rows);
   else print(rows);
   return ok;
 }

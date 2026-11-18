@@ -40,3 +40,14 @@ for (const lang of ['en', 'es']) test(`every --flag in the ${lang} verify prompt
   assert.ok(flags.size >= 6, 'the prompt should name its flags');
   for (const f of flags) if (!GH_FLAGS.has(f)) assert.match(help.stdout, new RegExp(`${f}(?![a-z0-9-])`), `${f} is not in --help`);
 });
+
+// The verify prompt and its guide tell the agent to run `--summary --filed-issue`; both flags must exist.
+test('the verify prompt and the install-with-an-agent guide only name flags that --help lists', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-skillflags-'));
+  const env = { PATH: process.env.PATH, NVM_DIR: process.env.NVM_DIR ?? '', HOME: home };
+  const help = spawnSync(process.execPath, [path.join(root, 'scripts', 'lean.mjs'), '--help'], { env, encoding: 'utf8' }).stdout;
+  const text = ['scripts/lib/verify-prompt.mjs', 'docs/install-with-an-agent.md'].map((f) => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
+  const flags = new Set(text.match(/--[a-z][a-z0-9-]*/g));
+  for (const f of ['--summary', '--filed-issue', '--doctor', '--feedback-draft']) assert.ok(flags.has(f), `${f} should be named`);
+  for (const f of flags) if (!GH_FLAGS.has(f)) assert.match(help, new RegExp(`${f}(?![a-z0-9-])`), `${f} is not in --help`);
+});
