@@ -3,9 +3,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parse } from 'jsonc-parser';
-import { hasMark } from './fsops.mjs';
+import { hasMark, plan, apply, describe } from './fsops.mjs';
 import { configHome } from './system.mjs';
 import { configPath } from './adapters/opencode-v2.mjs';
+import { readBackupStamp } from './backup-stamp.mjs';
 
 const j = path.join;
 
@@ -146,4 +147,77 @@ export function formatUpgrade(r) {
   for (const i of r.items.filter((x) => x.upgrade)) out.push(`  ${i.upgrade.class.padEnd(16)} ${i.upgrade.before}${i.upgrade.after ? ` -> ${i.upgrade.after}` : ''}${i.upgrade.class === 'user-manual' ? `  (${i.upgrade.reason})` : ''}${i.file ? `  (${i.file})` : ''}`);
   out.push('Translation table:', ...TRANSLATIONS.map((t) => `  ${t.from} -> ${t.to}  [${t.source}]`));
   return out.join('\n');
+}
+
+// Edits that turn the 1.x config into 2.x keys, from `managed` and `user-translatable` rows only. Whole keys are set or removed
+// (never single array slots), so each edit undoes exactly. `user-manual` keys and entries are left where they are.
+// `inv.items` come from upgradeInventory; `cfg` is the parsed live config. A 2.x-shaped file (mcp.servers) yields no edits.
+export function translateEdits(cfg, items) {
+  const edits = [];
+  const mine = items.filter((i) => i.upgrade && i.client === 'opencode' && i.kind !== 'file' && /opencode\.jsonc?$/.test(i.file ?? ''));
+  const cls = (kind, name) => mine.find((i) => i.kind === kind && i.name === name)?.upgrade.class;
+  const c = cfg && typeof cfg === 'object' ? cfg : {};
+  const set = (p, value) => edits.push({ path: p, value, mode: 'setIfAbsent' });
+  const drop = (p) => edits.push({ path: p, mode: 'remove' });
+
+  for (const [n, v] of Object.entries(c.agent ?? {})) if (cls('config', `agent.${n}`) === 'user-translatable') set(['agents', n], v);
+  // A 2.x value already there wins (setIfAbsent), so the 1.x source is dropped only when nothing of it would be lost.
+  if (c.agent && Object.entries(c.agent).every(([n, v]) => cls('config', `agent.${n}`) === 'user-translatable' && (c.agents?.[n] === undefined || JSON.stringify(c.agents[n]) === JSON.stringify(v)))) drop(['agent']);
+
+  // Managed MCPs are dropped here: the 2.x adapter writes them again under mcp.servers.
+  if (c.mcp && !c.mcp.servers) {
+    const servers = {};
+    for (const [n, v] of Object.entries(c.mcp)) if (cls('mcp', n) === 'user-translatable') servers[n] = v;
+    const left = Object.keys(c.mcp).filter((n) => !['user-translatable', 'managed'].includes(cls('mcp', n)));
+    if (!left.length) edits.push({ path: ['mcp'], value: { servers }, mode: 'set' });
+  }
+
+  if (Array.isArray(c.plugin)) {
+    const rest = [];
+    for (const spec of c.plugin) {
+      const k = typeof spec === 'string' ? cls('plugin', spec) : null;
+      if (k === 'user-translatable') edits.push({ path: ['plugins'], value: spec, mode: 'arrayAdd' });
+      else if (k !== 'managed') rest.push(spec);
+    }
+    if (rest.length !== c.plugin.length) edits.push(rest.length ? { path: ['plugin'], value: rest, mode: 'set' } : { path: ['plugin'], mode: 'remove' });
+  }
+
+  if (cls('config', 'compaction.reserved') === 'user-translatable' && c.compaction?.reserved !== undefined) {
+    set(['compaction', 'buffer'], c.compaction.reserved);
+    if (c.compaction.buffer === undefined) drop(['compaction', 'reserved']);
+  }
+  if (typeof c.autoupdate === 'boolean' && cls('config', 'autoupdate') === 'user-translatable') {
+    set(['update'], c.autoupdate ? 'auto' : 'disable');
+    if (c.update === undefined) drop(['autoupdate']);
+  }
+  if (Array.isArray(c.disabled_providers) && cls('config', 'disabled_providers') === 'user-translatable') {
+    for (const resource of c.disabled_providers) edits.push({ path: ['policies'], value: { effect: 'deny', action: 'provider.use', resource }, mode: 'arrayAdd' });
+    drop(['disabled_providers']);
+  }
+  return edits;
+}
+
+// Apply gate: a verified backup stamp. `stamp` is injectable; the default reader is the P3 stub (never verified until P3 merges).
+export const backupVerified = (stamp) => Boolean(stamp && stamp.verified === true);
+
+// Apply the translation to the live 2.x config dir. `adapter` is the v2 adapter plan ({ actions }); its config action is merged
+// with the translation edits so the file is written once. Writes only under the XDG config home, never the 1.x data folder.
+// Returns { planned, entries } (entries are the fsops state records an undo needs).
+export function upgradeApply({ home, inv, adapter, backupDir, stamp = readBackupStamp(home), dryRun = false, fsx = fs }) {
+  if (!backupVerified(stamp)) throw new Error('refusing to apply: no verified session backup (run --upgrade-agent opencode --backup first)');
+  const ocDir = j(configHome(home), 'opencode');
+  const file = configPath(ocDir);
+  const cfg = readJson(file, fsx);
+  const errors = [];
+  if (fsx.existsSync(file)) parse(fsx.readFileSync(file, 'utf8'), errors, { allowTrailingComma: true });
+  if (errors.length) throw new Error(`refusing to apply: ${file} could not be parsed; fix it by hand first`);
+  const tr = translateEdits(cfg, inv.items);
+  const actions = adapter.actions.map((a) => (a.kind === 'json' && a.path === file ? { ...a, edits: [...tr, ...a.edits] } : a));
+  if (!actions.some((a) => a.path === file) && tr.length) actions.push({ kind: 'json', path: file, edits: tr });
+  const cfgHome = configHome(home);
+  const stray = actions.find((a) => !path.resolve(a.path).startsWith(path.resolve(cfgHome) + path.sep));
+  if (stray) throw new Error(`refusing to write outside ${cfgHome}: ${stray.path}`);
+  const planned = plan(actions, [cfgHome]);
+  if (dryRun) return { planned, entries: [], text: describe(planned, home) };
+  return { planned, entries: apply(planned, backupDir, home, [cfgHome]), text: describe(planned, home) };
 }

@@ -83,3 +83,39 @@ else if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const r = await seedHandbuilt(home, { old: { dir: oldDir, version: oldV }, neu: { dir: newDir, version: newV }, link, win: win === 'win' });
   console.log(JSON.stringify(r));
 }
+
+// A synthetic team-machine-shaped OpenCode 1.x machine (#80 part 2, P5): user skills with scripts/, commands, .ts plugins next to a
+// CommonJS package.json, npm plugins, MCPs with env, AGENTS.md + SKILLS-INVENTORY.md and ponytail. Neutral names, no real paths.
+export function seedWorkPc(home) {
+  const oc = j(home, '.config', 'opencode');
+  const pluginUrl = (f) => new URL(`file:///${j(oc, 'plugins', f).replaceAll('\\', '/').replace(/^\//, '')}`).href;
+  for (let i = 1; i <= 7; i++) {
+    put(j(oc, 'skills', `team-skill-${i}`, 'SKILL.md'), `---\nname: team-skill-${i}\ndescription: Synthetic skill ${i}\n---\nBody ${i}\n`);
+    put(j(oc, 'skills', `team-skill-${i}`, 'scripts', 'run.sh'), '#!/bin/sh\nexit 0\n');
+  }
+  put(j(oc, 'commands', 'review-pr.md'), '---\ndescription: Review a PR\n---\nReview $ARGUMENTS\n');
+  put(j(oc, 'command', 'triage.md'), '---\ndescription: Triage\n---\nTriage $ARGUMENTS\n');
+  put(j(oc, 'plugins', 'package.json'), '{"type":"commonjs"}\n');
+  put(j(oc, 'plugins', 'team-notify.ts'), 'export default {}\n');
+  put(j(oc, 'plugins', 'team-guard.ts'), 'export default {}\n');
+  put(j(oc, 'AGENTS.md'), '# Team rules\n');
+  put(j(oc, 'SKILLS-INVENTORY.md'), '# Skills\n');
+  put(j(oc, 'opencode.jsonc'), `{
+  "agent": { "reviewer": { "mode": "subagent" } },
+  "mcp": {
+    "issues": { "type": "local", "command": ["node", "D:\\\\tools\\\\issues-mcp.js"], "environment": { "ISSUES_TOKEN": "${SECRETS[0]}" } },
+    "context-mode": { "type": "local", "command": ["npx", "-y", "context-mode@2.1.4", "server"] }
+  },
+  "plugin": ["context-mode", "team-npm-plugin@1.2.0", "@scope/other-plugin@2.0.0", "${pluginUrl('team-notify.ts')}"],
+  "compaction": { "auto": true, "reserved": 20000 },
+  "autoupdate": false,
+  "disabled_providers": ["opencode"],
+  // team keys
+  "keybinds": { "leader": "ctrl+x" },
+  "permission": { "bash": "ask" }
+}
+`);
+  put(j(home, '.config', 'ponytail', 'config.json'), '{"defaultMode":"lite"}\n');
+  put(j(home, '.local', 'share', 'opencode', 'opencode.db'), 'synthetic 1.x session data\n');
+  return { oc };
+}
