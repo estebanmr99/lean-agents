@@ -197,7 +197,7 @@ Every flag from `--help`. In PowerShell the same flags are PascalCase (`-DryRun`
 | `--adhd-always` | Turn on i-have-adhd for every answer |
 | `--ponytail-mode` lite, full, ultra or off | Ponytail level |
 | `--shell` default or git-bash | OpenCode on Windows: use Git Bash when found (default: git-bash); never overwrites a shell you set yourself |
-| `--json` | With `--dry-run`, `--doctor` or `--adopt`: print one JSON object on stdout |
+| `--json` | With `--dry-run`, `--doctor`, `--adopt` or `--yes` (a real apply: `{ ok, files, commands, errors, version }`, see [docs/install-json.md](docs/install-json.md)): print one JSON object on stdout |
 | `--feedback-draft` | After a failed install: read the error on stdin and print a redacted issue draft as JSON. Needs `--failed-command` |
 | `--failed-command <text>` | The command that failed, for `--feedback-draft` |
 | `--feedback-kind update` | With `--feedback-draft`: the text is a finding from an update, not an error |
