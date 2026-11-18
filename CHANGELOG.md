@@ -9,6 +9,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - Antigravity: an `agy` that is not on PATH is found in the installer folders (`~/.local/bin`; Windows `%LOCALAPPDATA%\agy\bin` and `~/.gemini/bin` (**VERIFY**)) by detection, `--doctor` and `--install-agent`, which run it by that path and never install over it (#211).
 - Antigravity `--uninstall` removes only the skill folders lean-agents installed (recorded in state.json or absent before the install); a user skill with the same name, such as `i-have-adhd`, is kept and never overwritten (#148).
 - `--install-agent antigravity` on macOS says the Homebrew cask cannot be pinned or verified and asks before installing it; #147 stays open (**VERIFY** pin by tarball).
+- `--adopt` compares a pre-release npm copy (`2.1.7-beta.1`) by its numeric core and sorts it below its release: against pin `2.1.7` it is `drift`, against `2.1.8` it is `newer`, and an equal version stays unflagged. Before, the pre-release read as equal to the pin (#204).
 - `--adopt` names a Cursor hook written as shell syntax (GSD's `$(for n in ...) ~/.cursor/hooks/gsd-cursor-<event>.js` loop) after the first script it runs, so it reads `sessionStart:gsd-cursor-session-start.js` instead of `sessionStart:$(for n in`; a shell command with no script reads `<event>:shell`. A second Cursor hook with the same event and name gets `#2`, a third `#3`, for shell and non-shell commands alike (#202).
 - `--upgrade-agent opencode` text rows end with the item's file (home-relative), as `--adopt` rows do, so the two `@tarquinen/opencode-dcp@latest` rows (`opencode.jsonc` and `tui.json`) no longer read as a duplicate (#203).
 - `--adopt` and `--upgrade-agent` count OpenCode sessions even when the engine runs on a Node without `node:sqlite` (22.12 and older): the count runs on the same read-only copy in a child process, first on the tool Node (22.13+ or 24.x), then on the engine's Node with `--experimental-sqlite`. When both fail, the note says which were tried (#201).
@@ -22,6 +23,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - The engine saves `state.json` after writing files and before and after each command, so a write error or an interrupted or failing command no longer leaves files that `--uninstall` cannot undo (#158).
 - `--uninstall` removes only what lean-agents created: the Linux and Windows Bun undo deletes `~/.bun/bin/bun` (`bun.exe`) and then its dirs only if empty, so your Bun cache and global packages stay; the OpenCode vendor undo re-derives the checkout path from your home at undo time and refuses a symlink, an edited `state.json` path or anything outside the home (#157).
 - `--doctor` (text and `--json`) and the install preview print only `set` / `not set` for proxy and CA variables, so internal proxy hosts, ports and CA paths no longer reach stdout; `NO_PROXY` also reports whether the loopback entries are present (#172).
+- The proxy test checks the proxy host and port (`127.0.0.1:3128`) on disk instead of the bare port `3128`, so a temp path or timestamp that contains `3128` no longer fails it (#205).
 
 ### Changed
 
@@ -32,6 +34,8 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 - Versions: README (EN and ES), `docs/ROADMAP.md` and the spec name 0.8.0 as the latest release (#161). The npm item on the README roadmap is ticked; "Later: 1.0.0" lists #179 to #182.
 - `docs/SECURITY-REVIEW.md` pin table names every key in `core/pins.json`; `tests/security-review-pins.test.mjs` fails when a key is missing (#155).
+- Bootstrap limit (#162): `SHA256SUMS` comes from the same release as the tarball, so the release check catches corruption, not a tampered release; `docs/compatibility.md` says so and lists attestation and npm provenance as **VERIFY** fixes. The Cursor installer's tarball has no checksum check (#206, **VERIFY** upstream).
+- `docs/compatibility.md` records the repo setting "Allow GitHub Actions to create and approve pull requests" (on, checked 2026-11-18) and PR #210's `action_required` run and dispatch workaround (#165). It records the 0.8.0 release run's sigstore log entry (logIndex 3845258591) and that OIDC publishing is unproven until a release uses it (#160).
 - `docs/compatibility.md`: the `lean-update` tag `v0.7.0` exists, and its tagged `skills add` form was checked in a throwaway HOME (#168).
 - README (EN and ES): an "All flags" table covers every flag in `--help`, `--home` included (#167).
 - Install docs (README, `docs/install-with-an-agent.md`, `skills/lean-update/SKILL.md`) use `npx lean-agents@latest` first and state Node.js 22.20+; Context Mode 2 and GSD Core need Node.js 24 via nvm. The bootstraps moved to a fallback section, and the `LEAN_AGENTS_VERSION` example is 0.8.0 (#178).
