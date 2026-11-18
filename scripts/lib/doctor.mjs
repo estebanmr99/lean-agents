@@ -139,6 +139,7 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
       const reset = adhdSkillFiles(home).filter((f) => fs.readFileSync(f, 'utf8').includes('disable-model-invocation: true'));
       if (reset.length) add('i-have-adhd skill', 'changed', 'a plugin update reset it; run --update');
     }
+    if (o.agents.includes('vscode-copilot')) add('Copilot extension', 'skipped', 'managed by VS Code, not lean-agents: install and update it from the Extensions view');
     if (exec) {
       for (const [bin, tool] of [['claude', 'claude'], ['opencode', 'opencode-v1'], ['opencode', 'opencode-v2'], ['copilot', 'copilot-cli'], ['agy', 'antigravity'], ['rtk', 'rtk'], ['context-mode', 'context-mode'], ['uvx', 'serena']]) {
         const needed = o.agents.includes(tool) || o.tools.includes(tool);

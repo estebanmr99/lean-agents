@@ -12,7 +12,10 @@ import { run, which, version, antigravityPrereqs, packageManager, agyCandidates,
 import { writePrivate, privateDir } from './fsops.mjs';
 
 const VERIFY = fileURLToPath(new URL('./verify-sha256.mjs', import.meta.url));
-export const LIFECYCLE_AGENTS = ['claude', 'opencode-v2', 'copilot-cli', 'cursor', 'antigravity'];
+export const LIFECYCLE_AGENTS = ['claude', 'opencode-v2', 'copilot-cli', 'cursor', 'antigravity', 'vscode-copilot'];
+const VSCODE = 'vscode-copilot';
+// VS Code owns the extension, so for vscode-copilot "install" only writes the adapter's files (the engine does it through o.vscode).
+export const VSCODE_NOTE = 'VS Code owns the GitHub Copilot extension: lean-agents never installs, updates or removes it. Install the extension and update it from VS Code (Extensions view).';
 
 // Pinned installer script: curl, verify, run. `args` go to the script (a version for Claude and OpenCode).
 function script(pinKey, dir, args = []) {
@@ -103,17 +106,30 @@ export function removeRecorded(home, rec) {
 const stateFile = (stateDir) => path.join(stateDir, 'agents.json');
 const readAgents = (stateDir) => (fs.existsSync(stateFile(stateDir)) ? JSON.parse(fs.readFileSync(stateFile(stateDir), 'utf8')) : { agents: {} });
 
-// o: { mode: 'install'|'uninstall', fromUpgrade (only --upgrade-agent may install 2.x next to 1.x), agents, home, realHome, platform, stateDir, dryRun, exec, yes, ask, yesNo }
+// vscode-copilot: configure or remove the adapter's files only. o.vscode = { configured(), install(), uninstall() } comes from the engine.
+async function vscodeLifecycle(o) {
+  const log = console.log;
+  log(`${VSCODE}: ${VSCODE_NOTE}`);
+  if (o.mode === 'install') {
+    if (o.vscode.configured()) log(`${VSCODE}: already configured by lean-agents; run --update to refresh it. Nothing done.`);
+    else await o.vscode.install();
+  } else if (!o.vscode.configured()) log(`${VSCODE}: not configured by lean-agents; nothing done.`);
+  else await o.vscode.uninstall();
+}
+
+// o: { mode: 'install'|'uninstall', fromUpgrade (only --upgrade-agent may install 2.x next to 1.x), agents, home, realHome, platform, stateDir, dryRun, exec, yes, ask, yesNo, vscode }
 export async function agentLifecycle(o) {
   const log = console.log;
   for (const a of o.agents) {
     if (a === 'opencode-v1') throw new Error('opencode-v1 is never installed or removed by lean-agents (work PCs run 1.x on purpose, #79)');
     if (!LIFECYCLE_AGENTS.includes(a)) throw new Error(`cannot ${o.mode} "${a}" (available: ${LIFECYCLE_AGENTS.join(', ')})`);
   }
+  if (o.agents.includes(VSCODE)) await vscodeLifecycle(o);
+  const agents = o.agents.filter((a) => a !== VSCODE);
   const state = readAgents(o.stateDir);
   const table = o.table ?? agentTable({ home: o.home, platform: o.platform ?? process.platform, dir: o.stateDir, realHome: o.realHome });
   const todo = [];
-  for (const a of o.agents) {
+  for (const a of agents) {
     const row = table[a];
     const mine = state.agents[a];
     if (o.mode === 'install') {

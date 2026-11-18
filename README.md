@@ -213,7 +213,8 @@ Every flag from `--help`. In PowerShell the same flags are PascalCase (`-DryRun`
 | `--upgrade-agent opencode --opencode1 [--yes]` | After `--backup`: adds `opencode1`, which runs OpenCode 1.x on the frozen copy only; `--uninstall` removes it |
 | `--upgrade-agent opencode --yes` | Apply, only with a verified backup stamp from `--backup --yes`: `opencode1`, OpenCode 2, the translated config, DCP. Every step is journaled; a failed step undoes the finished ones |
 | `--upgrade-agent opencode --undo [--yes]` | Back to 1.x: undoes each step, moves the 2.x-migrated db aside (never deleted), copies the frozen copy back; the backup and the frozen copy are kept |
-| `--install-agent a,b` / `--uninstall-agent a,b` | Install or remove agent CLIs that lean-agents installed; plan first, `--yes` runs it; never OpenCode 1.x |
+| `--install-agent a,b` / `--uninstall-agent a,b` | Install or remove agent CLIs that lean-agents installed; plan first, `--yes` runs it; never OpenCode 1.x. `vscode-copilot` only writes or removes its config files: VS Code owns the Copilot extension |
+| `--upgrade-agent vscode-copilot` | Report only: the extension updates from VS Code; `--update` refreshes the files lean-agents wrote |
 | `--usage` | Print the Copilot credits left (one `gh` call, no model request) |
 | `--version` | Print the lean-agents version |
 | `--home <dir>` | Treat this folder as your home directory; use a temp folder to try things safely |

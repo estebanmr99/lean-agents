@@ -213,7 +213,8 @@ Cada opción de `--help`. En PowerShell se escriben en PascalCase (`-DryRun`).
 | `--upgrade-agent opencode --opencode1 [--yes]` | Después de `--backup`: añade `opencode1`, que ejecuta OpenCode 1.x solo sobre la copia congelada; `--uninstall` lo quita |
 | `--upgrade-agent opencode --yes` | Aplicar, solo con un sello de copia verificada de `--backup --yes`: `opencode1`, OpenCode 2, la configuración traducida, DCP. Cada paso queda en un diario; si uno falla se deshacen los ya hechos |
 | `--upgrade-agent opencode --undo [--yes]` | Volver a 1.x: deshace cada paso, aparta la base migrada por 2.x (nunca se borra), devuelve la copia congelada; la copia y la copia congelada se conservan |
-| `--install-agent a,b` / `--uninstall-agent a,b` | Instala o quita CLIs de agente que lean-agents instaló; primero el plan, `--yes` lo ejecuta; nunca OpenCode 1.x |
+| `--install-agent a,b` / `--uninstall-agent a,b` | Instala o quita CLIs de agente que lean-agents instaló; primero el plan, `--yes` lo ejecuta; nunca OpenCode 1.x. `vscode-copilot` solo escribe o quita sus archivos de configuración: VS Code es dueño de la extensión Copilot |
+| `--upgrade-agent vscode-copilot` | Solo informa: la extensión se actualiza desde VS Code; `--update` refresca los archivos que lean-agents escribió |
 | `--usage` | Imprime los créditos de Copilot que quedan (una llamada a `gh`, sin pedir al modelo) |
 | `--version` | Imprime la versión de lean-agents |
 | `--home <dir>` | Usa esta carpeta como tu carpeta personal; usa una carpeta temporal para probar sin riesgo |

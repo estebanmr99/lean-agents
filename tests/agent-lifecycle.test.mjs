@@ -94,3 +94,50 @@ test('an agent lean-agents did not install is reported and nothing is done', asy
   const r = lean(home, '--uninstall-agent', 'copilot-cli', '--yes');
   assert.match(r.stdout, /not installed by lean-agents/);
 });
+
+// Engine runs get only PATH, NVM_DIR and HOME; --home keeps every write in the temp dir.
+const leanEnv = (home) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, '--no-exec', '--yes', '--agents', 'claude', '--tools', 'caveman'], { encoding: 'utf8', env: { PATH: process.env.PATH, NVM_DIR: process.env.NVM_DIR ?? '', HOME: home } });
+const engine = (home, ...args) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args], { encoding: 'utf8', env: { PATH: process.env.PATH, NVM_DIR: process.env.NVM_DIR ?? '', HOME: home } });
+
+test('vscode-copilot is a lifecycle agent; VS Code keeps the extension', () => {
+  assert.ok(LIFECYCLE_AGENTS.includes('vscode-copilot'));
+  const r = engine(tmp(), '--upgrade-agent', 'vscode-copilot');
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /VS Code owns the GitHub Copilot extension/);
+});
+
+test('vscode-copilot install and uninstall go through the lifecycle with a stub', async () => {
+  const calls = [];
+  let on = false;
+  const vscode = { configured: () => on, install: async () => { calls.push('install'); on = true; }, uninstall: async () => { calls.push('uninstall'); on = false; } };
+  const base = { agents: ['vscode-copilot'], home: tmp(), realHome: '/nowhere', stateDir: tmp(), dryRun: false, exec: false, yes: true, ask: async (_q, d) => d, yesNo, vscode };
+  assert.match(await quietly(() => agentLifecycle({ ...base, mode: 'uninstall' })), /not configured by lean-agents/);
+  assert.match(await quietly(() => agentLifecycle({ ...base, mode: 'install' })), /never installs, updates or removes it/);
+  assert.match(await quietly(() => agentLifecycle({ ...base, mode: 'install' })), /already configured/);
+  await quietly(() => agentLifecycle({ ...base, mode: 'uninstall' }));
+  assert.deepEqual(calls, ['install', 'uninstall']);
+});
+
+test('--install-agent vscode-copilot writes the adapter files; --uninstall-agent removes only those', () => {
+  const home = tmp();
+  assert.equal(leanEnv(home).status, 0);
+  const rules = path.join(home, '.config', 'lean-agents', 'AGENTS.md');
+  assert.ok(fs.existsSync(rules));
+  const r = engine(home, '--install-agent', 'vscode-copilot', '--no-exec', '--yes', '--tools', 'serena');
+  assert.equal(r.status, 0, r.stderr);
+  const state = () => JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'state.json'), 'utf8'));
+  assert.ok(state().options.agents.includes('vscode-copilot') && state().options.agents.includes('claude'));
+  const mcp = state().files.find((f) => f.path.endsWith(path.join('Code', 'User', 'mcp.json')));
+  assert.ok(mcp && fs.existsSync(mcp.path));
+  const u = engine(home, '--uninstall-agent', 'vscode-copilot', '--no-exec', '--yes');
+  assert.equal(u.status, 0, u.stderr);
+  assert.ok(!fs.existsSync(mcp.path), 'mcp.json left');
+  assert.deepEqual(state().options.agents, ['claude']);
+  assert.ok(fs.existsSync(rules), 'removed a file that is not vscode-copilot');
+});
+
+test('--doctor says VS Code owns the Copilot extension', () => {
+  const home = tmp();
+  assert.equal(engine(home, '--install-agent', 'vscode-copilot', '--no-exec', '--yes', '--tools', 'caveman').status, 0);
+  assert.match(engine(home, '--doctor', '--no-exec').stdout, /Copilot extension.*managed by VS Code/);
+});
