@@ -74,7 +74,7 @@ export function allowedEnv(env = process.env, platform = process.platform, onDro
     // A corporate proxy URL may carry user:pass on purpose; the child needs it.
     const unsafe = (up === 'NODE_OPTIONS' && value && !safeNodeOptions(value)) || SECRET_NAME.test(name) || ENV_DROP.test(name)
       || (!exact.has(up) && SECRET_VALUE.test(PROXY_VARS.includes(up) ? value.replace(/:\/\/[^/\s@]*@/, '://') : value));
-    if (unsafe) { if (wanted) dropped.push(name); continue; }
+    if (unsafe) { if (wanted && !seen.has(up)) dropped.push(name); continue; }
     if (wanted) { out[name] = value; seen.add(up); }
   }
   if (dropped.length) onDrop(dropped);

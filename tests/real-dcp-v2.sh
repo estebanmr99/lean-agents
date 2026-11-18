@@ -20,8 +20,9 @@ pids=""
 # shellcheck disable=SC2329 # run by the EXIT trap below
 cleanup() {
   for p in $pids; do kill "$p" 2>/dev/null || true; done
-  # Windows: kill only reaches the MSYS pid, so end opencode and its children before removing a HOME they may hold open.
-  if [ "$is_win" = "1" ]; then taskkill //F //T //IM opencode.exe >/dev/null 2>&1 || true; sleep 1; fi
+  # Windows CI: kill only reaches the MSYS pid, so end opencode and its children before removing a HOME they may hold open.
+  # CI only: taskkill by image name would also hit a developer's own sessions.
+  if [ "$is_win" = "1" ] && [ -n "${CI:-}" ]; then taskkill //F //T //IM opencode.exe >/dev/null 2>&1 || true; sleep 1; fi
   rm -rf "$T" 2>/dev/null || true
 }
 trap cleanup EXIT
