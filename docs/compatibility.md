@@ -678,6 +678,10 @@ Versions of the agent CLIs come from `<bin> --version` run with a scratch HOME (
 
 **VERIFY** (no real binary yet; the nightly proof is PR6): that the Claude and OpenCode installers accept a version older than the installed one (downgrade, needed by the undo) and a newer one over an existing install; that the Windows installers (not offered yet) behave the same; `npm install -g` over an older Copilot CLI behind a proxy.
 
+## Summary page (#181 PR3, 2026-11-18)
+
+One self-contained HTML (inline CSS and JS, no network, no external reference) written by the finish step and `--summary` to `<state dir>/summary.html`, an owned file that `--uninstall` removes. Opening it is asked once; `open` (macOS), `cmd /c start` (Windows) and `xdg-open` (Linux) run only after a yes, never under CI, `--yes`, `--json`, `--no-open` or without a terminal. CI proves the page and the engine only; **VERIFY** the browser opening on the owner's machine, a peer, and a corporate Windows PC behind a proxy.
+
 ## Login checks (#181 PR1, 2026-11-18)
 
 Read-only status by exit code only (the output can hold an account name, so it is dropped). Never run under `--no-exec` or outbound off.

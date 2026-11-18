@@ -21,7 +21,7 @@ function lean(home, args) {
   return r.stdout;
 }
 function files(dir) {
-  return fs.readdirSync(dir, { withFileTypes: true, recursive: true }).filter((e) => e.isFile())
+  return fs.readdirSync(dir, { withFileTypes: true, recursive: true }).filter((e) => e.isFile() && e.name !== 'summary.html') // the page shows the user-run `npx ... lean-agents@latest` commands
     .map((e) => fs.readFileSync(path.join(e.parentPath, e.name), 'utf8')).join('\n');
 }
 // Plan text (every command) plus every file the install wrote.
