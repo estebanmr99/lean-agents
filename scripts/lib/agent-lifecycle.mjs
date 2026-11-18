@@ -106,6 +106,16 @@ export function removeRecorded(home, rec) {
 }
 
 const stateFile = (stateDir) => path.join(stateDir, 'agents.json');
+export const installedAgents = (stateDir) => Object.keys(readAgents(stateDir).agents);
+// --install-agent / --uninstall-agent end the version history of an agent: its upgrade records would undo onto a stale install.
+function dropUpgradeRecords(stateDir, a) {
+  const file = path.join(stateDir, 'state.json');
+  if (!fs.existsSync(file)) return;
+  const s = JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (!s.commands?.some((c) => c.reinstall && agentOf(c) === a)) return;
+  s.commands = s.commands.filter((c) => !(c.reinstall && agentOf(c) === a));
+  writePrivate(file, `${JSON.stringify(s, null, 2)}\n`);
+}
 const readAgents = (stateDir) => (fs.existsSync(stateFile(stateDir)) ? JSON.parse(fs.readFileSync(stateFile(stateDir), 'utf8')) : { agents: {} });
 
 // vscode-copilot: configure or remove the adapter's files only. o.vscode = { configured(), install(), uninstall() } comes from the engine.
@@ -182,6 +192,7 @@ export async function agentLifecycle(o) {
       log(`${a}: removed. Your config and data were not touched.`);
     }
     writePrivate(stateFile(o.stateDir), `${JSON.stringify(state, null, 2)}\n`);
+    dropUpgradeRecords(o.stateDir, a);
   }
 }
 
@@ -210,9 +221,10 @@ export function upgradeCommands({ rows, home, platform = process.platform, dir, 
 // --update --undo: the first saved reinstall per agent. Commands are in run order, so that is the version before the oldest
 // upgrade; replaying every record forward would end on the newest "previous" version. The agent is the 2nd word of the desc.
 export const agentOf = (c) => c.desc.split(' ')[1];
-export function undoPlan(commands) {
+// `installed`: the agents in agents.json. A record of an agent that is gone (or reinstalled since) must not bring it back.
+export function undoPlan(commands, installed = null) {
   const seen = new Set();
-  return commands.filter((c) => c.reinstall && !seen.has(agentOf(c)) && seen.add(agentOf(c)));
+  return commands.filter((c) => c.reinstall && (!installed || installed.includes(agentOf(c))) && !seen.has(agentOf(c)) && seen.add(agentOf(c)));
 }
 
 // Runs each plan step (a failed one is reported and the rest still run). Returns { ok, restored: agents back on their old version }.

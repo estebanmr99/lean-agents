@@ -30,7 +30,7 @@ import { backupOpencode, backupLayout, listProcesses, opencodeRunning } from './
 import { readBackupStamp } from './lib/backup-stamp.mjs';
 import { isActive, failAt, applyPreflight, verifyBackup, configDrift, createSteps, makeCtx, runApply, runUndo, restoreData } from './lib/opencode-upgrade.mjs';
 import { planOpencode1, installOpencode1, removeOpencode1, layout as opencode1Layout } from './lib/opencode1.mjs';
-import { agentLifecycle, agentTable, upgradeCommands, undoPlan, undoUpgrades, agentOf, VSCODE_NOTE } from './lib/agent-lifecycle.mjs';
+import { agentLifecycle, agentTable, upgradeCommands, undoPlan, undoUpgrades, agentOf, installedAgents, VSCODE_NOTE } from './lib/agent-lifecycle.mjs';
 import { copilotUsage } from './lib/copilot-usage.mjs';
 import { draftIssue } from './lib/feedback.mjs';
 import { planUpdate, changelogNotes, formatUpdatePlan } from './lib/update-plan.mjs';
@@ -558,13 +558,14 @@ function printJson(o, planned, commands, migration, behind, prereqs, update) {
 
 // One JSON object on stdout after a real apply (--json --yes). Field names are a contract: see docs/install-json.md.
 function printApplied(o, files, commands, errors) {
-  const inText = (t) => t.split(o.home).join('~');
+  // The home becomes ~; any other absolute path (a --project dir, node's own) is masked like the files are.
+  const inText = (t) => t.split(o.home).join('~').replace(/(^|[\s'"=(])(?:\/|[A-Za-z]:[\\/])[^\s'")]*/g, '$1<outside-home>');
   // Never an absolute path: --project files live outside the home.
   const rel = (t) => { const r = path.relative(o.home, t); return r === '..' || r.startsWith(`..${path.sep}`) || path.isAbsolute(r) ? '<outside-home>' : r.split(path.sep).join('/') || '.'; };
   process.stdout.write(`${JSON.stringify({
     ok: errors.length === 0,
     files: files.map((f) => rel(f.path)),
-    commands: commands.map((c) => ({ ...c, desc: inText(c.desc) })),
+    commands: commands.map((c) => ({ ...c, desc: inText(c.desc), ...(c.run && { run: c.run.map((a) => a.map(inText)) }) })),
     errors: errors.map(inText),
     version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version,
   }, null, 2)}\n`);
@@ -771,15 +772,16 @@ async function install(o) {
 // Plan first; the answer (or --yes) runs it. A failed step is reported and the rest still run; --uninstall never does this.
 async function undoAgentUpgrades(o) {
   const S = readState(o.home);
-  const todo = undoPlan(S?.commands ?? []);
+  const todo = undoPlan(S?.commands ?? [], installedAgents(stateDir(o.home)));
   if (!todo.length) { console.log('nothing to undo: no agent CLI upgrade by lean-agents is recorded'); return true; }
   console.log('lean-agents --update --undo plan (the oldest saved version per agent):');
   for (const c of todo) {
     console.log(`  - ${agentOf(c)}: back to ${c.from}`);
     for (const argv of [...c.reinstall, ...(c.reinstallAlways ?? [])]) console.log(`      $ ${argv.join(' ')}`);
   }
-  if (o.dryRun || !o.exec) { console.log(o.dryRun ? 'Dry run: nothing was changed.' : '--no-exec: nothing was run.'); return true; }
-  if (!o.yes && !(process.stdin.isTTY && process.stdout.isTTY)) { console.log('No terminal to ask on: --yes runs it.'); return true; }
+  if (o.dryRun) { console.log('Dry run: nothing was changed.'); return true; }
+  if (!o.exec) { console.log('--no-exec: nothing was run. Not done.'); return false; }
+  if (!o.yes && !(process.stdin.isTTY && process.stdout.isTTY)) { console.log('No terminal to ask on: --yes runs it. Not done.'); return false; }
   const p = await prompter(o.yes);
   try { if (!yesNo(await p.ask('Reinstall these versions?', o.yes ? 'y' : 'n'))) { console.log('Cancelled.'); return true; } } finally { p.close(); }
   Object.assign(process.env, childEnv(S.options.network));
@@ -1057,6 +1059,7 @@ async function main() {
     return process.exit(0);
   }
   if (o.backup) throw new Error('--backup goes with --upgrade-agent opencode');
+  if (o.command === 'update' && o.undo && o.json) throw new Error('--update --undo has no --json output: the plan and the results are text');
   if (o.command === 'update' && o.undo) return process.exit((await undoAgentUpgrades(o)) ? 0 : 1);
   if ((o.undo || o.keepBackup || o.confirmRemovals) && o.command !== 'adopt') throw new Error('--undo, --keep-backup and --confirm-removals go with --adopt');
   if (o.command === 'adopt') {
