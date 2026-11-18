@@ -87,21 +87,20 @@ export function frozenDiffers(L) {
 // What the live data equals right now: the backup, the frozen copy (after an earlier --undo) or neither.
 export const liveBaseline = (L, dir) => (liveDiffers(L, dir) === null ? 'backup' : frozenDiffers(L) === null ? 'frozen' : null);
 
-// Problem with the frozen copy, or null. Until 1.x ran on it (no files in opencode1/state) it must still equal the backup byte for
-// byte; after that it only has to be a countable db with at least the backup's sessions (restoreData checks that).
-export function frozenProblem(home, dir) {
+// Problem with the frozen copy, or null. It equals the backup until 1.x writes to it (opencode1 run/serve change only the frozen db),
+// so a copy that differs is trusted only if it still counts at least the backup's sessions; fewer, or not countable, is not.
+export function frozenProblem(home, dir, { count, sessions = null } = {}) {
   const L = backupLayout(home, 'x');
   const frozen = j(L.frozen, 'opencode');
   if (!fs.existsSync(j(frozen, 'opencode.db'))) return `the frozen copy has no opencode.db (${frozen})`;
-  let ran = false;
-  try { ran = fs.readdirSync(layout1(home).state).length > 0; } catch { /* no state folder: 1.x never ran on the copy */ }
-  if (ran) return null;
   try {
     const have = new Map(listSource({ live: frozen, config: j(frozen, '.none') }).data.map((f) => [f.rel, sha256File(j(frozen, ...f.rel.split('/')))]));
     const want = manifestOf(dir).filter((m) => m.rel.startsWith('data/'));
-    if (have.size !== want.length) return `the frozen copy has ${have.size} files, the backup ${want.length}`;
-    for (const m of want) if (have.get(m.rel.slice(5)) !== m.sha) return `${m.rel.slice(5)} in the frozen copy differs from the backup`;
-    return null;
+    if (have.size === want.length && want.every((m) => have.get(m.rel.slice(5)) === m.sha)) return null;
+    const need = sessions ?? countCopy(j(dir, 'data'), count);
+    const got = countCopy(frozen, count);
+    if (got === null || need === null) return 'the frozen copy differs from the backup and its sessions could not be counted';
+    return got >= need ? null : `the frozen copy has ${got} sessions, the backup ${need}`;
   } catch (e) { return first(e); }
 }
 
@@ -118,7 +117,7 @@ export function configDrift(L, dir) {
 }
 
 // What stops an apply before anything is written: { problems, baseline } (no problems = go; baseline = what the live data equals).
-export function applyPreflight({ home, stamp, upgrade, exec = true, list, opencodeRunning }) {
+export function applyPreflight({ home, stamp, upgrade, exec = true, list, opencodeRunning, count }) {
   const problems = [];
   let baseline = null;
   if (!exec) problems.push('--no-exec: apply installs OpenCode 2 and runs `--version` probes, so it needs commands enabled');
@@ -129,8 +128,8 @@ export function applyPreflight({ home, stamp, upgrade, exec = true, list, openco
   if (bad.length) problems.push(`the backup no longer matches its manifest (${bad[0]}${bad.length > 1 ? ` and ${bad.length - 1} more` : ''}): not used`);
   else {
     const L = backupLayout(home, 'x');
-    const bad2 = frozenProblem(home, stamp.dir);
-    if (bad2) problems.push(`${bad2}: the frozen copy is not trusted`);
+    const bad2 = frozenProblem(home, stamp.dir, { count, sessions: stamp.sessions });
+    if (bad2) problems.push(`${bad2}: the frozen copy is not trusted. Move ${stamp.frozen} aside by hand (lean-agents never deletes it), then run --backup --yes again; the permanent backup in ${stamp.dir} is untouched`);
     baseline = liveBaseline(L, stamp.dir);
     if (!baseline) problems.push(`the live data changed since the backup (${liveDiffers(L, stamp.dir)}) and differs from the frozen copy: those sessions would not be in a copy. Move ${stamp.dir} and ${stamp.frozen} aside by hand (lean-agents never deletes them) and run --backup --yes again`);
   }
@@ -149,9 +148,7 @@ export function restoreData({ home, backupDir, now = new Date(), count, statfs =
   const backupData = j(backupDir, 'data');
   const want = countCopy(backupData, count);
   let src = frozenData;
-  const frozenBad = frozenProblem(home, backupDir);
-  if (frozenBad) log(`${frozenBad}: not used`);
-  let n = !frozenBad && fs.existsSync(j(frozenData, 'opencode.db')) ? countCopy(frozenData, count) : null;
+  let n = fs.existsSync(j(frozenData, 'opencode.db')) ? countCopy(frozenData, count) : null;
   if (want === null && n !== null) log('the backup could not be counted: using the frozen copy without the comparison');
   else if (n === null || want === null || n < want) {
     log(`the frozen copy has ${n ?? 'no countable'} sessions, the backup ${want ?? '?'}: restoring from the permanent backup`);
@@ -205,7 +202,7 @@ export function restoreData({ home, backupDir, now = new Date(), count, statfs =
 // A state.json that cannot be written (a Windows rename refused, a full disk) must not hide the way out: say so and go on.
 const safeSave = (save, log) => () => { try { save(); } catch (e) { log(`could not save the journal (${first(e)}): the steps above are still undone in this run`); } };
 
-async function unwind({ steps, journal, save, ctx, log }) {
+async function unwind({ steps, journal, keep, ctx, log }) {
   if (!Array.isArray(journal.steps)) throw new Error('the journal has no step list');
   for (const rec of [...journal.steps].reverse()) {
     if (rec.status === 'undone') continue;
@@ -215,7 +212,7 @@ async function unwind({ steps, journal, save, ctx, log }) {
       await step.undo(rec, ctx);
     } catch (e) { throw new Error(`could not undo step ${rec.id}: ${first(e)}`); }
     rec.status = 'undone';
-    save();
+    keep();
     log(`  undone: ${rec.id}`);
   }
 }
@@ -244,14 +241,14 @@ export async function runApply({ steps, journal, save, ctx, log = console.log, f
     keep();
     log(`failed: ${first(e)}\nrolling back the finished steps (the backup and the frozen copy are kept)`);
     try {
-      await unwind({ steps, journal, save, ctx, log });
+      await unwind({ steps, journal, keep, ctx, log });
       const drift = ctx.liveDrift();
       if (drift) {
         log(`the live data changed during the upgrade (${drift}): restoring it like --undo does`);
         await restore();
       }
       Object.assign(journal, { status: 'rolled-back', finishedAt: iso() });
-      save();
+      keep();
       log('rolled back: everything this run changed was undone');
     } catch (e2) {
       Object.assign(journal, { status: 'rollback-failed', error: `${journal.error}; rollback: ${first(e2)}` });
@@ -267,11 +264,11 @@ export async function runUndo({ steps, journal, save, ctx, log = console.log, re
   const keep = safeSave(save, log);
   try {
     Object.assign(journal, { status: 'undoing', error: null });
-    save();
-    await unwind({ steps, journal, save, ctx, log });
+    keep();
+    await unwind({ steps, journal, keep, ctx, log });
     const r = await restore();
     Object.assign(journal, { status: 'undone', finishedAt: iso(), restored: { sessions: r.sessions, aside: r.aside } });
-    save();
+    keep();
     return true;
   } catch (e) {
     Object.assign(journal, { status: 'undo-failed', error: first(e) });
