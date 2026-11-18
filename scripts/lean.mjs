@@ -28,7 +28,7 @@ import { agentLifecycle } from './lib/agent-lifecycle.mjs';
 import { copilotUsage } from './lib/copilot-usage.mjs';
 import { draftIssue } from './lib/feedback.mjs';
 import { pinVersions, behindPins, pinTool, nodeRange, npmSpec } from './lib/pins.mjs';
-import { findNvm, resolveToolNodes, nvmLatest, nvmInstallArgv, nvmEnv, toolEnv } from './lib/node-runtime.mjs';
+import { findNvm, resolveToolNodes, nvmLatest, nvmInstallArgv, nvmEnv, toolEnv, satisfies } from './lib/node-runtime.mjs';
 import { leanUpdateCommands, coordinateCommands, leanMigrateCommands } from './lib/lean-update.mjs';
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
 import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
@@ -660,8 +660,19 @@ function feedback(o) {
   process.stdout.write(`${JSON.stringify(draft ?? { offer: false })}\n`);
 }
 
+// Below the engines floor, read-only paths still report; anything that writes or runs commands stops.
+function checkNodeFloor(o) {
+  const floor = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).engines.node;
+  if (satisfies(NODE_VERSION, floor)) return;
+  const readOnly = ['help', 'version', 'doctor', 'upgrade-agent'].includes(o.command) || o.dryRun || (o.command === 'adopt' && !o.yes && !o.undo);
+  const allow = process.env.LEAN_AGENTS_ALLOW_OLD_NODE === '1';
+  console.error(`lean-agents: Node ${NODE_VERSION} is older than ${floor.replace(/^>=/, '')}, which lean-agents needs. Fix: nvm install 22 && nvm use 22, or run install.sh.${readOnly || allow ? '' : ' Set LEAN_AGENTS_ALLOW_OLD_NODE=1 to run anyway.'}`);
+  if (!readOnly && !allow) process.exit(1);
+}
+
 async function main() {
   const o = parseArgs(process.argv.slice(2));
+  checkNodeFloor(o);
   // A repository gets files only: tools and agents stay per user.
   if (o.project && o.agents?.length && !o.migrate) throw new Error('--project writes repository files only: run --agents in a separate install');
   if (o.project) { project = o.project; if (!o.migrate) { o.agents = []; o.exec = false; } }
