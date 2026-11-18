@@ -24,13 +24,14 @@ import { version as binVersion, gitHint, detectAgents, packageManager, prereqFor
 import { doctor } from './lib/doctor.mjs';
 import { probePlugins } from './lib/plugin-health.mjs';
 import { adopt, inventory } from './lib/adopt.mjs';
+import { planPrereqs, pendingPrereqs } from './lib/prereqs.mjs';
 import { upgradeInventory, formatUpgrade } from './lib/upgrade.mjs';
 import { backupOpencode } from './lib/opencode-backup.mjs';
 import { agentLifecycle } from './lib/agent-lifecycle.mjs';
 import { copilotUsage } from './lib/copilot-usage.mjs';
 import { draftIssue } from './lib/feedback.mjs';
 import { pinVersions, behindPins, pinTool, nodeRange, npmSpec } from './lib/pins.mjs';
-import { findNvm, resolveToolNodes, nvmLatest, nvmInstallArgv, nvmEnv, toolEnv, satisfies } from './lib/node-runtime.mjs';
+import { findNvm, installedNodes, resolveToolNodes, nvmLatest, nvmInstallArgv, nvmEnv, toolEnv, satisfies } from './lib/node-runtime.mjs';
 import { leanUpdateCommands, coordinateCommands, leanMigrateCommands } from './lib/lean-update.mjs';
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
 import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
@@ -85,6 +86,7 @@ function parseArgs(argv) {
       case '--tools': o.tools = [...new Set([...MINIMAL_TOOLS, ...list(next())])]; break;
       case '--all-tools': o.tools = [...MINIMAL_TOOLS, ...OPTIONAL_TOOLS]; break;
       case '--no-tools': o.tools = []; break;
+      case '--everything': o.everything = true; break;
       case '--no-core': o.core = false; break;
       case '--terminal': o.terminals = parseTerminal(next()); break;
       case '--bun': o.bun = true; break;
@@ -129,6 +131,17 @@ function parseArgs(argv) {
       default: throw new Error(`unknown option ${a} (see --help)`);
     }
   }
+  if (o.everything) {
+    // Preset for a fresh machine: every default is taken, so the plan is the only question.
+    o.agents ??= ['claude', 'opencode-v2'];
+    o.tools ??= [...MINIMAL_TOOLS, ...OPTIONAL_TOOLS];
+    o.gh ??= true;
+    o.bun ??= true;
+    o.lang ??= 'en';
+    o.profile ??= 'none';
+    o.ponytailMode ??= 'lite';
+    o.adhdAlways ??= true;
+  }
   if (!o.core && o.tools) o.tools = o.tools.filter((t) => !MINIMAL_TOOLS.includes(t));
   return o;
 }
@@ -137,6 +150,8 @@ const HELP = `Usage: lean-agents [options]
 
   --dry-run              Show every file change and command; change nothing
   --yes                  Accept defaults without asking
+  --everything           Fresh-machine preset: plan the prerequisites (Homebrew, nvm, Node 24, uv, RTK, Bun) and Claude Code +
+                         OpenCode 2 with every optional tool, show one plan, ask once (--yes accepts; --dry-run --json prints it)
   --agents a,b           ${Object.keys(ADAPTERS).join(', ')}
                          (default: the ones installed)
   --tools a,b            Optional tools on top of rtk and context-mode:
@@ -262,7 +277,8 @@ async function chooseMigration(o, p) {
 }
 
 async function choose(o, saved) {
-  const p = await prompter(o.yes);
+  // --everything answers every question with its default; install() asks the one plan question.
+  const p = await prompter(o.yes || o.everything);
   if (o.migrate) return chooseMigration(o, p);
   if (!o.agents) {
     o.agents = saved?.agents ?? [];
@@ -462,6 +478,30 @@ function prereqCommands(o, behind = new Set()) {
   return out;
 }
 
+// --everything: the planner's steps as engine commands. Probes the machine here; the planner itself stays pure.
+function everythingPrereqs(o, saved) {
+  const mac = process.platform === 'darwin';
+  const has = {
+    brew: !!which('brew'), winget: !!which('winget'), uv: !!which('uv'), rtk: !!which('rtk'), bun: bunPresent(o.home), git: !!which('git'),
+    clt: mac && quiet(['xcode-select', '-p']).ok, nvm: !!o.nvm,
+  };
+  const steps = planPrereqs({
+    platform: process.platform, arch: process.arch, home: o.home, tmp: stateDir(o.home), execPath: process.execPath, has,
+    nodeActive: NODE_VERSION, nvmNodes: o.nvm ? installedNodes(o.nvm).map((n) => n.version) : [],
+    proxyEnv: proxyReport().map((l) => l.split('=')[0]), done: (saved?.commands ?? []).filter((c) => c.ok && c.resumeKey).map((c) => c.resumeKey),
+  });
+  const commands = pendingPrereqs(steps).map((s) => s.commands.length
+    ? { tool: s.id === 'node-24' ? 'node' : s.id, desc: `prerequisite: ${s.label}`, run: s.commands, undo: s.id === 'nvm' && fs.existsSync(path.join(o.home, '.nvm')) ? [] : s.undo ?? [], optional: s.id === 'bun', resumeKey: s.resumeKey, ...(s.id === 'node-24' && o.nvm && { env: nvmEnv(o.nvm.dir) }) }
+    : { tool: s.id, desc: `${s.label} is missing: install it from ${s.manual}`, run: [], undo: [], manual: true, optional: true, resumeKey: s.resumeKey });
+  return { steps, commands };
+}
+
+function printPrereqs(steps, exec) {
+  console.log('\nPrerequisites (installed first, only what is missing; your own Node stays the default):');
+  for (const s of steps) console.log(`  - ${s.label}: ${s.skipIf ? `skipped (${s.skipIf})` : s.commands.length ? 'will install' : `install it yourself: ${s.manual}`} | ${s.why}`);
+  if (!exec) console.log('  (--no-exec: not run)');
+}
+
 function printMigration(o, m, commands) {
   const rel = (p) => (p.startsWith(o.home) ? `~${p.slice(o.home.length)}` : p.startsWith(m.base) ? `.${p.slice(m.base.length)}` : p);
   console.log(`\nlean-agents migration: ${m.names.join(', ')} -> ${o.agents.join(', ')}${o.project ? ` (project ${o.project})` : ''}`);
@@ -474,7 +514,7 @@ function printMigration(o, m, commands) {
 }
 
 // Agents parse this instead of scraping the text plan. Paths use ~ so no home directory leaks.
-function printJson(o, planned, commands, migration, behind) {
+function printJson(o, planned, commands, migration, behind, prereqs) {
   const rel = (t) => (t.startsWith(o.home + path.sep) || t === o.home ? `~${t.slice(o.home.length)}` : t);
   const inText = (t) => t.split(o.home).join('~');
   const plan = {
@@ -483,6 +523,7 @@ function printJson(o, planned, commands, migration, behind) {
     files: planned.map((f) => ({ status: f.status, path: rel(f.path), note: f.note ?? null })),
     commands: commands.map((c) => ({ desc: inText(c.desc), agent: c.agent ?? null, run: c.run.map((a) => a.map(inText)) })),
     ...(behind && { behind }),
+    ...(prereqs && { prereqs: prereqs.map((s) => ({ id: s.id, label: s.label, why: s.why, status: s.skipIf ? 'skip' : s.commands.length ? 'install' : 'manual', skipIf: s.skipIf, manual: s.manual ?? null })) }),
   };
   process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
 }
@@ -521,22 +562,32 @@ async function install(o) {
   const { planned, commands: agentCommands, migration } = buildPlan(o);
   if (migration && !migration.rows.length) { p.close(); console.log('Nothing to migrate: no rules, agents, skills, prompts, MCP servers or hooks found.'); return; }
   const behind = new Set((saved ? behindPins(saved) : []).map((b) => pinTool(b.tool)));
-  const commands = [...(o.exec ? prereqCommands(o, behind) : []), ...agentCommands];
+  const every = o.everything && !migration ? everythingPrereqs(o, readState(o.home)) : null;
+  // The planner owns these installs; the per-tool ones below would repeat them.
+  const owned = new Set(pendingPrereqs(every?.steps ?? []).map((s) => (s.id === 'node-24' ? 'node' : s.id)));
+  const commands = [...(o.exec ? [...every?.commands ?? [], ...prereqCommands(o, behind).filter((c) => !owned.has(c.tool))] : []), ...agentCommands];
   const noGit = migration ? null : gitHint(packageManager());
   if (noGit) console.log(noGit);
   if (o.json) {
     if (!o.dryRun) throw new Error('--json needs --dry-run (or --doctor)');
     p.close();
-    return printJson(o, planned, commands, migration, saved ? behindPins(saved) : undefined);
+    return printJson(o, planned, commands, migration, saved ? behindPins(saved) : undefined, every?.steps);
   }
   if (migration) printMigration(o, migration, o.exec ? commands : []);
-  else printPlan(o, planned, commands);
+  else {
+    if (every) printPrereqs(every.steps, o.exec);
+    printPlan(o, planned, commands);
+  }
   if (saved && behindPins(saved).length) console.log('Pins that will change (old -> new):');
   if (saved) for (const b of behindPins(saved)) console.log(`${b.tool}: ${b.installed} -> ${b.pinned}`);
   if (o.dryRun) { p.close(); console.log('Dry run: nothing was changed.'); return; }
-  if (!yesNo(await p.ask('Apply these changes?', 'y'))) { p.close(); console.log('Cancelled.'); return; }
+  // The one question of --everything: the choose() prompter answers by default, so ask on a real one.
+  const q = o.everything && !o.yes ? await prompter(false) : p;
   p.close();
-  const ui = p.menus ? await menuProgress() : null;
+  try { if (!yesNo(await q.ask('Apply these changes?', 'y'))) { console.log('Cancelled.'); return; } } finally { q.close(); }
+  // A Homebrew that this run installs is not on this process's PATH yet.
+  if (every && process.platform === 'darwin' && pendingPrereqs(every.steps).some((s) => s.id === 'homebrew')) process.env.PATH = `/opt/homebrew/bin${path.delimiter}/usr/local/bin${path.delimiter}${process.env.PATH ?? ''}`;
+  const ui = q.menus ? await menuProgress() : null;
   Object.assign(process.env, childEnv(o.network));
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -546,6 +597,8 @@ async function install(o) {
   const ran = [];
   let failed = 0;
   // Saved as the run goes, so an error or a killed command still leaves a state --uninstall can undo.
+  // Resume stamps only matter for an interrupted run; once everything finished they would hide a later removal.
+  let finished = false;
   const save = () => {
     const state = {
       version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version,
@@ -556,7 +609,7 @@ async function install(o) {
       ...(o.toolNode && { toolNode: { version: o.toolNode.version, installedByLean: !!o.toolNode.install || (previous?.toolNode?.version === o.toolNode.version && !!previous.toolNode.installedByLean) } }),
       files: [...(previous?.files ?? []), ...files],
       // A command that ran again replaces its earlier record, so --uninstall undoes it once.
-      commands: [...(previous?.commands ?? []).filter((c) => !ran.some((r) => r.desc === c.desc)), ...ran],
+      commands: [...(previous?.commands ?? []).filter((c) => !ran.some((r) => r.desc === c.desc)), ...ran].map(({ resumeKey, ...c }) => (finished ? c : { ...c, ...(resumeKey && { resumeKey }) })),
     };
     privateDir(stateDir(o.home), stateDir(o.home));
     writePrivate(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(state, null, 2)}\n`);
@@ -580,7 +633,7 @@ async function install(o) {
       if (ui) ui.step(i + 1, commands.length, c.desc);
       else console.log(`- ${c.desc}`);
       // Recorded before it runs, so a command killed midway can still be undone.
-      const rec = { desc: c.desc, ok: false, undo: c.undo, ...(c.env && { env: c.env }) };
+      const rec = { desc: c.desc, ok: false, undo: c.undo, ...(c.env && { env: c.env }), ...(c.resumeKey && { resumeKey: c.resumeKey }) };
       ran.push(rec);
       save();
       const ok = c.run.every((argv) => run(argv, { dryRun: false, log: console.log, env: c.env }));
@@ -599,6 +652,8 @@ async function install(o) {
     process.exitCode = 1;
     return;
   }
+  finished = true;
+  save();
   console.log(`\nDone. Backups: ${backupDir}`);
   if (o.project) return console.log('Next: review and commit these files. Each teammate runs the installer once for the tools (rtk, context-mode, ...).');
   console.log('Next: restart your agents, log in to your providers, then run --doctor.');

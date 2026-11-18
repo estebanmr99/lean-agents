@@ -180,6 +180,7 @@ Every flag from `--help`. In PowerShell the same flags are PascalCase (`-DryRun`
 | `--tools a,b` | Optional tools on top of RTK and Context Mode: serena, playwright, ponytail, caveman, i-have-adhd, dcp, codeburn, copilot-usage, gsd, autoskills, playwright-extension, coordinate, lean-migrate |
 | `--all-tools` | Every optional tool except gsd, autoskills, playwright-extension, coordinate and lean-migrate |
 | `--no-tools` | No optional tools |
+| `--everything` | Fresh-machine preset: plans the missing prerequisites first (Homebrew, nvm, Node 24 under nvm, uv, RTK, Bun), then Claude Code + OpenCode 2 with every optional tool, shows one plan and asks once (`--yes` accepts; `--dry-run --json` prints it; a rerun resumes). Your own Node stays the default. `--agents` and `--tools` still override it |
 | `--no-core` | Leave out RTK and Context Mode; install only the `--tools` you list |
 | `--privacy` standard or strict | Same as `--network on` (standard) or `--network off` (strict) |
 | `--network` on or off | Preset for telemetry, auto-updates and other outbound calls |
