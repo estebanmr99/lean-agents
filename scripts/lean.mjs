@@ -667,7 +667,10 @@ function feedback(o) {
 function checkNodeFloor(o) {
   const floor = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).engines.node;
   // LEAN_AGENTS_NODE may fake a lower version for tests, never a higher one (#229).
-  const running = [process.versions.node, NODE_VERSION].find((v) => !satisfies(v, floor));
+  // A malformed or prerelease override (`abc`, `22.20.0-rc.1`) is cleaned or ignored (#235).
+  const fake = (process.env.LEAN_AGENTS_NODE ?? '').replace(/-.*/, '');
+  const override = /^v?\d+(\.\d+){0,2}$/.test(fake) ? fake.replace(/^v/, '').split('.').concat('0', '0').slice(0, 3).join('.') : null;
+  const running = [process.versions.node, override].find((v) => v && !satisfies(v, floor));
   if (!running) return;
   const readOnly = ['help', 'version', 'doctor', 'upgrade-agent', 'usage', 'feedback'].includes(o.command) || o.dryRun || (o.command === 'adopt' && !o.yes && !o.undo);
   const allow = process.env.LEAN_AGENTS_ALLOW_OLD_NODE === '1';

@@ -139,7 +139,7 @@ function start(host) {
     if (solid) host.slot(() => render(solid, host.theme(), state, mounted));
     host.command(async () => toast(await refresh()));
     host.onIdle(() => {
-      if (Date.now() - state.fetchedAt >= MIN_REFRESH_MS) refresh();
+      if (Date.now() - state.fetchedAt >= MIN_REFRESH_MS) refresh().catch(() => {});
     });
     refresh().then((first) => {
       if (!solid || (first && first.level !== "success")) toast(first);

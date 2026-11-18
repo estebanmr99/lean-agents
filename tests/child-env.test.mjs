@@ -108,3 +108,16 @@ for (const [name, value, kept] of cases) {
     assert.equal(name in allowedEnv({ [name]: value }, 'linux'), kept);
   });
 }
+
+test('allowedEnv: dropped variables are reported by name, never by value (#235)', () => {
+  const env = { PATH: '/bin', NODE_OPTIONS: '--require ./evil-secret.js', GIT_CONFIG_COUNT: '1', GIT_AUTHOR_NAME: 'a', GH_TOKEN: 'x'.repeat(12), RANDOM_VAR: '1' };
+  let names;
+  const out = allowedEnv(env, 'linux', (n) => { names = n; });
+  assert.deepEqual(Object.keys(out).sort(), ['GIT_AUTHOR_NAME', 'PATH']);
+  // GH_TOKEN and RANDOM_VAR were never on the pass list, so they are not news.
+  assert.deepEqual([...names].sort(), ['GIT_CONFIG_COUNT', 'NODE_OPTIONS']);
+  assert.ok(!names.join(' ').includes('evil-secret'));
+  let called = false;
+  allowedEnv({ PATH: '/bin' }, 'linux', () => { called = true; });
+  assert.equal(called, false);
+});

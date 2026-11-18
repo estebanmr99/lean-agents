@@ -38,7 +38,9 @@ export const cursorHookLabel = (command, argv) => {
 // Bare `-e`/`-ec` only count next to powershell/pwsh: `node -e 1` is not a payload.
 export const cursorEncoded = (command) => /(^|\s)-enc\w*(\s|$)/i.test(command) || (/\b(powershell|pwsh)(\.exe)?\b/i.test(command) && /(^|\s)-ec?(\s|$)/i.test(command));
 // The basename of any argument counts (`npx -y context-mode hook cursor`, `env FOO=1 rtk hook cursor`); a folder never does: `node /opt/rtk-fork/hook.js` is the user's.
-export const cursorNameManaged = (command, argv) => argv.some((a) => !/^[A-Za-z_]\w*=/.test(a) && MANAGED_HOOK.test(path.win32.basename(a))) || MANAGED_HOOK.test(cursorHookLabel(command, argv));
+// Flags, URLs and whitespace tokens (`sh -c "echo rtk"`) are arguments, not program names (#235).
+const nameToken = (a) => !/^[A-Za-z_]\w*=/.test(a) && !a.startsWith('-') && !a.includes('://') && !/\s/.test(a);
+export const cursorNameManaged = (command, argv) => argv.some((a) => nameToken(a) && MANAGED_HOOK.test(path.win32.basename(a))) || MANAGED_HOOK.test(cursorHookLabel(command, argv));
 const MANAGED_PLUGIN = /context-mode|opencode-dcp|opencode-warp|lean-agents/;
 
 const readJson = (file) => { try { return parse(fs.readFileSync(file, 'utf8'), [], { allowTrailingComma: true }) ?? null; } catch { return null; } };

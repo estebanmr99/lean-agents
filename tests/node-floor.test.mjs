@@ -66,3 +66,13 @@ test('LEAN_AGENTS_NODE=99.0.0 on an old real Node still stops writing paths', ()
   assert.equal(r.status, 1, r.stderr);
   assert.match(r.stderr, /Node 22\.12\.0 is older than/);
 });
+
+test('a malformed LEAN_AGENTS_NODE is ignored; a prerelease is compared by its core (#235)', () => {
+  const bad = run('abc', ['--help']);
+  assert.equal(bad.status, 0, bad.stderr);
+  assert.doesNotMatch(bad.stderr, /older than|NaN/);
+  const pre = run('22.12.0-rc.1', ['--help']);
+  assert.match(pre.stderr, /Node 22\.12\.0 is older than/);
+  const high = run(`${floor}-rc.1`, ['--help']);
+  assert.doesNotMatch(high.stderr, /older than/);
+});

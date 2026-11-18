@@ -1253,7 +1253,7 @@ jobs:
       - name: Install winget
         shell: pwsh
         env:
-          # Repair-WinGetPackageManager reads GITHUB_TOKEN to avoid the anonymous API rate limit (#166; VERIFY in CI).
+          # Meant to avoid the anonymous API rate limit (#166); that Repair-WinGetPackageManager honors GITHUB_TOKEN is VERIFY in CI.
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           Install-Module Microsoft.WinGet.Client -Force -Repository PSGallery

@@ -53,18 +53,31 @@ function safeNodeOptions(v) {
   return true;
 }
 
-export function allowedEnv(env = process.env, platform = process.platform) {
+// One stderr line per run, names only: a dropped NODE_OPTIONS or GIT_CONFIG_* would otherwise vanish without a trace (#235).
+let warnedDrop = false;
+function warnDropped(names) {
+  if (warnedDrop) return;
+  warnedDrop = true;
+  console.error(`lean-agents: not passed to child processes (unsafe or carries a credential): ${names.join(', ')}`);
+}
+
+// onDrop gets the names of variables that would have passed but were dropped; never their values.
+export function allowedEnv(env = process.env, platform = process.platform, onDrop = warnDropped) {
   const exact = new Set([...ENV_EXACT, ...PROXY_VARS, ...CA_VARS, ...(platform === 'win32' ? ENV_WINDOWS : [])].map((n) => n.toUpperCase()));
   const out = {};
+  const dropped = [];
   const seen = new Set(); // Windows keeps one key per name in any case; a plain object could hold both
   for (const [name, value] of Object.entries(env)) {
     const up = name.toUpperCase();
-    if (up === 'NODE_OPTIONS' && value && !safeNodeOptions(value)) continue;
-    if (value == null || SECRET_NAME.test(name) || ENV_DROP.test(name) || seen.has(up)) continue;
+    if (value == null || seen.has(up)) continue;
+    const wanted = exact.has(up) || ENV_PREFIX.some((p) => up.startsWith(p));
     // A corporate proxy URL may carry user:pass on purpose; the child needs it.
-    if (!exact.has(up) && SECRET_VALUE.test(PROXY_VARS.includes(up) ? value.replace(/:\/\/[^/\s@]*@/, '://') : value)) continue;
-    if (exact.has(up) || ENV_PREFIX.some((p) => up.startsWith(p))) { out[name] = value; seen.add(up); }
+    const unsafe = (up === 'NODE_OPTIONS' && value && !safeNodeOptions(value)) || SECRET_NAME.test(name) || ENV_DROP.test(name)
+      || (!exact.has(up) && SECRET_VALUE.test(PROXY_VARS.includes(up) ? value.replace(/:\/\/[^/\s@]*@/, '://') : value));
+    if (unsafe) { if (wanted && !seen.has(up)) dropped.push(name); continue; }
+    if (wanted) { out[name] = value; seen.add(up); }
   }
+  if (dropped.length) onDrop(dropped);
   return out;
 }
 
