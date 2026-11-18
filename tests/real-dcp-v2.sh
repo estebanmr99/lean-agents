@@ -9,7 +9,8 @@ set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOME="$(mktemp -d)"
 # Native Windows binaries need a drive path, not the MSYS /tmp one.
-if command -v cygpath >/dev/null 2>&1; then HOME="$(cygpath -m "$HOME")"; fi
+is_win=0
+if command -v cygpath >/dev/null 2>&1; then is_win=1; HOME="$(cygpath -m "$HOME")"; fi
 export HOME USERPROFILE="$HOME" XDG_CONFIG_HOME="$HOME/.config"
 T="$HOME"
 CFG="$HOME/.config/opencode"
@@ -19,6 +20,8 @@ pids=""
 # shellcheck disable=SC2329 # run by the EXIT trap below
 cleanup() {
   for p in $pids; do kill "$p" 2>/dev/null || true; done
+  # Windows: kill only reaches the MSYS pid, so end opencode and its children before removing a HOME they may hold open.
+  if [ "$is_win" = "1" ]; then taskkill //F //T //IM opencode.exe >/dev/null 2>&1 || true; sleep 1; fi
   rm -rf "$T" 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -118,8 +121,12 @@ grep '^tools:' "$T/mock.err" | sort | uniq -c || true
 # reached its max-limit nudge (no below-threshold control run) and pruned once.
 n1="$(dcp_log | grep -c 'Compression #1' || true)"
 n2="$(dcp_log | grep -c 'Compression #2' || true)"
-if [ "$n1" = "1" ] && [ "$n2" = "0" ]; then ok "one compression in the DCP debug log"; else bad "expected one compression in the DCP debug log, found #1 x$n1, #2 x$n2"; fi
-# Windows interleaves the log writer, so the start of that line can be cut: summaryLength= is its tail.
-if dcp_log | grep -qE 'Injected compress summary|summaryLength=[0-9]+'; then ok "compress summary injected back into the context"; else bad "no injected compress summary in the DCP debug log"; fi
+# DCP may print the token more than once; what matters is at least one compression and never a second.
+if [ "$n1" -ge 1 ] && [ "$n2" = "0" ]; then ok "compression in the DCP debug log, no second one"; else bad "expected compression #1 and no #2 in the DCP debug log, found #1 x$n1, #2 x$n2"; fi
+# Windows interleaves the log writer, so the start of that line can be cut: there summaryLength= is its tail,
+# accepted only on a line after a "Compression #1" line.
+if [ "$is_win" = "1" ]; then
+  if dcp_log | awk '/Compression #1/ { seen = 1; next } seen && /summaryLength=[0-9]+/ { found = 1 } END { exit !found }'; then ok "compress summary injected back into the context"; else bad "no injected compress summary after Compression #1 in the DCP debug log"; fi
+elif dcp_log | grep -q 'Injected compress summary'; then ok "compress summary injected back into the context"; else bad "no injected compress summary in the DCP debug log"; fi
 
 exit "$fail"

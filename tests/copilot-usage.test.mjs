@@ -224,6 +224,36 @@ test('tui.js on 2.x: a finished turn refreshes the meter only after 5 minutes; c
   } finally { Date.now = realNow; process.env.PATH = old; }
 });
 
+test('tui.js on 2.x: turn events during the first fetch start no second gh call (#235)', async () => {
+  const old = process.env.PATH;
+  try {
+    const plugin = await loadPlugin();
+    const dir = tmp('gh');
+    const data = path.join(dir, 'out.json');
+    const count = path.join(dir, 'count.txt');
+    fs.writeFileSync(data, JSON.stringify(LIMITED));
+    if (isWin) fs.writeFileSync(path.join(dir, 'gh.cmd'), `@echo x>>"${count}"\r\n@type "${data}"\r\n`);
+    else { fs.writeFileSync(path.join(dir, 'gh'), `#!/bin/sh\necho x >> '${count}'\ncat '${data}'\n`); fs.chmodSync(path.join(dir, 'gh'), 0o755); }
+    process.env.PATH = dir + path.delimiter + old;
+    const slots = [];
+    const handlers = {};
+    const tok = (name) => ({ name });
+    const context = {
+      theme: { text: { base: tok('T'), muted: tok('M') }, border: { base: tok('B') } },
+      ui: { slot: (s) => slots.push(s), toast: { show() {} } },
+      keymap: { layer() {} },
+      data: { on: (name, fn) => { handlers[name] = fn; return () => {}; } },
+    };
+    await plugin.setup(context);
+    handlers['session.execution.succeeded']();
+    handlers['session.execution.succeeded']();
+    const box = slots[0].render({ sessionID: 's' });
+    await until(() => !texts(box).includes('loading...'));
+    await new Promise((r) => setTimeout(r, 500));
+    assert.equal(fs.readFileSync(count, 'utf8').trim().split(/\r?\n/).length, 1);
+  } finally { process.env.PATH = old; }
+});
+
 test('tui.js: unusable numbers show unavailable, an out-of-range percent is clamped', async () => {
   const old = process.env.PATH;
   const quota = (p) => ({ quota_reset_date: '2026-12-01', quota_snapshots: { premium_interactions: { unlimited: false, entitlement: 100, remaining: 50, ...p } } });

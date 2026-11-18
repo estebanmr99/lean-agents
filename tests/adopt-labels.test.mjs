@@ -35,6 +35,12 @@ test('managed: any argument basename counts, a folder never does; encoded stays 
   assert.equal(cursorEncoded('powershell -enc AAAA'), true);
 });
 
+test('managed: flags, URLs and quoted text are not program names (#235)', () => {
+  for (const c of ['node ./my.js --rtk-mode', 'node my.js --gsd', 'node https://example.com/rtk', 'sh -c "echo rtk"']) assert.equal(managed(c), false, c);
+  assert.equal(managed('node /opt/rtk-fork/hook.js'), false);
+  assert.equal(managed('rtk hook cursor'), true);
+});
+
 test('encoded: -e, -ec and -enc* match, --encoding does not', () => {
   for (const c of ['powershell -e AAAA', 'powershell -ec AAAA', 'powershell -EncodedCommand AAAA', 'powershell -enc AAAA', 'pwsh.exe -NoProfile -e AAAA']) assert.equal(cursorEncoded(c), true, c);
   for (const c of ['node hook.js --encoding utf8', 'node hook.js -x', 'node hook.js -echo', 'node -e 1', '$(node -e 1) d-demo.ps1']) assert.equal(cursorEncoded(c), false, c);
