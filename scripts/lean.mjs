@@ -27,6 +27,7 @@ import { adopt, inventory } from './lib/adopt.mjs';
 import { planPrereqs, pendingPrereqs } from './lib/prereqs.mjs';
 import { upgradeInventory, formatUpgrade } from './lib/upgrade.mjs';
 import { backupOpencode } from './lib/opencode-backup.mjs';
+import { planOpencode1, installOpencode1, removeOpencode1, layout as opencode1Layout } from './lib/opencode1.mjs';
 import { agentLifecycle } from './lib/agent-lifecycle.mjs';
 import { copilotUsage } from './lib/copilot-usage.mjs';
 import { draftIssue } from './lib/feedback.mjs';
@@ -122,6 +123,7 @@ function parseArgs(argv) {
       case '--undo': o.undo = true; break;
       case '--keep-backup': o.keepBackup = true; break;
       case '--backup': o.backup = true; break;
+      case '--opencode1': o.opencode1 = true; break;
       case '--confirm-removals': o.confirmRemovals = true; break;
       case '--install-agent': case '--uninstall-agent': o.command = 'agent'; o.agentMode = a.slice(2, -6); o.agentList = list(argv[i + 1]?.startsWith('--') ? '' : next() ?? ''); if (!o.agentList.length) throw new Error(`${a} needs an agent list (claude, opencode-v2, copilot-cli, cursor, antigravity)`); break;
       case '--usage': o.command = 'usage'; break;
@@ -201,6 +203,9 @@ const HELP = `Usage: lean-agents [options]
                          Permanent sha256-checked backup of the OpenCode 1.x sessions and config, then a frozen copy for
                          opencode1; the live data is only read. Plan first (the default); --yes copies. Refuses while
                          OpenCode runs or free space is under 2 x size + 1 GB
+  --upgrade-agent opencode --opencode1 [--dry-run|--yes]
+                         After --backup: copy the OpenCode 1.x binary next to the frozen copy and add opencode1, which runs
+                         1.x on that copy only (XDG_DATA_HOME + XDG_STATE_HOME), to PATH. --uninstall removes it
   --undo                 With --adopt: restore what the last --adopt --yes changed
   --install-agent a,b / --uninstall-agent a,b
                          Install (claude, opencode-v2, copilot-cli, cursor, antigravity) or remove the agent CLIs
@@ -610,6 +615,7 @@ async function install(o) {
       options: o.migrate ? previous?.options ?? { migrateOnly: true, agents: o.agents, tools: [], privacy: o.privacy, network: o.network, gh: false, terminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false, shell: 'git-bash' } : { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, gh: o.gh, terminals: o.terminals, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun, shell: o.shell },
       ...(o.toolNode && { toolNode: { version: o.toolNode.version, installedByLean: !!o.toolNode.install || (previous?.toolNode?.version === o.toolNode.version && !!previous.toolNode.installedByLean) } }),
       files: [...(previous?.files ?? []), ...files],
+      ...(previous?.opencode1 && { opencode1: previous.opencode1 }),
       // A command that ran again replaces its earlier record, so --uninstall undoes it once.
       commands: [...(previous?.commands ?? []).filter((c) => !ran.some((r) => r.desc === c.desc)), ...ran].map(({ resumeKey, ...c }) => (finished ? c : { ...c, ...(resumeKey && { resumeKey }) })),
     };
@@ -684,6 +690,28 @@ async function install(o) {
   ui?.summary('Summary', [`${files.length} files written, ${ran.length} commands run`, `Backups: ${backupDir}`], true);
 }
 
+// `opencode1` (P4). The state is saved after every step, so an error midway still leaves something --uninstall can undo.
+function sideBySide(o) {
+  const p = planOpencode1({ home: o.home, exec: o.exec });
+  if (!p.ok) { console.log(`refused, nothing changed:\n${p.problems.map((x) => `  - ${x}`).join('\n')}`); return false; }
+  const win = process.platform === 'win32';
+  console.log(`${o.dryRun || !o.yes ? 'dry run: would set up' : 'setting up'} opencode1 (OpenCode ${p.version}, from ${p.source})`);
+  console.log(`  binary copy: ${p.binary}\n  shim:        ${p.actions[0].path}\n  PATH:        ${win ? `user PATH (HKCU) gets ${p.pathDir}` : `${p.actions.slice(1).map((a) => a.path).join(', ')} gets a marked block`}`);
+  console.log(`  1.x reads and writes only ${opencode1Layout(o.home).frozen}; the live data is not touched`);
+  if (o.dryRun || !o.yes) { console.log('dry run: nothing was written'); return true; }
+  const previous = readState(o.home);
+  const files = [];
+  const save = (record) => {
+    const state = previous ?? { version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version, installedAt: new Date().toISOString(), pins: {}, options: { agents: [], tools: [], terminals: [], unverified: {}, gh: false, lang: 'en', profile: null, network: {} }, files: [], commands: [] };
+    privateDir(stateDir(o.home), stateDir(o.home));
+    writePrivate(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify({ ...state, updatedAt: new Date().toISOString(), files: [...state.files, ...files], opencode1: record }, null, 2)}\n`);
+  };
+  const ts = new Date().toISOString().replace(/\D/g, '');
+  installOpencode1(p, { home: o.home, roots: [...writeRoots(o), opencode1Layout(o.home).root], backupDir: path.join(stateDir(o.home), 'backups', ts), apply, files, onRecord: save });
+  console.log('done: run `opencode1 --version` in a new terminal. `--uninstall` removes it; the backup and the frozen copy stay.');
+  return true;
+}
+
 async function uninstall(o) {
   const state = readState(o.home);
   if (!state) { console.log('lean-agents is not installed.'); return; }
@@ -704,6 +732,7 @@ async function uninstall(o) {
   }
   if (state.toolNode?.installedByLean) console.log(`Kept Node v${state.toolNode.version} (lean-agents never removes a Node); remove it with \`nvm uninstall ${state.toolNode.version}\`.`);
   const report = undo(state.files, writeRoots(o));
+  if (state.opencode1) report.push(...removeOpencode1(state.opencode1, { home: o.home }));
   for (const [what, file] of report) console.log(`  ${what.padEnd(20)} ${file}`);
   if (report.some(([what]) => what === 'left (symlink)')) console.log('  ! Paths marked "left (symlink)" were not touched; remove our lines there by hand.');
   fs.renameSync(path.join(stateDir(o.home), 'state.json'), path.join(stateDir(o.home), `state.uninstalled-${Date.now()}.json`));
@@ -735,7 +764,7 @@ function checkNodeFloor(o) {
   const override = /^v?\d+(\.\d+){0,2}$/.test(fake) ? fake.replace(/^v/, '').split('.').concat('0', '0').slice(0, 3).join('.') : null;
   const running = [process.versions.node, override].find((v) => v && !satisfies(v, floor));
   if (!running) return;
-  const readOnly = ['help', 'version', 'doctor', 'usage', 'feedback'].includes(o.command) || (o.command === 'upgrade-agent' && !(o.backup && o.yes)) || o.dryRun || (o.command === 'adopt' && !o.yes && !o.undo);
+  const readOnly = ['help', 'version', 'doctor', 'usage', 'feedback'].includes(o.command) || (o.command === 'upgrade-agent' && !((o.backup || o.opencode1) && o.yes)) || o.dryRun || (o.command === 'adopt' && !o.yes && !o.undo);
   const allow = process.env.LEAN_AGENTS_ALLOW_OLD_NODE === '1';
   console.error(`lean-agents: Node ${running} is older than ${floor.replace(/^>=/, '')}, which lean-agents needs. Fix: nvm install 22 && nvm use 22, or run install.sh.${readOnly || allow ? '' : ' Set LEAN_AGENTS_ALLOW_OLD_NODE=1 to run anyway.'}`);
   if (!readOnly && !allow) process.exit(1);
@@ -763,6 +792,10 @@ async function main() {
       if (o.undo) throw new Error('--upgrade-agent opencode --backup has no --undo: the backup is permanent and lean-agents never deletes it');
       const r = backupOpencode({ home: o.home, dryRun: o.dryRun || !o.yes });
       return process.exit(r.ok ? 0 : 1);
+    }
+    if (o.opencode1) {
+      if (o.undo) throw new Error('--upgrade-agent opencode --opencode1 has no --undo yet: run --uninstall');
+      return process.exit(sideBySide(o) ? 0 : 1);
     }
     if (o.undo || (o.yes && !o.dryRun)) throw new Error('--upgrade-agent opencode apply and --undo are not in this release yet; it only lists (dry run)');
     const env = process.env;
