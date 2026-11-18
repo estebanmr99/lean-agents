@@ -58,6 +58,21 @@ export function findAgy(home, platform = process.platform, env = process.env) {
   return which('agy') ? 'agy' : agyCandidates(home, platform, env).find(exists) ?? null;
 }
 
+// Antigravity IDE folders and the VS Code extension, by existence only (#216): nothing is read or written.
+// The extension folder name is lowercase on disk (`google.google-antigravity-<version>`); Windows and Linux paths are VERIFY.
+export function antigravityFootprint(home, fsx = fs) {
+  const found = [];
+  for (const d of ['antigravity-ide', 'antigravity-cli', 'antigravity']) {
+    const p = path.join(home, '.gemini', d);
+    if (fsx.existsSync(p)) found.push({ name: d === 'antigravity' ? 'antigravity (legacy)' : d, file: p });
+  }
+  const ext = path.join(home, '.vscode', 'extensions');
+  let names = [];
+  try { names = fsx.readdirSync(ext); } catch { /* no VS Code extensions folder */ }
+  for (const n of names.filter((x) => x.toLowerCase().startsWith('google.google-antigravity'))) found.push({ name: 'vscode extension Google.google-antigravity', file: path.join(ext, n) });
+  return found;
+}
+
 export const agyVersion = (home) => { const a = findAgy(home); return a && version(a); };
 
 export function detectAgents() {

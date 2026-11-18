@@ -26,10 +26,20 @@ function Invoke-OpenCode {
   $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
   try { & $opencodeBin @args 2>&1 | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] } } finally { $ErrorActionPreference = $prev }
 }
-function Get-SessionCount {
-  $out = Invoke-OpenCode session list --format json | Out-String
-  # Windows PowerShell 5.1 emits a JSON array as ONE object (Count would always be 1); the extra pipeline unrolls it.
-  try { return @(($out | ConvertFrom-Json) | ForEach-Object { $_ }).Count } catch { return -1 }
+# Same count as the engine (COUNT_SCRIPT in scripts/lib/adopt.mjs): node:sqlite on a COPY of the db (+wal/shm), never the original.
+# Parsing `session list --format json` is avoided on purpose (Windows PowerShell 5.1 JSON/ANSI/banner quirks).
+$countScript = "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync(process.argv[1],{readOnly:true});console.log(d.prepare('SELECT count(*) AS n FROM session').get().n)"
+function Get-SessionCount([string]$dataDir) {
+  $db = Join-Path $dataDir 'opencode.db'
+  if (-not (Test-Path $db)) { return -1 }
+  $tmp = Join-Path $root "count-$([guid]::NewGuid())"
+  New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+  $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+  try {
+    foreach ($ext in '', '-wal', '-shm') { if (Test-Path "$db$ext") { Copy-Item "$db$ext" "$tmp\c.db$ext" } }
+    $out = (& node -e $countScript "$tmp\c.db" 2>$null | Out-String).Trim()
+    if ($out -match '^\d+$') { return [int]$out } else { return -1 }
+  } finally { $ErrorActionPreference = $prev; Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
 $mockLog = Join-Path $root 'mock.log'
@@ -54,9 +64,9 @@ try {
 
   Use-Env @{ HOME = $live; USERPROFILE = $live; XDG_DATA_HOME = $null; XDG_STATE_HOME = $null; XDG_CONFIG_HOME = $null; OPENCODE_DB = $null; OPENCODE_CONFIG_DIR = $null }
   Invoke-OpenCode run 'p1 seed live' --model mock/mock-model | Out-Null
-  $liveCount = Get-SessionCount
   $liveDirs = @{ data = "$live\.local\share\opencode"; state = "$live\.local\state\opencode"; config = "$live\.config\opencode" }
   $before = @{}; foreach ($k in $liveDirs.Keys) { $before[$k] = Get-Tree $liveDirs[$k] }
+  $liveCount = Get-SessionCount $liveDirs.data
   Write-Output "P1 live: sessions=$liveCount"
   if ($liveCount -lt 1 -or -not $before.data) { throw 'the live seed made no session' }
 
@@ -68,9 +78,9 @@ try {
     Copy-Item $liveDirs.config "$frozen\config\opencode" -Recurse
     $env:XDG_DATA_HOME = "$frozen\data"; $env:XDG_STATE_HOME = "$frozen\state"
     $env:XDG_CONFIG_HOME = $(if ($case -eq 'a1') { "$frozen\config" } else { $null })
-    $n0 = Get-SessionCount
+    $n0 = Get-SessionCount "$frozen\data\opencode"
     Invoke-OpenCode run "p1 seed $case" --model mock/mock-model | Out-Null
-    $n1 = Get-SessionCount
+    $n1 = Get-SessionCount "$frozen\data\opencode"
     Use-Env @{ XDG_DATA_HOME = $null; XDG_STATE_HOME = $null; XDG_CONFIG_HOME = $null }
     $changed = @(foreach ($k in $liveDirs.Keys) { if ((Get-Tree $liveDirs[$k]) -ne $before[$k]) { $k } })
     $ok = ($changed.Count -eq 0) -and ($n0 -eq $liveCount) -and ($n1 -eq $n0 + 1)

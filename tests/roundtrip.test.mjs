@@ -39,7 +39,7 @@ const userFiles = (home) => ({
   antigravity: {
     '.gemini/config/mcp_config.json': jsonc(`"mcpServers": ${JSON.stringify(mine)}`),
     '.gemini/config/agents/explore.md': 'my explorer\n',
-    '.agents/skills/caveman/SKILL.md': 'my skill\n',
+    '.gemini/config/skills/caveman/SKILL.md': 'my skill\n',
   },
   cursor: {
     '.cursor/mcp.json': jsonc(`"mcpServers": ${JSON.stringify(mine)}`),
@@ -61,20 +61,32 @@ const lean = (home, args) => {
   assert.equal(r.status, 0, r.stderr || r.stdout);
 };
 
-// Paths and bytes of every file. Empty directories are not compared (uninstall leaves some, #223). Ignored: the engine's own folder (backups, and the state.uninstalled-*.json it keeps on purpose).
+// Paths and bytes of every file, and every directory path. Ignored: the state.uninstalled-*.json the engine keeps on purpose.
 function snapshot(root) {
-  const out = {};
+  const files = {};
+  const dirs = [];
   const walk = (d) => {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
       const p = path.join(d, e.name);
       const rel = path.relative(root, p).split(path.sep).join('/');
-      if (rel === '.config/lean-agents') continue;
-      if (e.isDirectory()) walk(p);
-      else out[rel] = fs.readFileSync(p).toString('base64');
+      if (/^\.config\/lean-agents\/state\.uninstalled-.*\.json$/.test(rel)) continue;
+      if (e.isDirectory()) { dirs.push(rel); walk(p); }
+      else files[rel] = fs.readFileSync(p).toString('base64');
     }
   };
   walk(root);
-  return out;
+  return { files, dirs };
+}
+
+// --yes keeps backups on uninstall on purpose (they undo edits we cannot revert). Each must be a byte copy of a user file from before the install.
+const BACKUPS = /^\.config\/lean-agents\/backups\/[^/]+\//;
+function withoutBackups(files, before) {
+  const rest = {};
+  for (const [rel, b64] of Object.entries(files)) {
+    if (!BACKUPS.test(rel)) { rest[rel] = b64; continue; }
+    assert.equal(b64, before[rel.replace(BACKUPS, '')], `backup of a file the user did not have: ${rel}`);
+  }
+  return rest;
 }
 
 for (const agent of Object.keys(userFiles('/h'))) {
@@ -87,8 +99,11 @@ for (const agent of Object.keys(userFiles('/h'))) {
     }
     const before = snapshot(home);
     lean(home, ['--yes', '--no-exec', '--agents', agent, '--all-tools']);
-    assert.notDeepEqual(snapshot(home), before, 'install must change something');
+    assert.notDeepEqual(snapshot(home).files, before.files, 'install must change something');
     lean(home, ['--uninstall', '--yes', '--no-exec']);
-    assert.deepEqual(snapshot(home), before);
+    const after = snapshot(home);
+    assert.deepEqual(withoutBackups(after.files, before.files), before.files);
+    // Every directory the user had survives. Extra empty ones are left by uninstall (#223) and the engine folder stays on purpose.
+    assert.deepEqual(before.dirs.filter((d) => !after.dirs.includes(d)), []);
   });
 }

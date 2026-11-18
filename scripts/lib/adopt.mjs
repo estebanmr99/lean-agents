@@ -10,12 +10,13 @@ import { execFileSync } from 'node:child_process';
 import { parse } from 'jsonc-parser';
 import { hasMark, plan as planFiles, revertJsonEdits, sha, writePrivate, privateDir, dropBackups, unsafe } from './fsops.mjs';
 import { PINS, npmSpec, pinVersions } from './pins.mjs';
-import { configHome, envDir } from './system.mjs';
+import { configHome, envDir, antigravityFootprint } from './system.mjs';
 import { configPath } from './adapters/opencode-v2.mjs';
 import { mcpServers } from './migrate.mjs';
 import { findNvm, resolveToolNodes, minVersion, compare, satisfies, installedNodes, toolEnv } from './node-runtime.mjs';
 import { run } from './system.mjs';
 import { doctor } from './doctor.mjs';
+import { pluginHealth, probePlugins } from './plugin-health.mjs';
 import { orcaHooksFound } from './terminals.mjs';
 import { clients, launchOf, pinOf, classify, npmCopies, skillDirs, duplicateSkills, treeSha, probeInitialize } from './inventory.mjs';
 
@@ -246,6 +247,9 @@ export async function inventory({ home, env = process.env, platform = process.pl
     }
   }
 
+  // --- Antigravity IDE folders and VS Code extension: listed, never changed (#216)
+  for (const f of antigravityFootprint(home, fsx)) add({ client: 'antigravity', kind: 'ide', name: f.name, file: f.file, owner: 'user' });
+
   // --- npm copies under each nvm Node, and the one Node the tools should use
   const nvm = findNvm({ env, home, platform, realHome });
   const copies = nvm ? npmCopies(nvm) : [];
@@ -287,24 +291,26 @@ export async function inventory({ home, env = process.env, platform = process.pl
   const oc = await opencodeInfo(home, env, fsx, { toolNode: tn });
   const plan = items.filter((i) => i.action !== 'keep').map((i) => `${i.action} ${i.client} ${i.kind} ${i.name} (${i.status.join(', ') || i.owner})`);
   for (const s of stopgaps) if (s.replaceWith) plan.push(`ask ${s.file}: replace with ${s.replaceWith}`);
-  return { version: 1, os: platform, toolNode, items, opencode: { ...oc, dataDir: rel(oc.dataDir) }, stopgaps, plan, ok: !items.some((i) => i.action !== 'keep') };
+  return { version: 1, os: platform, toolNode, items, opencode: { ...oc, dataDir: rel(oc.dataDir) }, stopgaps, plan, health: pluginHealth(home, { fsx }), ok: !items.some((i) => i.action !== 'keep') };
 }
 
 export async function adopt(o) {
   if (o.undo) return adoptUndo(o);
   if (o.yes && !o.dryRun && !o.json) return adoptApply(o);
   const r = await inventory(o);
+  if (o.probePlugins) r.health.push(...await probePlugins(o.home)); // opt-in: starts a short-lived opencode serve
   if (o.json) { process.stdout.write(`${JSON.stringify(r, null, 2)}\n`); return true; }
   const by = {};
   for (const i of r.items) by[`${i.kind}`] = (by[`${i.kind}`] ?? 0) + 1;
   console.log(`--adopt (dry run: nothing is changed; --yes applies). Found: ${Object.entries(by).map(([k, n]) => `${n} ${k}`).join(', ') || 'nothing'}`);
   console.log(`tool Node: ${r.toolNode.range ? `${r.toolNode.range} -> ${r.toolNode.node ?? 'no matching Node installed, nvm not found'} (${r.toolNode.source ?? 'none'})` : 'not needed'}`);
   console.log(`OpenCode: major ${r.opencode.major ?? 'none'}, ${r.opencode.dbBytes} bytes of db, sessions ${r.opencode.sessions ?? 'unknown'}${r.opencode.note ? ` (${r.opencode.note})` : ''}`);
-  for (const i of r.items.filter((x) => x.action !== 'keep' || x.owner === 'managed' || x.kind === 'hook')) {
+  for (const i of r.items.filter((x) => x.action !== 'keep' || x.owner === 'managed' || x.kind === 'hook' || x.kind === 'ide')) {
     console.log(`  ${i.action.padEnd(9)} ${i.owner.padEnd(8)} ${i.client} ${i.kind} ${i.name}${i.status.length ? `  [${i.status.join(', ')}]` : ''}${i.note ? `  (${i.note})` : ''}  (${i.file})`);
     if (i.kind === 'skill' && i.fix) console.log(`            ${i.clients.join(' and ')} loads it twice: ${Object.entries(i.hashes).map(([d, h]) => `${d} ${h}`).join(', ')} (${i.differs ? 'differs' : 'identical'}); ${i.fix}`);
   }
   console.log(`  user-owned items kept untouched: ${r.items.filter((i) => i.owner === 'user' && i.action === 'keep').length}`);
+  for (const f of r.health) console.log(`  health    ${f.plugin || 'probe'} [${f.id}] ${f.line}\n            fix: ${f.fix}`);
   for (const s of r.stopgaps) console.log(`  stopgap   ${s.file}${s.replaceWith ? `: replace with ${s.replaceWith}` : `: ${s.note}`}`);
   console.log(r.plan.length ? `Plan (${r.plan.length} steps; add --yes to apply, --confirm-removals to allow the removals):\n${r.plan.map((l) => `  - ${l}`).join('\n')}` : 'Plan: nothing to change.');
   return true;

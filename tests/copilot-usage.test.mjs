@@ -171,8 +171,9 @@ test('tui.js on 2.x: setup registers the sidebar slot and the /copilot-usage lay
       theme: { text: { base: tok('T'), muted: tok('M') }, border: { base: tok('B') } },
       ui: { slot: (s) => calls.slots.push(s), toast: { show: (t) => calls.toasts.push(t) } },
       keymap: { layer: (f) => calls.layers.push(f()) },
+      data: { on: () => () => {} },
     };
-    for (const name of ['client', 'data', 'app']) Object.defineProperty(context, name, { get() { throw new Error(`plugin touched context.${name}`); } });
+    for (const name of ['client', 'app']) Object.defineProperty(context, name, { get() { throw new Error(`plugin touched context.${name}`); } });
     await plugin.setup(context);
     assert.equal(calls.slots[0].append, 'sidebar.content');
     const box = calls.slots[0].render({ sessionID: 's' });
@@ -184,6 +185,43 @@ test('tui.js on 2.x: setup registers the sidebar slot and the /copilot-usage lay
     await cmd.run();
     assert.match(calls.toasts[0].message, /Left 15,441 \(\$154\.41\)/);
   } finally { process.env.PATH = old; }
+});
+
+test('tui.js on 2.x: a finished turn refreshes the meter only after 5 minutes; cleanup unsubscribes', async () => {
+  const old = process.env.PATH;
+  const realNow = Date.now;
+  try {
+    const plugin = await loadPlugin();
+    process.env.PATH = fakeGh(LIMITED);
+    const data = path.join(process.env.PATH.split(path.delimiter)[0], 'out.json');
+    const tok = (name) => ({ name });
+    const slots = [];
+    const handlers = {};
+    let unsubscribed = 0;
+    const context = {
+      theme: { text: { base: tok('T'), muted: tok('M') }, border: { base: tok('B') } },
+      ui: { slot: (s) => slots.push(s), toast: { show() {} } },
+      keymap: { layer() {} },
+      data: { on: (name, fn) => { handlers[name] = fn; return () => { unsubscribed++; }; } },
+    };
+    Object.defineProperty(context, 'client', { get() { throw new Error('plugin touched context.client'); } });
+    const cleanup = await plugin.setup(context);
+    const box = slots[0].render({ sessionID: 's' });
+    await until(() => !texts(box).includes('loading...'));
+    assert.match(texts(box).join('|'), /61% left/);
+    // The quota drops to 20% left; the turn-finished signal is the only trigger.
+    fs.writeFileSync(data, JSON.stringify({ ...LIMITED, quota_snapshots: { premium_interactions: { unlimited: false, entitlement: 25000, remaining: 5000, percent_remaining: 20 } } }));
+    handlers['session.execution.succeeded']();
+    await new Promise((r) => setTimeout(r, 1500));
+    assert.match(texts(box).join('|'), /61% left/); // under 5 minutes: no new gh call
+    const start = realNow();
+    Date.now = () => start + 5 * 60 * 1000 + 1000;
+    handlers['session.execution.succeeded']();
+    await until(() => /20% left/.test(texts(box).join('|')));
+    assert.match(texts(box).join('|'), /20% left/);
+    cleanup();
+    assert.equal(unsubscribed, 1);
+  } finally { Date.now = realNow; process.env.PATH = old; }
 });
 
 test('tui.js: unusable numbers show unavailable, an out-of-range percent is clamped', async () => {

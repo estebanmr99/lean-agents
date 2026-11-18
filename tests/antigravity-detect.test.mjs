@@ -42,6 +42,21 @@ test('--install-agent leaves an agy found outside PATH alone', async () => {
   assert.match(out, /antigravity: already installed, not by lean-agents; left alone/);
 });
 
+test('--install-agent ignores the real LOCALAPPDATA when --home is a temp folder (#229)', { skip: process.platform !== 'win32' && 'win32 paths only exist on Windows' }, async () => {
+  const home = tmp();
+  const real = tmp();
+  const agy = path.join(real, 'agy', 'bin', 'agy.exe');
+  fs.mkdirSync(path.dirname(agy), { recursive: true });
+  fs.writeFileSync(agy, 'fake');
+  const old = process.env.LOCALAPPDATA;
+  process.env.LOCALAPPDATA = real;
+  const table = { antigravity: { method: 'script', run: [['true']], bins: [], dirs: [], cmd: 'agy' } };
+  try {
+    const out = await quietly(() => agentLifecycle({ mode: 'install', agents: ['antigravity'], home, realHome: '/nowhere', stateDir: path.join(home, 'state'), dryRun: true, exec: false, yes: true, ask: async (_q, d) => d, yesNo: (a) => /^y/i.test(a), table }));
+    assert.doesNotMatch(out, /left alone/);
+  } finally { if (old === undefined) delete process.env.LOCALAPPDATA; else process.env.LOCALAPPDATA = old; }
+});
+
 const adapt = (home, prior = []) => antigravityAdapter({ home, core: { agents: [] }, profile: null, opts: { tools: ['caveman', 'i-have-adhd'], prior }, rules: '', adhdCommand: { tool: 'adhd', desc: 'adhd', run: [], undo: [] } });
 const skillDir = (home, n) => { const d = path.join(home, '.gemini', 'config', 'skills', n); fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, 'SKILL.md'), 'mine'); };
 
@@ -62,6 +77,23 @@ test('a skill recorded in state.json from an earlier run stays managed', async (
   const prior = [{ desc: 'Caveman skills for Antigravity', undo: [['npx', 'remove', 'caveman', 'caveman-compress']] }];
   const caveman = adapt(home, prior).commands.find((c) => c.desc.startsWith('Caveman'));
   assert.ok(caveman.undo[0].includes('caveman'));
+});
+
+// #229: opts.prior unset (first run) and set (re-run) decide who owns an existing ~/.gemini/config/skills/caveman.
+test('opts.prior unset keeps an unmarked caveman folder out of run and undo; prior set installs and removes it', async () => {
+  const home = tmp();
+  skillDir(home, 'caveman');
+  const plan = (prior) => antigravityAdapter({ home, core: { agents: [] }, profile: null, opts: { tools: ['caveman'], ...(prior && { prior }) }, rules: '', adhdCommand: null }).commands.find((c) => c.desc.startsWith('Caveman'));
+  let kept;
+  const out = await quietly(() => { kept = plan(undefined); });
+  assert.match(out, /Kept your existing Antigravity skill "caveman"/);
+  for (const argv of [...kept.run, ...kept.undo]) {
+    assert.ok(!argv.includes('caveman'), `${argv.join(' ')} names the kept skill`);
+    assert.ok(argv.includes('caveman-compress') && argv.includes('caveman-stats'));
+  }
+  const prior = [{ desc: 'Caveman skills for Antigravity', undo: [['npx', 'remove', 'caveman', 'caveman-compress', 'caveman-stats']] }];
+  const ours = plan(prior);
+  for (const argv of [...ours.run, ...ours.undo]) assert.ok(argv.includes('caveman'));
 });
 
 test('--install-agent on a brew cask prints the unpinned limit and names it in the question', async () => {
