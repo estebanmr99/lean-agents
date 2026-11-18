@@ -24,7 +24,7 @@ import { version as binVersion, gitHint, detectAgents, packageManager, prereqFor
 import { doctor } from './lib/doctor.mjs';
 import { probePlugins } from './lib/plugin-health.mjs';
 import { adopt, inventory } from './lib/adopt.mjs';
-import { planPrereqs, pendingPrereqs, everythingAgents } from './lib/prereqs.mjs';
+import { planPrereqs, pendingPrereqs, everythingAgents, undoArgv, nvmDirExistedBefore } from './lib/prereqs.mjs';
 import { upgradeInventory, formatUpgrade } from './lib/upgrade.mjs';
 import { backupOpencode, backupLayout, listProcesses, opencodeRunning } from './lib/opencode-backup.mjs';
 import { readBackupStamp } from './lib/backup-stamp.mjs';
@@ -508,6 +508,7 @@ function everythingPrereqs(o, saved) {
     clt: mac && quiet(['xcode-select', '-p']).ok, nvm: !!o.nvm,
   };
   const steps = planPrereqs({
+    nvmDirExisted: nvmDirExistedBefore(saved?.commands, fs.existsSync(path.join(o.home, '.nvm'))),
     platform: process.platform, arch: process.arch, home: o.home, tmp: stateDir(o.home), execPath: process.execPath, has,
     nodeActive: NODE_VERSION, nvmNodes: o.nvm ? installedNodes(o.nvm).map((n) => n.version) : [],
     proxyEnv: proxyReport().map((l) => l.split('=')[0]), done: (saved?.commands ?? []).filter((c) => c.ok && c.resumeKey).map((c) => c.resumeKey),
@@ -594,13 +595,18 @@ function printPlan(o, planned, commands) {
 // --update: rows `tool: installed -> pin` plus the shipped CHANGELOG sections after the installed lean-agents version.
 function updateInfo(o, saved) {
   const agentsFile = path.join(stateDir(o.home), 'agents.json');
-  const owned = fs.existsSync(agentsFile) ? Object.keys(JSON.parse(fs.readFileSync(agentsFile, 'utf8')).agents ?? {}) : [];
-  // A scratch HOME: `opencode --version` writes a log under HOME, and a dry run must leave --home untouched.
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-probe-'));
-  const env = { HOME: scratch, USERPROFILE: scratch };
-  const probe = (b) => binVersion(b, ['--version'], env);
-  const installed = { claude: probe('claude'), opencode: probe('opencode'), copilot: probe('copilot') };
-  fs.rmSync(scratch, { recursive: true, force: true });
+  let owned = [];
+  try { owned = Object.keys(JSON.parse(fs.readFileSync(agentsFile, 'utf8')).agents ?? {}); } catch { /* absent or unreadable: no agent is ours */ }
+  // --no-exec runs no external command, not even a version probe: the agent rows then show nothing installed.
+  let installed = { claude: null, opencode: null, copilot: null };
+  if (o.exec) {
+    // A scratch HOME: `opencode --version` writes a log under HOME, and a dry run must leave --home untouched.
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-probe-'));
+    const env = { HOME: scratch, USERPROFILE: scratch };
+    const probe = (b) => binVersion(b, ['--version'], env);
+    installed = { claude: probe('claude'), opencode: probe('opencode'), copilot: probe('copilot') };
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
   const rows = planUpdate({ saved, pins: PINS, owned, installed });
   const log = path.join(ROOT, 'CHANGELOG.md');
   const current = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
@@ -688,7 +694,7 @@ async function install(o) {
       if (there) {
         if (!behind.has(c.tool)) continue;
         // Installed at an older pin: undo it, then add it again at the new pin.
-        if (!c.undo.every((argv) => run(argv, { dryRun: false, log: console.log, env: c.env, json: o.json }))) {
+        if (!c.undo.every((argv) => run(undoArgv(argv), { dryRun: false, log: console.log, env: c.env, json: o.json }))) {
           console.log(`  ! could not remove the old ${c.desc}; left as it is. Fix it by hand, then --update.`);
           failed++;
           errors.push(`could not remove the old ${c.desc}`);
@@ -754,14 +760,17 @@ async function install(o) {
 // The state of a machine where only an upgrade step ran (nothing else installed yet).
 const blankState = () => ({ version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version, installedAt: new Date().toISOString(), pins: {}, options: { agents: [], tools: [], terminals: [], unverified: {}, gh: false, lang: 'en', profile: null, network: {} }, files: [], commands: [] });
 
+// The 1.x config the verified backup saved: opencode1 runs on a copy of it, not on the live (2.x) config.
+const snapshot1x = (home) => { const st = readBackupStamp(home); return st ? path.join(st.dir, 'config') : null; };
+
 // `opencode1` (P4). The state is saved after every step, so an error midway still leaves something --uninstall can undo.
 function sideBySide(o) {
-  const p = planOpencode1({ home: o.home, exec: o.exec });
+  const p = planOpencode1({ home: o.home, exec: o.exec, configSnapshot: snapshot1x(o.home) });
   if (!p.ok) { console.log(`refused, nothing changed:\n${p.problems.map((x) => `  - ${x}`).join('\n')}`); return false; }
   const win = process.platform === 'win32';
   console.log(`${o.dryRun || !o.yes ? 'dry run: would set up' : 'setting up'} opencode1 (OpenCode ${p.version}, from ${p.source})`);
   console.log(`  binary copy: ${p.binary}\n  shim:        ${p.actions[0].path}\n  PATH:        ${win ? `user PATH (HKCU) gets ${p.pathDir}` : `${p.actions.slice(1).map((a) => a.path).join(', ')} gets a marked block`}`);
-  console.log(`  1.x reads and writes only ${opencode1Layout(o.home).frozen}; the live data is not touched`);
+  console.log(`  1.x reads and writes only ${opencode1Layout(o.home).frozen} and its own config copy in ${opencode1Layout(o.home).config}; the live data and config are not touched`);
   if (o.dryRun || !o.yes) { console.log('dry run: nothing was written'); return true; }
   const previous = readState(o.home);
   const files = [];
@@ -795,7 +804,7 @@ function upgradeDeps(o, S, save, extra) {
     tools: { config: (S.options?.tools ?? []).filter((t) => t !== 'dcp'), dcp: ['dcp'] },
     adapterFor, backupDir: (name) => path.join(stateDir(o.home), 'backups', `${ts}-${name}`),
     manual: agentTable({ home: o.home, platform: process.platform, dir: stateDir(o.home), realHome: REAL_HOME })['opencode-v2'].manual,
-    plan1: () => planOpencode1({ home: o.home, exec: o.exec }),
+    plan1: () => planOpencode1({ home: o.home, exec: o.exec, configSnapshot: snapshot1x(o.home) }),
     install1: (p, files, onRecord) => installOpencode1(p, { home: o.home, roots: [...writeRoots(o), opencode1Layout(o.home).root], backupDir: path.join(stateDir(o.home), 'backups', `${ts}-opencode1`), apply, files, onRecord }),
     installAgent: () => lifecycle('install'),
     uninstallAgent: () => lifecycle('uninstall'),
@@ -862,11 +871,28 @@ async function undoUpgrade(o) {
   return true;
 }
 
+// --uninstall after an applied upgrade: undo the files the opencode1, config and dcp steps wrote (same entry undo as --undo, roots
+// checked there). No 1.x restore, no 2.x uninstall, no data restore: the journal is archived right after.
+async function revertUpgradeFiles(o, S) {
+  const steps = createSteps(upgradeDeps(o, S, () => {}, { stamp: {}, inv: { items: [] } }));
+  const recs = Array.isArray(S.upgrade.steps) ? S.upgrade.steps : [];
+  for (const rec of [...recs].reverse()) {
+    const step = ['opencode1', 'config', 'dcp'].includes(rec?.id) && rec.status !== 'undone' ? steps.find((x) => x.id === rec.id) : null;
+    if (step) await step.undo(rec, null);
+  }
+}
+
 async function uninstall(o) {
   const state = readState(o.home);
   if (!state) { console.log('lean-agents is not installed.'); return; }
-  // The journal is what --undo needs to put the 1.x data back: --uninstall would archive it.
-  if (isActive(state.upgrade)) throw new Error(`an OpenCode upgrade is ${state.upgrade.status}: run --upgrade-agent opencode --undo first (it restores your 1.x data), then --uninstall`);
+  // A settled upgrade (`applied` never moves on by itself) must not block --uninstall for a user who stays on 2.x. Any other live
+  // status is a half-done apply or undo: finish it with --undo first. --uninstall archives the journal, so --undo is gone after it.
+  const up = state.upgrade;
+  if (isActive(up) && up.status !== 'applied') throw new Error(`an OpenCode upgrade is ${up.status}: run --upgrade-agent opencode --undo first (it restores your 1.x data), then --uninstall`);
+  if (isActive(up)) {
+    const kept = typeof up.backup === 'string' ? `the 1.x backup (${up.backup}, see RESTORE.md in it)` : 'the 1.x backup';
+    console.log(`! the OpenCode 2 upgrade stays: --uninstall does not go back to 1.x, and its journal is archived, so --undo is no longer available afterwards.\n  Removed: what the upgrade added (the opencode1 shim and PATH block, the managed 2.x config and DCP edits).\n  Kept: your data (the live 2.x sessions), ${kept}, the frozen copy and the OpenCode 2 install. To go back to 1.x, run --upgrade-agent opencode --undo --yes first.`);
+  }
   const p = await prompter(o.yes);
   console.log(`This restores ${state.files.length} files and undoes ${state.commands.length} commands.`);
   if (o.dryRun || !yesNo(await p.ask('Uninstall?', o.yes ? 'y' : 'n'))) { p.close(); console.log('Nothing changed.'); return; }
@@ -875,7 +901,7 @@ async function uninstall(o) {
   if (o.exec) {
     for (const c of [...state.commands].reverse()) {
       for (const argv of c.undo ?? []) {
-        if (!run(argv, { dryRun: false, log: console.log, env: c.env })) {
+        if (!run(undoArgv(argv), { dryRun: false, log: console.log, env: c.env })) {
           console.log('  ! failed. Run the command above by hand.');
           process.exitCode = 1;
         }
@@ -883,6 +909,7 @@ async function uninstall(o) {
     }
   }
   if (state.toolNode?.installedByLean) console.log(`Kept Node v${state.toolNode.version} (lean-agents never removes a Node); remove it with \`nvm uninstall ${state.toolNode.version}\`.`);
+  if (isActive(up)) await revertUpgradeFiles(o, state);
   const report = undo(state.files, writeRoots(o));
   if (state.opencode1) report.push(...removeOpencode1(state.opencode1, { home: o.home }));
   for (const [what, file] of report) console.log(`  ${what.padEnd(20)} ${file}`);

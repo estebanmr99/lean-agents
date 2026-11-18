@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { planPrereqs, pendingPrereqs, everythingAgents } from '../scripts/lib/prereqs.mjs';
+import { planPrereqs, pendingPrereqs, everythingAgents, undoArgv, UNDO_NODE, nvmDirExistedBefore } from '../scripts/lib/prereqs.mjs';
 
 // Synthetic probes: platform is injected, so every table runs on every OS and nothing touches the machine.
 const bare = (platform, extra = {}) => ({ platform, arch: 'x64', home: platform === 'win32' ? 'D:\\tools\\home' : '/tmp/x', has: {}, ...extra });
@@ -120,14 +120,14 @@ test('nvm undo removes a partial or lean-only ~/.nvm and keeps one with the user
   const fs = await import('node:fs');
   const os = await import('node:os');
   const path = await import('node:path');
-  const undo = (home) => by(planPrereqs({ platform: 'linux', home, has: {}, execPath: process.execPath }), 'nvm').undo[0];
+  const undo = (home) => by(planPrereqs({ platform: 'linux', home, has: {} }), 'nvm').undo[0];
   const make = (...versions) => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-nvm-'));
     for (const v of versions) fs.mkdirSync(path.join(home, '.nvm', 'versions', 'node', v), { recursive: true });
     fs.mkdirSync(path.join(home, '.nvm'), { recursive: true });
     return home;
   };
-  const run = (home) => spawnSync(undo(home)[0], undo(home).slice(1), { encoding: 'utf8' });
+  const run = (home) => { const [cmd, ...args] = undoArgv(undo(home)); return spawnSync(cmd, args, { encoding: 'utf8', env: {} }); };
   const partial = make();
   run(partial);
   assert.equal(fs.existsSync(path.join(partial, '.nvm')), false);
@@ -141,6 +141,16 @@ test('nvm undo removes a partial or lean-only ~/.nvm and keeps one with the user
   for (const h of [partial, ours, mixed]) fs.rmSync(h, { recursive: true, force: true });
 });
 
+test('nvm undo is empty when ~/.nvm existed before this run, and runs the Node that runs lean.mjs otherwise', () => {
+  const probe = { platform: 'linux', home: '/tmp/x', has: {}, execPath: '/opt/old/bin/node' };
+  assert.deepEqual(by(planPrereqs({ ...probe, nvmDirExisted: true }), 'nvm').undo, []);
+  const undo = by(planPrereqs(probe), 'nvm').undo;
+  assert.equal(undo[0][0], UNDO_NODE);
+  assert.ok(!JSON.stringify(undo).includes('/opt/old'));
+  assert.equal(undoArgv(undo[0], '/opt/new/bin/node')[0], '/opt/new/bin/node', 'resolved at undo time');
+  assert.deepEqual(undoArgv(['rm', 'x']), ['rm', 'x']);
+});
+
 test('--everything agents: Claude Code + OpenCode 2; Windows adds the team agents found and lists the rest', () => {
   assert.deepEqual(everythingAgents({ platform: 'darwin', detected: { 'copilot-cli': '1' } }), { agents: ['claude', 'opencode-v2'], skipped: [] });
   assert.deepEqual(everythingAgents({ platform: 'win32', detected: { 'copilot-cli': '1', antigravity: '1' } }),
@@ -151,4 +161,14 @@ test('--everything agents: Claude Code + OpenCode 2; Windows adds the team agent
 test('--everything team preset leaves Antigravity out of a --project run', () => {
   const r = everythingAgents({ platform: 'win32', detected: { antigravity: '1', 'copilot-cli': '1' }, project: true });
   assert.deepEqual(r, { agents: ['claude', 'opencode-v2', 'copilot-cli'], skipped: ['vscode-copilot'] });
+});
+
+test('resuming an interrupted nvm install: ~/.nvm stays ours only when the earlier run recorded an undo for it', () => {
+  const probe = { platform: 'linux', home: '/tmp/x', has: {} };
+  const undoAfter = (saved, dirExists) => by(planPrereqs({ ...probe, nvmDirExisted: nvmDirExistedBefore(saved, dirExists) }), 'nvm').undo;
+  const created = [{ resumeKey: 'prereq:nvm', ok: false, undo: [[UNDO_NODE, '-e', 'x', '/tmp/x/.nvm']] }];
+  assert.equal(undoAfter(created, true).length, 1, 'killed after creating ~/.nvm: the undo is kept');
+  assert.deepEqual(undoAfter([{ resumeKey: 'prereq:nvm', ok: false, undo: [] }], true), [], 'it existed before: still not ours');
+  assert.deepEqual(undoAfter(undefined, true), [], 'first run with ~/.nvm there');
+  assert.equal(undoAfter(undefined, false).length, 1, 'first run without ~/.nvm');
 });

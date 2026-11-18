@@ -288,6 +288,18 @@ test('--no-core installs only the listed tools, and --update keeps it', () => {
   assert.match(lean(other, ['--update', '--no-core', '--yes', '--no-exec', '--dry-run']), /tools: playwright \|/);
 });
 
+test('--update --dry-run --no-exec runs no version probe and survives an unreadable agents.json', { skip: process.platform === 'win32' && 'sh stubs' }, () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  lean(home, ['--yes', '--no-exec', '--agents', 'opencode-v2', '--tools', 'playwright', '--lang', 'en', '--profile', 'none']);
+  fs.writeFileSync(path.join(home, '.config', 'lean-agents', 'agents.json'), '{ not json');
+  const bin = path.join(home, 'stubs');
+  fs.mkdirSync(bin);
+  for (const n of ['claude', 'opencode', 'copilot']) fs.writeFileSync(path.join(bin, n), `#!/bin/sh\ntouch "${path.join(home, `probed-${n}`)}"\necho 9.9.9\n`, { mode: 0o755 });
+  const env = { PATH: `${bin}${path.delimiter}${process.env.PATH}`, HOME: home, NVM_DIR: path.join(home, '.nvm'), LEAN_AGENTS_NODE: process.env.LEAN_AGENTS_NODE };
+  lean(home, ['--update', '--yes', '--no-exec', '--dry-run'], env);
+  assert.deepEqual(fs.readdirSync(home).filter((n) => n.startsWith('probed-')), []);
+});
+
 test('GSD plans --cursor and skips agents without an installer instead of crashing', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
   const out = lean(home, ['--no-exec', '--yes', '--dry-run', '--agents', 'cursor,vscode-copilot', '--tools', 'gsd']);

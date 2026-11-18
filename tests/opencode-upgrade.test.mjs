@@ -391,14 +391,54 @@ test('lean.mjs: LEAN_TEST_FAIL_AT without LEAN_AGENTS_TEST=1 is refused before a
   fs.rmSync(home, { recursive: true, force: true });
 });
 
-test('lean.mjs: --uninstall refuses while an upgrade is active', () => {
+test('lean.mjs: --uninstall refuses while an upgrade is half done, and proceeds with a warning once it is applied', () => {
   const home = fs.realpathSync(fs.mkdtempSync(j(os.tmpdir(), 'lean-upg-')));
-  fs.mkdirSync(j(home, '.config', 'lean-agents'), { recursive: true });
-  fs.writeFileSync(j(home, '.config', 'lean-agents', 'state.json'), JSON.stringify({ version: '0', files: [], commands: [], options: {}, upgrade: { status: 'applied', steps: [] } }));
+  const dir = j(home, '.config', 'lean-agents');
+  fs.mkdirSync(dir, { recursive: true });
+  const put = (upgrade) => fs.writeFileSync(j(dir, 'state.json'), JSON.stringify({ version: '0', files: [], commands: [], options: {}, upgrade }));
+  put({ status: 'rollback-failed', steps: [] });
   const r = lean(home, ['--no-exec', '--uninstall', '--yes']);
   assert.equal(r.status, 1);
-  assert.match(r.stderr, /upgrade is applied: run --upgrade-agent opencode --undo first/);
-  assert.ok(fs.existsSync(j(home, '.config', 'lean-agents', 'state.json')), 'the journal is not archived');
+  assert.match(r.stderr, /upgrade is rollback-failed: run --upgrade-agent opencode --undo first/);
+  assert.ok(fs.existsSync(j(dir, 'state.json')), 'the journal is not archived');
+  put({ status: 'applied', backup: '/opt/x/backups/opencode1-sessions-20260101T000000Z', steps: [] });
+  const dry = lean(home, ['--no-exec', '--uninstall', '--dry-run', '--yes']);
+  assert.equal(dry.status, 0, dry.stdout + dry.stderr);
+  assert.match(dry.stdout, /OpenCode 2 upgrade stays/);
+  assert.ok(fs.existsSync(j(dir, 'state.json')), 'a dry run changes nothing');
+  const ok = lean(home, ['--no-exec', '--uninstall', '--yes']);
+  assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+  assert.match(ok.stdout, /--undo is no longer available afterwards/);
+  assert.equal(fs.existsSync(j(dir, 'state.json')), false);
+  assert.ok(fs.readdirSync(dir).some((n) => n.startsWith('state.uninstalled-')), 'the journal is archived');
+  fs.rmSync(home, { recursive: true, force: true });
+});
+
+test('lean.mjs: --uninstall after an applied upgrade removes the shim, the PATH block and the managed 2.x config; data, backup, frozen copy and 2.x stay', { skip }, async () => {
+  const m = await machine({ overwrite: false });
+  const r = await applyWith(m);
+  assert.equal(r.ok, true, m.log.join('\n'));
+  const home = m.f.home;
+  const shim = j(home, '.local', 'share', 'lean-agents', 'opencode1', 'bin', 'opencode1');
+  const cfg = j(home, '.config', 'opencode');
+  const dcp = j(cfg, 'dcp.jsonc');
+  const rcs = ['.bashrc', '.zshrc', '.profile', '.bash_profile'].map((n) => j(home, n)).filter((f) => fs.existsSync(f) && /lean-agents/.test(fs.readFileSync(f, 'utf8')));
+  assert.ok(fs.existsSync(shim) && fs.existsSync(dcp) && rcs.length, 'the apply wrote the shim, dcp.jsonc and a PATH block');
+  fs.writeFileSync(j(m.f.L.live, 'opencode.db'), 'migrated by 2.x');
+  const dir = j(home, '.config', 'lean-agents');
+  fs.writeFileSync(j(dir, 'state.json'), JSON.stringify({ version: '0', files: [], commands: [], options: m.S.options, upgrade: r.journal, opencode1: m.S.opencode1 }));
+  const ok = lean(home, ['--no-exec', '--uninstall', '--yes']);
+  assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+  assert.match(ok.stdout, /Removed: what the upgrade added/);
+  assert.equal(fs.existsSync(shim), false, 'the shim is gone');
+  assert.equal(fs.existsSync(dcp), false, 'dcp.jsonc is gone');
+  assert.doesNotMatch(fs.existsSync(j(cfg, 'opencode.jsonc')) ? fs.readFileSync(j(cfg, 'opencode.jsonc'), 'utf8') : '', /opencode-dcp/);
+  for (const f of rcs) assert.doesNotMatch(fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '', /lean-agents/, 'the marked PATH block is gone');
+  assert.equal(fs.readFileSync(j(m.f.L.live, 'opencode.db'), 'utf8'), 'migrated by 2.x', 'live 2.x data untouched');
+  assert.ok(fs.existsSync(r.stamp.dir), 'the backup stays');
+  assert.ok(fs.existsSync(j(m.f.L.frozen, 'opencode', 'opencode.db')), 'the frozen copy stays');
+  assert.equal(fakeProbe(m.ocBin), '2.2.5', 'the 2.x install stays');
+  assert.ok(fs.readdirSync(dir).some((n) => n.startsWith('state.uninstalled-')), 'the journal is archived');
   fs.rmSync(home, { recursive: true, force: true });
 });
 
