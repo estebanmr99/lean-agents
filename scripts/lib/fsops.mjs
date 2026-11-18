@@ -9,6 +9,19 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { parse, modify, applyEdits, findNodeAtLocation, parseTree } from 'jsonc-parser';
 
+// Rename that waits out a file another process holds for a moment (Windows antivirus or indexer: EBUSY, EPERM, EACCES on a file
+// just written). Retries `tries` times, `ms` apart; if it still fails, the error says so and keeps its code.
+const waitMs = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+export function renameRetry(from, to, { rename = fs.renameSync, sleep = waitMs, tries = 8, ms = 250 } = {}) {
+  for (let i = 1; ; i++) {
+    try { return rename(from, to); } catch (e) {
+      if (!['EBUSY', 'EPERM', 'EACCES'].includes(e.code)) throw e;
+      if (i >= tries) throw Object.assign(new Error(`${e.message} (still locked after ${tries} tries over ${Math.round(((tries - 1) * ms) / 1000)} s: another program holds it; close it and try again)`), { code: e.code });
+      sleep(ms);
+    }
+  }
+}
+
 export const OWNED_MARK = 'managed by lean-agents';
 const BLOCK_START = '<!-- lean-agents:start -->';
 const BLOCK_END = '<!-- lean-agents:end -->';

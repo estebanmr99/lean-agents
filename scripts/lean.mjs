@@ -7,7 +7,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import tty from 'node:tty';
 import { fileURLToPath } from 'node:url';
-import { plan, apply, undo, describe, writePrivate, privateDir, dropBackups } from './lib/fsops.mjs';
+import { plan, apply, undo, describe, writePrivate, privateDir, dropBackups, renameRetry } from './lib/fsops.mjs';
 import { loadCore, renderRules, loadProfile, useToolNode } from './lib/render.mjs';
 import { claudeAdapter } from './lib/adapters/claude.mjs';
 import { opencodeV1Adapter } from './lib/adapters/opencode-v1.mjs';
@@ -26,9 +26,11 @@ import { probePlugins } from './lib/plugin-health.mjs';
 import { adopt, inventory } from './lib/adopt.mjs';
 import { planPrereqs, pendingPrereqs, everythingAgents } from './lib/prereqs.mjs';
 import { upgradeInventory, formatUpgrade } from './lib/upgrade.mjs';
-import { backupOpencode } from './lib/opencode-backup.mjs';
+import { backupOpencode, backupLayout, listProcesses, opencodeRunning } from './lib/opencode-backup.mjs';
+import { readBackupStamp } from './lib/backup-stamp.mjs';
+import { isActive, failAt, applyPreflight, verifyBackup, configDrift, createSteps, makeCtx, runApply, runUndo, restoreData } from './lib/opencode-upgrade.mjs';
 import { planOpencode1, installOpencode1, removeOpencode1, layout as opencode1Layout } from './lib/opencode1.mjs';
-import { agentLifecycle } from './lib/agent-lifecycle.mjs';
+import { agentLifecycle, agentTable } from './lib/agent-lifecycle.mjs';
 import { copilotUsage } from './lib/copilot-usage.mjs';
 import { draftIssue } from './lib/feedback.mjs';
 import { planUpdate, changelogNotes, formatUpdatePlan } from './lib/update-plan.mjs';
@@ -198,7 +200,13 @@ const HELP = `Usage: lean-agents [options]
                          hand-made stopgaps (all backed up; on a terminal a menu asks instead)
   --keep-backup          Keep the backup after a verified --adopt --yes (--adopt --undo needs it to restore bytes)
   --upgrade-agent opencode  Dry run: classify the OpenCode 1.x config as managed, translatable to 2.x or manual and print the
-                         translation table; changes nothing (with --json: one JSON object). Apply and --undo come later
+                         translation table; changes nothing (with --json: one JSON object)
+  --upgrade-agent opencode --yes
+                         Apply, after --backup --yes made a verified backup: opencode1, install OpenCode 2, translate the
+                         config, add DCP. Steps are journaled in state.json; a failed step undoes the finished ones
+  --upgrade-agent opencode --undo [--yes]
+                         Back to 1.x: undo each step, move the 2.x db aside, copy the frozen copy back. Never deletes the
+                         backup or the frozen copy. Plan first; --yes does it
   --upgrade-agent opencode --backup [--dry-run|--yes]
                          Permanent sha256-checked backup of the OpenCode 1.x sessions and config, then a frozen copy for
                          opencode1; the live data is only read. Plan first (the default); --yes copies. Refuses while
@@ -643,6 +651,7 @@ async function install(o) {
       ...(o.toolNode && { toolNode: { version: o.toolNode.version, installedByLean: !!o.toolNode.install || (previous?.toolNode?.version === o.toolNode.version && !!previous.toolNode.installedByLean) } }),
       files: [...(previous?.files ?? []), ...files],
       ...(previous?.opencode1 && { opencode1: previous.opencode1 }),
+      ...(previous?.upgrade && { upgrade: previous.upgrade }),
       // A command that ran again replaces its earlier record, so --uninstall undoes it once.
       commands: [...(previous?.commands ?? []).filter((c) => !ran.some((r) => r.desc === c.desc)), ...ran].map(({ resumeKey, ...c }) => (finished ? c : { ...c, ...(resumeKey && { resumeKey }) })),
     };
@@ -717,6 +726,9 @@ async function install(o) {
   ui?.summary('Summary', [`${files.length} files written, ${ran.length} commands run`, `Backups: ${backupDir}`], true);
 }
 
+// The state of a machine where only an upgrade step ran (nothing else installed yet).
+const blankState = () => ({ version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version, installedAt: new Date().toISOString(), pins: {}, options: { agents: [], tools: [], terminals: [], unverified: {}, gh: false, lang: 'en', profile: null, network: {} }, files: [], commands: [] });
+
 // `opencode1` (P4). The state is saved after every step, so an error midway still leaves something --uninstall can undo.
 function sideBySide(o) {
   const p = planOpencode1({ home: o.home, exec: o.exec });
@@ -729,7 +741,7 @@ function sideBySide(o) {
   const previous = readState(o.home);
   const files = [];
   const save = (record) => {
-    const state = previous ?? { version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version, installedAt: new Date().toISOString(), pins: {}, options: { agents: [], tools: [], terminals: [], unverified: {}, gh: false, lang: 'en', profile: null, network: {} }, files: [], commands: [] };
+    const state = previous ?? blankState();
     privateDir(stateDir(o.home), stateDir(o.home));
     writePrivate(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify({ ...state, updatedAt: new Date().toISOString(), files: [...state.files, ...files], opencode1: record }, null, 2)}\n`);
   };
@@ -739,9 +751,97 @@ function sideBySide(o) {
   return true;
 }
 
+// `--upgrade-agent opencode --yes` / `--undo` (#80 part 2, P6). The journal is state.json `upgrade`; the steps are in lib/opencode-upgrade.mjs.
+function upgradeDeps(o, S, save, extra) {
+  const ts = new Date().toISOString().replace(/\D/g, '');
+  const rulesPath = path.join(stateDir(o.home), 'AGENTS.md');
+  // The adapter's file and JSON actions only: its commands (npx skill installs, git clones) are not run by an upgrade.
+  const adapterFor = (tools) => {
+    const saved = S.options ?? {};
+    const opts = { tools, network: saved.network ?? {}, terminals: [], platform: process.platform, env: process.env, shell: 'default', ponytailMode: saved.ponytailMode ?? 'lite', adhdAlways: false };
+    const r = opencodeV2Adapter({ home: o.home, core: loadCore(ROOT), profile: null, opts, rulesPath: rulesPath.split(path.sep).join('/') });
+    if (r.commands.length) console.log(`  ${r.commands.length} adapter command(s) not run by the upgrade; --update runs them`);
+    // No rules file (lean-agents never installed the rules here): do not point `instructions` at a missing file.
+    return fs.existsSync(rulesPath) ? r : { ...r, actions: r.actions.map((a) => (a.kind === 'json' ? { ...a, edits: a.edits.filter((e) => e.path[0] !== 'instructions') } : a)) };
+  };
+  const lifecycle = (mode) => agentLifecycle({ mode, fromUpgrade: true, agents: ['opencode-v2'], home: o.home, realHome: REAL_HOME, stateDir: stateDir(o.home), dryRun: false, exec: o.exec, yes: true, ask: async (_q, def) => def, yesNo });
+  const d = {
+    home: o.home, platform: process.platform, log: console.log, state: S, save, roots: writeRoots(o), which,
+    tools: { config: (S.options?.tools ?? []).filter((t) => t !== 'dcp'), dcp: ['dcp'] },
+    adapterFor, backupDir: (name) => path.join(stateDir(o.home), 'backups', `${ts}-${name}`),
+    manual: agentTable({ home: o.home, platform: process.platform, dir: stateDir(o.home), realHome: REAL_HOME })['opencode-v2'].manual,
+    plan1: () => planOpencode1({ home: o.home, exec: o.exec }),
+    install1: (p, files, onRecord) => installOpencode1(p, { home: o.home, roots: [...writeRoots(o), opencode1Layout(o.home).root], backupDir: path.join(stateDir(o.home), 'backups', `${ts}-opencode1`), apply, files, onRecord }),
+    installAgent: () => lifecycle('install'),
+    uninstallAgent: () => lifecycle('uninstall'),
+    ...extra,
+  };
+  return d;
+}
+
+// Temp file then rename: a kill midway never leaves a truncated state.json (it holds the journal --undo needs).
+function saveJournalState(o, S) {
+  S.updatedAt = new Date().toISOString();
+  const dir = stateDir(o.home);
+  privateDir(dir, dir);
+  const file = path.join(dir, 'state.json');
+  writePrivate(`${file}.tmp`, `${JSON.stringify(S, null, 2)}\n`);
+  renameRetry(`${file}.tmp`, file);
+}
+
+const refuse = (problems) => { console.log(`refused, nothing changed:\n${problems.map((x) => `  - ${x}`).join('\n')}`); return false; };
+
+async function applyUpgrade(o) {
+  const fail = failAt();
+  const S = readState(o.home) ?? blankState();
+  const stamp = readBackupStamp(o.home);
+  const { problems, baseline } = applyPreflight({ home: o.home, stamp, upgrade: S.upgrade, exec: o.exec, list: listProcesses, opencodeRunning });
+  if (problems.length) return refuse(problems);
+  const save = () => saveJournalState(o, S);
+  const inv = upgradeInventory(await inventory({ home: o.home, env: process.env, realHome: REAL_HOME }), { home: o.home });
+  const steps = createSteps(upgradeDeps(o, S, save, { inv, stamp }));
+  S.upgrade = { backup: stamp.dir, baseline };
+  const ctx = makeCtx({ home: o.home, stamp, journal: S.upgrade });
+  console.log(`applying the OpenCode upgrade: verified backup ${stamp.dir} (${stamp.sessions} sessions)`);
+  const ok = await runApply({ steps, journal: S.upgrade, save, ctx, fail, restore: () => restoreData({ home: o.home, backupDir: stamp.dir }) });
+  if (!ok) { process.exitCode = 1; return false; }
+  console.log('done. Start OpenCode 2 once: it migrates the live session db (the backup and the frozen copy hold the 1.x state). `opencode1` runs 1.x on the frozen copy.\n`--upgrade-agent opencode --undo --yes` goes back to 1.x; the backup and the frozen copy are never deleted.');
+  return true;
+}
+
+async function undoUpgrade(o) {
+  const S = readState(o.home);
+  const journal = S?.upgrade;
+  if (!isActive(journal)) { console.log('nothing to undo: no OpenCode upgrade is active (the backup and the frozen copy are kept either way)'); return true; }
+  const L = backupLayout(o.home, 'x');
+  // The journal names the backup folder: only one inside lean-agents' own backups folder is used.
+  if (typeof journal.backup !== 'string' || path.dirname(journal.backup) !== path.dirname(L.backup) || !/^opencode1-sessions-\d{8}T\d{6}Z$/.test(path.basename(journal.backup)) || !Array.isArray(journal.steps)) return refuse([`the journal names a backup outside ${path.dirname(L.backup)}: not used`]);
+  const stamp = { dir: journal.backup, frozen: L.frozen };
+  const todo = journal.steps.filter((s) => s.status !== 'undone').reverse().map((s) => s.id);
+  console.log(`undo: ${todo.length ? todo.join(', ') : 'no step left to undo'}, then the 1.x data comes back from ${L.frozen} (the 2.x db is moved aside, never deleted)`);
+  if (o.dryRun || !o.yes) { console.log('dry run: nothing was changed (--yes does it)'); return true; }
+  const problems = [];
+  try { if (opencodeRunning(listProcesses())) problems.push('an opencode process is running (the 1.x app or the 2.x background service): close it first; lean-agents did not start it'); } catch (e) { problems.push(`cannot list the running processes (${String(e.message).split('\n')[0]}): not safe to continue`); }
+  const bad = verifyBackup(stamp.dir);
+  if (bad.length) problems.push(`the backup does not match its manifest (${bad[0]}): not used; see ${path.join(stamp.dir, 'RESTORE.md')}`);
+  if (!o.exec) problems.push('--no-exec: undo may run the OpenCode 2 uninstall and a `--version` probe');
+  if (problems.length) return refuse(problems);
+  const save = () => saveJournalState(o, S);
+  const steps = createSteps(upgradeDeps(o, S, save, { stamp, inv: { items: [] } }));
+  const ctx = makeCtx({ home: o.home, stamp, journal });
+  const ok = await runUndo({ steps, journal, save, ctx, restore: () => restoreData({ home: o.home, backupDir: stamp.dir }) });
+  if (!ok) { process.exitCode = 1; return false; }
+  const drift = configDrift(L, stamp.dir);
+  if (drift.length) console.log(`! these config files differ from the 1.x snapshot in the backup (left as they are): ${drift.join(', ')}`);
+  console.log(`undone: OpenCode 1.x data and binary are back. The backup (${stamp.dir}) and the frozen copy (${L.frozen}) are kept.`);
+  return true;
+}
+
 async function uninstall(o) {
   const state = readState(o.home);
   if (!state) { console.log('lean-agents is not installed.'); return; }
+  // The journal is what --undo needs to put the 1.x data back: --uninstall would archive it.
+  if (isActive(state.upgrade)) throw new Error(`an OpenCode upgrade is ${state.upgrade.status}: run --upgrade-agent opencode --undo first (it restores your 1.x data), then --uninstall`);
   const p = await prompter(o.yes);
   console.log(`This restores ${state.files.length} files and undoes ${state.commands.length} commands.`);
   if (o.dryRun || !yesNo(await p.ask('Uninstall?', o.yes ? 'y' : 'n'))) { p.close(); console.log('Nothing changed.'); return; }
@@ -791,7 +891,7 @@ function checkNodeFloor(o) {
   const override = /^v?\d+(\.\d+){0,2}$/.test(fake) ? fake.replace(/^v/, '').split('.').concat('0', '0').slice(0, 3).join('.') : null;
   const running = [process.versions.node, override].find((v) => v && !satisfies(v, floor));
   if (!running) return;
-  const readOnly = ['help', 'version', 'doctor', 'usage', 'feedback'].includes(o.command) || (o.command === 'upgrade-agent' && !((o.backup || o.opencode1) && o.yes)) || o.dryRun || (o.command === 'adopt' && !o.yes && !o.undo);
+  const readOnly = ['help', 'version', 'doctor', 'usage', 'feedback'].includes(o.command) || (o.command === 'upgrade-agent' && !o.yes) || o.dryRun || (o.command === 'adopt' && !o.yes && !o.undo);
   const allow = process.env.LEAN_AGENTS_ALLOW_OLD_NODE === '1';
   console.error(`lean-agents: Node ${running} is older than ${floor.replace(/^>=/, '')}, which lean-agents needs. Fix: nvm install 22 && nvm use 22, or run install.sh.${readOnly || allow ? '' : ' Set LEAN_AGENTS_ALLOW_OLD_NODE=1 to run anyway.'}`);
   if (!readOnly && !allow) process.exit(1);
@@ -824,7 +924,8 @@ async function main() {
       if (o.undo) throw new Error('--upgrade-agent opencode --opencode1 has no --undo yet: run --uninstall');
       return process.exit(sideBySide(o) ? 0 : 1);
     }
-    if (o.undo || (o.yes && !o.dryRun)) throw new Error('--upgrade-agent opencode apply and --undo are not in this release yet; it only lists (dry run)');
+    if (o.undo) return process.exit((await undoUpgrade(o)) ? 0 : 1);
+    if (o.yes && !o.dryRun) return process.exit((await applyUpgrade(o)) ? 0 : 1);
     const env = process.env;
     const inv = await inventory({ home: o.home, env, realHome: REAL_HOME });
     const bin = which('opencode');

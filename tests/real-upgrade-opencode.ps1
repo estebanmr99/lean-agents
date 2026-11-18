@@ -5,6 +5,10 @@
 # Then `--opencode1` (P4): opencode1.cmd reports 1.19.0 from cmd and from Git Bash (through the user PATH), a new session made
 # through it lands in the frozen copy (3 -> 4) while the live data hash stays equal, and `--uninstall` removes the shim, the copy and
 # the PATH entry but keeps the backup and the frozen copy.
+# Then the upgrade (P6): an apply without a backup stamp is refused, LEAN_TEST_FAIL_AT without LEAN_AGENTS_TEST=1 is refused, and an
+# injected failure after backup and after opencode1 rolls back to a byte-identical config, ~/.opencode, data and user PATH. The 2.x
+# install is manual on Windows (VERIFY), so a plain apply stops at that step and rolls back the same way; the Linux job (the sh half)
+# runs the full apply and --undo.
 param([string]$Binary = 'opencode')
 $opencodeBin = $Binary
 $ErrorActionPreference = 'Stop'
@@ -61,6 +65,15 @@ function Invoke-LeanSide {
     return [pscustomobject]@{ Code = $LASTEXITCODE; Text = ($out -join "`n") }
   } finally { $ErrorActionPreference = $prev }
 }
+# `--upgrade-agent opencode` with the given arguments (apply, --undo). $FailAt turns on the test-only fault injection for this one call.
+function Invoke-LeanUpgrade([string[]]$UpArgs, [string]$FailAt) {
+  $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+  try {
+    if ($FailAt) { $env:LEAN_AGENTS_TEST = '1'; $env:LEAN_TEST_FAIL_AT = $FailAt }
+    $out = & node "$repo\scripts\lean.mjs" --home $live --upgrade-agent opencode @UpArgs 2>&1 | ForEach-Object { "$_" }
+    return [pscustomobject]@{ Code = $LASTEXITCODE; Text = ($out -join "`n") }
+  } finally { $env:LEAN_AGENTS_TEST = $null; $env:LEAN_TEST_FAIL_AT = $null; $ErrorActionPreference = $prev }
+}
 function Invoke-LeanUninstall {
   $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
   try {
@@ -72,6 +85,14 @@ function Invoke-LeanUninstall {
 function Get-UserPathRaw {
   $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment')
   try { [string]$key.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames) } finally { $key.Close() }
+}
+# The live state an upgrade must give back: config, the 2.x installer's folder and the user PATH as stored.
+function Get-LiveState { return "$(Get-Tree $cfgDir '')`n--`n$(Get-Tree "$live\.opencode" '')`n--`n$((Get-UserPathRaw).TrimEnd(';'))" }
+function Get-JournalStatus {
+  $f = "$live\.config\lean-agents\state.json"
+  if (-not (Test-Path $f)) { return 'none' }
+  $st = Get-Content $f -Raw | ConvertFrom-Json
+  if ($st.upgrade) { return [string]$st.upgrade.status } else { return 'none' }
 }
 # What a new terminal would see: machine + user PATH from the registry.
 function Get-FreshPath { return (@('Machine', 'User' | ForEach-Object { [Environment]::GetEnvironmentVariable('Path', $_) }) -join ';') }
@@ -136,6 +157,13 @@ try {
   Assert-That 'whole HOME tree unchanged by the dry run' ((Get-Tree $live $skip) -eq $before)
   Assert-That 'no lean-agents folder after the dry run' (-not (Test-Path $leanDir))
 
+  Write-Output '== upgrade apply without a backup stamp is refused (P6)'
+  $nostamp = Invoke-LeanUpgrade @('--yes') ''
+  Write-Output $nostamp.Text
+  Assert-That 'apply without a stamp exits 1 and names it' (($nostamp.Code -eq 1) -and ($nostamp.Text -match 'no verified session backup'))
+  Assert-That 'whole HOME tree unchanged by the refused apply' ((Get-Tree $live $skip) -eq $before)
+  Assert-That 'no lean-agents folder after the refused apply' (-not (Test-Path $leanDir))
+
   Write-Output '== apply: permanent backup + frozen copy'
   $apply = Invoke-Lean --yes
   Write-Output $apply.Text
@@ -195,6 +223,28 @@ try {
   Assert-That 'binary copy and shim folder removed' ((-not (Test-Path "$oc1\1.19.0")) -and (-not (Test-Path "$oc1\bin")))
   Assert-That 'user PATH entry removed, the rest of the PATH untouched' ((Get-UserPathRaw).TrimEnd(';') -eq $pathBefore.TrimEnd(';'))
   Assert-That 'frozen copy kept (4 sessions) and the backup kept' (((Get-SessionCount "$leanDir\opencode1\data\opencode") -eq 4) -and (Test-Path "$($bk[0].FullName)\MANIFEST.sha256"))
+
+  Write-Output '== upgrade: injected failures and rollback (P6)'
+  $liveState = Get-LiveState
+  $liveData = Get-Tree $data ''
+  $env:LEAN_TEST_FAIL_AT = 'config'
+  $guarded = Invoke-LeanUpgrade @('--yes') ''
+  $env:LEAN_TEST_FAIL_AT = $null
+  Assert-That 'LEAN_TEST_FAIL_AT without LEAN_AGENTS_TEST=1 is refused' (($guarded.Code -eq 1) -and ($guarded.Text -match 'test-only'))
+  Assert-That 'and nothing changed' ((Get-LiveState) -eq $liveState)
+  foreach ($step in 'backup', 'opencode1') {
+    $inj = Invoke-LeanUpgrade @('--yes') $step
+    Write-Output (($inj.Text -split "`n" | Select-Object -Last 10) -join "`n")
+    Assert-That "failure after ${step}: exit 1 and the journal says rolled-back" (($inj.Code -eq 1) -and ((Get-JournalStatus) -eq 'rolled-back'))
+    Assert-That "failure after ${step}: config, ~/.opencode and the user PATH byte-identical" ((Get-LiveState) -eq $liveState)
+    Assert-That "failure after ${step}: live data byte-identical" ((Get-Tree $data '') -eq $liveData)
+    Assert-That "failure after ${step}: no shim folder; backup and frozen copy kept" ((-not (Test-Path "$oc1\bin")) -and (Test-Path "$($bk[0].FullName)\MANIFEST.sha256") -and (Test-Path "$leanDir\opencode1\data\opencode\opencode.db"))
+  }
+  $manual = Invoke-LeanUpgrade @('--yes') ''
+  Write-Output (($manual.Text -split "`n" | Select-Object -Last 10) -join "`n")
+  Assert-That 'plain apply: stops at install2x (the Windows 2.x install is manual) and names it' (($manual.Code -eq 1) -and ($manual.Text -match 'not proven yet'))
+  Assert-That 'plain apply: rolled back, config, ~/.opencode, user PATH and data byte-identical' (((Get-JournalStatus) -eq 'rolled-back') -and ((Get-LiveState) -eq $liveState) -and ((Get-Tree $data '') -eq $liveData))
+  Assert-That 'a 1.x opencode still runs' ((Invoke-OpenCode --version | Select-Object -Last 1) -match '^1\.19\.0')
 
   Write-Output '== refused while an opencode process runs'
   # npm installs an extensionless sh shim next to opencode.cmd; Start-Process needs the .cmd (or .exe).

@@ -67,12 +67,16 @@ test('the CLI dry run prints the table and --json the doc, writes nothing and le
   for (const out of [text.stdout, json.stdout]) for (const v of SECRETS) assert.ok(!out.includes(v), `${v} leaked`);
 });
 
-test('apply and --undo are not in this release yet', { skip }, async () => {
+test('apply needs a verified backup stamp, and --undo has nothing to undo: both leave the tree alone (P6)', { skip }, async () => {
   const { home } = await seeded();
-  for (const extra of [['--yes'], ['--yes', '--json'], ['--undo']]) {
+  const before = treeHash(home);
+  for (const extra of [['--yes'], ['--yes', '--json']]) {
     const r = spawnSync(process.execPath, [LEAN, '--home', home, '--no-exec', '--upgrade-agent', 'opencode', ...extra], { encoding: 'utf8' });
-    assert.notEqual(r.status, 0); assert.match(r.stderr, /not in this release yet/);
+    assert.equal(r.status, 1); assert.match(r.stdout + r.stderr, /no verified session backup/);
   }
+  const u = spawnSync(process.execPath, [LEAN, '--home', home, '--no-exec', '--upgrade-agent', 'opencode', '--undo'], { encoding: 'utf8' });
+  assert.equal(u.status, 0); assert.match(u.stdout, /nothing to undo/);
+  assert.equal(treeHash(home), before);
 });
 
 test('the lean-migrate skill is opt-in: only with --tools lean-migrate', { skip }, async () => {
