@@ -167,6 +167,21 @@ try {
   if ($rc -ne 1 -or $out -notmatch 'LEAN_AGENTS_SRC points at a git clone' -or $out -notmatch 'Move it away') { Fail "LEAN_AGENTS_SRC clone: $rc $out" }
   if ((git -C $srcdir rev-parse HEAD) -ne $head -or (Get-Content "$srcdir\scripts\lean.mjs" -Raw).Trim() -ne '// old') { Fail 'LEAN_AGENTS_SRC clone changed' }
 
+  Write-Output '--- (i3) git is not required; a clone that cannot be checked is left alone'
+  Initialize-TempProfile
+  $srcdir = "$dir\.config\lean-agents\src"
+  Build-PushedClone $srcdir
+  $oldPath = $env:Path
+  $env:Path = @($env:Path -split ';' | Where-Object { $_ -and -not (Test-Path (Join-Path $_ 'git.exe')) }) -join ';'
+  try {
+    Invoke-Boot $Dist (Merge @{})
+    if ($rc -ne 1 -or $out -notmatch 'git is not installed') { Fail "clone without git: $rc $out" }
+    if (-not (Test-Path "$srcdir\.git")) { Fail 'a clone was deleted although git could not check it' }
+    Remove-Item -Recurse -Force $srcdir
+    Invoke-Boot $Dist (Merge @{})
+    if ($rc -ne 0 -or -not (Test-Path "$srcdir\.lean-agents-release")) { Fail "install needs git: $rc $out" }
+  } finally { $env:Path = $oldPath }
+
   Write-Output '--- (j) a checkout reinstalls its dependencies when package-lock.json changes'
   Initialize-TempProfile
   $co = Join-Path $work 'checkout'

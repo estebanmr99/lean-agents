@@ -37,6 +37,10 @@ test('below the floor, writing paths exit 1 unless LEAN_AGENTS_ALLOW_OLD_NODE=1'
   assert.equal(r.status, 1);
   assert.match(r.stderr, /older than/);
   assert.equal(run('22.12.0', ['--uninstall', '--yes']).status, 1);
+  // --backup copies files: a write path, unlike the plain --upgrade-agent listing.
+  const bk = run('22.12.0', ['--upgrade-agent', 'opencode', '--backup', '--yes']);
+  assert.equal(bk.status, 1);
+  assert.match(bk.stderr, /older than/);
   const ok = run('22.12.0', args, { LEAN_AGENTS_ALLOW_OLD_NODE: '1' });
   assert.equal(ok.status, 0, ok.stderr);
   assert.match(ok.stderr, /older than/);
