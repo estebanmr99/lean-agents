@@ -29,7 +29,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ### Fixed
 
 - CI: `real-opencode-shell` asks the OS for a free port instead of a random one, which hit Windows reserved ranges (`EACCES`) twice on main.
-- CI: the macOS legs run nightly (and on manual dispatch) instead of on every push to main, where they queued for 20+ minutes for a runner and were cancelled, leaving main red. Pull requests and pushes run the Ubuntu and Windows legs.
+- CI: the macOS legs run in the nightly `ci-latest` run (which opens a version-watch issue on failure) and on manual dispatch instead of on every push to main, where they queued for 20+ minutes for a runner and were cancelled, leaving main red. Pull requests and pushes run the Ubuntu and Windows legs.
 - CI: a push to main is no longer cancelled by the next merge, so the macOS and other main-only jobs finish for every merge (only pull request runs are cancelled by a newer push).
 - `--everything` no longer fills in default agents and tools when `--migrate` is given, and `install.sh` keeps a global npm prefix that the user set in `.npmrc` instead of forcing `~/.local` (review 6, #253 items 1 and 4).
 - `install.ps1 -Uninstall` retries removing the Node.js it installed when a file is still in use, instead of failing on a locked `node.exe` (seen once on main's Windows run).
