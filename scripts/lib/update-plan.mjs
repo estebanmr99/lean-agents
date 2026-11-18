@@ -9,7 +9,7 @@ const major = (v) => String(v).replace(/^v/, '').split('.')[0];
 // `download` and `ciOnly` pins never reach state.pins (see pins.mjs), so they cannot be rows here either.
 const tracked = (p) => !p.ciOnly && p.kind !== 'download';
 
-// action: update (will move to the pin), report (behind, but --update does not apply agent CLIs yet), held (never moved), major (pin is another major), own (not installed by lean-agents).
+// action: update (will move to the pin), held (never moved), major (pin is another major), own (not installed by lean-agents).
 // `installed`: versions of the binaries on PATH ({ claude, opencode, copilot }, null when absent). `owned`: agents.json `agents` keys.
 export function planUpdate({ saved, pins, installed = {}, owned = [] }) {
   const rows = [];
@@ -30,7 +30,7 @@ export function planUpdate({ saved, pins, installed = {}, owned = [] }) {
     const base = { tool: key, installed: have, pinned };
     if (!owned.includes(agent)) rows.push({ ...base, action: 'own', reason: 'installed by you, left alone' });
     else if (major(have) !== major(pinned)) rows.push({ ...base, action: 'major', reason: `crosses major ${major(have)} -> ${major(pinned)}, update it yourself` });
-    else rows.push({ ...base, action: 'report', reason: 'newer pin; --update does not move agent CLIs yet' });
+    else rows.push({ ...base, action: 'update', reason: null });
   }
   return rows;
 }

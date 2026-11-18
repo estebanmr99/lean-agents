@@ -667,3 +667,9 @@ Versions of the agent CLIs come from `<bin> --version` run with a scratch HOME (
 **Limit:** this is a PATH trick on a runner image, not a bare machine. `/usr/bin/git` (the Xcode shim) stays on macOS, winget and the Windows system tools stay, and a per-user install on the runner could still be found by absolute path. Corporate proxy and TLS inspection are only provable on the owner's PC.
 
 **VERIFY** (first nightly runs decide): Homebrew's pinned installer unattended on macOS runners (including the Xcode CLT step); nvm-windows without admin on `windows-latest`; `--everything` as root in the Ubuntu container; `actions/download-artifact` inside the container. Not run locally: no real binaries on the owner's machine.
+
+## Agent CLI upgrades within a major (#182 PR3, 2026-11-18)
+
+`--update` runs, after the one confirm, one command per plan row with action `update` for an agent lean-agents installed (`agents.json`): Claude Code `claude-installer.sh <pin>`, OpenCode 2 `opencode-installer.sh --version <pin> --no-modify-path`, Copilot CLI `npm install -g [--prefix] @github/copilot@<pin>`. The installer scripts are the same sha256-pinned ones as `--install-agent`. `state.json` keeps `from` and `reinstall` (the same command at the previous version) next to each command; `--uninstall` does not run it. Never moved: OpenCode 1.x, another major, an agent you installed, the VS Code Copilot extension, Cursor (its installer takes no version) and Antigravity (no pin). Proof: `tests/agent-upgrade.test.mjs` (synthetic rows, temp HOME, no binaries).
+
+**VERIFY** (no real binary yet; the nightly proof is PR6): that the Claude and OpenCode installers accept a version older than the installed one (downgrade, needed by the undo) and a newer one over an existing install; that the Windows installers (not offered yet) behave the same; `npm install -g` over an older Copilot CLI behind a proxy.
