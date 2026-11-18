@@ -82,7 +82,11 @@ $results = @{}
 foreach ($name in $cases.Keys) {
   # Not $home: that shadows PowerShell's own read-only automatic $HOME variable.
   $caseHome = Initialize-CaseHome $name
-  $port = Get-Random -Minimum 20000 -Maximum 60000
+  # Windows reserves ranges of ports (EACCES on bind, seen at 49766 and 49830); ask the OS for a free one instead of guessing.
+  $probe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+  $probe.Start()
+  $port = $probe.LocalEndpoint.Port
+  $probe.Stop()
   $mockLog = "$caseHome\mock.log"
   # Env vars, not argv: a Windows command line full of quotes and `$` is fragile to pass as a process argument.
   $env:MOCK_LLM_PORT = "$port"
