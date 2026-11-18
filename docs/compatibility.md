@@ -373,7 +373,7 @@ The network question (`--network`, `--telemetry`, `--auto-update`, `--outbound`)
 | Agent or tool | Category | Switch | Source | Checked |
 | --- | --- | --- | --- | --- |
 | Claude Code | telemetry | env `DISABLE_TELEMETRY=1`, `DISABLE_ERROR_REPORTING=1`, `DO_NOT_TRACK=1` | [data usage](https://code.claude.com/docs/en/data-usage), [env vars](https://code.claude.com/docs/en/env-vars) | 2026-11-03 |
-| Claude Code | auto-update | env `DISABLE_AUTOUPDATER=1` (`claude update` still works) | [env vars](https://code.claude.com/docs/en/env-vars) | 2026-11-03 |
+| Claude Code | auto-update | env `DISABLE_AUTOUPDATER=1` (`claude update` still works); written for every managed install (`setIfAbsent`, forced with the category off) since #182 PR5 | [env vars](https://code.claude.com/docs/en/env-vars) | 2026-11-03 |
 | Claude Code | other | env `DISABLE_BUG_COMMAND=1` (now also `DISABLE_FEEDBACK_COMMAND`); `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` turns off updates, telemetry, error reports, feedback and surveys together, so lean-agents sets it only when all three are off | [env vars](https://code.claude.com/docs/en/env-vars) | 2026-11-03 |
 | OpenCode 2 | auto-update | `update: "disable"` | [v2 config](https://opencode.ai/v2/docs/config), real binary 2.2.5 | 2026-11-03 |
 | OpenCode 2 | other | `share: "disabled"`; `policies` deny `provider.use` `opencode` | real binary 2.2.5 (`tests/real-opencode.sh`) | 2026-10-31 |
