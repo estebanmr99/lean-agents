@@ -17,12 +17,15 @@ export function which(bin) {
 // Windows .cmd shims (npm, npx) need a shell; real .exe files must not get one, or paths with spaces split.
 const useShell = (bin) => isWin && !/\.exe$/i.test(bin) && !/\.exe$/i.test(which(bin) ?? '');
 
-export function version(bin, args = ['--version'], env = {}) {
+// The version string as the binary prints it, pre-release tag included (2.0.1-beta): what an undo must reinstall.
+export function versionFull(bin, args = ['--version'], env = {}) {
   if (!path.isAbsolute(bin) && !which(bin)) return null;
   const r = spawnSync(bin, args, { encoding: 'utf8', shell: useShell(bin), timeout: 20000, env: { ...allowedEnv(), ...env } });
-  const m = `${r.stdout}${r.stderr}`.match(/(\d+)\.(\d+)\.(\d+)/);
+  const m = `${r.stdout}${r.stderr}`.match(/\d+\.\d+\.\d+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?/);
   return m ? m[0] : 'unknown';
 }
+
+export const version = (bin, args, env) => versionFull(bin, args, env)?.replace(/-.*/, '') ?? null;
 
 // A config dir from the environment counts only for the real home or inside --home:
 // a run with --home must never write outside it, even when the variable is set.

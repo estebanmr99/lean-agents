@@ -202,6 +202,7 @@ Every flag from `--help`. In PowerShell the same flags are PascalCase (`-DryRun`
 | `--failed-command <text>` | The command that failed, for `--feedback-draft` |
 | `--feedback-kind update` | With `--feedback-draft`: the text is a finding from an update, not an error |
 | `--update` | Re-apply with your saved choices; the plan lists `tool: installed -> release pin`, what stays held (OpenCode 1.x, agent CLIs across a major, tools you installed yourself) and the release notes since your version (`--dry-run [--json]` shows it without changing anything). After the one confirm it also moves the Claude Code, OpenCode 2 and Copilot CLI that lean-agents installed to the release pin, inside the same major (Cursor and Antigravity have no pin, so they stay); each step saves the previous version in `state.json`, and a failed step is reported while the rest continue |
+| `--update --undo [--yes]` | Put each agent CLI that `--update` upgraded back on the version it had before its first upgrade (the oldest saved `from` per agent, never OpenCode 1.x or across a major): plan first, then a confirm (or `--yes`); a failed step is reported, the rest continue, and the records of restored agents are dropped from `state.json`. `--uninstall` leaves upgraded agent CLIs alone (`--uninstall-agent` removes the ones lean-agents installed) |
 | `--doctor` | Check the install |
 | `--uninstall` | Undo everything lean-agents changed |
 | `--adopt` | List what a hand-built machine already has and what each item is; with `--yes` it applies the plan |
