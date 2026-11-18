@@ -10,6 +10,9 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- Antigravity: an `agy` that is not on PATH is found in the installer folders (`~/.local/bin`; Windows `%LOCALAPPDATA%\agy\bin` and `~/.gemini/bin` (**VERIFY**)) by detection, `--doctor` and `--install-agent`, which run it by that path and never install over it (#211).
+- Antigravity `--uninstall` removes only the skill folders lean-agents installed (recorded in state.json or absent before the install); a user skill with the same name, such as `i-have-adhd`, is kept and never overwritten (#148).
+- `--install-agent antigravity` on macOS says the Homebrew cask cannot be pinned or verified and asks before installing it; #147 stays open (**VERIFY** pin by tarball).
 - `--adopt` compares a pre-release npm copy (`2.1.7-beta.1`) by its numeric core and sorts it below its release: against pin `2.1.7` it is `drift`, against `2.1.8` it is `newer`, and an equal version stays unflagged. Before, the pre-release read as equal to the pin (#204).
 - `--adopt` names a Cursor hook written as shell syntax (GSD's `$(for n in ...) ~/.cursor/hooks/gsd-cursor-<event>.js` loop) after the first script it runs, so it reads `sessionStart:gsd-cursor-session-start.js` instead of `sessionStart:$(for n in`; a shell command with no script reads `<event>:shell`. A second Cursor hook with the same event and name gets `#2`, a third `#3`, for shell and non-shell commands alike (#202).
 - `--upgrade-agent opencode` text rows end with the item's file (home-relative), as `--adopt` rows do, so the two `@tarquinen/opencode-dcp@latest` rows (`opencode.jsonc` and `tui.json`) no longer read as a duplicate (#203).
