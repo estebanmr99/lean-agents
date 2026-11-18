@@ -575,3 +575,15 @@ Source: `tests/spike-opencode-side.sh` / `.ps1`, job `spike-opencode-side` (now 
 - Server vs TUI: each reads its own file (`opencode.json(c)`, `tui.json(c)`), so there is no winning spec; the report says so and suggests one exact version in both. **VERIFY** upstream resolution of `tui.json` plugins (docs for 2.x name `cli.json`).
 - `--probe-plugins`: `GET /command` (1.x, documented) or `GET /api/command` (2.x, **VERIFY**, as used by `tests/real-dcp-v2.sh` on PR 228), basic auth `opencode:$OPENCODE_SERVER_PASSWORD`. The throwaway dir holds copies of the OpenCode config and the plugin's cache wrapper, so nothing of yours is written; **VERIFY** that `opencode serve` honors all four `XDG_*` variables.
 - Not done here: no real-binary CI leg (the 1.x `/command` assertion belongs with `real-dcp-v2`), no cache repair, no change to how the adapter writes the DCP spec.
+
+## Install with VS Code Copilot chat (#180, 2026-11-18)
+
+Guide only, no code change: `docs/install-with-an-agent.md`, section "VS Code Copilot chat (agent mode), corporate Windows PC".
+
+- Proxy: `$env:HTTPS_PROXY`, `$env:NO_PROXY` and `$env:NODE_EXTRA_CA_CERTS` set per PowerShell session; the engine reads them and never writes them to disk (source: this file, "Proxy and corporate CA", 2026-11-05; Node.js docs for `NODE_EXTRA_CA_CERTS`).
+- Terminal blocked by policy: the agent prints the commands for the user to run and links `docs/manual-install.md` (owner default, plan #180 section 4, 2026-11-18). Not a verified VS Code behavior.
+- **VERIFY:** agent-mode terminal tool and auto-approve behavior on Windows (no source yet; needs a logged-in VS Code).
+- **VERIFY:** which agent-mode tools enterprise policy leaves available (no source yet).
+- **VERIFY:** the `*.prompt.md` user folder (`<VS Code user dir>/prompts`); no `/lean-install` prompt file is written until it is proven.
+- **VERIFY:** whether VS Code, not only Copilot CLI, loads `~/.copilot` rules and agents.
+- Antigravity pilot users use the same guide (owner default, 2026-11-18).

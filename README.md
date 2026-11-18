@@ -24,6 +24,7 @@ It asks you each choice, shows a dry run, and waits for your OK.
 Install lean-agents for me from https://github.com/estebanmr99/lean-agents.
 Follow docs/install-with-an-agent.md in that repo. Ask before every change.
 Never read, print or store my API keys or tokens, and never run gh auth login for me.
+If you cannot run terminal commands, print them for me to run.
 ```
 
 ### Or run it yourself

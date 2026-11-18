@@ -24,6 +24,7 @@ Te pregunta cada decisión, muestra una vista previa y espera tu visto bueno.
 Instala lean-agents por mí desde https://github.com/estebanmr99/lean-agents.
 Sigue docs/install-with-an-agent.md de ese repo. Pregunta antes de cada cambio.
 Nunca leas, muestres ni guardes mis claves o tokens, y nunca corras gh auth login por mí.
+Si no puedes ejecutar comandos de terminal, imprímelos para que los ejecute yo.
 ```
 
 ### O ejecútalo tú
