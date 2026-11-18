@@ -120,7 +120,7 @@ test('nvm undo removes a partial or lean-only ~/.nvm and keeps one with the user
   const fs = await import('node:fs');
   const os = await import('node:os');
   const path = await import('node:path');
-  const undo = (home) => by(planPrereqs({ platform: 'linux', home, has: {}, execPath: process.execPath }), 'nvm').undo[0];
+  const undo = (home) => by(planPrereqs({ platform: 'linux', home, has: {} }), 'nvm').undo[0];
   const make = (...versions) => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-nvm-'));
     for (const v of versions) fs.mkdirSync(path.join(home, '.nvm', 'versions', 'node', v), { recursive: true });
@@ -139,6 +139,14 @@ test('nvm undo removes a partial or lean-only ~/.nvm and keeps one with the user
   assert.equal(fs.existsSync(path.join(mixed, '.nvm', 'versions', 'node', 'v20.11.0')), true);
   assert.match(r.stdout, /kept .*v20\.11\.0/);
   for (const h of [partial, ours, mixed]) fs.rmSync(h, { recursive: true, force: true });
+});
+
+test('nvm undo is empty when ~/.nvm existed before this run, and names node from PATH otherwise', () => {
+  const probe = { platform: 'linux', home: '/tmp/x', has: {}, execPath: '/opt/old/bin/node' };
+  assert.deepEqual(by(planPrereqs({ ...probe, nvmDirExisted: true }), 'nvm').undo, []);
+  const undo = by(planPrereqs(probe), 'nvm').undo;
+  assert.equal(undo[0][0], 'node');
+  assert.ok(!JSON.stringify(undo).includes('/opt/old'));
 });
 
 test('--everything agents: Claude Code + OpenCode 2; Windows adds the team agents found and lists the rest', () => {

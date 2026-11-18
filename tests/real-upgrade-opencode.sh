@@ -223,7 +223,10 @@ if [ "$is_win" = 1 ]; then
   check "opencode1.cmd --version = 1.19.0 from cmd" test "$(PATH="$binp:$PATH" cmd //c "opencode1.cmd --version" 2>/dev/null | tr -d '\r' | tail -n 1)" = "1.19.0"
 fi
 check "frozen copy still has 3 sessions" test "$(count "$frozen")" = 3
-PATH="$binp:$PATH" opencode1 session list >"$T/oc1-list.out" 2>&1; echo "  opencode1 session list (printed, not asserted: VERIFY): $(wc -l <"$T/oc1-list.out" | tr -d ' ') lines"
+PATH="$binp:$PATH" opencode1 session list >"$T/oc1-list.out" 2>&1; rc=$?
+sed 's/^/  /' "$T/oc1-list.out"
+check "opencode1 session list works (reads its own 1.x config and the frozen copy)" test "$rc" = 0
+check "opencode1 has its own config copy (XDG_CONFIG_HOME under opencode1)" test -d "$OC1/config/opencode"
 cd "$T/proj" || exit 1
 run_to 120 env PATH="$binp:$PATH" opencode1 run "from opencode1" --model mock/mock-model >"$T/oc1-run.out" 2>&1; echo "  opencode1 run: exit $? ($(tail -n 1 "$T/oc1-run.out" | cut -c1-60))"
 cd "$repo" || exit 1
@@ -299,7 +302,19 @@ else
   check "the mock provider (a user key) is kept" grep -q '"mock"' "$CFG/opencode.jsonc"
   check "apply never touched the live data" test "$(dtree)" = "$LIVE_DATA"
   refute "a second apply is refused (already applied)" leanu --yes
-  refute "--uninstall is refused while the upgrade is applied" node "$repo/scripts/lean.mjs" --home "$HOME" --no-exec --uninstall --yes
+  # opencode1 runs on its own 1.x config copy: the 2.x keys the apply wrote must not reach it.
+  "$OC1/bin/opencode1" session list >"$T/oc1-after.out" 2>&1; rc=$?
+  sed 's/^/  /' "$T/oc1-after.out"
+  check "after apply: opencode1 session list still works" test "$rc" = 0
+  "$OC1/bin/opencode1" debug config >"$T/oc1-cfg.out" 2>&1; rc=$?
+  check "after apply: opencode1 debug config exits 0" test "$rc" = 0
+  check "after apply: opencode1 sees the 1.x config (the user's mock provider)" grep -q '"mock"' "$T/oc1-cfg.out"
+  refute "after apply: opencode1 does not see the 2.x config (no DCP)" grep -q 'opencode-dcp' "$T/oc1-cfg.out"
+  # --uninstall is not blocked by an applied upgrade: it warns that 2.x stays. Dry run here: the --undo below needs the journal.
+  node "$repo/scripts/lean.mjs" --home "$HOME" --no-exec --uninstall --dry-run --yes >"$T/un-applied.out" 2>&1; rc=$?
+  check "--uninstall --dry-run is allowed while the upgrade is applied (exit 0)" test "$rc" = 0
+  check "and it warns that the 2.x upgrade stays" grep -q 'OpenCode 2 upgrade stays' "$T/un-applied.out"
+  check "and the journal still says applied" test "$(jstatus)" = applied
 
   echo "-- the first 2.x start migrates the live db; opencode must be closed before --undo"
   # An empty config folder: 2.x must not install DCP into the real one; the data folder is the live one, which is the point.
@@ -310,7 +325,7 @@ else
     check "--undo refuses while an opencode process runs" test "$rc" = 1 -a "$(jstatus)" = applied
     kill_oc || echo "  (an opencode process is still running)"
   else
-    echo "  (no 2.x background process to refuse on: skipped)"
+    check "a 2.x background process appeared after the first start (needed for the --undo refusal check)" false
     kill_oc || true
   fi
   leanu --undo --yes >"$T/undo.out" 2>&1; rc=$?

@@ -37,6 +37,8 @@ test('shimText: sh exports the isolation env and execs the copy; cmd scopes it w
   const cmd = shimText('cmd', { data: 'D:\\tools\\data', state: 'D:\\tools\\state', binary: 'D:\\tools\\1.19.0\\opencode.exe' });
   assert.match(cmd, /^@echo off\r\nrem managed by lean-agents/);
   assert.match(cmd, /setlocal\r\nset "XDG_DATA_HOME=D:\\tools\\data"\r\nset "XDG_STATE_HOME=D:\\tools\\state"\r\n"D:\\tools\\1\.19\.0\\opencode\.exe" %\*\r\nexit \/b %errorlevel%\r\n$/);
+  assert.match(shimText('sh', { data: '/d', state: '/s', binary: '/b', config: '/opt/x/config' }), /export XDG_STATE_HOME='\/s'\nexport XDG_CONFIG_HOME='\/opt\/x\/config'\nexec/);
+  assert.match(shimText('cmd', { data: 'd', state: 's', binary: 'b', config: 'D:\\tools\\config' }), /set "XDG_STATE_HOME=s"\r\nset "XDG_CONFIG_HOME=D:\\tools\\config"\r\n"b" %\*/);
   assert.match(shimText('sh', { data: 'D:\\tools\\data', state: 's', binary: 'b' }), /XDG_DATA_HOME='D:\/tools\/data'/);
 });
 
@@ -132,6 +134,42 @@ test('a copy that reports another version is not kept', () => {
   assert.equal(p.ok, true, p.problems.join('\n'));
   assert.throws(() => doInstall(p, f, { probe: () => '1.18.0', files: [] }), /expected 1\.19\.0/);
   assert.equal(fs.existsSync(p.binary), false);
+});
+
+test('install: opencode1 gets its own copy of the 1.x config snapshot (without node_modules) and the shim points XDG_CONFIG_HOME at it', { skip: win && 'sh shim' }, () => {
+  const f = fixture();
+  const snap = j(f.home, 'snap');
+  fs.mkdirSync(j(snap, 'node_modules'), { recursive: true });
+  fs.writeFileSync(j(snap, 'opencode.jsonc'), '{ "agent": {} }');
+  fs.writeFileSync(j(snap, 'node_modules', 'x.js'), 'x');
+  const p = planFor(f, { configSnapshot: snap });
+  doInstall(p, f);
+  const cfg = j(f.L.config, 'opencode');
+  assert.equal(fs.readFileSync(j(cfg, 'opencode.jsonc'), 'utf8'), '{ "agent": {} }');
+  assert.equal(fs.existsSync(j(cfg, 'node_modules')), false);
+  assert.match(fs.readFileSync(j(f.L.bin, 'opencode1'), 'utf8'), new RegExp(`export XDG_CONFIG_HOME='${f.L.config.replace(/[\\/]/g, '.')}'`));
+  fs.writeFileSync(j(cfg, 'opencode.jsonc'), 'edited');
+  doInstall(planFor(f, { configSnapshot: snap }), f);
+  assert.equal(fs.readFileSync(j(cfg, 'opencode.jsonc'), 'utf8'), 'edited', 'an existing copy is never overwritten');
+  const rec = JSON.parse(JSON.stringify({ binary: p.binary, dir: path.dirname(p.binary), binDir: f.L.bin }));
+  removeOpencode1(rec, { home: f.home });
+  assert.ok(fs.existsSync(cfg), 'the config copy is kept on undo');
+});
+
+test('install: an empty config folder when there is no snapshot, so 1.x never reads the live 2.x config', { skip: win && 'sh shim' }, () => {
+  const f = fixture();
+  doInstall(planFor(f), f);
+  assert.deepEqual(fs.readdirSync(j(f.L.config, 'opencode')), []);
+});
+
+test('Windows: the PATH entry is recorded before the registry write', () => {
+  const f = fixture();
+  const p = planOpencode1({ home: f.home, platform: 'win32', which: () => f.onPath, probe: () => '1.19.0', shell: '' });
+  const seen = [];
+  const winPath = () => { seen.push(seen.length); throw new Error('killed'); };
+  let last = null;
+  assert.throws(() => installOpencode1(p, { home: f.home, roots: [f.home], backupDir: j(f.home, 'bk'), apply, platform: 'win32', probe: () => '1.19.0', winPath, onRecord: (r) => { last = { ...r }; } }), /killed/);
+  assert.equal(last.pathEntry, true, 'state already names the entry when the write dies');
 });
 
 test('Windows: cmd + sh shims, no rc block, the HKCU entry is added once and removed only if we added it', () => {

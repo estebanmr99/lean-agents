@@ -1,9 +1,10 @@
 // `opencode1`: OpenCode 1.x side by side with 2.x (#80 part 2, P4): `--upgrade-agent opencode --opencode1`.
 // Copies the 1.x binary to `<data>/lean-agents/opencode1/<version>/`, writes an owned shim `opencode1` (+ `opencode1.cmd` on Windows)
-// that points XDG_DATA_HOME + XDG_STATE_HOME at the frozen copy (proven by the P1 spike), and puts the shim folder on PATH: a marked
+// that points XDG_DATA_HOME + XDG_STATE_HOME at the frozen copy (proven by the P1 spike) and XDG_CONFIG_HOME at its own copy of the
+// 1.x config (the upgrade rewrites ~/.config/opencode to 2.x keys, which 1.x may reject), and puts the shim folder on PATH: a marked
 // block in the shell rc file, or the HKCU user PATH on Windows. Files and blocks go through the engine's fsops actions; the copied
 // binary and the HKCU entry are recorded in state.json (`opencode1`) and removed by `--uninstall`. The backup, the frozen copy and
-// `opencode1/state` (what 1.x writes while it runs) are never removed.
+// `opencode1/state` (what 1.x writes while it runs) and `opencode1/config` (the 1.x config copy) are never removed.
 // `which`, `probe`, `winPath` and `shell` are passed in so tests never read the real machine or the registry.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -19,19 +20,19 @@ const MIN_BINARY = 1 << 20; // npm ships a ~0.5 KB launcher in bin/ until its po
 export function layout(home) {
   const { lean, frozen } = backupLayout(home, 'x');
   const root = j(lean, 'opencode1');
-  return { root, frozen, state: j(root, 'state'), bin: j(root, 'bin') };
+  return { root, frozen, state: j(root, 'state'), config: j(root, 'config'), bin: j(root, 'bin') };
 }
 
 const sq = (s) => `'${s.replace(/'/g, "'\\''")}'`;
 const MARK = 'managed by lean-agents: OpenCode 1.x on its own frozen copy of the data (#80); removed by --uninstall';
 
-export function shimText(kind, { data, state, binary }) {
+export function shimText(kind, { data, state, binary, config }) {
   if (kind === 'cmd') {
-    const lines = ['@echo off', `rem ${MARK}`, 'setlocal', `set "XDG_DATA_HOME=${data}"`, `set "XDG_STATE_HOME=${state}"`, `"${binary}" %*`, 'exit /b %errorlevel%'];
+    const lines = ['@echo off', `rem ${MARK}`, 'setlocal', `set "XDG_DATA_HOME=${data}"`, `set "XDG_STATE_HOME=${state}"`, ...(config ? [`set "XDG_CONFIG_HOME=${config}"`] : []), `"${binary}" %*`, 'exit /b %errorlevel%'];
     return `${lines.join('\r\n')}\r\n`;
   }
   const fwd = (p) => p.replace(/\\/g, '/'); // Git Bash on Windows reads D:/x
-  return `#!/bin/sh\n# ${MARK}\nexport XDG_DATA_HOME=${sq(fwd(data))}\nexport XDG_STATE_HOME=${sq(fwd(state))}\nexec ${sq(fwd(binary))} "$@"\n`;
+  return `#!/bin/sh\n# ${MARK}\nexport XDG_DATA_HOME=${sq(fwd(data))}\nexport XDG_STATE_HOME=${sq(fwd(state))}\n${config ? `export XDG_CONFIG_HOME=${sq(fwd(config))}\n` : ''}exec ${sq(fwd(binary))} "$@"\n`;
 }
 
 // Where an `opencode` 1.x binary may be: the 2.x installer's folder (same path on Windows), what is on PATH, and npm's platform packages.
@@ -107,7 +108,8 @@ export const winPathDefault = (op, dir) => execFileSync('powershell.exe', ['-NoP
 }).trim().split(/\r?\n/).pop();
 
 // Read-only. Returns { ok, problems, version, source, binary, actions, pathDir } for `installOpencode1`.
-export function planOpencode1({ home, exec = true, platform = process.platform, env = process.env, which = findOnPath, probe = probeVersion, shell = process.env.SHELL, fsx = fs }) {
+// `configSnapshot`: the 1.x config folder saved by --backup (copied for the shim); without one the shim gets an empty config folder.
+export function planOpencode1({ home, configSnapshot = null, exec = true, platform = process.platform, env = process.env, which = findOnPath, probe = probeVersion, shell = process.env.SHELL, fsx = fs }) {
   const L = layout(home);
   const win = platform === 'win32';
   const problems = [];
@@ -123,12 +125,12 @@ export function planOpencode1({ home, exec = true, platform = process.platform, 
   if (problems.length) return { ok: false, problems };
 
   const binary = j(L.root, found.version, `opencode${win ? '.exe' : ''}`);
-  const text = { data: L.frozen, state: L.state, binary };
+  const text = { data: L.frozen, state: L.state, binary, config: L.config };
   const actions = win
     ? [{ kind: 'file', path: j(L.bin, 'opencode1.cmd'), content: shimText('cmd', text) }, { kind: 'file', path: j(L.bin, 'opencode1'), content: shimText('sh', text) }]
     : [{ kind: 'file', path: j(L.bin, 'opencode1'), content: shimText('sh', text) },
       ...rcFiles(home, shell, fsx).map((p) => ({ kind: 'block', path: p, body: `export PATH=${sq(L.bin)}:"$PATH"` }))];
-  return { ok: true, problems, version: found.version, source: found.path, binary, actions, pathDir: L.bin, root: L.root };
+  return { ok: true, problems, version: found.version, source: found.path, binary, actions, pathDir: L.bin, root: L.root, configSnapshot, configDir: j(L.config, 'opencode') };
 }
 
 // Writes. `files` collects the fsops entries (the caller saves them in state.json); `onRecord(record)` fires after each step that
@@ -152,10 +154,26 @@ export function installOpencode1(p, { home, roots, backupDir, apply, files = [],
     if (v !== p.version) throw new Error(`the copied binary reports "${v}", expected ${p.version}`);
     renameRetry(part, p.binary);
   }
+  // 1.x gets its own copy of the config it knew; an existing copy (the user may have edited it) is never overwritten.
+  const cfg = p.configDir ?? j(layout(home).config, 'opencode');
+  if (!fs.existsSync(cfg)) {
+    // Copy beside it and rename: a copy that fails midway must not leave a partial folder that later runs would keep.
+    const part = `${cfg}.partial`;
+    fs.rmSync(part, { recursive: true, force: true });
+    fs.mkdirSync(part, { recursive: true, mode: 0o700 });
+    if (p.configSnapshot && fs.existsSync(p.configSnapshot)) fs.cpSync(p.configSnapshot, part, { recursive: true, filter: (f) => path.basename(f) !== 'node_modules' });
+    renameRetry(part, cfg);
+  }
   onRecord(record);
   try { apply(planned, backupDir, home, roots, files); } finally { onRecord(record); }
   if (!win) fs.chmodSync(p.actions[0].path, 0o755);
-  if (win) { record.pathEntry = winPath('add', p.pathDir) === 'changed'; onRecord(record); }
+  if (win) {
+    // Recorded before the registry write: a kill in between must not leave an HKCU entry --uninstall does not know about.
+    record.pathEntry = true;
+    onRecord(record);
+    record.pathEntry = winPath('add', p.pathDir) === 'changed';
+    onRecord(record);
+  }
   return record;
 }
 
@@ -164,7 +182,7 @@ export function removeOpencode1(record, { home, winPath = winPathDefault, platfo
   const report = [];
   const L = layout(home);
   // Only ever inside <data>/lean-agents/opencode1: a hand-edited state.json cannot point this at anything else.
-  const inside = (p) => path.dirname(p) === L.root && p !== L.frozen && p !== L.state && p !== L.bin;
+  const inside = (p) => path.dirname(p) === L.root && p !== L.frozen && p !== L.state && p !== L.config && p !== L.bin;
   // Only the copied binary, then the folder if nothing else is in it.
   if (record.dir && inside(record.dir) && record.binary && path.dirname(record.binary) === record.dir && fs.existsSync(record.binary)) {
     fs.rmSync(record.binary);

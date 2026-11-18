@@ -391,14 +391,26 @@ test('lean.mjs: LEAN_TEST_FAIL_AT without LEAN_AGENTS_TEST=1 is refused before a
   fs.rmSync(home, { recursive: true, force: true });
 });
 
-test('lean.mjs: --uninstall refuses while an upgrade is active', () => {
+test('lean.mjs: --uninstall refuses while an upgrade is half done, and proceeds with a warning once it is applied', () => {
   const home = fs.realpathSync(fs.mkdtempSync(j(os.tmpdir(), 'lean-upg-')));
-  fs.mkdirSync(j(home, '.config', 'lean-agents'), { recursive: true });
-  fs.writeFileSync(j(home, '.config', 'lean-agents', 'state.json'), JSON.stringify({ version: '0', files: [], commands: [], options: {}, upgrade: { status: 'applied', steps: [] } }));
+  const dir = j(home, '.config', 'lean-agents');
+  fs.mkdirSync(dir, { recursive: true });
+  const put = (upgrade) => fs.writeFileSync(j(dir, 'state.json'), JSON.stringify({ version: '0', files: [], commands: [], options: {}, upgrade }));
+  put({ status: 'rollback-failed', steps: [] });
   const r = lean(home, ['--no-exec', '--uninstall', '--yes']);
   assert.equal(r.status, 1);
-  assert.match(r.stderr, /upgrade is applied: run --upgrade-agent opencode --undo first/);
-  assert.ok(fs.existsSync(j(home, '.config', 'lean-agents', 'state.json')), 'the journal is not archived');
+  assert.match(r.stderr, /upgrade is rollback-failed: run --upgrade-agent opencode --undo first/);
+  assert.ok(fs.existsSync(j(dir, 'state.json')), 'the journal is not archived');
+  put({ status: 'applied', backup: '/opt/x/backups/opencode1-sessions-20260101T000000Z', steps: [] });
+  const dry = lean(home, ['--no-exec', '--uninstall', '--dry-run', '--yes']);
+  assert.equal(dry.status, 0, dry.stdout + dry.stderr);
+  assert.match(dry.stdout, /OpenCode 2 upgrade stays/);
+  assert.ok(fs.existsSync(j(dir, 'state.json')), 'a dry run changes nothing');
+  const ok = lean(home, ['--no-exec', '--uninstall', '--yes']);
+  assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+  assert.match(ok.stdout, /--undo is no longer available afterwards/);
+  assert.equal(fs.existsSync(j(dir, 'state.json')), false);
+  assert.ok(fs.readdirSync(dir).some((n) => n.startsWith('state.uninstalled-')), 'the journal is archived');
   fs.rmSync(home, { recursive: true, force: true });
 });
 

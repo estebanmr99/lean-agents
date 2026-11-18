@@ -208,6 +208,9 @@ try {
     Assert-That 'Git Bash: opencode1 --version = 1.19.0 (the sh shim)' ($gb.EndsWith('1.19.0'))
   } else { Write-Output 'skip  Git Bash not found' }
   Assert-That 'frozen copy still has 3 sessions' ((Get-SessionCount "$leanDir\opencode1\data\opencode") -eq 3)
+  $null = Invoke-Cmd "$oc1\bin\opencode1.cmd session list"
+  Assert-That 'opencode1 session list works (its own 1.x config and the frozen copy)' ($LASTEXITCODE -eq 0)
+  Assert-That 'opencode1 has its own config copy (XDG_CONFIG_HOME under opencode1)' (Test-Path "$oc1\config\opencode")
   Set-Location $proj
   $prevEap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
   $oc1run = Start-Process "$oc1\bin\opencode1.cmd" -ArgumentList 'run', '"from opencode1"', '--model', 'mock/mock-model' -NoNewWindow -PassThru -RedirectStandardOutput "$root\oc1-run.out" -RedirectStandardError "$root\oc1-run.err"
