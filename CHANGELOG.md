@@ -6,6 +6,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Added
 
+- `--doctor` and `--adopt` report OpenCode plugins that are listed but not healthy (#212), read-only with a suggested fix per finding: an incomplete cached dependency tree, and the same plugin with different version specs in the server config and `tui.json`. `--probe-plugins` (opt-in) also starts a short-lived `opencode serve` on loopback in a throwaway state dir and checks that DCP's `/dcp-compress` is registered. Nothing is repaired.
 - `tests/roundtrip.test.mjs`: one table-driven test runs install then `--uninstall` for each of the seven adapters in a temp HOME seeded with user files (a JSONC comment, a user MCP server, an agent and a skill named like managed ones) and asserts every file, path and bytes, equals the pre-install snapshot. Tests only (#164).
 
 ### Fixed

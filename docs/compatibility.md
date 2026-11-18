@@ -522,3 +522,13 @@ Spike for #80 (job `spike-opencode-side`, PR #143, CI run 43350726437, 2026-11-1
 - **V4 installer:** the v2 installer wrote only `~/.opencode/bin/opencode` (+ its data dir logs). With `--no-modify-path` it did not touch `.bashrc`, `.zshrc` or `.profile`; on Windows the HKCU user Path was unchanged.
 - **Note:** 2.x migrates the shared 1.x db in place (owner decision pending for 0.9.0; PR B is deferred).
 - **Layout answer: I (isolate).** Config could be shared, but 2.x migrates the shared 1.x database, so a 1.x user's sessions cannot be left untouched without giving 1.x its own data dir. Next (PR B): prove isolation (`XDG_DATA_HOME` or equivalent for the `opencode1` shim) before any upgrade path ships.
+
+## Plugin health (#212, 2026-11-18)
+
+`--doctor` / `--adopt` read-only checks in `scripts/lib/plugin-health.mjs`. A plugin listed in config is not proof it loads: `opencode debug config` succeeded on a cache with missing dependencies.
+
+- Cache layout: `$XDG_CACHE_HOME/opencode/packages/<pkg>@<spec>/node_modules/<pkg>` (seen in anomalyco/opencode issue 32421); older docs say `~/.cache/opencode/node_modules`. Both are searched. **VERIFY** against a real 1.x and 2.x binary: exact wrapper folder name for scoped packages, and whether 1.x and 2.x share it.
+- Dependency check: every `dependencies` entry of the cached package, and of what it resolves to (depth 4), must resolve through `node_modules` as Node would. Peer and optional dependencies are skipped.
+- Server vs TUI: each reads its own file (`opencode.json(c)`, `tui.json(c)`), so there is no winning spec; the report says so and suggests one exact version in both. **VERIFY** upstream resolution of `tui.json` plugins (docs for 2.x name `cli.json`).
+- `--probe-plugins`: `GET /command` (1.x, documented) or `GET /api/command` (2.x, **VERIFY**, as used by `tests/real-dcp-v2.sh` on PR 228), basic auth `opencode:$OPENCODE_SERVER_PASSWORD`. The throwaway dir holds copies of the OpenCode config and the plugin's cache wrapper, so nothing of yours is written; **VERIFY** that `opencode serve` honors all four `XDG_*` variables.
+- Not done here: no real-binary CI leg (the 1.x `/command` assertion belongs with `real-dcp-v2`), no cache repair, no change to how the adapter writes the DCP spec.

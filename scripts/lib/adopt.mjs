@@ -16,6 +16,7 @@ import { mcpServers } from './migrate.mjs';
 import { findNvm, resolveToolNodes, minVersion, compare, satisfies, installedNodes, toolEnv } from './node-runtime.mjs';
 import { run } from './system.mjs';
 import { doctor } from './doctor.mjs';
+import { pluginHealth, probePlugins } from './plugin-health.mjs';
 import { orcaHooksFound } from './terminals.mjs';
 import { clients, launchOf, pinOf, classify, npmCopies, skillDirs, duplicateSkills, treeSha, probeInitialize } from './inventory.mjs';
 
@@ -287,13 +288,14 @@ export async function inventory({ home, env = process.env, platform = process.pl
   const oc = await opencodeInfo(home, env, fsx, { toolNode: tn });
   const plan = items.filter((i) => i.action !== 'keep').map((i) => `${i.action} ${i.client} ${i.kind} ${i.name} (${i.status.join(', ') || i.owner})`);
   for (const s of stopgaps) if (s.replaceWith) plan.push(`ask ${s.file}: replace with ${s.replaceWith}`);
-  return { version: 1, os: platform, toolNode, items, opencode: { ...oc, dataDir: rel(oc.dataDir) }, stopgaps, plan, ok: !items.some((i) => i.action !== 'keep') };
+  return { version: 1, os: platform, toolNode, items, opencode: { ...oc, dataDir: rel(oc.dataDir) }, stopgaps, plan, health: pluginHealth(home, { fsx }), ok: !items.some((i) => i.action !== 'keep') };
 }
 
 export async function adopt(o) {
   if (o.undo) return adoptUndo(o);
   if (o.yes && !o.dryRun && !o.json) return adoptApply(o);
   const r = await inventory(o);
+  if (o.probePlugins) r.health.push(...await probePlugins(o.home)); // opt-in: starts a short-lived opencode serve
   if (o.json) { process.stdout.write(`${JSON.stringify(r, null, 2)}\n`); return true; }
   const by = {};
   for (const i of r.items) by[`${i.kind}`] = (by[`${i.kind}`] ?? 0) + 1;
@@ -305,6 +307,7 @@ export async function adopt(o) {
     if (i.kind === 'skill' && i.fix) console.log(`            ${i.clients.join(' and ')} loads it twice: ${Object.entries(i.hashes).map(([d, h]) => `${d} ${h}`).join(', ')} (${i.differs ? 'differs' : 'identical'}); ${i.fix}`);
   }
   console.log(`  user-owned items kept untouched: ${r.items.filter((i) => i.owner === 'user' && i.action === 'keep').length}`);
+  for (const f of r.health) console.log(`  health    ${f.plugin || 'probe'} [${f.id}] ${f.line}\n            fix: ${f.fix}`);
   for (const s of r.stopgaps) console.log(`  stopgap   ${s.file}${s.replaceWith ? `: replace with ${s.replaceWith}` : `: ${s.note}`}`);
   console.log(r.plan.length ? `Plan (${r.plan.length} steps; add --yes to apply, --confirm-removals to allow the removals):\n${r.plan.map((l) => `  - ${l}`).join('\n')}` : 'Plan: nothing to change.');
   return true;
