@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Real OpenCode 1.19 + `--upgrade-agent opencode --backup` (#80 part 2, P3; steps 1-3 of plan section 5).
+# Real OpenCode 1.19 + `--upgrade-agent opencode --backup` (#80 part 2, P3; steps 1-3 of plan section 5) and `--opencode1` (P4).
 # Three sessions are seeded through the mock LLM (tests/fixtures/mock-llm.mjs, no login). Then: the dry run leaves the whole
 # HOME tree hash unchanged; the apply makes a backup and a frozen copy whose sha256 equal the live files, whose session
 # count (on a temp copy) is 3, and leaves everything outside ~/.local/share/lean-agents byte-identical; a second apply and a
-# run while `opencode serve` is up are refused. Needs `opencode` 1.x on PATH and node:sqlite on this Node.
+# run while `opencode serve` is up are refused. Then `--opencode1`: the binary copy and the shim report 1.19.0, a new session made
+# through `opencode1` lands in the frozen copy (3 -> 4) while the live data hash stays equal, and `--uninstall` removes the shim,
+# the copy and the PATH entry but keeps the backup and the frozen copy. Needs `opencode` 1.x on PATH and node:sqlite on this Node.
 # Used by CI (ubuntu, windows via Git Bash); safe locally because HOME is a temp directory.
 set -uo pipefail
 
@@ -78,6 +80,7 @@ if (mode === 'tree') {
 JS
 tree() { node "$T/h.mjs" tree "$HOME" ".local/share/lean-agents"; }
 count() { node "$T/h.mjs" count "$1" 2>/dev/null; }
+lean1() { node "$repo/scripts/lean.mjs" --home "$HOME" --upgrade-agent opencode --opencode1 "$@"; }
 lean() { node "$repo/scripts/lean.mjs" --home "$HOME" --no-exec --upgrade-agent opencode --backup "$@"; }
 # run_to <secs> <cmd...>: no timeout binary on every runner, so poll in the background.
 run_to() {
@@ -160,6 +163,48 @@ check "everything outside lean-agents byte-identical (live data, config, state)"
 check "live config untouched" test "$(node "$T/h.mjs" tree "$CFG")" = "$cfg_tree"
 if [ "$is_win" = 0 ]; then check "backup folder is 0700" test "$(stat -c %a "$bk" 2>/dev/null || stat -f %Lp "$bk")" = 700; fi
 refute "a second apply is refused (frozen copy exists)" lean --yes
+
+echo "== opencode1: binary copy + shim + PATH (P4)"
+OC1="$LEAN/opencode1"
+bin1="opencode"; [ "$is_win" = 1 ] && bin1="opencode.exe"
+live_data_tree="$(node "$T/h.mjs" tree "$LIVE")"
+pre1="$(tree)"
+lean1 --dry-run >"$T/oc1-dry.out" 2>&1; rc=$?
+sed 's/^/  /' "$T/oc1-dry.out"
+check "opencode1 dry run exits 0" test "$rc" = 0
+check "opencode1 dry run names 1.19.0" grep -q 'OpenCode 1\.19\.0' "$T/oc1-dry.out"
+check "opencode1 dry run leaves the HOME tree unchanged" test "$(tree)" = "$pre1"
+check "no binary copy after the dry run" test ! -e "$OC1/1.19.0"
+lean1 --yes >"$T/oc1.out" 2>&1; rc=$?
+sed 's/^/  /' "$T/oc1.out"
+check "opencode1 apply exits 0" test "$rc" = 0
+check "binary copied to opencode1/1.19.0" test -s "$OC1/1.19.0/$bin1"
+check "shim written" test -s "$OC1/bin/opencode1"
+if [ "$is_win" = 1 ]; then check "opencode1.cmd written" test -s "$OC1/bin/opencode1.cmd"; else check "PATH block in a shell rc file" grep -rq 'lean-agents:start' "$HOME/.profile" "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.bash_profile" 2>/dev/null; fi
+binp="$OC1/bin"; if [ "$is_win" = 1 ]; then binp="$(cygpath -u "$binp")"; fi
+check "opencode1 --version = 1.19.0 (shim by path)" test "$("$OC1/bin/opencode1" --version 2>/dev/null | tail -n 1)" = "1.19.0"
+check "opencode1 --version = 1.19.0 (found on PATH)" test "$(PATH="$binp:$PATH" opencode1 --version 2>/dev/null | tail -n 1)" = "1.19.0"
+if [ "$is_win" = 1 ]; then
+  check "opencode1.cmd --version = 1.19.0 from cmd" test "$(PATH="$binp:$PATH" cmd //c "opencode1.cmd --version" 2>/dev/null | tr -d '\r' | tail -n 1)" = "1.19.0"
+fi
+check "frozen copy still has 3 sessions" test "$(count "$frozen")" = 3
+PATH="$binp:$PATH" opencode1 session list >"$T/oc1-list.out" 2>&1; echo "  opencode1 session list (printed, not asserted: VERIFY): $(wc -l <"$T/oc1-list.out" | tr -d ' ') lines"
+cd "$T/proj" || exit 1
+run_to 120 env PATH="$binp:$PATH" opencode1 run "from opencode1" --model mock/mock-model >"$T/oc1-run.out" 2>&1; echo "  opencode1 run: exit $? ($(tail -n 1 "$T/oc1-run.out" | cut -c1-60))"
+cd "$repo" || exit 1
+wait_procs 0 || echo "  (an opencode process is still running)"
+check "the new 1.x session landed in the frozen copy (3 -> 4)" test "$(count "$frozen")" = 4
+check "live data hash unchanged by opencode1" test "$(node "$T/h.mjs" tree "$LIVE")" = "$live_data_tree"
+check "live data still 3 sessions" test "$(count "$LIVE")" = 3
+node "$repo/scripts/lean.mjs" --home "$HOME" --no-exec --uninstall --yes >"$T/oc1-un.out" 2>&1; rc=$?
+sed 's/^/  /' "$T/oc1-un.out"
+check "uninstall exits 0" test "$rc" = 0
+check "binary copy removed" test ! -e "$OC1/1.19.0"
+check "shim folder removed" test ! -e "$OC1/bin"
+if [ "$is_win" = 0 ]; then refute "PATH block removed from the rc files" grep -rq 'lean-agents:start' "$HOME/.profile" "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.bash_profile" 2>/dev/null; fi
+check "frozen copy kept (4 sessions)" test "$(count "$frozen")" = 4
+check "backup kept" test -s "$bk/MANIFEST.sha256"
+check "live data hash still unchanged" test "$(node "$T/h.mjs" tree "$LIVE")" = "$live_data_tree"
 
 echo "== refused while an opencode process runs"
 opencode serve --port $((20000 + RANDOM % 40000)) --hostname 127.0.0.1 >"$T/serve.log" 2>&1 &
