@@ -25,6 +25,7 @@ import { doctor } from './lib/doctor.mjs';
 import { probePlugins } from './lib/plugin-health.mjs';
 import { adopt, inventory } from './lib/adopt.mjs';
 import { upgradeInventory, formatUpgrade } from './lib/upgrade.mjs';
+import { backupOpencode } from './lib/opencode-backup.mjs';
 import { agentLifecycle } from './lib/agent-lifecycle.mjs';
 import { copilotUsage } from './lib/copilot-usage.mjs';
 import { draftIssue } from './lib/feedback.mjs';
@@ -118,6 +119,7 @@ function parseArgs(argv) {
       case '--upgrade-agent': o.command = 'upgrade-agent'; o.upgradeAgent = next(); if (o.upgradeAgent !== 'opencode') throw new Error('--upgrade-agent takes opencode'); break;
       case '--undo': o.undo = true; break;
       case '--keep-backup': o.keepBackup = true; break;
+      case '--backup': o.backup = true; break;
       case '--confirm-removals': o.confirmRemovals = true; break;
       case '--install-agent': case '--uninstall-agent': o.command = 'agent'; o.agentMode = a.slice(2, -6); o.agentList = list(argv[i + 1]?.startsWith('--') ? '' : next() ?? ''); if (!o.agentList.length) throw new Error(`${a} needs an agent list (claude, opencode-v2, copilot-cli, cursor, antigravity)`); break;
       case '--usage': o.command = 'usage'; break;
@@ -180,6 +182,10 @@ const HELP = `Usage: lean-agents [options]
   --keep-backup          Keep the backup after a verified --adopt --yes (--adopt --undo needs it to restore bytes)
   --upgrade-agent opencode  Dry run: classify the OpenCode 1.x config as managed, translatable to 2.x or manual and print the
                          translation table; changes nothing (with --json: one JSON object). Apply and --undo come later
+  --upgrade-agent opencode --backup [--dry-run|--yes]
+                         Permanent sha256-checked backup of the OpenCode 1.x sessions and config, then a frozen copy for
+                         opencode1; the live data is only read. Plan first (the default); --yes copies. Refuses while
+                         OpenCode runs or free space is under 2 x size + 1 GB
   --undo                 With --adopt: restore what the last --adopt --yes changed
   --install-agent a,b / --uninstall-agent a,b
                          Install (claude, opencode-v2, copilot-cli, cursor, antigravity) or remove the agent CLIs
@@ -672,7 +678,7 @@ function checkNodeFloor(o) {
   const override = /^v?\d+(\.\d+){0,2}$/.test(fake) ? fake.replace(/^v/, '').split('.').concat('0', '0').slice(0, 3).join('.') : null;
   const running = [process.versions.node, override].find((v) => v && !satisfies(v, floor));
   if (!running) return;
-  const readOnly = ['help', 'version', 'doctor', 'upgrade-agent', 'usage', 'feedback'].includes(o.command) || o.dryRun || (o.command === 'adopt' && !o.yes && !o.undo);
+  const readOnly = ['help', 'version', 'doctor', 'usage', 'feedback'].includes(o.command) || (o.command === 'upgrade-agent' && !(o.backup && o.yes)) || o.dryRun || (o.command === 'adopt' && !o.yes && !o.undo);
   const allow = process.env.LEAN_AGENTS_ALLOW_OLD_NODE === '1';
   console.error(`lean-agents: Node ${running} is older than ${floor.replace(/^>=/, '')}, which lean-agents needs. Fix: nvm install 22 && nvm use 22, or run install.sh.${readOnly || allow ? '' : ' Set LEAN_AGENTS_ALLOW_OLD_NODE=1 to run anyway.'}`);
   if (!readOnly && !allow) process.exit(1);
@@ -696,6 +702,11 @@ async function main() {
     return process.exit(doctor({ home: o.home, state, exec: o.exec, nodeVersion: NODE_VERSION, json: o.json, probe }) ? 0 : 1);
   }
   if (o.command === 'upgrade-agent') {
+    if (o.backup) {
+      if (o.undo) throw new Error('--upgrade-agent opencode --backup has no --undo: the backup is permanent and lean-agents never deletes it');
+      const r = backupOpencode({ home: o.home, dryRun: o.dryRun || !o.yes });
+      return process.exit(r.ok ? 0 : 1);
+    }
     if (o.undo || (o.yes && !o.dryRun)) throw new Error('--upgrade-agent opencode apply and --undo are not in this release yet; it only lists (dry run)');
     const env = process.env;
     const inv = await inventory({ home: o.home, env, realHome: REAL_HOME });
@@ -704,6 +715,7 @@ async function main() {
     if (o.json) process.stdout.write(`${JSON.stringify(r, null, 2)}\n`); else console.log(formatUpgrade(r));
     return process.exit(0);
   }
+  if (o.backup) throw new Error('--backup goes with --upgrade-agent opencode');
   if ((o.undo || o.keepBackup || o.confirmRemovals) && o.command !== 'adopt') throw new Error('--undo, --keep-backup and --confirm-removals go with --adopt');
   if (o.command === 'adopt') {
     // Removals outside the JSON edits need a yes: a menu on a terminal, --confirm-removals without one.

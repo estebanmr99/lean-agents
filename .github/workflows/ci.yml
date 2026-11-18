@@ -36,6 +36,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       code: ${{ steps.diff.outputs.code }}
+      upgrade: ${{ steps.diff.outputs.upgrade }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -49,6 +50,10 @@ jobs:
           code=true
           if [ "$EVENT" = pull_request ] && ! git diff --name-only "origin/$BASE...HEAD" | grep -qvE '^(docs/|assets/)|^[^/]*\.md$'; then code=false; fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
+          # real-upgrade-opencode (#80 part 2): on a PR only when the files it exercises change; always on push to main and dispatch.
+          upgrade=true
+          if [ "$EVENT" = pull_request ] && ! git diff --name-only "origin/$BASE...HEAD" | grep -qE '^(scripts/lean\.mjs|scripts/lib/(opencode-backup|adopt|upgrade|fsops|system)\.mjs|tests/real-upgrade-opencode\.(sh|ps1)|tests/fixtures/mock-llm\.mjs|core/pins\.json|\.github/workflows/ci\.yml)$'; then upgrade=false; fi
+          echo "upgrade=$upgrade" >> "$GITHUB_OUTPUT"
 
   lint:
     timeout-minutes: 5
@@ -469,6 +474,40 @@ jobs:
           echo "${USERPROFILE:-$HOME}/.opencode/bin" >> "$GITHUB_PATH"
       - name: DCP prunes on OpenCode 2
         run: bash tests/real-dcp-v2.sh
+
+  real-upgrade-opencode:
+    # #80 part 2, P3: real OpenCode 1.19 with 3 sessions seeded through the mock LLM, then `--upgrade-agent opencode --backup`:
+    # the dry run leaves the HOME tree unchanged; backup and frozen copy equal the live files (sha256) and hold 3 sessions;
+    # a run while `opencode serve` is up is refused. Throwaway HOME. Path-filtered on PRs, always on push to main and dispatch.
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && needs.changes.outputs.upgrade == 'true'
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
+      - run: npm ci
+      - name: Install OpenCode 1.19
+        run: npm install -g "$(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('opencode-v1')))")"
+      - name: Backup and frozen copy (Git Bash)
+        run: bash tests/real-upgrade-opencode.sh
+      - name: Backup and frozen copy (PowerShell 5.1)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./tests/real-upgrade-opencode.ps1
 
   real-opencode-v1:
     # Real OpenCode 1.x binary, throwaway HOME: proves the 1.x keys are accepted.
