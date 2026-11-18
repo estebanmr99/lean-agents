@@ -23,6 +23,18 @@ test('managed: only the program name and the script label count, not the whole c
   assert.equal(managed('$(for n in a b; do echo $n; done) /home/u/gsd-cursor-x.js'), true);
 });
 
+test('managed: any argument basename counts, a folder never does; encoded stays user', () => {
+  assert.equal(managed('node /opt/hooks/gsd-cursor-stop.js'), true);
+  assert.equal(managed('npx -y context-mode hook cursor'), true);
+  assert.equal(managed('env FOO=1 rtk hook cursor'), true);
+  assert.equal(managed('FOO=1 rtk hook cursor'), true);
+  assert.equal(managed('$(for n in a b; do echo $n; done) D:\\tools\\gsd-cursor-x.js'), true);
+  assert.equal(managed('node /opt/rtk-fork/hook.js'), false);
+  assert.equal(managed('python /opt/gsd/exfil.py'), false);
+  assert.equal(managed('env RTK=1 node /opt/x/hook.js'), false);
+  assert.equal(cursorEncoded('powershell -enc AAAA'), true);
+});
+
 test('encoded: -e, -ec and -enc* match, --encoding does not', () => {
   for (const c of ['powershell -e AAAA', 'powershell -ec AAAA', 'powershell -EncodedCommand AAAA', 'powershell -enc AAAA', 'pwsh.exe -NoProfile -e AAAA']) assert.equal(cursorEncoded(c), true, c);
   for (const c of ['node hook.js --encoding utf8', 'node hook.js -x', 'node hook.js -echo', 'node -e 1', '$(node -e 1) d-demo.ps1']) assert.equal(cursorEncoded(c), false, c);

@@ -36,8 +36,8 @@ export const cursorHookLabel = (command, argv) => {
 // PowerShell -e, -ec, -enc...: the payload is never named or matched; `--encoding` is not one.
 // Bare `-e`/`-ec` only count next to powershell/pwsh: `node -e 1` is not a payload.
 export const cursorEncoded = (command) => /(^|\s)-enc\w*(\s|$)/i.test(command) || (/\b(powershell|pwsh)(\.exe)?\b/i.test(command) && /(^|\s)-ec?(\s|$)/i.test(command));
-// Only the program name and the script it runs count: `node /x/rtk-fork/hook.js` is the user's.
-export const cursorNameManaged = (command, argv) => MANAGED_HOOK.test(path.win32.basename(argv[0])) || MANAGED_HOOK.test(cursorHookLabel(command, argv));
+// The basename of any argument counts (`npx -y context-mode hook cursor`, `env FOO=1 rtk hook cursor`); a folder never does: `node /opt/rtk-fork/hook.js` is the user's.
+export const cursorNameManaged = (command, argv) => argv.some((a) => !/^[A-Za-z_]\w*=/.test(a) && MANAGED_HOOK.test(path.win32.basename(a))) || MANAGED_HOOK.test(cursorHookLabel(command, argv));
 const MANAGED_PLUGIN = /context-mode|opencode-dcp|opencode-warp|lean-agents/;
 
 const readJson = (file) => { try { return parse(fs.readFileSync(file, 'utf8'), [], { allowTrailingComma: true }) ?? null; } catch { return null; } };
@@ -71,7 +71,7 @@ export function countInChild(dbCopy, toolNode) {
   for (const c of cands) {
     tried.push(c.label);
     try {
-      const out = execFileSync(c.node, [...c.flags, '-e', COUNT_SCRIPT, dbCopy], { encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      const out = execFileSync(c.node, [...c.flags, '-e', COUNT_SCRIPT, dbCopy], { encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
       if (/^\d+$/.test(out)) return { sessions: Number(out) }; // empty output is a failure, not 0
     } catch { /* next candidate */ }
   }
