@@ -26,6 +26,7 @@ function Get-FileMap([string]$dir, [string]$skip, [string]$filter) {
   foreach ($f in Get-ChildItem $dir -Recurse -File) {
     $rel = $f.FullName.Substring($dir.Length).TrimStart('\').Replace('\', '/')
     if ($skip -and $rel.StartsWith($skip)) { continue }
+    if ($rel -match '(^|/)node_modules/') { continue } # the backup leaves it out
     if ($filter -eq 'data' -and $rel -notmatch '^(opencode\.db(-wal|-shm)?$|storage/|snapshot/)') { continue }
     $map[$rel] = (Get-FileHash $f.FullName -Algorithm SHA256).Hash
   }

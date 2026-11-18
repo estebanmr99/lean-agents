@@ -52,7 +52,7 @@ jobs:
           echo "code=$code" >> "$GITHUB_OUTPUT"
           # real-upgrade-opencode (#80 part 2): on a PR only when the files it exercises change; always on push to main and dispatch.
           upgrade=true
-          if [ "$EVENT" = pull_request ] && ! git diff --name-only "origin/$BASE...HEAD" | grep -qE '^(scripts/lean\.mjs|scripts/lib/(opencode-backup|adopt|upgrade|fsops|system)\.mjs|tests/real-upgrade-opencode\.(sh|ps1)|tests/fixtures/mock-llm\.mjs|core/pins\.json|\.github/workflows/ci\.yml)$'; then upgrade=false; fi
+          if [ "$EVENT" = pull_request ] && ! git diff --name-only "origin/$BASE...HEAD" | grep -qE '^(scripts/lean\.mjs|scripts/lib/(opencode-backup|adopt|upgrade|fsops|system|pins)\.mjs|tests/real-upgrade-opencode\.(sh|ps1)|tests/fixtures/mock-llm\.mjs|core/pins\.json|\.github/workflows/ci\.yml)$'; then upgrade=false; fi
           echo "upgrade=$upgrade" >> "$GITHUB_OUTPUT"
 
   lint:

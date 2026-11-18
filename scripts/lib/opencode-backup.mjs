@@ -19,10 +19,11 @@ const DATA_DIRS = ['storage', 'snapshot'];
 
 export const stamp = (d = new Date()) => d.toISOString().replace(/\.\d+Z$/, 'Z').replace(/[-:]/g, '');
 // Backup + frozen copy are two full copies; keep 1 GiB spare (plan 80b, decision 2).
-export const neededBytes = (bytes) => 2 * bytes + GIB;
+// The temp count copy of the db (os.tmpdir(), often the same volume) adds one more db.
+export const neededBytes = (bytes, dbBytes = 0) => 2 * bytes + dbBytes + GIB;
 export const opencodeRunning = (names) => names.some((n) => /^opencode(\.exe)?$/i.test(n.trim().split(/[\\/]/).pop()));
 
-// Image names of every running process. shortcut: the 2.x service is found by its image name only, not its command line.
+// Image names of every running process. shortcut: found by image name only (the 2.x service, and 1.19's platform binary, which npm's node wrapper spawns: VERIFY), not by command line.
 export function listProcesses(platform = process.platform) {
   const win = platform === 'win32';
   const out = execFileSync(win ? 'tasklist' : 'ps', win ? ['/FO', 'CSV', '/NH'] : ['-A', '-o', 'comm='], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
@@ -126,8 +127,9 @@ export function backupOpencode({ home, dryRun = false, log = console.log, now = 
   try { src = listSource(L); } catch (e) { return refuse([e.message]); }
   const bytes = [...src.data, ...src.config].reduce((n, f) => n + f.size, 0);
   const st = statfs(nearest(L.lean));
+  const dbBytes = src.data.filter((f) => f.rel.startsWith('opencode.db')).reduce((n, f) => n + f.size, 0);
   const free = Number(st.bavail) * Number(st.bsize);
-  if (free < neededBytes(bytes)) problems.push(`not enough free space: ${gb(free)} free, ${gb(neededBytes(bytes))} needed (2 x ${gb(bytes)} + 1 GB)`);
+  if (free < neededBytes(bytes, dbBytes)) problems.push(`not enough free space: ${gb(free)} free, ${gb(neededBytes(bytes, dbBytes))} needed (2 x ${gb(bytes)} + the db once more for the count copy + 1 GB)`);
   if (fs.existsSync(L.frozen)) problems.push(`a frozen copy already exists at ${L.frozen}: lean-agents does not overwrite it`);
   if (fs.existsSync(L.backup)) problems.push(`${L.backup} already exists: try again in a second`);
   let sessions = null;

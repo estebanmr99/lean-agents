@@ -61,7 +61,7 @@ const files = (dir, skip) => {
 if (mode === 'tree') {
   console.log(crypto.createHash('sha256').update(JSON.stringify(Object.entries(files(a, b)).sort())).digest('hex'));
 } else if (mode === 'same') {
-  const keep = (m) => Object.fromEntries(Object.entries(m).filter(([k]) => c === 'all' || /^(opencode\.db(-wal|-shm)?$|storage\/|snapshot\/)/.test(k)));
+  const keep = (m) => Object.fromEntries(Object.entries(m).filter(([k]) => (c === 'all' && !/(^|\/)node_modules\//.test(k)) || /^(opencode\.db(-wal|-shm)?$|storage\/|snapshot\/)/.test(k)));
   const x = keep(files(a)), y = keep(files(b));
   const same = Object.keys(x).length > 0 && JSON.stringify(Object.entries(x).sort()) === JSON.stringify(Object.entries(y).sort());
   if (!same) console.log(`differs: ${Object.keys(x).length} vs ${Object.keys(y).length} files`);
@@ -89,7 +89,7 @@ run_to() {
   wait "$pid"
 }
 oc_procs() {
-  if [ "$is_win" = 1 ]; then tasklist //FO CSV //NH 2>/dev/null | grep -ci '"opencode.exe"'; else ps -A -o comm= | grep -c '^opencode$'; fi
+  if [ "$is_win" = 1 ]; then tasklist //FO CSV //NH 2>/dev/null | grep -ci '"opencode.exe"'; else ps -A -o comm= | grep -Ec '(^|/)opencode$'; fi
 }
 wait_procs() { # wait_procs <0|1>: 0 = none left, 1 = at least one, up to 20 s
   local i=0 n
