@@ -23,15 +23,21 @@ const j = path.join;
 const MANAGED_SKILLS = new Set(Object.entries(PINS).filter(([, p]) => p.kind === 'skill').map(([k]) => k));
 const MANAGED_HOOK = /\b(rtk|context-mode|gsd)\b/;
 // A pre-release sorts below its release (#204). shortcut: two pre-releases of one core compare equal, no -beta.2 vs -beta.10 order; upgrade when a pinned tool ships two.
-const cmpVersion = (a, b) => compare(String(a).split('-')[0], String(b).split('-')[0]) || (String(b).includes('-') - String(a).includes('-'));
+export const cmpVersion = (a, b) => compare(String(a).split(/[-+]/)[0], String(b).split(/[-+]/)[0]) || (String(b).split('+')[0].includes('-') - String(a).split('+')[0].includes('-')); // build metadata (+x) is ignored (#219)
 // Shell syntax (GSD's `$(for n in ...; done) file.js`) is named after the first script it runs (#202).
 const SHELL_HEAD = /^(\$\(|\(|\{)|^(for|if|while)$/;
 const SCRIPT_PATH = /[^\s"'();|&]+\.(?:[cm]?js|ts|ps1|sh)(?![\w.])/;
-const cursorHookLabel = (command, argv) => {
-  if (!(SHELL_HEAD.test(argv[0]) || (/^(sh|bash)$/.test(argv[0]) && argv[1] === '-c'))) return path.basename(argv[0]);
+// win32.basename splits both separators, so a Windows path never leaks into a name on macOS or Linux.
+export const cursorHookLabel = (command, argv) => {
+  if (!(SHELL_HEAD.test(argv[0]) || (/^(sh|bash)$/.test(argv[0]) && argv[1] === '-c'))) return path.win32.basename(argv[0]);
   const script = command.match(SCRIPT_PATH);
-  return script ? path.basename(script[0]) : 'shell';
+  return script ? path.win32.basename(script[0]) : 'shell';
 };
+// PowerShell -e, -ec, -enc...: the payload is never named or matched; `--encoding` is not one.
+// Bare `-e`/`-ec` only count next to powershell/pwsh: `node -e 1` is not a payload.
+export const cursorEncoded = (command) => /(^|\s)-enc\w*(\s|$)/i.test(command) || (/\b(powershell|pwsh)(\.exe)?\b/i.test(command) && /(^|\s)-ec?(\s|$)/i.test(command));
+// The basename of any argument counts (`npx -y context-mode hook cursor`, `env FOO=1 rtk hook cursor`); a folder never does: `node /opt/rtk-fork/hook.js` is the user's.
+export const cursorNameManaged = (command, argv) => argv.some((a) => !/^[A-Za-z_]\w*=/.test(a) && MANAGED_HOOK.test(path.win32.basename(a))) || MANAGED_HOOK.test(cursorHookLabel(command, argv));
 const MANAGED_PLUGIN = /context-mode|opencode-dcp|opencode-warp|lean-agents/;
 
 const readJson = (file) => { try { return parse(fs.readFileSync(file, 'utf8'), [], { allowTrailingComma: true }) ?? null; } catch { return null; } };
@@ -51,22 +57,21 @@ const STOPGAPS = [
   { rel: ['.config', 'opencode', 'plugins', 'orca-status-tui-shim.js'], by: 'the managed Orca integration (--terminal orca)', needs: { terminals: 'orca' } },
 ];
 
-// node:sqlite needs no flag from Node 22.13 (24.x too); a tool Node older than that is not tried.
-const sqliteOk = (v) => { const [a, b] = minVersion(`>=${v}`); return a >= 24 || (a === 22 && b >= 13); };
+// node:sqlite needs no flag from Node 22.13 and 23.4 (24.x too); a tool Node older than that is not tried.
+export const sqliteOk = (v) => { const [a, b] = minVersion(`>=${v}`); return a >= 24 || (a === 23 && b >= 4) || (a === 22 && b >= 13); };
 const COUNT_SCRIPT = "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync(process.argv[1],{readOnly:true});console.log(d.prepare('SELECT count(*) AS n FROM session').get().n)";
 
 // Count in a child Node when this one lacks node:sqlite (#201): the tool Node first, then this Node with the flag. null when neither answers.
-function countInChild(dbCopy, toolNode, home) {
+export function countInChild(dbCopy, toolNode) {
   const tried = [];
-  const shown = (p) => (p === home || p.startsWith(home + path.sep) ? `~${p.slice(home.length)}` : p);
   const cands = [
     ...(toolNode?.node && sqliteOk(toolNode.version) ? [{ node: toolNode.node, flags: [], label: `Node ${toolNode.version}` }] : []),
-    { node: process.execPath, flags: ['--experimental-sqlite'], label: `${shown(process.execPath)} --experimental-sqlite` },
+    { node: process.execPath, flags: ['--experimental-sqlite'], label: `Node ${process.version} --experimental-sqlite` },
   ];
   for (const c of cands) {
     tried.push(c.label);
     try {
-      const out = execFileSync(c.node, [...c.flags, '-e', COUNT_SCRIPT, dbCopy], { encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      const out = execFileSync(c.node, [...c.flags, '-e', COUNT_SCRIPT, dbCopy], { encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
       if (/^\d+$/.test(out)) return { sessions: Number(out) }; // empty output is a failure, not 0
     } catch { /* next candidate */ }
   }
@@ -90,7 +95,7 @@ export async function opencodeInfo(home, env, fsx = fs, { toolNode = null, sqlit
   try {
     for (const f of dbs) fs.copyFileSync(j(dataDir, f), j(tmp, f));
     if (!sqlite) {
-      const c = countInChild(j(tmp, 'opencode.db'), toolNode, home);
+      const c = countInChild(j(tmp, 'opencode.db'), toolNode);
       if (c.tried) out.note = `node:sqlite is not available on this Node: sessions not counted (tried ${c.tried.join(', ')})`;
       else out.sessions = c.sessions;
       return out;
@@ -164,11 +169,11 @@ export async function inventory({ home, env = process.env, platform = process.pl
       const argv = (h.command.match(/"[^"]*"|'[^']*'|\S+/g) ?? []).map((a) => a.replace(/^(["'])(.*)\1$/, '$2'));
       while (argv.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(argv[0])) argv.shift();
       if (!argv.length) continue;
-      const encoded = /(^|\s)-enc\w*(\s|$)/i.test(h.command);
+      const encoded = cursorEncoded(h.command);
       // Only an absolute path can carry the mark: a bare `rtk` would resolve against the cwd.
       const script = !encoded && path.isAbsolute(argv[0]) ? argv[0] : null;
       // RTK and GSD write their own Cursor hooks without the mark, so the name match counts too (#199).
-      const managed = !encoded && (MANAGED_HOOK.test(h.command) || (Boolean(script) && fsx.existsSync(script) && hasMark(readJsonText(script) ?? '')));
+      const managed = !encoded && (cursorNameManaged(h.command, argv) || (Boolean(script) && fsx.existsSync(script) && hasMark(readJsonText(script) ?? '')));
       const base = `${event}:${encoded ? 'powershell' : cursorHookLabel(h.command, argv)}`;
       // Same event and label twice (#198): the second gets `#2`, the third `#3`.
       const n = seenCursor.get(base) ?? 0;
