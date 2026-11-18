@@ -62,3 +62,13 @@ Every install, update and `--doctor` command (`npx`, `npm -g`, `brew`, `bun`, `g
 Any allowed name that looks like a secret (`TOKEN`, `SECRET`, `PASSW`, `API_KEY`, `AUTH`, `CREDENTIAL`, `PRIVATE`) is dropped again (`GIT_AUTHOR_*` is kept). Code-running or credential-carrying names are not passed even though their prefix is: `GIT_CONFIG*`, `GIT_ASKPASS`, `GIT_SSH`, `GIT_SSH_COMMAND`, `GIT_PROXY_COMMAND`, `GIT_EXEC_PATH`, `GIT_EDITOR`, `GIT_PAGER`, `GIT_EXTERNAL_DIFF`, `NPM_CONFIG_SCRIPT_SHELL`, `NODE_PATH` and npm per-registry keys. `NODE_OPTIONS` passes only when every token is `--use-system-ca`, `--use-openssl-ca`, `--use-bundled-ca`, `--use-env-proxy`, `--max-old-space-size=<digits>` (or the digits as the next token) or `--dns-result-order=<word>` (or the word as the next token); any other token (`--require`, `-r`, `--import`, `--loader`, `--eval`) drops it, for example `npm_config__authToken` or `HOMEBREW_GITHUB_API_TOKEN`. lean-agents installs public packages only; a private registry still works through `.npmrc`. `scripts/parallel.mjs` workers keep your full environment, because the agents they start need their API keys. Sources: [compatibility.md](compatibility.md#child-environment-allowlist).
 
 Free text that may reach a public issue (`--feedback-draft`) goes through `scripts/lib/redact.mjs`: home paths, user and host names, proxy and CA values, values of secret-named variables, emails, key=value pairs, `Authorization` headers and common token formats are replaced before anything is shown. Backups of your config and `state.json` are owner-only (`0600`, directories `0700`), and `--uninstall` asks before deleting backups (default no; `--yes` keeps them).
+
+## What the verify prompt sends
+
+Nothing, unless you say yes. The verify prompt (see [install-with-an-agent.md](install-with-an-agent.md#verify-prompt-after-the-install)) can end with a GitHub issue on this repository, filed with your own `gh` login:
+
+- **When:** only when `outbound` is on, a problem could not be fixed, and no open issue already matches.
+- **What:** the redacted draft you were shown: OS, lean-agents and Node.js versions, the tool name and the doctor status and detail, passed through `redactText`. Employer names cannot be detected, so read it first.
+- **Consent:** one yes per issue. No yes, no issue. There is no telemetry and no background filing.
+- **Strict (`--privacy strict`, `--network off`, `--outbound off`):** the prompt has no filing text. You get the doctor row to copy yourself.
+- **Stored:** a filed issue's link and redacted title go into `state.json` (`filedIssues`) on your machine; `--uninstall` removes it with the rest.
