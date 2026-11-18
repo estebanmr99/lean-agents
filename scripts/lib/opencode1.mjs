@@ -11,7 +11,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { backupLayout, sha256File } from './opencode-backup.mjs';
 import { which as findOnPath } from './system.mjs';
-import { plan as planActions } from './fsops.mjs';
+import { plan as planActions, renameRetry } from './fsops.mjs';
 
 const j = path.join;
 const MIN_BINARY = 1 << 20; // npm ships a ~0.5 KB launcher in bin/ until its postinstall swaps in the native binary
@@ -150,7 +150,7 @@ export function installOpencode1(p, { home, roots, backupDir, apply, files = [],
     if (sha256File(part) !== sha256File(p.source)) throw new Error('sha256 differs after copying the binary');
     const v = probe(part, { ...env, XDG_DATA_HOME: layout(home).frozen, XDG_STATE_HOME: layout(home).state });
     if (v !== p.version) throw new Error(`the copied binary reports "${v}", expected ${p.version}`);
-    fs.renameSync(part, p.binary);
+    renameRetry(part, p.binary);
   }
   onRecord(record);
   try { apply(planned, backupDir, home, roots, files); } finally { onRecord(record); }

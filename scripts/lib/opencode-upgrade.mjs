@@ -12,7 +12,7 @@ import { backupLayout, listSource, copyVerified, countCopy, sha256File, stamp as
 import { spawnSync } from 'node:child_process';
 import { layout as layout1, removeOpencode1 } from './opencode1.mjs';
 import { upgradeApply } from './upgrade.mjs';
-import { undo as undoEntries, privateDir } from './fsops.mjs';
+import { undo as undoEntries, privateDir, renameRetry } from './fsops.mjs';
 import { configHome } from './system.mjs';
 
 const j = path.join;
@@ -142,7 +142,7 @@ export function applyPreflight({ home, stamp, upgrade, exec = true, list, openco
 // Replaces the live db, storage and snapshot with the frozen copy (or the permanent backup when the frozen copy holds fewer
 // sessions). Order: choose the source and check its count, copy it next to the live folder and check it, move the live items to
 // `backups/opencode2-db-<ts>/`, rename the copy into place. Anything else in the live folder (auth, logs) is left alone.
-export function restoreData({ home, backupDir, now = new Date(), count, statfs = fs.statfsSync, rename = fs.renameSync, log = console.log }) {
+export function restoreData({ home, backupDir, now = new Date(), count, statfs = fs.statfsSync, rename = renameRetry, log = console.log }) {
   const ts = stampTs(now);
   const L = backupLayout(home, ts);
   const frozenData = j(L.frozen, 'opencode');
@@ -403,7 +403,7 @@ export function createSteps(d) {
           const aside = j(lean, 'backups', `opencode2-bin-${stampTs()}`);
           privateDir(aside, lean);
           if (fs.existsSync(j(aside, path.basename(ocBin)))) throw new Error(`${aside} already holds a 2.x binary: not replaced`);
-          fs.renameSync(ocBin, j(aside, path.basename(ocBin)));
+          renameRetry(ocBin, j(aside, path.basename(ocBin)));
           d.log(`  moved the 2.x binary to ${aside}`);
         }
         fs.mkdirSync(path.dirname(ocBin), { recursive: true });
@@ -411,7 +411,7 @@ export function createSteps(d) {
         fs.copyFileSync(copy, part);
         if (!win) fs.chmodSync(part, 0o755);
         if (sha256File(part) !== rec.preSha) { fs.rmSync(part, { force: true }); throw new Error('sha256 differs after copying the 1.x binary back'); }
-        fs.renameSync(part, ocBin);
+        renameRetry(part, ocBin);
         d.log(`  restored the 1.x binary at ${ocBin} (sha256 checked)`);
     }
   }

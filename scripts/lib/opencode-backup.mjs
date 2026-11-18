@@ -10,7 +10,7 @@ import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { countInChild } from './adopt.mjs';
 import { configHome, envDir } from './system.mjs';
-import { privateDir } from './fsops.mjs';
+import { privateDir, renameRetry } from './fsops.mjs';
 
 const j = path.join;
 const GIB = 1024 ** 3;
@@ -35,7 +35,7 @@ export function listProcesses(platform = process.platform) {
 function writeStamp(dir, info) {
   const tmp = j(dir, `${STAMP_FILE}.tmp`);
   fs.writeFileSync(tmp, `${JSON.stringify({ version: 1, verified: true, ...info }, null, 2)}\n`, { mode: 0o600 });
-  fs.renameSync(tmp, j(dir, STAMP_FILE));
+  renameRetry(tmp, j(dir, STAMP_FILE));
 }
 
 export function backupLayout(home, ts) {
@@ -164,7 +164,7 @@ export function backupOpencode({ home, dryRun = false, log = console.log, now = 
     manifestCount = manifest.length;
     fs.writeFileSync(j(part, 'MANIFEST.sha256'), manifest.map((m) => `${m.sha}  ${m.rel}`).join('\n') + '\n', { mode: 0o600 });
     fs.writeFileSync(j(part, 'RESTORE.md'), restoreText(L, ts, sessions), { mode: 0o600 });
-    fs.renameSync(part, L.backup);
+    renameRetry(part, L.backup);
     log('backup: every file sha256 equals its source');
   } catch (e) {
     fs.rmSync(part, { recursive: true, force: true });
@@ -179,7 +179,7 @@ export function backupOpencode({ home, dryRun = false, log = console.log, now = 
     copyVerified(j(L.backup, 'data'), j(fpart, 'opencode'), src.data);
     const frozen = countCopy(j(fpart, 'opencode'), count);
     if (frozen !== sessions) throw new Error(`session count differs: ${sessions} live, ${frozen} in the frozen copy`);
-    fs.renameSync(fpart, L.frozen);
+    renameRetry(fpart, L.frozen);
     log(`frozen copy: every file sha256 equals the backup, ${frozen} sessions`);
     writeStamp(L.backup, { ts, sessions, files: manifestCount });
   } catch (e) {

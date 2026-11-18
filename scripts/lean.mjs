@@ -7,7 +7,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import tty from 'node:tty';
 import { fileURLToPath } from 'node:url';
-import { plan, apply, undo, describe, writePrivate, privateDir, dropBackups } from './lib/fsops.mjs';
+import { plan, apply, undo, describe, writePrivate, privateDir, dropBackups, renameRetry } from './lib/fsops.mjs';
 import { loadCore, renderRules, loadProfile, useToolNode } from './lib/render.mjs';
 import { claudeAdapter } from './lib/adapters/claude.mjs';
 import { opencodeV1Adapter } from './lib/adapters/opencode-v1.mjs';
@@ -786,7 +786,7 @@ function saveJournalState(o, S) {
   privateDir(dir, dir);
   const file = path.join(dir, 'state.json');
   writePrivate(`${file}.tmp`, `${JSON.stringify(S, null, 2)}\n`);
-  fs.renameSync(`${file}.tmp`, file);
+  renameRetry(`${file}.tmp`, file);
 }
 
 const refuse = (problems) => { console.log(`refused, nothing changed:\n${problems.map((x) => `  - ${x}`).join('\n')}`); return false; };

@@ -15,7 +15,7 @@ import { planOpencode1, installOpencode1 } from '../scripts/lib/opencode1.mjs';
 import { opencodeV2Adapter } from '../scripts/lib/adapters/opencode-v2.mjs';
 import { upgradeInventory } from '../scripts/lib/upgrade.mjs';
 import { inventory } from '../scripts/lib/adopt.mjs';
-import { apply } from '../scripts/lib/fsops.mjs';
+import { apply, renameRetry } from '../scripts/lib/fsops.mjs';
 import { loadCore } from '../scripts/lib/render.mjs';
 import { seedWorkPc } from './fixtures/handbuilt.mjs';
 
@@ -489,4 +489,20 @@ test('the opencode1 step saves its entries on every push, before the step ends (
   };
   await applyWith(m, 'opencode1');
   assert.deepEqual(atFirstPush, { saved: true, len: 1 }, 'the first push saved a journal that already holds the entry');
+});
+
+test('renameRetry: waits out EBUSY twice then succeeds; a permanent lock fails clearly with its code; other errors are not retried', () => {
+  const slept = [];
+  let n = 0;
+  const flaky = (a, b) => { if (++n <= 2) throw Object.assign(new Error('EBUSY: resource busy or locked'), { code: 'EBUSY' }); return `${a}->${b}`; };
+  assert.equal(renameRetry('/opt/x/a.partial', '/opt/x/a', { rename: flaky, sleep: (ms) => slept.push(ms) }), '/opt/x/a.partial->/opt/x/a');
+  assert.deepEqual(slept, [250, 250]);
+  let m = 0;
+  const locked = () => { m++; throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' }); };
+  assert.throws(() => renameRetry('/opt/x/a', '/opt/x/b', { rename: locked, sleep: () => {} }), (e) => e.code === 'EPERM' && /still locked after 8 tries.*another program holds it/.test(e.message));
+  assert.equal(m, 8);
+  let k = 0;
+  const missing = () => { k++; throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' }); };
+  assert.throws(() => renameRetry('/opt/x/a', '/opt/x/b', { rename: missing, sleep: () => {} }), /ENOENT/);
+  assert.equal(k, 1);
 });
