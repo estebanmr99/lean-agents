@@ -29,6 +29,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Docs
 
+- Isolation proof for `opencode1` (#80, part 2): `spike-opencode-side` runs on pull requests (Linux and Windows) and shows that OpenCode 1.19 started with `XDG_DATA_HOME` and `XDG_STATE_HOME` on a frozen copy leaves the live data, state and config dirs byte-identical and stores the new session in the copy; `OPENCODE_DB` + `OPENCODE_CONFIG_DIR` does not isolate (logs, locks and `storage/` stay live), `XDG_CONFIG_HOME` hides the `gh` login from MCP children, and `opencode debug config` on 2.x migrates the db while `--version` does not. Recorded in `docs/compatibility.md`.
 - Versions: README (EN and ES), `docs/ROADMAP.md` and the spec name 0.8.0 as the latest release (#161). The npm item on the README roadmap is ticked; "Later: 1.0.0" lists #179 to #182.
 - `docs/SECURITY-REVIEW.md` pin table names every key in `core/pins.json`; `tests/security-review-pins.test.mjs` fails when a key is missing (#155).
 - `docs/compatibility.md`: the `lean-update` tag `v0.7.0` exists, and its tagged `skills add` form was checked in a throwaway HOME (#168).

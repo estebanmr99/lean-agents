@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Spike (#80 B0): OpenCode 1.19 and 2.2.5 side by side in one throwaway HOME. Prints labelled V1-V4 lines for the
-# layout decision (shared vs isolated config/data); asserts only that both binaries run --version.
+# layout decision (shared vs isolated config/data); asserts that both binaries run --version.
+# Spike (#80 part 2, P1): proves which env set runs 1.19 on a frozen copy while the live dirs stay byte-identical
+# (P1 lines; asserts the XDG sets, prints OPENCODE_DB as evidence), and whether 2.x migrates the db on --version / debug config.
 # Used by CI (ubuntu, windows via Git Bash); safe locally because HOME is a temp directory.
 set -uo pipefail
 
@@ -15,9 +17,9 @@ export npm_config_cache="$T/npmcache"
 
 CFG="$HOME/.config/opencode"
 DATA="$HOME/.local/share/opencode"
-B1="" B2=""
+B1="" B2="" MOCK_PID=""
 # shellcheck disable=SC2329 # called through the trap
-cleanup() { [ -n "$B2" ] && "$B2" service stop >/dev/null 2>&1; rm -rf "$T"; }
+cleanup() { [ -n "$MOCK_PID" ] && { kill "$MOCK_PID"; wait "$MOCK_PID"; } 2>/dev/null; [ -n "$B2" ] && "$B2" service stop >/dev/null 2>&1; rm -rf "$T"; }
 trap cleanup EXIT
 
 # tree.mjs snap <label> <dir> <out.json> | diff <label> <a.json> <b.json>: sha256 manifests, short output.
@@ -215,5 +217,144 @@ snap_both S4-after-probes
 snapdiff "V3 config after probes (vs S3)" S3-after-1x-again-config S4-after-probes-config
 snapdiff "V3 data after probes (vs S3)" S3-after-1x-again-data S4-after-probes-data
 
-[ "$fail" -eq 0 ] && echo "SPIKE OK: both binaries ran --version" || echo "FAIL: a binary did not run --version"
+
+# ===== P1 (#80 part 2): can `opencode1` (1.19) run on a frozen copy while the live dirs stay untouched? =====
+# Fresh HOME so the B0 runs above (which left 2.x-migrated data) do not leak in. "Live" = the default dirs of this HOME.
+"$B2" service stop >/dev/null 2>&1
+HOME="$T/p1home"; export HOME
+mkdir -p "$HOME/AppData/Roaming" "$T/proj"
+if command -v cygpath >/dev/null 2>&1; then USERPROFILE="$(cygpath -w "$HOME")"; APPDATA="$(cygpath -w "$HOME/AppData/Roaming")"; export USERPROFILE APPDATA; fi
+unset XDG_CONFIG_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME OPENCODE_CONFIG OPENCODE_CONFIG_DIR OPENCODE_DB GH_TOKEN GITHUB_TOKEN GH_CONFIG_DIR
+CFG="$HOME/.config/opencode"; DATA="$HOME/.local/share/opencode"; STATE="$HOME/.local/state/opencode"
+np() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s' "$1"; fi; } # native path for env values
+echo "== P1: isolation proof (1.19 on a frozen copy)"
+
+# Synthetic gh login in the place gh reads without any env (Windows: %AppData%\GitHub CLI), to see whether XDG_CONFIG_HOME hides it.
+if is_windows; then ghdir="$HOME/AppData/Roaming/GitHub CLI"; else ghdir="$HOME/.config/gh"; fi
+mkdir -p "$ghdir"
+printf 'github.com:\n    oauth_token: synthetic-not-a-token\n    user: synthetic\n    git_protocol: https\n' > "$ghdir/hosts.yml"
+
+# Fake stdio MCP server: logs what an MCP child inherits (booleans only), answers the handshake with no tools.
+cat > "$T/p1probe.mjs" <<'JS'
+import fs from 'node:fs';
+import readline from 'node:readline';
+import { spawnSync } from 'node:child_process';
+const gh = (args) => spawnSync('gh', args, { encoding: 'utf8' });
+const v = gh(['--version']);
+const t = gh(['auth', 'token']);
+const e = process.env;
+fs.appendFileSync(process.env.P1_PROBE_LOG, `${JSON.stringify({ gh: v.status === 0 ? 'on-PATH' : 'missing', ghLogin: t.status === 0 && t.stdout.trim() ? 'found' : 'missing', xdgData: !!e.XDG_DATA_HOME, xdgState: !!e.XDG_STATE_HOME, xdgConfig: !!e.XDG_CONFIG_HOME })}\n`);
+const send = (m) => process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', ...m })}\n`);
+readline.createInterface({ input: process.stdin }).on('line', (l) => {
+  let m;
+  try { m = JSON.parse(l); } catch { return; }
+  if (m.method === 'initialize') send({ id: m.id, result: { protocolVersion: m.params?.protocolVersion ?? '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'p1probe', version: '0' } } });
+  else if (m.method === 'tools/list') send({ id: m.id, result: { tools: [] } });
+  else if (m.id !== undefined) send({ id: m.id, result: {} });
+});
+JS
+
+# Mock LLM (read only: tests/fixtures/mock-llm.mjs): one bash tool call, then "done". Ephemeral port.
+MOCK_LLM_PORT=0 MOCK_LLM_COMMAND='echo p1' MOCK_LLM_TOOL=bash node "$repo/tests/fixtures/mock-llm.mjs" >"$T/mock.log" 2>&1 &
+MOCK_PID=$!
+port=""
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  port="$(sed -n 's/^MOCK_LLM_PORT=//p' "$T/mock.log" | head -1)"; [ -n "$port" ] && break; sleep 1
+done
+[ -n "$port" ] || { echo "FAIL: mock LLM did not start"; exit 1; }
+
+mkdir -p "$CFG"
+cat > "$CFG/opencode.jsonc" <<JSON
+{
+  "\$schema": "https://opencode.ai/config.json",
+  "model": "mock/mock-model",
+  "autoupdate": false,
+  "share": "disabled",
+  "provider": { "mock": { "npm": "@ai-sdk/openai-compatible", "name": "Mock", "options": { "baseURL": "http://127.0.0.1:$port/v1" }, "models": { "mock-model": { "name": "Mock Model" } } } },
+  "mcp": { "p1probe": { "type": "local", "command": ["node", "$(np "$T/p1probe.mjs")"] } }
+}
+JSON
+
+# p1run <secs> <cmd...>: runs under the P1ENV assignments (a subshell, so nothing leaks into later cases).
+P1ENV=()
+p1run() { ( export "${P1ENV[@]}"; run_to "$@" ); }
+# sessions <label>: number of sessions 1.19 lists for the P1ENV dirs (same cwd every time: the list is per project).
+sessions() {
+  p1run 90 "$B1" session list --format json >"$T/sl-$1.json" 2>"$T/sl-$1.err"
+  node -e "try{const j=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));console.log(Array.isArray(j)?j.length:'?')}catch{console.log('?')}" "$(np "$T/sl-$1.json")"
+}
+seed() { # seed <label>: one session through the mock LLM
+  p1run 120 "$B1" run "p1 seed $1" --model mock/mock-model >"$T/run-$1.out" 2>&1; echo "  seed $1: exit $? ($(tail -n 1 "$T/run-$1.out" | cut -c1-60))"
+}
+ndiff() { node "$T/tree.mjs" diff x "$T/$1.json" "$T/$2.json" | head -1 | sed 's/^x: \([0-9]*\) differences$/\1/'; }
+snap3() { snap "$1" data "$DATA" >/dev/null; snap "$1" state "$STATE" >/dev/null; snap "$1" config "$CFG" >/dev/null; }
+
+cd "$T/proj" || exit 1
+echo "-- live seed (default dirs, the way 1.19 runs today)"
+P1ENV=(P1_PROBE_LOG="$(np "$T/probe-live.log")")
+seed live
+live_n="$(sessions live)"
+snap3 L0
+case "$live_n" in ''|*[!0-9]*|0) echo "FAIL: the live seed made no session (count: $live_n)"; exit 1 ;; esac
+[ -s "$T/L0-data.json" ] && [ "$(wc -c < "$T/L0-data.json")" -gt 5 ] || { echo "FAIL: live data dir is empty"; exit 1; }
+echo "P1 live: sessions=$live_n; MCP child: $(tail -n 1 "$T/probe-live.log" 2>/dev/null || echo 'did not run')"
+
+# p1_case <name> <assert:yes|no>: copy live -> frozen root, run 1.19 under the env set, compare.
+p1_case() {
+  local name=$1 must=$2 root="$T/frozen-$1" ok=1
+  mkdir -p "$root/data" "$root/state" "$root/config" "$root/db"
+  case $name in
+    a1) cp -R "$DATA" "$root/data/opencode"; cp -R "$STATE" "$root/state/opencode"; cp -R "$CFG" "$root/config/opencode"
+        P1ENV=(XDG_DATA_HOME="$(np "$root/data")" XDG_STATE_HOME="$(np "$root/state")" XDG_CONFIG_HOME="$(np "$root/config")") ;;
+    a2) cp -R "$DATA" "$root/data/opencode"; cp -R "$STATE" "$root/state/opencode"
+        P1ENV=(XDG_DATA_HOME="$(np "$root/data")" XDG_STATE_HOME="$(np "$root/state")") ;;
+    b)  cp "$DATA"/opencode.db* "$root/db/"; cp -R "$CFG" "$root/config/opencode"
+        P1ENV=(OPENCODE_DB="$(np "$root/db/opencode.db")" OPENCODE_CONFIG_DIR="$(np "$root/config/opencode")") ;;
+  esac
+  P1ENV+=(P1_PROBE_LOG="$(np "$T/probe-$name.log")")
+  local before after
+  before="$(sessions "$name-before")"
+  if [ "$name" = a1 ]; then echo "  1.x debug paths:"; p1run 60 "$B1" debug paths 2>&1 | sed "s|$(np "$root")|<frozen>|g; s|$HOME|~|g" | grep -iE 'data|state|config' | capn 6; fi
+  seed "$name"
+  after="$(sessions "$name-after")"
+  snap3 "L-$name"
+  local dd ds dc; dd="$(ndiff L0-data "L-$name-data")"; ds="$(ndiff L0-state "L-$name-state")"; dc="$(ndiff L0-config "L-$name-config")"
+  echo "P1 $name: live changed files data=$dd state=$ds config=$dc | frozen sessions $before -> $after (live had $live_n) | MCP child: $(tail -n 1 "$T/probe-$name.log" 2>/dev/null || echo 'did not run')"
+  [ "$dd" = 0 ] && [ "$ds" = 0 ] && [ "$dc" = 0 ] || { ok=0; echo "  live files that changed:"; for k in data state config; do snapdiff "  $k" L0-$k "L-$name-$k" | tail -n +2 | capn 5; done; }
+  case "$before$after$live_n" in *[!0-9]*) ok=0 ;; *) [ "$before" = "$live_n" ] && [ "$after" = $((before + 1)) ] || ok=0 ;; esac
+  if [ "$ok" = 1 ]; then echo "P1 $name: PASS (live untouched, the session landed in the frozen copy)"; else echo "P1 $name: not isolated"; [ "$must" = yes ] && fail=1; fi
+}
+p1_case a1 yes
+p1_case a2 yes
+p1_case b no
+
+# a2 keeps the shared config dir, so an MCP child that needs gh must still see it there (n/a only when the runner has no gh).
+if [ ! -s "$T/probe-a2.log" ]; then echo "P1 a2: the MCP child never ran"; fail=1
+elif grep -q '"gh":"on-PATH"' "$T/probe-a2.log"; then
+  grep -q '"ghLogin":"found"' "$T/probe-a2.log" || { echo "P1 a2: MCP child lost the gh login"; fail=1; }
+else echo "P1 a2: gh not on PATH in the MCP child (n/a if the runner has no gh)"; fi
+
+# --- does 2.x migrate the db on --version / debug config? (own XDG dirs, copy of the 1.x data) ---
+echo "== P1: 2.x on a copy of the 1.x data"
+v2="$T/frozen-v2"; mkdir -p "$v2/data" "$v2/state" "$v2/config"
+cp -R "$DATA" "$v2/data/opencode"
+P1ENV=(XDG_DATA_HOME="$(np "$v2/data")" XDG_STATE_HOME="$(np "$v2/state")" XDG_CONFIG_HOME="$(np "$v2/config")")
+( export "${P1ENV[@]}"; "$B2" service set port $((20000 + RANDOM % 40000)) >/dev/null 2>&1 )
+echo "  2.x debug paths (XDG honored?):"; p1run 60 "$B2" debug paths 2>&1 | sed "s|$(np "$v2")|<frozen>|g; s|$HOME|~|g" | grep -iE 'data|state|config' | capn 6
+v2step() { # v2step <label> <args...>: run 2.x, then say whether the db file changed since the last step
+  local label=$1; shift
+  p1run 90 "$B2" "$@" >"$T/v2-$label.out" 2>&1; local rc=$?
+  node "$T/tree.mjs" snap "v2 $label" "$v2/data" "$T/v2-$label.json" >/dev/null
+  local changed; changed="$(node -e "const f=(n)=>JSON.parse(require('fs').readFileSync(process.argv[n],'utf8'))['opencode/opencode.db'];console.log(f(1)===f(2)?0:1)" "$(np "$T/v2-$prev.json")" "$(np "$T/v2-$label.json")")"
+  echo "P1 2.x $label: exit $rc, db file changed since previous step: $([ "$changed" -gt 0 ] && echo YES || echo no)"; prev=$label
+  node "$T/dbinfo.mjs" "$v2/data/opencode/opencode.db" "  db after $label" "$T/dbcopy-$label"
+}
+node "$T/tree.mjs" snap "v2 start" "$v2/data" "$T/v2-start.json" >/dev/null; prev=start
+node "$T/dbinfo.mjs" "$v2/data/opencode/opencode.db" "  db before" "$T/dbcopy-before"
+v2step version --version
+v2step debug-config debug config
+v2step session-list session list
+( export "${P1ENV[@]}"; "$B2" service stop >/dev/null 2>&1 )
+
+[ "$fail" -eq 0 ] && echo "SPIKE OK: both binaries ran --version, the XDG isolation proof held" || echo "FAIL: see the lines above (a --version, or an isolation check)"
 exit "$fail"

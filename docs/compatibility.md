@@ -519,3 +519,19 @@ Spike for #80 (job `spike-opencode-side`, PR #143, CI run 43350726437, 2026-11-1
 - **V4 installer:** the v2 installer wrote only `~/.opencode/bin/opencode` (+ its data dir logs). With `--no-modify-path` it did not touch `.bashrc`, `.zshrc` or `.profile`; on Windows the HKCU user Path was unchanged.
 - **Note:** 2.x migrates the shared 1.x db in place (owner decision pending for 0.9.0; PR B is deferred).
 - **Layout answer: I (isolate).** Config could be shared, but 2.x migrates the shared 1.x database, so a 1.x user's sessions cannot be left untouched without giving 1.x its own data dir. Next (PR B): prove isolation (`XDG_DATA_HOME` or equivalent for the `opencode1` shim) before any upgrade path ships.
+
+### Isolation proof for `opencode1` (#80 part 2, P1)
+
+Source: `tests/spike-opencode-side.sh` / `.ps1`, job `spike-opencode-side` (now per PR, ubuntu-latest + windows-latest), throwaway HOME, 1.19.0 and 2.2.5, a mock LLM (`tests/fixtures/mock-llm.mjs`) for the seeded session. Run locally on macOS (throwaway HOME, not CI) 2026-11-18. **VERIFY** Linux and Windows until this PR's job is green; macOS stays VERIFY (real-* jobs skip PRs, #56).
+
+| Env set for 1.19 (frozen copy of data/state/config, then `opencode run` through the mock) | Live dirs after | Session | MCP child (stdio) |
+| --- | --- | --- | --- |
+| (a2) `XDG_DATA_HOME` + `XDG_STATE_HOME`, config dir shared | data, state, config: 0 changed files | lands in the frozen db (1 -> 2) | `gh` on PATH, `gh` login found |
+| (a1) (a2) + `XDG_CONFIG_HOME` | 0 changed files | lands in the frozen db (1 -> 2) | `gh` on PATH, `gh` login **missing**: `gh` reads `$XDG_CONFIG_HOME/gh`, so a moved config dir hides its login (Windows: **VERIFY**, `gh` documents `XDG_CONFIG_HOME` before `%AppData%`; the job's Windows leg prints the result) |
+| (b) `OPENCODE_DB` + `OPENCODE_CONFIG_DIR` | **changed**: `log/opencode.log`, new `locks/*`, state files; `storage/` and `snapshot/` stay live | in the frozen db (1 -> 2) | `gh` found, no XDG vars inherited |
+
+- **Which env set works:** `XDG_DATA_HOME` + `XDG_STATE_HOME` (a2). 1.19 and 2.x both print the XDG dirs in `opencode debug paths`. `OPENCODE_DB` moves only the db, so it is not isolation.
+- **Config for `opencode1`:** keep it shared (a2) unless the frozen config is needed: setting `XDG_CONFIG_HOME` is inherited by MCP children and hides the `gh` login (the plan's rule: frozen config only if MCP children still see `gh`).
+- **MCP children inherit the shim's env:** `XDG_DATA_HOME` and `XDG_STATE_HOME` reach the child (booleans logged by the probe); PATH is intact. Only tools that store their own state under those dirs (not `gh` auth) would notice.
+- **Does 2.x migrate the db on its own commands?** `opencode --version`: no, the db file is unchanged. `opencode debug config`: **yes**, the db file changes (it runs the migration like any command that opens the db); `session list` too. So even a config check on 2.x counts as the first 2.x start: the backup and frozen copy must exist before it.
+- **Not proven here:** `OPENCODE_DB` on 2.x; XDG honoring on macOS in CI.
