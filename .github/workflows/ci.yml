@@ -17,8 +17,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ inputs.latest && 'latest-' || '' }}${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push cancels an older PR run, but every push to main keeps its own run: back-to-back merges used to cancel
+  # each other, so the macOS legs that only run on main almost never finished.
+  group: ci-${{ inputs.latest && 'latest-' || '' }}${{ github.event_name == 'push' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # Context Mode 2 needs Node >=24.15 (on older Node npm installs 1.x, and the engine skips it), so every real-* job uses this.
