@@ -6,6 +6,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- `scripts/lean.mjs` checks the `engines.node` floor (22.20) when run directly from a clone: below it, one stderr line names the running Node and the fix (`nvm use`, `install.sh`). `--help`, `--version`, `--doctor`, `--dry-run`, `--upgrade-agent` and `--adopt` without `--yes` keep working; install, uninstall, migrate and `--yes` exit 1 unless `LEAN_AGENTS_ALLOW_OLD_NODE=1` is set (#208).
 - `--adopt` compares a pre-release npm copy (`2.1.7-beta.1`) by its numeric core and sorts it below its release: against pin `2.1.7` it is `drift`, against `2.1.8` it is `newer`, and an equal version stays unflagged. Before, the pre-release read as equal to the pin (#204).
 - `--adopt` names a Cursor hook written as shell syntax (GSD's `$(for n in ...) ~/.cursor/hooks/gsd-cursor-<event>.js` loop) after the first script it runs, so it reads `sessionStart:gsd-cursor-session-start.js` instead of `sessionStart:$(for n in`; a shell command with no script reads `<event>:shell`. A second Cursor hook with the same event and name gets `#2`, a third `#3`, for shell and non-shell commands alike (#202).
 - `--upgrade-agent opencode` text rows end with the item's file (home-relative), as `--adopt` rows do, so the two `@tarquinen/opencode-dcp@latest` rows (`opencode.jsonc` and `tui.json`) no longer read as a duplicate (#203).
