@@ -33,7 +33,7 @@ function Get-FileMap([string]$dir, [string]$skip, [string]$filter) {
   return $map
 }
 function Get-Tree([string]$dir, [string]$skip) { $m = Get-FileMap $dir $skip ''; return (($m.Keys | Sort-Object | ForEach-Object { "${_}:$($m[$_])" }) -join "`n") }
-function Test-SameFiles([string]$a, [string]$b, [string]$filter) {
+function Test-SameFile([string]$a, [string]$b, [string]$filter) {
   $x = Get-FileMap $a '' $filter; $y = Get-FileMap $b '' $filter
   if ($x.Count -eq 0 -or $x.Count -ne $y.Count) { return $false }
   foreach ($k in $x.Keys) { if ($x[$k] -ne $y[$k]) { return $false } }
@@ -117,9 +117,9 @@ try {
   if ($bk.Count -eq 1) {
     $frozen = "$leanDir\opencode1\data\opencode"
     Assert-That 'RESTORE.md and MANIFEST.sha256 written' ((Test-Path "$($bk[0].FullName)\RESTORE.md") -and (Test-Path "$($bk[0].FullName)\MANIFEST.sha256"))
-    Assert-That 'backup data sha256 = live data' (Test-SameFiles $data "$($bk[0].FullName)\data" 'data')
-    Assert-That 'backup config sha256 = live config' (Test-SameFiles $cfgDir "$($bk[0].FullName)\config" '')
-    Assert-That 'frozen copy sha256 = live data' (Test-SameFiles $data $frozen 'data')
+    Assert-That 'backup data sha256 = live data' (Test-SameFile $data "$($bk[0].FullName)\data" 'data')
+    Assert-That 'backup config sha256 = live config' (Test-SameFile $cfgDir "$($bk[0].FullName)\config" '')
+    Assert-That 'frozen copy sha256 = live data' (Test-SameFile $data $frozen 'data')
     Assert-That 'backup has 3 sessions (temp copy)' ((Get-SessionCount "$($bk[0].FullName)\data") -eq 3)
     Assert-That 'frozen copy has 3 sessions (temp copy)' ((Get-SessionCount $frozen) -eq 3)
   }
@@ -145,3 +145,5 @@ try {
 }
 if ($failed) { throw 'real-upgrade-opencode failed (see the FAIL lines above)' }
 Write-Output 'real-upgrade-opencode ps1 OK'
+# A native command earlier leaves a non-zero $LASTEXITCODE (the refused runs are expected); the step must report the script's result.
+exit 0

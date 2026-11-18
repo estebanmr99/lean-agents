@@ -89,7 +89,7 @@ run_to() {
   wait "$pid"
 }
 oc_procs() {
-  if [ "$is_win" = 1 ]; then tasklist //FO CSV //NH 2>/dev/null | grep -ci '"opencode.exe"'; else ps -A -o comm= | grep -Ec '(^|/)opencode$'; fi
+  if [ "$is_win" = 1 ]; then tasklist //FO CSV //NH 2>/dev/null | grep -ci '"opencode.exe"'; else pgrep -x opencode | wc -l | tr -d ' '; fi
 }
 wait_procs() { # wait_procs <0|1>: 0 = none left, 1 = at least one, up to 20 s
   local i=0 n
