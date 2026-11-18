@@ -47,6 +47,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 - CI (CI-1, from a timing analysis of PR runs on 2026-11-18): on pull requests `test` and `package` skip macOS, and the Windows legs of `real-orca-opencode-v1`, `real-bun`, `real-tool-node` and `real-adopt` are skipped; push to main, tags, manual and nightly runs keep them. Required checks are unchanged. New `scripts/ci-timing.mjs` prints median/p90, last job and queue waits of recent PR runs.
 - The `--adopt` text report now prints every hook row and a `(note)`; linked skill copies are never auto-deleted and print a detail line (#213).
+- Cursor installer pin moves to the 2026-11-18 script (sha256 `dcb95f1b…51e4`, CLI 2026.11.17-f532c45), re-checked as text, not run (#218).
 - Release gate: `release.yml` stops before building anything when `docs/audit-<version>.md` is missing or an issue labeled `audit` is still open, so no release ships half audited. Audit findings of medium or higher get the new `audit` label.
 - The Cursor CLI installer pin moves to `cursor.com/install` as of 2026-11-13 (reviewed: one download from `downloads.cursor.com`, no sudo or eval), which fixes the `real-cursor` sha256 mismatch (#193).
 
