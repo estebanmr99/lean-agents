@@ -69,7 +69,8 @@ export function opencodeV1Adapter({ home, core, profile, opts, rulesPath }) {
   }
   const net = opts.network;
   if (net.outbound === 'off') edits.push({ path: ['share'], value: 'disabled', mode: 'set' });
-  if (net.autoUpdate === 'off') edits.push({ path: ['autoupdate'], value: false, mode: 'set' });
+  // Managed installs update through --update: off unless the user already set `autoupdate` (network off forces it).
+  edits.push({ path: ['autoupdate'], value: false, mode: net.autoUpdate === 'off' ? 'set' : 'setIfAbsent' });
   if (net.telemetry === 'off') edits.push({ path: ['experimental', 'openTelemetry'], value: false, mode: 'set' });
   if (net.outbound === 'off' && profile?.provider !== 'opencode') edits.push({ path: ['disabled_providers'], value: 'opencode', mode: 'arrayAdd' });
   actions.push({ kind: 'json', path: configPath(dir), edits });
