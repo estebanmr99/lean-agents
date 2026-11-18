@@ -29,6 +29,24 @@ const toolFloor = () => ['context-mode', 'gsd-core'].map((k) => PINS[k]?.node).f
   .reduce((a, b) => (compare(minVersion(b), minVersion(a)) > 0 ? b : a));
 const floorText = (range) => minVersion(range).join('.');
 
+// nvm's undo runs later, so it decides then: ~/.nvm goes only when every Node under it is one lean-agents installs (the floor's
+// major, v24); otherwise it stays and says why. shortcut: a user's own v24 counts as ours, upgrade when state records the version.
+const nvmUndo = (node, dir, major) => [[node, '-e',
+  `const fs=require('fs'),p=require('path'),d=process.argv[1],v=p.join(d,'versions','node'),r=new RegExp('^v${major}\\\\.');`
+  + `const o=fs.existsSync(v)?fs.readdirSync(v,{withFileTypes:true}).filter(e=>e.isDirectory()&&!r.test(e.name)).map(e=>e.name):[];`
+  + `if(o.length)console.log('kept '+d+': it holds Node versions lean-agents did not install ('+o.join(', ')+')');else fs.rmSync(d,{recursive:true,force:true})`,
+  dir]];
+
+// The agents --everything configures: Claude Code and OpenCode 2 everywhere; on Windows the team preset adds the ones found
+// (Copilot CLI, VS Code Copilot, Antigravity) and lists the missing ones so the plan says what it skipped.
+export const TEAM_AGENTS = ['copilot-cli', 'vscode-copilot', 'antigravity'];
+export function everythingAgents({ platform, detected = {}, project = false }) {
+  const base = ['claude', 'opencode-v2'];
+  if (platform !== 'win32') return { agents: base, skipped: [] };
+  const team = TEAM_AGENTS.filter((a) => !(project && a === 'antigravity')); // Antigravity has no project scope
+  return { agents: [...base, ...team.filter((a) => detected[a])], skipped: team.filter((a) => !detected[a]) };
+}
+
 // winget ids, brew formulas `rtk` and `uv`, and `--scope user` for Git.Git are unverified on a fresh machine. VERIFY
 const WINGET = (id) => ['winget', 'install', '--id', id, '-e', '--scope', 'user', '--accept-source-agreements', '--accept-package-agreements'];
 
@@ -83,7 +101,7 @@ export function planPrereqs(probe) {
       id: 'nvm', label: 'nvm', why: 'Node manager: lets the tools get Node 24 without touching your Node.',
       // PROFILE=/dev/null keeps the installer away from the shell profile; the engine finds $NVM_DIR itself. Script hash VERIFY.
       commands: [fetch(NVM_INSTALL_URL, script), ['env', `NVM_DIR=${nvmDir}`, 'PROFILE=/dev/null', 'bash', script]],
-      undo: [['rm', '-rf', nvmDir]], // only runs when this step ran: skipIf covers an existing nvm
+      undo: nvmUndo(node, nvmDir, minVersion(floor)[0]),
       skipIf: has.nvm ? 'nvm is installed' : null,
     });
   }

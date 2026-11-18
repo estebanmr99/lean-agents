@@ -181,7 +181,7 @@ Every flag from `--help`. In PowerShell the same flags are PascalCase (`-DryRun`
 | `--tools a,b` | Optional tools on top of RTK and Context Mode: serena, playwright, ponytail, caveman, i-have-adhd, dcp, codeburn, copilot-usage, gsd, autoskills, playwright-extension, coordinate, lean-migrate |
 | `--all-tools` | Every optional tool except gsd, autoskills, playwright-extension, coordinate and lean-migrate |
 | `--no-tools` | No optional tools |
-| `--everything` | Fresh-machine preset: plans the missing prerequisites first (Homebrew, nvm, Node 24 under nvm, uv, RTK, Bun), then Claude Code + OpenCode 2 with every optional tool, shows one plan and asks once (`--yes` accepts; `--dry-run --json` prints it; a rerun resumes). Your own Node stays the default. `--agents` and `--tools` still override it |
+| `--everything` | Fresh-machine preset: plans the missing prerequisites first (Homebrew, nvm, Node 24 under nvm, uv, RTK, Bun), then Claude Code + OpenCode 2 (on Windows also the Copilot CLI, VS Code Copilot and Antigravity that are installed; missing ones are listed as skipped in the plan) with every optional tool, shows one plan and asks once (`--yes` accepts; `--dry-run --json` prints it; a rerun resumes). Your own Node stays the default. `--agents` and `--tools` still override it |
 | `--no-core` | Leave out RTK and Context Mode; install only the `--tools` you list |
 | `--privacy` standard or strict | Same as `--network on` (standard) or `--network off` (strict) |
 | `--network` on or off | Preset for telemetry, auto-updates and other outbound calls |
@@ -201,7 +201,7 @@ Every flag from `--help`. In PowerShell the same flags are PascalCase (`-DryRun`
 | `--feedback-draft` | After a failed install: read the error on stdin and print a redacted issue draft as JSON. Needs `--failed-command` |
 | `--failed-command <text>` | The command that failed, for `--feedback-draft` |
 | `--feedback-kind update` | With `--feedback-draft`: the text is a finding from an update, not an error |
-| `--update` | Re-apply with your saved choices |
+| `--update` | Re-apply with your saved choices; the plan lists `tool: installed -> release pin`, what stays held (OpenCode 1.x, agent CLIs across a major, tools you installed yourself) and the release notes since your version (`--dry-run [--json]` shows it without changing anything) |
 | `--doctor` | Check the install |
 | `--uninstall` | Undo everything lean-agents changed |
 | `--adopt` | List what a hand-built machine already has and what each item is; with `--yes` it applies the plan |

@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The macOS legs run here and on dispatch only: on push to main they waited 20+ minutes for a runner and were cancelled.
+  schedule:
+    - cron: '17 7 * * *'
   # A PR opened with GITHUB_TOKEN triggers no pull_request run; the pin-bump job dispatches this on the PR branch instead.
   workflow_dispatch:
   workflow_call:
@@ -17,8 +20,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ inputs.latest && 'latest-' || '' }}${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push cancels an older PR run, but every push to main keeps its own run: back-to-back merges used to cancel
+  # each other, so the macOS legs that only run on main almost never finished.
+  group: ci-${{ inputs.latest && 'latest-' || '' }}${{ github.event_name == 'push' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # Context Mode 2 needs Node >=24.15 (on older Node npm installs 1.x, and the engine skips it), so every real-* job uses this.
@@ -101,7 +106,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest","windows-latest"]' || '["ubuntu-latest","macos-latest","windows-latest"]') }}
+        os: ${{ fromJSON(github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && '["ubuntu-latest","windows-latest"]' || '["ubuntu-latest","macos-latest","windows-latest"]') }}
         node: [22]
     runs-on: ${{ matrix.os }}
     env:
@@ -243,7 +248,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest","windows-latest"]' || '["ubuntu-latest","macos-latest","windows-latest"]') }}
+        os: ${{ fromJSON(github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && '["ubuntu-latest","windows-latest"]' || '["ubuntu-latest","macos-latest","windows-latest"]') }}
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -648,7 +653,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["ubuntu-latest","macos-latest"]') }}
+        os: ${{ fromJSON(github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && '["ubuntu-latest"]' || '["ubuntu-latest","macos-latest"]') }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -805,7 +810,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         agents: [claude, opencode-v1, opencode-v2, 'claude,opencode-v2']
-        include: ${{ fromJSON(github.event_name == 'pull_request' && '[]' || '[{"os":"macos-latest","agents":"claude,opencode-v2"}]') }}
+        include: ${{ fromJSON(github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && '[]' || '[{"os":"macos-latest","agents":"claude,opencode-v2"}]') }}
     runs-on: ${{ matrix.os }}
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1
@@ -910,7 +915,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["ubuntu-latest","macos-latest"]') }}
+        os: ${{ fromJSON(github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && '["ubuntu-latest"]' || '["ubuntu-latest","macos-latest"]') }}
     runs-on: ${{ matrix.os }}
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1
@@ -963,7 +968,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["ubuntu-latest","macos-latest"]') }}
+        os: ${{ fromJSON(github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && '["ubuntu-latest"]' || '["ubuntu-latest","macos-latest"]') }}
     runs-on: ${{ matrix.os }}
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1
@@ -1271,7 +1276,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["ubuntu-latest","macos-latest"]') }}
+        os: ${{ fromJSON(github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && '["ubuntu-latest"]' || '["ubuntu-latest","macos-latest"]') }}
     runs-on: ${{ matrix.os }}
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1

@@ -181,7 +181,7 @@ Cada opción de `--help`. En PowerShell se escriben en PascalCase (`-DryRun`).
 | `--tools a,b` | Herramientas opcionales además de RTK y Context Mode: serena, playwright, ponytail, caveman, i-have-adhd, dcp, codeburn, copilot-usage, gsd, autoskills, playwright-extension, coordinate, lean-migrate |
 | `--all-tools` | Todas las herramientas opcionales salvo gsd, autoskills, playwright-extension, coordinate y lean-migrate |
 | `--no-tools` | Ninguna herramienta opcional |
-| `--everything` | Preajuste para una máquina nueva: planifica primero los requisitos que faltan (Homebrew, nvm, Node 24 bajo nvm, uv, RTK, Bun), luego Claude Code + OpenCode 2 con todas las herramientas opcionales, muestra un solo plan y pregunta una vez (`--yes` acepta; `--dry-run --json` lo imprime; al repetir se reanuda). Tu Node sigue siendo el predeterminado. `--agents` y `--tools` lo sustituyen |
+| `--everything` | Preajuste para una máquina nueva: planifica primero los requisitos que faltan (Homebrew, nvm, Node 24 bajo nvm, uv, RTK, Bun), luego Claude Code + OpenCode 2 (en Windows también el Copilot CLI, VS Code Copilot y Antigravity que estén instalados; los que faltan aparecen como omitidos en el plan) con todas las herramientas opcionales, muestra un solo plan y pregunta una vez (`--yes` acepta; `--dry-run --json` lo imprime; al repetir se reanuda). Tu Node sigue siendo el predeterminado. `--agents` y `--tools` lo sustituyen |
 | `--no-core` | Deja fuera RTK y Context Mode; instala solo las de `--tools` |
 | `--privacy` standard o strict | Igual que `--network on` (standard) o `--network off` (strict) |
 | `--network` on u off | Preajuste de telemetría, auto-updates y otras llamadas salientes |
@@ -201,7 +201,7 @@ Cada opción de `--help`. En PowerShell se escriben en PascalCase (`-DryRun`).
 | `--feedback-draft` | Tras un fallo de instalación: lee el error por stdin e imprime un borrador de issue sin datos sensibles en JSON. Necesita `--failed-command` |
 | `--failed-command <texto>` | El comando que falló, para `--feedback-draft` |
 | `--feedback-kind update` | Con `--feedback-draft`: el texto es un hallazgo de una actualización, no un error |
-| `--update` | Vuelve a aplicar con tus opciones guardadas |
+| `--update` | Vuelve a aplicar con tus opciones guardadas; el plan lista `herramienta: instalada -> pin de la versión`, lo que queda retenido (OpenCode 1.x, CLIs de agentes que cambian de major, herramientas que instalaste tú) y las notas de versión desde la tuya (`--dry-run [--json]` lo muestra sin cambiar nada) |
 | `--doctor` | Revisa la instalación |
 | `--uninstall` | Deshace todo lo que lean-agents cambió |
 | `--adopt` | Lista lo que ya tiene una máquina armada a mano y qué es cada cosa; con `--yes` aplica el plan |

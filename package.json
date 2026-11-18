@@ -17,7 +17,8 @@
   "files": [
     "scripts/",
     "core/",
-    "profiles/"
+    "profiles/",
+    "CHANGELOG.md"
   ],
   "bundleDependencies": true,
   "scripts": {

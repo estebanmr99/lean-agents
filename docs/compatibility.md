@@ -298,6 +298,7 @@ Checked 2026-11-10 for Session 64 (#64, #66, #75). Every value is read from the 
 | Bun 1.4.4 zips (linux-x64, linux-aarch64, windows-x64, windows-aarch64) and their SHA256 from the release `SHASUMS256.txt`; macOS stays on Homebrew. Linux x64 CPUs without AVX2 would need the `-baseline` zip, which is not offered. The Windows route (Expand-Archive, user PATH) is **VERIFY** until `real-bun` passes on `windows-latest` | github.com/oven-sh/bun/releases/tag/bun-v1.4.4 | 2026-11-10 |
 | `install.sh` without Homebrew or Node.js (#179 PR3): Node.js tarball `https://nodejs.org/dist/latest-v24.x/node-v<ver>-{darwin,linux}-{arm64,x64}.tar.gz` checked against `SHASUMS256.txt` of the same folder (integrity only; the `.sig` GPG signature is not checked **VERIFY**); official Homebrew installer pinned to commit `e5b3c5834e39` (`raw.githubusercontent.com/Homebrew/install/<commit>/install.sh`, sha256 in `install.sh` and `core/pins.json` `homebrew-installer`, checked before it runs; downloaded as text and read once 2026-11-18: sudo, `git clone` of brew, Command Line Tools via `softwareupdate`, prints the PATH lines and edits no shell profile; upstream moves, so the pin is bumped like the others **VERIFY**) run interactively with stdin from `/dev/tty` (it installs the Xcode Command Line Tools itself; unattended `NONINTERACTIVE=1` needs sudo without a password **VERIFY**; not run on any CI runner, which has Homebrew); curl reads `HTTPS_PROXY`/`https_proxy` and `NO_PROXY`, `NODE_EXTRA_CA_CERTS` becomes `--cacert` only when a proxy variable is set (replaces curl's roots, so right only behind a TLS-inspecting proxy **VERIFY** behind a real one) | [Node.js dist](https://nodejs.org/dist/latest-v24.x/), [Homebrew install](https://docs.brew.sh/Installation), [curl --cacert](https://curl.se/docs/manpage.html#--cacert); `tests/real-bootstrap.sh` (k) to (n) with a stub tarball and stub curl, PATH without node | 2026-11-18 |
 | `--everything` (#179 PR2): runs `scripts/lib/prereqs.mjs` steps through the engine; Homebrew via the pinned installer (`core/pins.json` `homebrew-installer`) with `NONINTERACTIVE=1` and `/opt/homebrew/bin` prepended to PATH for the later `brew install` steps (unattended behavior and PATH pickup **VERIFY**, not run on any CI runner); nvm-windows admin path stays **VERIFY** | this repo, `tests/everything.test.mjs` (plan only, `--no-exec`) | 2026-11-18 |
+| `--everything` team preset (#179 PR5): Windows adds `copilot-cli`, `vscode-copilot`, `antigravity` to the default agents when `detectAgents()` finds them (same detection as the agent menu); nvm undo is a Node one-liner that removes `~/.nvm` only when `versions/node` holds only v24 (a user's own v24 counts as ours: limit) | this repo, `tests/prereqs.test.mjs` (undo run against a synthetic `.nvm`) | 2026-11-18 |
 | OpenCode 2 is on npm as `@opencode/cli` (+ `@opencode/cli-<target>`); its installer takes `--version`. CI runs 2.2.5 (2.2.6 is under 14 days old). The installer script is pinned by SHA256 in `tests/ci-downloads.json`; the Antigravity and Cursor installers the same way, so a changed script fails CI until its hash is reviewed. What those installers then download is chosen by them. `tests/real-opencode.sh` was **not** run against 2.2.5 locally: another OpenCode service held the port. The install and `opencode --version` (v2.2.5) worked | `opencode.ai/v2/install --help`, npm registry | 2026-11-10 |
 | VS Code 1.144.0 linux-x64 tarball URL and `sha256hash` | `update.code.visualstudio.com/api/versions/1.144.0/linux-x64/stable` | 2026-11-10 |
 | `real-proxy` keeps `GH_TOKEN`: `tests/real-proxy.sh` calls `gh api /zen` twice | `grep gh tests/real-proxy.sh` | 2026-11-10 |
@@ -613,3 +614,31 @@ Guide only, no code change: `docs/install-with-an-agent.md`, section "VS Code Co
 - **VERIFY:** the `*.prompt.md` user folder (`<VS Code user dir>/prompts`); no `/lean-install` prompt file is written until it is proven.
 - **VERIFY:** whether VS Code, not only Copilot CLI, loads `~/.copilot` rules and agents.
 - Antigravity pilot users use the same guide (owner default, 2026-11-18).
+
+## Update plan (#182 PR2, 2026-11-18)
+
+`--update` prints one row per pinned tool in use whose saved version differs from `core/pins.json` (`tool: installed -> pin`), then what it will not move, then the `CHANGELOG.md` sections after the saved lean-agents version (`scripts/lib/update-plan.mjs`; `--dry-run --json` has `update.rows` and `update.notes`).
+
+| Case | Shown as | Moved by `--update` |
+| --- | --- | --- |
+| Pinned tool in use, behind the pin | `update` | yes (as before) |
+| OpenCode 1.x on PATH | `held` | never |
+| Agent CLI (claude, opencode 2, copilot) behind its pin, same major, installed by lean-agents | `report` | not yet (later #182 PR) |
+| Same, pin is another major | `major` | never |
+| Same, installed by the user (not in `agents.json`) | `own` | never |
+
+Versions of the agent CLIs come from `<bin> --version` run with a scratch HOME (`opencode --version` writes a log under HOME). The notes need `CHANGELOG.md` in the package: it is now in the `files` list of `package.json` (checked with `tests/update-plan.test.mjs` against the repo copy; **VERIFY** with `npm pack --dry-run` at release). Cursor and Antigravity have no version pin, so no row.
+
+## Fresh-machine workflow (#179 PR6, 2026-11-18)
+
+`.github/workflows/fresh-machine.yml` runs nightly (05:23 UTC) and on `workflow_dispatch` only, never on a pull request. It packs the release files once, then runs the real `install.sh` / `install.ps1 --everything --yes` and `--doctor` (must exit 0) from `LEAN_AGENTS_DIST`, into a throwaway HOME, on `macos-latest`, `windows-latest` and an `ubuntu:24.04` container. A failure opens or comments one `version-watch` issue, "Fresh-machine install breaks". `force-fail` tests the report.
+
+| Leg | What is hidden | How |
+| --- | --- | --- |
+| macOS | brew, Node.js, npm, git, gh, nvm | `/opt/homebrew` and `/usr/local/Homebrew` are renamed (throwaway VM); PATH is `/usr/bin:/bin:/usr/sbin:/sbin`, `env -i` |
+| Windows | Node.js, npm, git, gh, nvm | PATH entries matching them are dropped; `USERPROFILE` is a temp folder |
+| Linux | everything | the stock image has none; only `curl` and CA certificates are added for `install.sh` |
+
+**Limit:** this is a PATH trick on a runner image, not a bare machine. `/usr/bin/git` (the Xcode shim) stays on macOS, winget and the Windows system tools stay, and a per-user install on the runner could still be found by absolute path. Corporate proxy and TLS inspection are only provable on the owner's PC.
+
+**VERIFY** (first nightly runs decide): Homebrew's pinned installer unattended on macOS runners (including the Xcode CLT step); nvm-windows without admin on `windows-latest`; `--everything` as root in the Ubuntu container; `actions/download-artifact` inside the container. Not run locally: no real binaries on the owner's machine.
