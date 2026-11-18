@@ -62,3 +62,11 @@ test('the same plugin in the server config and tui.json is two needed rows with 
   assert.equal(lines.length, 2);
   assert.ok(lines.some((l) => l.includes('opencode.jsonc')) && lines.some((l) => l.includes('tui.json')));
 });
+
+// #204: a pre-release is older than its release and compares by its numeric core; equal versions stay unflagged.
+test('a pre-release copy is drift below its pin, newer when its core is above the pin, and unflagged when equal', { skip }, async () => {
+  const one = async (v) => npm(await run(home([['24.20.0', v]])))[0].status;
+  assert.ok((await one(`${maj}.${min}.${pat}-beta.1`)).includes('drift'));
+  assert.ok((await one(`${maj}.${min}.${pat + 1}-beta.1`)).includes('newer'));
+  assert.deepEqual(await one(pin), []);
+});
