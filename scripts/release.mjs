@@ -5,6 +5,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { diffPins, toolVersionsTable } from './lib/pins-diff.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -15,6 +16,28 @@ export function releaseNotes(changelog, version) {
   const rest = lines.slice(start + 1);
   const end = rest.findIndex((l) => l.startsWith('## ['));
   return rest.slice(0, end < 0 ? undefined : end).join('\n').trim();
+}
+
+const nums = (v) => v.replace(/^v/, '').split('-')[0].split('.').map(Number);
+
+// Highest `v<x.y.z>` tag below `version`, or null (first release, or a shallow clone without tags).
+export function previousTag(tags, version) {
+  const cmp = (a, b) => { const x = nums(a), y = nums(b); return (x[0] - y[0]) || (x[1] - y[1]) || (x[2] - y[2]); };
+  return tags.filter((t) => /^v\d+\.\d+\.\d+$/.test(t) && cmp(t, version) < 0).sort(cmp).pop() ?? null;
+}
+
+// "Tool versions" section from the pins at the previous tag; '' when there is no earlier pins file or nothing changed.
+export function toolVersionsSection(prevPins, nextPins) {
+  const table = toolVersionsTable(diffPins(prevPins, nextPins));
+  return table ? `## Tool versions\n\n${table}` : '';
+}
+
+function pinsAtPreviousTag(version) {
+  const git = (args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  try {
+    const tag = previousTag(git(['tag', '--list', 'v*']).split('\n'), version);
+    return tag ? JSON.parse(git(['show', `${tag}:core/pins.json`])) : null;
+  } catch { return null; } // a tag from before core/pins.json existed, or no git: the notes just skip the table
 }
 
 // Needs `npm ci --omit=dev` first: the tarball bundles node_modules.
@@ -36,7 +59,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (!notes) throw new Error(`CHANGELOG.md has no notes for ${version}`);
   const dist = path.join(ROOT, 'dist');
   fs.mkdirSync(dist, { recursive: true });
-  fs.writeFileSync(path.join(dist, 'notes.md'), `${notes}\n`);
+  const nextPins = JSON.parse(fs.readFileSync(path.join(ROOT, 'core', 'pins.json'), 'utf8'));
+  const versions = toolVersionsSection(pinsAtPreviousTag(version), nextPins);
+  fs.writeFileSync(path.join(dist, 'notes.md'), `${[notes, versions].filter(Boolean).join('\n\n')}\n`);
   const name = `lean-agents-${version}`;
   for (const ext of ['tar.gz', 'zip']) {
     execFileSync('git', ['archive', '--format', ext, '--prefix', `${name}/`, '-o', path.join(dist, `${name}.${ext}`), 'HEAD'], { cwd: ROOT });
