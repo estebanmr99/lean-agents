@@ -527,6 +527,23 @@ Spike for #80 (job `spike-opencode-side`, PR #143, CI run 43350726437, 2026-11-1
 - **Note:** 2.x migrates the shared 1.x db in place (owner decision pending for 0.9.0; PR B is deferred).
 - **Layout answer: I (isolate).** Config could be shared, but 2.x migrates the shared 1.x database, so a 1.x user's sessions cannot be left untouched without giving 1.x its own data dir. Next (PR B): prove isolation (`XDG_DATA_HOME` or equivalent for the `opencode1` shim) before any upgrade path ships.
 
+### Isolation proof for `opencode1` (#80 part 2, P1)
+
+Source: `tests/spike-opencode-side.sh` / `.ps1`, job `spike-opencode-side` (now per PR, ubuntu-latest + windows-latest), throwaway HOME, 1.19.0 and 2.2.5, a mock LLM (`tests/fixtures/mock-llm.mjs`) for the seeded session. Run locally on macOS (throwaway HOME, not CI) 2026-11-18. **VERIFY** Linux and Windows until this PR's job is green; macOS stays VERIFY (real-* jobs skip PRs, #56).
+
+| Env set for 1.19 (frozen copy of data/state/config, then `opencode run` through the mock) | Live dirs after | Session | MCP child (stdio) |
+| --- | --- | --- | --- |
+| (a2) `XDG_DATA_HOME` + `XDG_STATE_HOME`, config dir shared | data, state, config: 0 changed files | lands in the frozen db (1 -> 2) | `gh` on PATH, `gh` login found |
+| (a1) (a2) + `XDG_CONFIG_HOME` | 0 changed files | lands in the frozen db (1 -> 2) | `gh` on PATH, `gh` login **missing**: `gh` reads `$XDG_CONFIG_HOME/gh`, so a moved config dir hides its login (Windows: **VERIFY**, `gh` documents `XDG_CONFIG_HOME` before `%AppData%`; the job's Windows leg prints the result) |
+| (b) `OPENCODE_DB` + `OPENCODE_CONFIG_DIR` | **changed**: `log/opencode.log`, new `locks/*`, state files; `storage/` and `snapshot/` stay live | in the frozen db (1 -> 2) | `gh` found, no XDG vars inherited |
+
+- **Which env set works:** `XDG_DATA_HOME` + `XDG_STATE_HOME` (a2). 1.19 and 2.x both print the XDG dirs in `opencode debug paths`. `OPENCODE_DB` moves only the db, so it is not isolation.
+- **Config for `opencode1`:** keep it shared (a2) unless the frozen config is needed: setting `XDG_CONFIG_HOME` is inherited by MCP children and hides the `gh` login (the plan's rule: frozen config only if MCP children still see `gh`).
+- **MCP children inherit the shim's env:** `XDG_DATA_HOME` and `XDG_STATE_HOME` reach the child (booleans logged by the probe); PATH is intact. Only tools that store their own state under those dirs (not `gh` auth) would notice.
+- **Does 2.x migrate the db on its own commands?** `opencode --version`: no, the db file is unchanged. `opencode debug config`: **yes**, the db file changes (it runs the migration like any command that opens the db); `session list` too. So even a config check on 2.x counts as the first 2.x start: the backup and frozen copy must exist before it.
+- **Windows (native PowerShell, CI job `spike-opencode-side (windows-latest)`, 2026-11-18):** XDG works as in the source (`packages/core/src/global.ts` at v1.19.0 reads `xdg-basedir` 5.1.0, which honors `XDG_*_HOME` on win32; the db is `<data>\opencode.db`). `opencode debug paths` printed `data`, `state` and `config` under the frozen root (backslash paths) with `XDG_DATA_HOME` + `XDG_STATE_HOME` + `XDG_CONFIG_HOME` set and `HOME`/`USERPROFILE` pointing at the throwaway; the frozen `opencode.db` grew and the live files kept their size. The earlier `frozen sessions 1 -> 1` FAIL was a test bug, not an isolation failure (the db grew; an array unroll did not fix the PowerShell count either): `tests/spike-opencode-side.ps1` now counts like the engine (`COUNT_SCRIPT` in `scripts/lib/adopt.mjs`): `node:sqlite` read-only on a copy of `opencode.db` (+wal/shm), no JSON parsing. Pre-existing, not from this PR: the V3 step of `tests/spike-opencode-side.sh` logs `ENOENT ... cfg-1x.jsonc` (Git Bash `/tmp` path inside `node -e`) and `ERR_UNSUPPORTED_ESM_URL_SCHEME ... 'd:'` (`import()` of a Windows path, needs `pathToFileURL`) on Windows; they do not fail the job. Not moved by XDG: `home` and the `cache`/`bin` dirs stay under `HOME` (`.cache/opencode`, e.g. `models.json`), and `tmp` stays in `%TEMP%\opencode`. None holds sessions. Source: upstream v1.19.0 + job log.
+- **Not proven here:** `OPENCODE_DB` on 2.x; XDG honoring on macOS in CI.
+
 - **Antigravity skill undo scope (#229, item 3): VERIFY.** `skills remove` runs without `-a` (`remove -a` keeps `~/.agents/skills`), so if the skills CLI uses a shared canonical folder it could delete a copy another adapter installed. Needs the real skills CLI layout (`tests/real-antigravity.sh`); behavior unchanged until proven (2026-11-18).
 
 ## Plugin health (#212, 2026-11-18)

@@ -494,11 +494,13 @@ jobs:
         run: bash tests/real-opencode-v1.sh
 
   spike-opencode-side:
-    # Manual only (workflow_dispatch; no per-PR cost), kept for reruns before PR B (0.9.0, #80 B0): OpenCode 1.19 and 2.2.5 in one throwaway HOME. Prints
-    # V1-V4 evidence (paths, config/data hashes, key tolerance, installer footprint) for the
-    # shared-vs-isolated layout decision; fails only if setup (installs) or a binary's --version fails.
+    # OpenCode 1.19 and 2.2.5 in one throwaway HOME (#80 B0: V1-V4 evidence for the shared-vs-isolated layout decision) and
+    # the isolation proof for `opencode1` (#80 part 2, P1): 1.19 on a frozen copy under XDG_DATA_HOME + XDG_STATE_HOME leaves the
+    # live dirs byte-identical (asserted), OPENCODE_DB + OPENCODE_CONFIG_DIR is printed as evidence, plus what a stdio MCP child
+    # inherits and whether 2.x migrates the db on --version / debug config. Windows also runs the native PowerShell half.
+    # macOS stays VERIFY (real-* jobs skip PRs, #56).
     needs: changes
-    if: needs.changes.outputs.code == 'true' && github.event_name == 'workflow_dispatch'
+    if: needs.changes.outputs.code == 'true'
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -513,9 +515,15 @@ jobs:
         with:
           node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
       - run: npm ci
-      - name: Side-by-side spike
+      - name: Side-by-side spike and isolation proof
         shell: bash
         run: bash tests/spike-opencode-side.sh
+      - name: Isolation proof from PowerShell 5.1 (the way opencode1.cmd sets its env)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          npm install -g "$(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('opencode-v1')))")"
+          powershell -NoProfile -ExecutionPolicy Bypass -File tests/spike-opencode-side.ps1
 
   real-opencode-shell:
     # Spike for issue #124 follow-up: does OpenCode's `shell` config key govern the Windows bash/shell
