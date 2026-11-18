@@ -61,7 +61,7 @@ const lean = (home, args) => {
   assert.equal(r.status, 0, r.stderr || r.stdout);
 };
 
-// Paths and bytes of every file. Empty directories are not compared (uninstall leaves some; see the PR). Ignored: the engine's own folder (backups, and the state.uninstalled-*.json it keeps on purpose).
+// Paths and bytes of every file. Empty directories are not compared (uninstall leaves some, #223). Ignored: the engine's own folder (backups, and the state.uninstalled-*.json it keeps on purpose).
 function snapshot(root) {
   const out = {};
   const walk = (d) => {
@@ -70,7 +70,7 @@ function snapshot(root) {
       const rel = path.relative(root, p).split(path.sep).join('/');
       if (rel === '.config/lean-agents') continue;
       if (e.isDirectory()) walk(p);
-      else out[rel] = fs.readFileSync(p, 'utf8');
+      else out[rel] = fs.readFileSync(p).toString('base64');
     }
   };
   walk(root);
@@ -78,8 +78,9 @@ function snapshot(root) {
 }
 
 for (const agent of Object.keys(userFiles('/h'))) {
-  test(`${agent}: install then --uninstall leaves HOME as it was`, () => {
+  test(`${agent}: install then --uninstall leaves HOME as it was`, (t) => {
     const home = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'lean-roundtrip-')));
+    t.after(() => fs.rmSync(home, { recursive: true, force: true }));
     for (const [rel, text] of Object.entries(userFiles(home)[agent])) {
       fs.mkdirSync(path.dirname(path.join(home, rel)), { recursive: true });
       fs.writeFileSync(path.join(home, rel), text);
