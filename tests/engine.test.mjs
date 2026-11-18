@@ -22,6 +22,8 @@ const ALL = ['--yes', '--no-exec', '--agents', 'claude,opencode-v2', '--all-tool
 
 // The host Node must not decide whether Context Mode is planned (it needs Node 24.15+); child engines inherit this.
 process.env.LEAN_AGENTS_NODE ??= '24.22.2';
+// The Claude adapter respects an exported DISABLE_AUTOUPDATER (#284); a developer shell must not change what these tests expect.
+delete process.env.DISABLE_AUTOUPDATER;
 
 function lean(home, args, env = process.env) {
   const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args], { encoding: 'utf8', env });
@@ -697,8 +699,25 @@ test('--network off still plans the tools you pick (privacy.md: the preset sets 
 
 test('one category flag overrides the preset', () => {
   const r = switchesFor(['claude', 'opencode-v2'], ['--network', 'off', '--auto-update', 'on']);
-  assert.deepEqual(r.claude, ['DISABLE_AUTOUPDATER', 'DISABLE_BUG_COMMAND', 'DISABLE_ERROR_REPORTING', 'DISABLE_TELEMETRY', 'DO_NOT_TRACK']);
-  assert.equal(r['opencode-v2'].update, 'disable');
+  // an explicit --auto-update on writes no updater switch (#284)
+  assert.deepEqual(r.claude, ['DISABLE_BUG_COMMAND', 'DISABLE_ERROR_REPORTING', 'DISABLE_TELEMETRY', 'DO_NOT_TRACK']);
+  assert.equal(r['opencode-v2'].update, undefined);
+  const all = switchesFor(['claude', 'opencode-v1', 'copilot-cli'], ['--auto-update', 'on']);
+  assert.ok(!all.claude.includes('DISABLE_AUTOUPDATER') && all['opencode-v1'].autoupdate === undefined && all['copilot-cli'] === undefined);
+  // the choice is saved, so --update keeps it
+  const kept2 = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-net-'));
+  lean(kept2, [...NET_BASE, '--agents', 'claude', '--auto-update', 'on']);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(kept2, '.config', 'lean-agents', 'state.json'), 'utf8')).options.keepUpdater, true);
+  lean(kept2, ['--update', '--yes', '--no-exec']);
+  assert.ok(!('DISABLE_AUTOUPDATER' in parse(fs.readFileSync(path.join(kept2, '.claude', 'settings.json'), 'utf8')).env));
+  // a plain preset on keeps the managed default and says why
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-net-'));
+  assert.match(lean(home, [...NET_BASE, '--agents', 'claude', '--network', 'on'], { PATH: process.env.PATH, NVM_DIR: process.env.NVM_DIR ?? '', HOME: home }), /auto-update: claude keep their own updater off because --update owns updates/);
+  // a DISABLE_AUTOUPDATER the user already exported is respected
+  const envHome = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-net-'));
+  const kept = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', envHome, ...NET_BASE, '--agents', 'claude'], { encoding: 'utf8', env: { PATH: process.env.PATH, NVM_DIR: process.env.NVM_DIR ?? '', HOME: envHome, DISABLE_AUTOUPDATER: '0' } });
+  assert.equal(kept.status, 0, kept.stderr);
+  assert.ok(!('DISABLE_AUTOUPDATER' in parse(fs.readFileSync(path.join(envHome, '.claude', 'settings.json'), 'utf8')).env));
   assert.deepEqual(switchesFor(['claude'], ['--telemetry', 'off']).claude, ['DISABLE_AUTOUPDATER', 'DISABLE_ERROR_REPORTING', 'DISABLE_TELEMETRY', 'DO_NOT_TRACK']);
   const bad = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--outbound', 'maybe'], { encoding: 'utf8' });
   assert.match(bad.stderr, /--outbound takes on or off/);

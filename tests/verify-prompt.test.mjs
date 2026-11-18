@@ -28,7 +28,10 @@ test('outbound on: per-issue consent wording, search, draft, file, write-back', 
   assert.match(en, /Only after my yes, run `gh issue create/);
   assert.match(en, /--filed-issue/);
   assert.match(en, /--summary/);
-  assert.ok(en.indexOf('gh issue list') < en.indexOf('File this issue?') && en.indexOf('File this issue?') < en.indexOf('gh issue create'));
+  // the duplicate search sends text to GitHub, so it comes after the yes and uses the redacted title
+  assert.ok(en.indexOf('File this issue?') < en.indexOf('gh issue list') && en.indexOf('gh issue list') < en.indexOf('gh issue create'));
+  assert.match(en, /Only after my yes, search open issues.*--search "<draft title>"/);
+  assert.ok(!en.includes('--search "<item>"'));
   const es = verifyPrompt({ lang: 'es', network: on });
   assert.match(es, /No crees nada sin mi sí\. Un sí cubre un solo issue/);
   assert.match(es, /Solo después de mi sí, ejecuta `gh issue create/);

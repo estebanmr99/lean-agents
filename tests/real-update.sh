@@ -78,6 +78,11 @@ if [ "${CI_LATEST:-}" = true ]; then
   ln -s "$repo/node_modules" "$prev/node_modules"
   curl -fsSL "https://raw.githubusercontent.com/estebanmr99/lean-agents/v$rel/core/pins.json" -o "$work/release-pins.json"
   node -e "const fs=require('node:fs'),[f,r]=process.argv.slice(1),j=JSON.parse(fs.readFileSync(f,'utf8')),o=JSON.parse(fs.readFileSync(r,'utf8'));for(const [k,p] of Object.entries(j.pins)){const q=o.pins?.[k];if(q&&q.version&&!p.hold)p.version=q.version}fs.writeFileSync(f,JSON.stringify(j,null,2))" "$prev/core/pins.json" "$work/release-pins.json"
+  # Identical pins would make the cycle a no-op that still prints OK: skip instead.
+  if ! node -e "const r=(f)=>JSON.parse(require('fs').readFileSync(f,'utf8')).pins,a=r(process.argv[1]),b=r(process.argv[2]);process.exit([...new Set([...Object.keys(a),...Object.keys(b)])].some((k)=>a[k]?.version!==b[k]?.version)?0:1)" "$prev/core/pins.json" "$repo/core/pins.json"; then
+    echo "real-update N-1 ($rel): SKIP, the release pins equal this checkout's pins (nothing to update)"
+    exit 0
+  fi
   prevv="$(node -p "require('$prev/core/pins.json').pins['context-mode'].version")"
   node "$prev/scripts/lean.mjs" --home "$HOME" "${flags[@]}" </dev/null 2>&1 | tee "$work/n1-install.txt"
   refute grep -qE '^ *! ' "$work/n1-install.txt"

@@ -210,7 +210,8 @@ export function run(argv, { dryRun, log, env, json, codes }) {
 
 export function quiet(argv, timeout = 30000, env = {}) {
   const r = spawnSync(argv[0], argv.slice(1), { encoding: 'utf8', shell: useShell(argv[0]), timeout, env: { ...allowedEnv(), ...env } });
-  return { ok: r.status === 0, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
+  // `failed`: the command did not finish (timeout, signal, not runnable), so a non-zero status says nothing about its answer.
+  return { ok: r.status === 0, failed: Boolean(r.error || r.signal), out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
 }
 
 export const exists = (p) => fs.existsSync(p);

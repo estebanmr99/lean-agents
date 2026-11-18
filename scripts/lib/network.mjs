@@ -14,6 +14,10 @@ export function fromPrivacy(privacy) {
   return preset(privacy === 'strict' ? 'off' : 'on');
 }
 
+// Mode for the agent self-updater switch (#182, #284): forced when the category is off, absent when the user chose updates
+// on (`--auto-update on`, per-category menu, or the saved choice), else written only when the user has no value.
+export const updaterMode = (opts) => (opts.network.autoUpdate === 'off' ? 'set' : opts.keepUpdater ? null : 'setIfAbsent');
+
 export const privacyOf = (network) => (CATEGORIES.every((c) => network[c] === 'off') ? 'strict' : 'standard');
 
 // Env for the commands lean-agents runs, so installers do not phone home when telemetry is off.

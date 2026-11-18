@@ -8,6 +8,7 @@ import { envDir } from '../system.mjs';
 import { localServer } from './opencode-v2.mjs';
 import { skillSource, skillsCli } from '../pins.mjs';
 import { toolEnv } from '../node-runtime.mjs';
+import { updaterMode } from '../network.mjs';
 
 const CONTEXT_MODE_SCRIPT = fileURLToPath(new URL('../../copilot-context-mode.mjs', import.meta.url));
 
@@ -53,7 +54,8 @@ export function copilotAdapter({ home, core, profile, opts, rules, adhdCommand }
   }
   if (edits.length) actions.push({ kind: 'json', path: path.join(dir, 'mcp-config.json'), edits, keepEmpty: [['mcpServers']] });
   // Managed installs update through --update: off unless the user already set `autoUpdate` (network off forces it).
-  actions.push({ kind: 'json', path: path.join(dir, 'settings.json'), edits: [{ path: ['autoUpdate'], value: false, mode: opts.network.autoUpdate === 'off' ? 'set' : 'setIfAbsent' }] });
+  const updater = updaterMode(opts);
+  if (updater) actions.push({ kind: 'json', path: path.join(dir, 'settings.json'), edits: [{ path: ['autoUpdate'], value: false, mode: updater }] });
 
   if (tools.includes('rtk')) {
     commands.push({ tool: 'rtk', desc: 'RTK hook for Copilot CLI', run: [['rtk', 'init', '-g', '--copilot']], undo: [['rtk', 'init', '-g', '--copilot', '--uninstall']] });
