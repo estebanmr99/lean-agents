@@ -245,6 +245,8 @@ curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/i
 | Ponytail | ✅ | ✅ | ✅ | ➖ | ➖ |
 | i-have-adhd | ✅ | ✅ | ✅ | ✅ | ⚠️ written, load unproven |
 | Caveman and other skills | ✅ | ✅ | ✅ | ✅ | ⚠️ written, load unproven |
+| Own skills only on undo; `agy` found outside PATH | ➖ | ➖ | ➖ | ➖ | ✅ keeps your same-name skill |
+| Node 22.20 floor check (engine, not per agent) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Context compaction | ✅ auto 80% | ✅ native | ✅ native, optional DCP | ➖ | ➖ |
 | Network presets (telemetry, updates, outbound) | ✅ | ✅ updates, sharing | ✅ | ⚠️ updates; telemetry is a reminder | ⚠️ reminders only |
 | Proxy passed to every install command | ✅ | ✅ | ✅ | ✅ | ⚠️ checked in CI, undocumented upstream |
