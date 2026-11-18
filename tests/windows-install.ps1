@@ -47,6 +47,8 @@ Assert-That ((Get-PathWith $raw 'D:\tools\x\') -eq $raw) 'an entry that is alrea
 Assert-That ((Get-PathWith $raw 'D:\tools\y') -eq "$raw;D:\tools\y") 'a new entry is appended, %USERPROFILE% untouched'
 Assert-That ((Get-PathWithout "$raw;D:\tools\y" 'D:\tools\y') -eq $raw) 'removing the entry restores the original'
 Assert-That ((Get-PathWithout $raw (Join-Path $env:USERPROFILE 'bin')) -eq 'D:\tools\x') 'an unexpanded entry matches its expansion'
+$odd = 'D:\tools\x;;D:\tools\z;'
+Assert-That ((Get-PathWithout (Get-PathWith $odd 'D:\tools\y') 'D:\tools\y') -eq $odd) 'empty segments survive an add and a remove'
 
 Write-Output '--- dry run from a file changes nothing'
 $dir = Initialize-TempProfile
