@@ -4,9 +4,14 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Added
+
+- `tests/roundtrip.test.mjs`: one table-driven test runs install then `--uninstall` for each of the seven adapters in a temp HOME seeded with user files (a JSONC comment, a user MCP server, an agent and a skill named like managed ones) and asserts every file, path and bytes, equals the pre-install snapshot. Tests only (#164).
+
 ### Fixed
 
 - `--adopt` review follow-ups (#213): Cursor hook names split Windows backslash paths on every OS; `managed` is matched on the basename of any argument, never a folder (`npx -y context-mode hook cursor` and `env FOO=1 rtk hook cursor` are `managed`; `node /opt/rtk-fork/hook.js` stays `user`); the sqlite child times out after 5 s per candidate; PowerShell `-e` and `-ec` count as encoded payloads; the sqlite note prints `Node <version> --experimental-sqlite` and never a path; Node 23.4+ counts as having `node:sqlite`; `--upgrade-agent` text rows no longer end with `(undefined)`; a copy version with build metadata (`2.1.7+build`) compares by its numeric core instead of NaN (#219).
+- `scripts/lean.mjs` checks the `engines.node` floor (22.20) when run directly from a clone: below it, one stderr line names the running Node and the fix (`nvm use`, `install.sh`). `--help`, `--version`, `--doctor`, `--dry-run`, `--upgrade-agent` and `--adopt` without `--yes` keep working; install, uninstall, migrate and `--yes` exit 1 unless `LEAN_AGENTS_ALLOW_OLD_NODE=1` is set (#208).
 - Antigravity: an `agy` that is not on PATH is found in the installer folders (`~/.local/bin`; Windows `%LOCALAPPDATA%\agy\bin` and `~/.gemini/bin` (**VERIFY**)) by detection, `--doctor` and `--install-agent`, which run it by that path and never install over it (#211).
 - Antigravity `--uninstall` removes only the skill folders lean-agents installed (recorded in state.json or absent before the install); a user skill with the same name, such as `i-have-adhd`, is kept and never overwritten (#148).
 - `--install-agent antigravity` on macOS says the Homebrew cask cannot be pinned or verified and asks before installing it; #147 stays open (**VERIFY** pin by tarball).
