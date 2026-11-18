@@ -1,6 +1,6 @@
 # Install with an agent
 
-Hand lean-agents to Claude Code, OpenCode, Copilot CLI or Antigravity CLI. The agent reads machine output (`--json`) instead of scraping text, asks you before it changes anything, and installs with exact flags.
+Hand lean-agents to Claude Code, OpenCode, Copilot CLI, Antigravity CLI or VS Code Copilot chat (agent mode). The agent reads machine output (`--json`) instead of scraping text, asks you before it changes anything, and installs with exact flags.
 
 ## Prompt to paste
 
@@ -8,6 +8,7 @@ Hand lean-agents to Claude Code, OpenCode, Copilot CLI or Antigravity CLI. The a
 Install lean-agents for me from https://github.com/estebanmr99/lean-agents.
 Follow docs/install-with-an-agent.md in that repo. Ask before every change.
 Never read, print or store my API keys or tokens, and never run gh auth login for me.
+If you cannot run terminal commands, print them for me to run.
 ```
 
 ## Steps the agent follows
@@ -30,6 +31,23 @@ Never read, print or store my API keys or tokens, and never run gh auth login fo
 6. **Verify.** Run `node scripts/lean.mjs --doctor --json` again. Report every row that is not `ok`.
 
 Undo everything with `--uninstall`.
+
+## VS Code Copilot chat (agent mode), corporate Windows PC
+
+Open Copilot chat, switch the mode to **Agent**, paste the prompt above. The agent uses VS Code's terminal tool, which is PowerShell on Windows, so every command below is PowerShell. Antigravity pilot users follow this same guide; only the agent changes.
+
+1. **Proxy, per session.** Behind a proxy, set the variables in the terminal before step 1 of "Steps the agent follows". They last until that terminal closes; the engine never writes proxy or CA values to disk, and `--doctor` shows them only as set or not set. Use your company's values; `D:\tools\corp-ca.pem` stands for your CA bundle.
+
+   ```powershell
+   $env:HTTPS_PROXY = "http://proxy.example:8080"
+   $env:NO_PROXY = "localhost,127.0.0.1"
+   $env:NODE_EXTRA_CA_CERTS = "D:\tools\corp-ca.pem"   # only if the proxy re-signs TLS
+   ```
+2. **Run the steps below** with `npx -y lean-agents@latest <flags>` (PowerShell has no `curl | bash`; the Windows fallback is the `install.ps1` line in step 1). Each command asks VS Code for approval unless you set it to auto-approve; read the command before you approve it.
+3. **Terminal tool blocked by policy?** Some companies disable the terminal tool or auto-block commands. Then the agent should not try workarounds: it prints each command, in order, for you to run in your own PowerShell, and asks you to paste the output back. The same steps by hand are in [manual-install.md](manual-install.md).
+4. **Flow.** `--doctor --json` first, then one question per choice (agents, tools, migrate, network, terminal), then `--yes --dry-run --json` and your OK, then the same command without `--dry-run` and `--json`, then `--doctor --json` again. `vscode-copilot` goes in the `--agents` list when you want it.
+
+Not proven yet (**VERIFY**, see [compatibility.md](compatibility.md)): which agent-mode tools your company policy allows, how auto-approve behaves for terminal commands, and whether VS Code loads the rules lean-agents writes under `~/.copilot`.
 
 ## Update with an agent
 
