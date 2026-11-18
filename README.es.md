@@ -211,7 +211,8 @@ Cada opción de `--help`. En PowerShell se escriben en PascalCase (`-DryRun`).
 | `--upgrade-agent opencode` | Simulacro para pasar OpenCode 1.x a 2.x; no cambia nada |
 | `--upgrade-agent opencode --backup [--yes]` | Copia de seguridad permanente con sha256 de las sesiones y la configuración 1.x, y una copia congelada; sin `--yes` solo muestra el plan |
 | `--upgrade-agent opencode --opencode1 [--yes]` | Después de `--backup`: añade `opencode1`, que ejecuta OpenCode 1.x solo sobre la copia congelada; `--uninstall` lo quita |
-| `--install-agent a,b` / `--uninstall-agent a,b` | Instala o quita CLIs de agente que lean-agents instaló; primero el plan, `--yes` lo ejecuta; nunca OpenCode 1.x |
+| `--install-agent a,b` / `--uninstall-agent a,b` | Instala o quita CLIs de agente que lean-agents instaló; primero el plan, `--yes` lo ejecuta; nunca OpenCode 1.x. `vscode-copilot` solo escribe o quita sus archivos de configuración: VS Code es dueño de la extensión Copilot |
+| `--upgrade-agent vscode-copilot` | Solo informa: la extensión se actualiza desde VS Code; `--update` refresca los archivos que lean-agents escribió |
 | `--usage` | Imprime los créditos de Copilot que quedan (una llamada a `gh`, sin pedir al modelo) |
 | `--version` | Imprime la versión de lean-agents |
 | `--home <dir>` | Usa esta carpeta como tu carpeta personal; usa una carpeta temporal para probar sin riesgo |

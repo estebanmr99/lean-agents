@@ -211,7 +211,8 @@ Every flag from `--help`. In PowerShell the same flags are PascalCase (`-DryRun`
 | `--upgrade-agent opencode` | Dry run for moving OpenCode 1.x to 2.x; changes nothing |
 | `--upgrade-agent opencode --backup [--yes]` | Permanent sha256-checked backup of the 1.x sessions and config, then a frozen copy; plan only without `--yes` |
 | `--upgrade-agent opencode --opencode1 [--yes]` | After `--backup`: adds `opencode1`, which runs OpenCode 1.x on the frozen copy only; `--uninstall` removes it |
-| `--install-agent a,b` / `--uninstall-agent a,b` | Install or remove agent CLIs that lean-agents installed; plan first, `--yes` runs it; never OpenCode 1.x |
+| `--install-agent a,b` / `--uninstall-agent a,b` | Install or remove agent CLIs that lean-agents installed; plan first, `--yes` runs it; never OpenCode 1.x. `vscode-copilot` only writes or removes its config files: VS Code owns the Copilot extension |
+| `--upgrade-agent vscode-copilot` | Report only: the extension updates from VS Code; `--update` refreshes the files lean-agents wrote |
 | `--usage` | Print the Copilot credits left (one `gh` call, no model request) |
 | `--version` | Print the lean-agents version |
 | `--home <dir>` | Treat this folder as your home directory; use a temp folder to try things safely |
