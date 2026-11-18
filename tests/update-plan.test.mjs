@@ -33,10 +33,10 @@ test('OpenCode 1.x is held, whoever installed it', () => {
   }
 });
 
-test('agent CLI: reported within its major, held across it, left alone when the user installed it', () => {
+test('agent CLI: updated within its major, held across it, left alone when the user installed it', () => {
   const owned = ['claude', 'copilot-cli'];
   const rows = planUpdate({ saved, pins, owned, installed: { claude: '2.1.0', copilot: '0.9.9', opencode: '2.0.0' } });
-  assert.equal(rowOf(rows, 'claude-code').action, 'report');
+  assert.equal(rowOf(rows, 'claude-code').action, 'update');
   assert.equal(rowOf(rows, 'copilot-cli').action, 'major');
   assert.equal(rowOf(rows, 'opencode-v2').action, 'own');
 });

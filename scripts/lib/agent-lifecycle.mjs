@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PINS, npmSpec } from './pins.mjs';
+import { PINS } from './pins.mjs';
 import { sha256 } from './verify-sha256.mjs';
 import { run, which, version, antigravityPrereqs, packageManager, agyCandidates, BREW_AGY_LIMIT } from './system.mjs';
 import { writePrivate, privateDir } from './fsops.mjs';
@@ -26,7 +26,9 @@ function script(pinKey, dir, args = []) {
 
 // One row per agent for this OS: how it is installed, where its binary lands and which dirs the install may write to.
 // `manual` is a reason, not a command: that agent/OS route is not proven yet (VERIFY in docs/compatibility.md).
-export function agentTable({ home, platform, dir, realHome }) {
+// `ver`: version per pin key to install instead of the release pin (the saved previous version, for an undo).
+export function agentTable({ home, platform, dir, realHome, ver = {} }) {
+  const at = (key) => ver[key] ?? PINS[key].version;
   const posix = platform !== 'win32';
   const cmds = { claude: 'claude', 'opencode-v2': 'opencode', 'copilot-cli': 'copilot', cursor: 'agent', antigravity: 'agy' };
   const local = path.join(home, '.local');
@@ -34,15 +36,15 @@ export function agentTable({ home, platform, dir, realHome }) {
   const prefix = home === realHome ? [] : ['--prefix', local];
   const t = {};
   t.claude = posix
-    ? { method: 'script', ...script('claude-installer', dir, [PINS['claude-code'].version]), bins: bin('claude'), dirs: [path.join(local, 'bin'), path.join(local, 'share', 'claude'), path.join(home, '.claude', 'downloads')] }
+    ? { method: 'script', ...script('claude-installer', dir, [at('claude-code')]), bins: bin('claude'), dirs: [path.join(local, 'bin'), path.join(local, 'share', 'claude'), path.join(home, '.claude', 'downloads')] }
     : { manual: 'Claude Code on Windows (claude.ai/install.ps1): not proven yet. VERIFY' };
   t['opencode-v2'] = posix
     // --no-modify-path: the installer must not edit ~/.bashrc, which we could not undo.
-    ? { method: 'script', ...script('opencode-installer', dir, ['--version', PINS['opencode-v2'].version, '--no-modify-path']), bins: [path.join(home, '.opencode', 'bin', 'opencode')], dirs: [path.join(home, '.opencode')] }
+    ? { method: 'script', ...script('opencode-installer', dir, ['--version', at('opencode-v2'), '--no-modify-path']), bins: [path.join(home, '.opencode', 'bin', 'opencode')], dirs: [path.join(home, '.opencode')] }
     : { manual: 'OpenCode 2 on Windows (Git Bash installer): install-dir and PATH not proven yet. VERIFY' };
   t['copilot-cli'] = {
-    method: 'npm', version: PINS['copilot-cli'].version,
-    run: [['npm', 'install', '-g', ...prefix, npmSpec('copilot-cli')]], uninstall: [['npm', 'uninstall', '-g', ...prefix, PINS['copilot-cli'].source]],
+    method: 'npm', version: at('copilot-cli'),
+    run: [['npm', 'install', '-g', ...prefix, `${PINS['copilot-cli'].source}@${at('copilot-cli')}`]], uninstall: [['npm', 'uninstall', '-g', ...prefix, PINS['copilot-cli'].source]],
     bins: prefix.length ? (posix ? [path.join(local, 'bin', 'copilot')] : [path.join(local, 'copilot.cmd')]) : [], dirs: [],
   };
   t.cursor = posix
@@ -181,4 +183,35 @@ export async function agentLifecycle(o) {
     }
     writePrivate(stateFile(o.stateDir), `${JSON.stringify(state, null, 2)}\n`);
   }
+}
+
+// --update (#182): the commands that move an agent CLI lean-agents installed to the release pin, one per plan row with
+// action 'update' (planUpdate already holds OpenCode 1.x, other majors and CLIs the user installed). `reinstall` is the same
+// installer at the version it had, saved in state.json next to the command; undoUpgrades() runs it.
+// Cursor and Antigravity have no version pin, so they never get a row and are not moved (VERIFY in docs/compatibility.md).
+const UPGRADE = { 'claude-code': 'claude', 'opencode-v2': 'opencode-v2', 'copilot-cli': 'copilot-cli' };
+export function upgradeCommands({ rows, home, platform = process.platform, dir, realHome }) {
+  const out = [];
+  for (const r of rows) {
+    const a = UPGRADE[r.tool];
+    if (!a || r.action !== 'update') continue;
+    const argvs = (ver) => { const row = agentTable({ home, platform, dir, realHome, ver: { [r.tool]: ver } })[a]; return row.manual ? null : row; };
+    const to = argvs(r.pinned);
+    const from = argvs(r.installed);
+    if (!to) { console.log(`! ${a}: ${agentTable({ home, platform, dir, realHome })[a].manual}`); continue; }
+    // The downloaded installer is removed after a successful run, like --install-agent does.
+    const clean = (row) => (row.download ? [...row.run, [process.execPath, '-e', "require('fs').rmSync(process.argv[1],{force:true})", row.download]] : row.run);
+    out.push({ tool: r.tool, desc: `upgrade ${a} ${r.installed} -> ${r.pinned}`, run: clean(to), undo: [], from: r.installed, reinstall: clean(from) });
+  }
+  return out;
+}
+
+// Reinstalls the version saved by an upgrade. `commands`: the state.json commands; returns false when a reinstall failed.
+export function undoUpgrades(commands, env = {}) {
+  let ok = true;
+  for (const c of commands.filter((x) => x.reinstall)) {
+    console.log(`- reinstall ${c.from} (undo of: ${c.desc})`);
+    if (!c.reinstall.every((argv) => run(argv, { dryRun: false, log: console.log, env }))) { console.log('  ! failed. Run the command above by hand.'); ok = false; }
+  }
+  return ok;
 }

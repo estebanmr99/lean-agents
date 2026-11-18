@@ -30,7 +30,7 @@ import { backupOpencode, backupLayout, listProcesses, opencodeRunning } from './
 import { readBackupStamp } from './lib/backup-stamp.mjs';
 import { isActive, failAt, applyPreflight, verifyBackup, configDrift, createSteps, makeCtx, runApply, runUndo, restoreData } from './lib/opencode-upgrade.mjs';
 import { planOpencode1, installOpencode1, removeOpencode1, layout as opencode1Layout } from './lib/opencode1.mjs';
-import { agentLifecycle, agentTable, VSCODE_NOTE } from './lib/agent-lifecycle.mjs';
+import { agentLifecycle, agentTable, upgradeCommands, VSCODE_NOTE } from './lib/agent-lifecycle.mjs';
 import { copilotUsage } from './lib/copilot-usage.mjs';
 import { draftIssue } from './lib/feedback.mjs';
 import { planUpdate, changelogNotes, formatUpdatePlan } from './lib/update-plan.mjs';
@@ -625,8 +625,9 @@ async function install(o) {
   const every = o.everything && !migration ? everythingPrereqs(o, readState(o.home)) : null;
   // The planner owns these installs; the per-tool ones below would repeat them.
   const owned = new Set(pendingPrereqs(every?.steps ?? []).map((s) => (s.id === 'node-24' ? 'node' : s.id)));
-  const commands = [...(o.exec ? [...every?.commands ?? [], ...prereqCommands(o, behind).filter((c) => !owned.has(c.tool))] : []), ...agentCommands];
-  const update = saved && o.dryRun ? updateInfo(o, saved) : null;
+  const update = saved && (o.dryRun || o.exec) ? updateInfo(o, saved) : null;
+  const upgrades = update && o.exec ? upgradeCommands({ rows: update.rows, home: o.home, dir: stateDir(o.home), realHome: REAL_HOME }) : [];
+  const commands = [...(o.exec ? [...every?.commands ?? [], ...prereqCommands(o, behind).filter((c) => !owned.has(c.tool))] : []), ...agentCommands, ...upgrades];
   const noGit = migration ? null : gitHint(packageManager());
   if (noGit) console.log(noGit);
   if (o.json && o.dryRun) {
@@ -704,7 +705,7 @@ async function install(o) {
       if (ui) ui.step(i + 1, commands.length, c.desc);
       else console.log(`- ${c.desc}`);
       // Recorded before it runs, so a command killed midway can still be undone.
-      const rec = { desc: c.desc, ok: false, undo: c.undo, ...(c.env && { env: c.env }), ...(c.resumeKey && { resumeKey: c.resumeKey }) };
+      const rec = { desc: c.desc, ok: false, undo: c.undo, ...(c.reinstall && { from: c.from, reinstall: c.reinstall }), ...(c.env && { env: c.env }), ...(c.resumeKey && { resumeKey: c.resumeKey }) };
       ran.push(rec);
       save();
       const codes = [];
