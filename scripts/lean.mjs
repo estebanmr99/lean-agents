@@ -20,7 +20,7 @@ import { projectPlan, projectStateDir } from './lib/project.mjs';
 import { gsdPlan } from './lib/gsd.mjs';
 import { MIGRATE_SOURCES, MIGRATE_TARGETS, readSource, detectSources, migratePlan, finishRows, formatTable } from './lib/migrate.mjs';
 import { adhdCommand } from './lib/adhd.mjs';
-import { version as binVersion, gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPresent, which, run, quiet, exists, isolate, configHome, envDir } from './lib/system.mjs';
+import { version as binVersion, versionFull, gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPresent, which, run, quiet, exists, isolate, configHome, envDir } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
 import { probePlugins } from './lib/plugin-health.mjs';
 import { adopt, inventory } from './lib/adopt.mjs';
@@ -30,7 +30,7 @@ import { backupOpencode, backupLayout, listProcesses, opencodeRunning } from './
 import { readBackupStamp } from './lib/backup-stamp.mjs';
 import { isActive, failAt, applyPreflight, verifyBackup, configDrift, createSteps, makeCtx, runApply, runUndo, restoreData } from './lib/opencode-upgrade.mjs';
 import { planOpencode1, installOpencode1, removeOpencode1, layout as opencode1Layout } from './lib/opencode1.mjs';
-import { agentLifecycle, agentTable, upgradeCommands, VSCODE_NOTE } from './lib/agent-lifecycle.mjs';
+import { agentLifecycle, agentTable, upgradeCommands, undoPlan, undoUpgrades, agentOf, VSCODE_NOTE } from './lib/agent-lifecycle.mjs';
 import { copilotUsage } from './lib/copilot-usage.mjs';
 import { draftIssue } from './lib/feedback.mjs';
 import { planUpdate, changelogNotes, formatUpdatePlan } from './lib/update-plan.mjs';
@@ -190,6 +190,10 @@ const HELP = `Usage: lean-agents [options]
   --shell default|git-bash  OpenCode on Windows: set its shell to Git Bash when found (default: git-bash;
                          never overwrites a shell you set yourself; "default" opts out)
   --update               Re-apply with your saved choices
+  --update --undo [--yes]
+                         Put each agent CLI that --update upgraded back on the version it had before its first upgrade
+                         (plan first, then a confirm; a failed step is reported and the rest run). --uninstall leaves
+                         upgraded agent CLIs alone; use --uninstall-agent for ones lean-agents installed
   --uninstall            Undo everything lean-agents changed
   --doctor               Check the install
   --adopt                List what a hand-built machine already has (MCPs, hooks, plugins, skills, npm copies),
@@ -544,7 +548,7 @@ function printJson(o, planned, commands, migration, behind, prereqs, update) {
     agents: o.agents, tools: o.tools, privacy: o.privacy, lang: o.lang, profile: o.profile ?? null, terminals: o.terminals,
     ...(o.everything && { afterNvm: o.deferred ?? [], agentNotes: o.agentNotes ?? [] }), gh: !!o.gh, bun: !!o.bun, network: o.network, migrate: migration ? migration.names : null,
     files: planned.map((f) => ({ status: f.status, path: rel(f.path), note: f.note ?? null })),
-    commands: commands.map((c) => ({ desc: inText(c.desc), agent: c.agent ?? null, run: c.run.map((a) => a.map(inText)) })),
+    commands: commands.map((c) => ({ desc: inText(c.desc), agent: c.agent ?? null, run: [...c.run, ...(c.always ?? [])].map((a) => a.map(inText)) })),
     ...(behind && { behind }),
     ...(update && { update }),
     ...(prereqs && { prereqs: prereqs.map((s) => ({ id: s.id, label: s.label, why: s.why, status: s.skipIf ? 'skip' : s.commands.length ? 'install' : 'manual', skipIf: s.skipIf, manual: s.manual ?? null })) }),
@@ -555,7 +559,8 @@ function printJson(o, planned, commands, migration, behind, prereqs, update) {
 // One JSON object on stdout after a real apply (--json --yes). Field names are a contract: see docs/install-json.md.
 function printApplied(o, files, commands, errors) {
   const inText = (t) => t.split(o.home).join('~');
-  const rel = (t) => (t.startsWith(o.home + path.sep) ? path.relative(o.home, t).split(path.sep).join('/') : t);
+  // Never an absolute path: --project files live outside the home.
+  const rel = (t) => { const r = path.relative(o.home, t); return r === '..' || r.startsWith(`..${path.sep}`) || path.isAbsolute(r) ? '<outside-home>' : r.split(path.sep).join('/') || '.'; };
   process.stdout.write(`${JSON.stringify({
     ok: errors.length === 0,
     files: files.map((f) => rel(f.path)),
@@ -586,7 +591,7 @@ function printPlan(o, planned, commands) {
     console.log('\nCommands:');
     for (const c of commands) {
       console.log(`  - ${c.desc}${c.agent ? ` (${c.agent})` : ''}`);
-      for (const argv of c.run) console.log(`      $ ${argv.join(' ')}`);
+      for (const argv of [...c.run, ...(c.always ?? [])]) console.log(`      $ ${argv.join(' ')}`);
     }
   }
   console.log('');
@@ -603,11 +608,14 @@ function updateInfo(o, saved) {
     // A scratch HOME: `opencode --version` writes a log under HOME, and a dry run must leave --home untouched.
     const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-probe-'));
     const env = { HOME: scratch, USERPROFILE: scratch };
-    const probe = (b) => binVersion(b, ['--version'], env);
+    const probe = (b) => versionFull(b, ['--version'], env);
     installed = { claude: probe('claude'), opencode: probe('opencode'), copilot: probe('copilot') };
     fs.rmSync(scratch, { recursive: true, force: true });
   }
-  const rows = planUpdate({ saved, pins: PINS, owned, installed });
+  // planUpdate compares numeric versions; the raw string (pre-release tag kept) is what an undo reinstalls.
+  const numeric = Object.fromEntries(Object.entries(installed).map(([b, v]) => [b, v?.replace(/-.*/, '') ?? null]));
+  const raw = { 'claude-code': installed.claude, 'opencode-v2': installed.opencode, 'copilot-cli': installed.copilot };
+  const rows = planUpdate({ saved, pins: PINS, owned, installed: numeric }).map((r) => (r.action === 'update' && raw[r.tool] ? { ...r, raw: raw[r.tool] } : r));
   const log = path.join(ROOT, 'CHANGELOG.md');
   const current = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
   return { rows, notes: changelogNotes(fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '', saved.version ?? '0.0.0', current) };
@@ -705,11 +713,12 @@ async function install(o) {
       if (ui) ui.step(i + 1, commands.length, c.desc);
       else console.log(`- ${c.desc}`);
       // Recorded before it runs, so a command killed midway can still be undone.
-      const rec = { desc: c.desc, ok: false, undo: c.undo, ...(c.reinstall && { from: c.from, reinstall: c.reinstall }), ...(c.env && { env: c.env }), ...(c.resumeKey && { resumeKey: c.resumeKey }) };
+      const rec = { desc: c.desc, ok: false, undo: c.undo, ...(c.reinstall && { from: c.from, reinstall: c.reinstall, reinstallAlways: c.reinstallAlways }), ...(c.env && { env: c.env }), ...(c.resumeKey && { resumeKey: c.resumeKey }) };
       ran.push(rec);
       save();
       const codes = [];
       const ok = c.run.every((argv) => run(argv, { dryRun: false, log: console.log, env: c.env, json: o.json, codes }));
+      for (const argv of c.always ?? []) run(argv, { dryRun: false, log: console.log, env: c.env, json: o.json });
       report.push({ desc: c.desc, ok, exit: codes.at(-1) ?? null });
       if (!ok && !c.optional) errors.push(c.desc);
       if (ui) ui.result(ok || c.optional, c.desc);
@@ -756,6 +765,30 @@ async function install(o) {
     console.log('Auto-updates off: Antigravity CLI updates itself and has no documented switch for it.');
   }
   ui?.summary('Summary', [`${files.length} files written, ${ran.length} commands run`, `Backups: ${backupDir}`], true);
+}
+
+// --update --undo (#278): each agent CLI goes back to the version it had before the first upgrade lean-agents ran.
+// Plan first; the answer (or --yes) runs it. A failed step is reported and the rest still run; --uninstall never does this.
+async function undoAgentUpgrades(o) {
+  const S = readState(o.home);
+  const todo = undoPlan(S?.commands ?? []);
+  if (!todo.length) { console.log('nothing to undo: no agent CLI upgrade by lean-agents is recorded'); return true; }
+  console.log('lean-agents --update --undo plan (the oldest saved version per agent):');
+  for (const c of todo) {
+    console.log(`  - ${agentOf(c)}: back to ${c.from}`);
+    for (const argv of [...c.reinstall, ...(c.reinstallAlways ?? [])]) console.log(`      $ ${argv.join(' ')}`);
+  }
+  if (o.dryRun || !o.exec) { console.log(o.dryRun ? 'Dry run: nothing was changed.' : '--no-exec: nothing was run.'); return true; }
+  if (!o.yes && !(process.stdin.isTTY && process.stdout.isTTY)) { console.log('No terminal to ask on: --yes runs it.'); return true; }
+  const p = await prompter(o.yes);
+  try { if (!yesNo(await p.ask('Reinstall these versions?', o.yes ? 'y' : 'n'))) { console.log('Cancelled.'); return true; } } finally { p.close(); }
+  Object.assign(process.env, childEnv(S.options.network));
+  const { ok, restored } = undoUpgrades(todo);
+  // A restored agent's records are spent; a failed one keeps them so the next --update --undo retries it.
+  S.commands = S.commands.filter((c) => !(c.reinstall && restored.has(agentOf(c))));
+  S.updatedAt = new Date().toISOString();
+  writePrivate(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(S, null, 2)}\n`);
+  return ok;
 }
 
 // The state of a machine where only an upgrade step ran (nothing else installed yet).
@@ -1024,6 +1057,7 @@ async function main() {
     return process.exit(0);
   }
   if (o.backup) throw new Error('--backup goes with --upgrade-agent opencode');
+  if (o.command === 'update' && o.undo) return process.exit((await undoAgentUpgrades(o)) ? 0 : 1);
   if ((o.undo || o.keepBackup || o.confirmRemovals) && o.command !== 'adopt') throw new Error('--undo, --keep-backup and --confirm-removals go with --adopt');
   if (o.command === 'adopt') {
     // Removals outside the JSON edits need a yes: a menu on a terminal, --confirm-removals without one.

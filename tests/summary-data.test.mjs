@@ -16,7 +16,7 @@ const rows = [
   { item: 'lean-agents', status: 'ok', detail: 'v0.9.0' },
   { item: '~/.claude/CLAUDE.md', status: 'changed', detail: 'edited since install' },
   { item: 'Copilot extension', status: 'skipped', detail: 'managed by VS Code' },
-  { item: 'claude on PATH', status: 'error', detail: `not found in ${home}/bin token=ghp_abcdefgh12345678` },
+  { item: 'claude on PATH', status: 'error', detail: `not found in ${home}/bin token=ghp_abcdefgh12345678` }, // gitleaks:allow (fake value: the test asserts it is never printed)
 ];
 const logins = loginRows({ agents: ['claude'], gh: true, exec: false });
 

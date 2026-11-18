@@ -155,7 +155,7 @@ npx lean-agents@latest --update      # vuelve a aplicar con tus opciones guardad
 npx lean-agents@latest --uninstall   # deshace todo lo que lean-agents cambió
 ```
 
-Los prompts para el agente tienen [una guía](docs/install-with-an-agent.md) con los pasos y la salida `--json`; [los pasos de actualización](docs/install-with-an-agent.md#update-with-an-agent) funcionan también sin el skill `lean-update`.
+Los prompts para el agente tienen [una guía](docs/install-with-an-agent.md) con los pasos y la salida `--json`; [los pasos de actualización](docs/install-with-an-agent.md#update-with-an-agent) funcionan también sin el skill `lean-update`. ¿Tienes VS Code con Copilot en modo agente en un PC de trabajo? Ejecuta una vez la [lista de comprobación](docs/vscode-agent-checklist.md) (en inglés).
 
 Usa `--lang es` para que las reglas y las respuestas queden en español.
 
@@ -202,6 +202,7 @@ Cada opción de `--help`. En PowerShell se escriben en PascalCase (`-DryRun`).
 | `--failed-command <texto>` | El comando que falló, para `--feedback-draft` |
 | `--feedback-kind update` | Con `--feedback-draft`: el texto es un hallazgo de una actualización, no un error |
 | `--update` | Vuelve a aplicar con tus opciones guardadas; el plan lista `herramienta: instalada -> pin de la versión`, lo que queda retenido (OpenCode 1.x, CLIs de agentes que cambian de major, herramientas que instalaste tú) y las notas de versión desde la tuya (`--dry-run [--json]` lo muestra sin cambiar nada). Tras la única confirmación también lleva al pin de la versión el Claude Code, OpenCode 2 y Copilot CLI que instaló lean-agents, dentro del mismo major (Cursor y Antigravity no tienen pin, así que se quedan); cada paso guarda la versión anterior en `state.json` y un paso fallido se informa mientras los demás continúan |
+| `--update --undo [--yes]` | Devuelve cada CLI de agente que `--update` actualizó a la versión que tenía antes de su primera actualización (el `from` más antiguo guardado por agente, nunca OpenCode 1.x ni entre majors): primero el plan, luego una confirmación (o `--yes`); un paso fallido se informa, los demás continúan y los registros de los agentes restaurados se quitan de `state.json`. `--uninstall` no toca los CLIs de agentes actualizados (`--uninstall-agent` quita los que instaló lean-agents) |
 | `--doctor` | Revisa la instalación |
 | `--uninstall` | Deshace todo lo que lean-agents cambió |
 | `--adopt` | Lista lo que ya tiene una máquina armada a mano y qué es cada cosa; con `--yes` aplica el plan |
