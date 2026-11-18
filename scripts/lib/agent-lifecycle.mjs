@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PINS, npmSpec } from './pins.mjs';
 import { sha256 } from './verify-sha256.mjs';
-import { run, which, version, antigravityPrereqs, packageManager } from './system.mjs';
+import { run, which, version, antigravityPrereqs, packageManager, agyCandidates, BREW_AGY_LIMIT } from './system.mjs';
 import { writePrivate, privateDir } from './fsops.mjs';
 
 const VERIFY = fileURLToPath(new URL('./verify-sha256.mjs', import.meta.url));
@@ -48,7 +48,7 @@ export function agentTable({ home, platform, dir, realHome }) {
   if (platform === 'darwin' && packageManager() === 'brew') {
     // The engine's own Antigravity install (antigravityPrereqs); brew removes what it installed.
     const c = antigravityPrereqs('brew', platform, home, false).find((x) => x.run.length);
-    t.antigravity = { method: 'brew', version: null, run: c?.run ?? [], uninstall: [['brew', 'uninstall', '--cask', 'antigravity-cli']], bins: [], dirs: [] };
+    t.antigravity = { method: 'brew', version: null, run: c?.run ?? [], uninstall: [['brew', 'uninstall', '--cask', 'antigravity-cli']], bins: [], dirs: [], unpinned: BREW_AGY_LIMIT };
   } else {
     t.antigravity = posix
       ? { method: 'script', ...script('antigravity-installer', dir), bins: bin('agy'), dirs: [path.join(local, 'bin'), path.join(local, 'share'), path.join(home, '.antigravity'), path.join(home, '.gemini')] }
@@ -118,6 +118,8 @@ export async function agentLifecycle(o) {
     const mine = state.agents[a];
     if (o.mode === 'install') {
       if (mine) log(`${a}: already installed by lean-agents (${mine.method}); nothing to do.`);
+      // #211: a working agy outside PATH (Windows installer folders) counts too; never installed over.
+      else if (a === 'antigravity' && agyCandidates(o.home, o.platform ?? process.platform).some((c) => fs.existsSync(c))) log(`${a}: already installed, not by lean-agents; left alone.`);
       else if (row.manual) log(`${a}: ${row.manual}`);
       else if (row.bins.some((b) => fs.existsSync(b)) || ((o.home === o.realHome || row.method === 'brew') && which(row.cmd))) log(`${a}: already installed, not by lean-agents; left alone.`);
       else if (a === 'opencode-v2' && version('opencode')?.startsWith('1.')) log('opencode-v2: OpenCode 1.x is on PATH; lean-agents never installs 2.x next to it here (#79). Nothing done.');
@@ -131,8 +133,10 @@ export async function agentLifecycle(o) {
     log(`  - ${a}${o.mode === 'install' ? ` (${table[a].method}${table[a].version ? ` ${table[a].version}` : ''})` : ` (${state.agents[a].files.length} recorded files${state.agents[a].uninstall ? ', npm/brew uninstall' : ''})`}`);
     for (const argv of o.mode === 'install' ? table[a].run : state.agents[a].uninstall ?? []) log(`      $ ${argv.join(' ')}`);
   }
+  for (const a of todo) if (o.mode === 'install' && table[a].unpinned) log(`  ! ${a}: ${table[a].unpinned}`);
   if (o.dryRun || !o.exec) { log(o.dryRun ? 'Dry run: nothing was changed.' : '--no-exec: nothing was run.'); return; }
-  if (!o.yesNo(await o.ask(o.mode === 'install' ? 'Download and run these installers?' : 'Remove these agents?', o.yes ? 'y' : 'n'))) { log('Cancelled.'); return; }
+  const unpinned = o.mode === 'install' && todo.some((a) => table[a].unpinned);
+  if (!o.yesNo(await o.ask(o.mode === 'install' ? `Download and run these installers${unpinned ? ' (some are not pinned, see above)' : ''}?` : 'Remove these agents?', o.yes ? 'y' : 'n'))) { log('Cancelled.'); return; }
   privateDir(o.stateDir, o.stateDir);
   fs.mkdirSync(o.stateDir, { recursive: true });
   const env = {};

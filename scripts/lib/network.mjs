@@ -39,9 +39,19 @@ const ENV_DROP = /^(NODE_PATH|GIT_CONFIG.*|GIT_ASKPASS|GIT_SSH|GIT_SSH_COMMAND|G
 // Values that hold a credential whatever the name: `://user:pass@` or `://token@`, GitHub and npm tokens.
 const SECRET_VALUE = /:\/\/[^/\s@]+@|\b(gh[pousr]_|github_pat_)[A-Za-z0-9_]{16,}|\bnpm_[A-Za-z0-9]{20,}/;
 
-// NODE_OPTIONS passes only when every token is a CA, memory or DNS setting a corporate proxy setup needs; --require, --import and the like can run code.
-const SAFE_NODE_OPTION = /^(--use-(system|openssl|bundled)-ca|--max-old-space-size=\d+|--dns-result-order=\w+)$/;
-const safeNodeOptions = (v) => v.trim().split(/\s+/).every((t) => SAFE_NODE_OPTION.test(t));
+// NODE_OPTIONS passes only when every token is a CA, proxy, memory or DNS setting a corporate proxy setup needs; --require, --import and the like can run code.
+const SAFE_NODE_FLAG = /^--(use-(system|openssl|bundled)-ca|use-env-proxy|max-old-space-size=\d+|dns-result-order=\w+)$/;
+const SPACE_VALUE = { '--max-old-space-size': /^\d+$/, '--dns-result-order': /^\w+$/ };
+function safeNodeOptions(v) {
+  const t = v.trim().split(/\s+/);
+  for (let i = 0; i < t.length; i++) {
+    if (SAFE_NODE_FLAG.test(t[i])) continue;
+    const value = SPACE_VALUE[t[i]];
+    if (!value || !value.test(t[i + 1] ?? '')) return false;
+    i++;
+  }
+  return true;
+}
 
 export function allowedEnv(env = process.env, platform = process.platform) {
   const exact = new Set([...ENV_EXACT, ...PROXY_VARS, ...CA_VARS, ...(platform === 'win32' ? ENV_WINDOWS : [])].map((n) => n.toUpperCase()));

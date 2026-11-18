@@ -18,6 +18,12 @@ New-Item -ItemType Directory -Path $env:NPM_CONFIG_PREFIX | Out-Null
 $env:Path = "$dir\npm;$env:Path"
 & $agy --version
 if ($LASTEXITCODE -ne 0) { throw 'agy --version failed' }
+# #211: with agy's folder off PATH, lean-agents still finds it and does not offer to install over it.
+$withAgy = $env:Path
+$env:Path = ($env:Path -split ';' | Where-Object { $_ -ne "$env:LOCALAPPDATA\agy\bin" }) -join ';'
+$found = node "$repo\scripts\lean.mjs" --home $dir --no-exec --yes --install-agent antigravity | Out-String
+$env:Path = $withAgy
+if ($found -notmatch 'already installed, not by lean-agents') { throw "agy outside PATH was not detected: $found" }
 
 # winget is not on the runner image; install.ps1 falls back to the release zip.
 Invoke-WebRequest 'https://github.com/rtk-ai/rtk/releases/latest/download/rtk-x86_64-pc-windows-msvc.zip' -OutFile "$dir\rtk.zip"
