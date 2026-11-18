@@ -6,6 +6,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- `--adopt` review follow-ups (#213): Cursor hook names split Windows backslash paths on every OS; `managed` is matched on the program name and script name only (`node /x/rtk-fork/hook.js` stays `user`); PowerShell `-e` and `-ec` count as encoded payloads; the sqlite note prints `Node <version> --experimental-sqlite` and never a path; Node 23.4+ counts as having `node:sqlite`; `--upgrade-agent` text rows no longer end with `(undefined)`; a copy version with build metadata (`2.1.7+build`) compares by its numeric core instead of NaN (#219).
 - `--adopt` compares a pre-release npm copy (`2.1.7-beta.1`) by its numeric core and sorts it below its release: against pin `2.1.7` it is `drift`, against `2.1.8` it is `newer`, and an equal version stays unflagged. Before, the pre-release read as equal to the pin (#204).
 - `--adopt` names a Cursor hook written as shell syntax (GSD's `$(for n in ...) ~/.cursor/hooks/gsd-cursor-<event>.js` loop) after the first script it runs, so it reads `sessionStart:gsd-cursor-session-start.js` instead of `sessionStart:$(for n in`; a shell command with no script reads `<event>:shell`. A second Cursor hook with the same event and name gets `#2`, a third `#3`, for shell and non-shell commands alike (#202).
 - `--upgrade-agent opencode` text rows end with the item's file (home-relative), as `--adopt` rows do, so the two `@tarquinen/opencode-dcp@latest` rows (`opencode.jsonc` and `tui.json`) no longer read as a duplicate (#203).
@@ -24,6 +25,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Changed
 
+- The `--adopt` text report now prints every hook row and a `(note)`; linked skill copies are never auto-deleted and print a detail line (#213).
 - Release gate: `release.yml` stops before building anything when `docs/audit-<version>.md` is missing or an issue labeled `audit` is still open, so no release ships half audited. Audit findings of medium or higher get the new `audit` label.
 - The Cursor CLI installer pin moves to `cursor.com/install` as of 2026-11-13 (reviewed: one download from `downloads.cursor.com`, no sudo or eval), which fixes the `real-cursor` sha256 mismatch (#193).
 
