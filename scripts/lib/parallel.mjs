@@ -10,6 +10,7 @@ import { which } from './system.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const LOG_TAIL_BYTES = 2000;
 
+const NAME_RE = /^[a-z0-9][a-z0-9-]*$/;
 // User-facing tier names; profiles call the cheapest one "fast".
 export const TIERS = { cheap: 'fast', balanced: 'balanced', strong: 'strong' };
 const ROLE_TIER = { plan: 'strong', build: 'balanced', explore: 'cheap', research: 'cheap' };
@@ -30,7 +31,7 @@ function gitOrThrow(cwd, args) {
 export function parseTask(file) {
   const text = fs.readFileSync(file, 'utf8');
   const name = path.basename(file).replace(/\.md$/, '');
-  if (!/^[a-z0-9][a-z0-9-]*$/.test(name)) throw new Error(`task file name "${name}" must be lowercase letters, digits and dashes`);
+  if (!NAME_RE.test(name)) throw new Error(`task file name "${name}" must be lowercase letters, digits and dashes`);
   const meta = {};
   let body = text;
   const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
@@ -96,8 +97,12 @@ export function repoInfo(cwd) {
 
 const workersFile = (stateDir) => path.join(stateDir, 'workers.json');
 
+// A worker name becomes a path (clean removes stateDir/<name>), so a hand-edited workers.json is checked like a task file name.
 export function loadWorkers(stateDir) {
-  try { return JSON.parse(fs.readFileSync(workersFile(stateDir), 'utf8')); } catch { return { base: null, workers: [] }; }
+  let data;
+  try { data = JSON.parse(fs.readFileSync(workersFile(stateDir), 'utf8')); } catch { return { base: null, workers: [] }; }
+  if (!Array.isArray(data?.workers) || data.workers.some((w) => typeof w?.name !== 'string' || !NAME_RE.test(w.name))) throw new Error(`${workersFile(stateDir)} is not a valid worker list (names are lowercase letters, digits and dashes); fix or delete the file`);
+  return data;
 }
 
 function saveWorkers(stateDir, data) {

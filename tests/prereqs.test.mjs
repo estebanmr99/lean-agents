@@ -36,7 +36,8 @@ test('user Node >=22.20 is kept: Node 24 is added under nvm, never replaced', ()
 test('Mac without nvm: installer keeps the shell profile alone and undo removes only the nvm dir', () => {
   const nvm = by(planPrereqs(bare('darwin')), 'nvm');
   assert.ok(nvm.commands[1].includes('PROFILE=/dev/null'));
-  assert.equal(nvm.undo[0].at(-1), '/tmp/x/.nvm');
+  assert.equal(nvm.undo[0][3], '/tmp/x/.nvm');
+  assert.equal(nvm.undo[0][4], '/tmp/x', 'the recorded home the undo checks the dir against');
   assert.ok(!nvm.undo[0].includes('rm'));
 });
 
@@ -138,7 +139,24 @@ test('nvm undo removes a partial or lean-only ~/.nvm and keeps one with the user
   const r = run(mixed);
   assert.equal(fs.existsSync(path.join(mixed, '.nvm', 'versions', 'node', 'v20.11.0')), true);
   assert.match(r.stdout, /kept .*v20\.11\.0/);
-  for (const h of [partial, ours, mixed]) fs.rmSync(h, { recursive: true, force: true });
+  // Global packages: npm, corepack and lean-agents' own tools do not block the removal; the user's own CLI (scoped or not) does.
+  const pkgs = (v, ...names) => { const home = make(v); for (const n of ['npm', 'corepack', 'context-mode', '@opengsd/gsd-core', ...names]) fs.mkdirSync(path.join(home, '.nvm', 'versions', 'node', v, 'lib', 'node_modules', n), { recursive: true }); return home; };
+  const clean = pkgs('v24.15.0');
+  run(clean);
+  assert.equal(fs.existsSync(path.join(clean, '.nvm')), false, 'only npm, corepack and recorded tools');
+  const own = pkgs('v24.15.0', 'my-cli');
+  assert.match(run(own).stdout, /kept .*my-cli \(v24\.15\.0\)/);
+  assert.equal(fs.existsSync(path.join(own, '.nvm')), true);
+  const scoped = pkgs('v24.15.0', '@me/tool');
+  assert.match(run(scoped).stdout, /@me\/tool/);
+  assert.equal(fs.existsSync(path.join(scoped, '.nvm')), true);
+  // A recorded home that does not resolve to this ~/.nvm (edited state, other path) removes nothing.
+  const elsewhere = make('v24.15.0');
+  const [cmd, ...args] = undoArgv(undo(elsewhere));
+  const wrong = spawnSync(cmd, [...args.slice(0, 2), path.join(elsewhere, '.nvm'), path.join(elsewhere, 'other'), ...args.slice(4)], { encoding: 'utf8', env: {} });
+  assert.match(wrong.stdout, /not the \.nvm of the home/);
+  assert.equal(fs.existsSync(path.join(elsewhere, '.nvm')), true);
+  for (const h of [partial, ours, mixed, clean, own, scoped, elsewhere]) fs.rmSync(h, { recursive: true, force: true });
 });
 
 test('nvm undo is empty when ~/.nvm existed before this run, and runs the Node that runs lean.mjs otherwise', () => {

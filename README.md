@@ -192,6 +192,8 @@ Every flag from `--help`. In PowerShell the same flags are PascalCase (`-DryRun`
 | `--gh` / `--no-gh` | Install GitHub CLI (`gh`) if it is missing (default: on) |
 | `--bun` / `--no-bun` | Install Bun for Context Mode (default: on) |
 | `--no-app` | Do not install the Antigravity app (the CLI is still installed when missing) |
+| `--no-exec` | Run no external command (no installs, no version probes); `--uninstall` refuses it when commands need undoing |
+| `--probe-plugins` | With `--doctor` or `--adopt`: start a short-lived `opencode serve` (throwaway state dir, loopback) and check that a plugin's command registers |
 | `--project <dir>` | Write the shared team files into one repository |
 | `--migrate <from>` or `auto` | Copy rules, agents, skills, prompts and MCP servers from another harness; never overwrites |
 | `--adhd-always` | Turn on i-have-adhd for every answer |
