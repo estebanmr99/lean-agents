@@ -43,7 +43,7 @@ import { leanUpdateCommands, coordinateCommands, leanMigrateCommands } from './l
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
 import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
 import { unverifiedItems, notesFile } from './lib/unverified.mjs';
-import { detectTerminals, parseTerminal, terminalCommands, terminalPrivacyNotes, orcaEnvSet, gitBashActions, stillNeeded, shellNotice } from './lib/terminals.mjs';
+import { detectTerminals, TERMINALS, parseTerminal, terminalCommands, terminalPrivacyNotes, orcaEnvSet, gitBashActions, stillNeeded, shellNotice } from './lib/terminals.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ADAPTERS = { claude: claudeAdapter, 'opencode-v1': opencodeV1Adapter, 'opencode-v2': opencodeV2Adapter, 'copilot-cli': copilotAdapter, antigravity: antigravityAdapter };
@@ -96,6 +96,7 @@ function parseArgs(argv) {
       case '--everything': o.everything = true; break;
       case '--no-core': o.core = false; break;
       case '--terminal': o.terminals = parseTerminal(next()); break;
+      case '--install-terminal': o.installTerminals = parseTerminal(next()); break;
       case '--bun': o.bun = true; break;
       case '--no-bun': o.bun = false; break;
       case '--no-app': o.app = false; break;
@@ -177,6 +178,8 @@ const HELP = `Usage: lean-agents [options]
   --terminal warp|orca|both|none
                          Agent integrations for a terminal you already have (default: the detected ones;
                          ignored with --project)
+  --install-terminal warp|orca|both
+                         Install the terminal app and its agent integrations (macOS: Warp requires brew)
   --gh / --no-gh         Install GitHub CLI (gh) if it is missing (default: on; you run gh auth login yourself)
   --feedback-draft       After a failed install: read the error on stdin, print a redacted issue draft as JSON
                          (--feedback-kind update: the text is a finding from an update, not an error)
@@ -354,15 +357,35 @@ async function choose(o, saved) {
   o.deferred = resolved.skipped.map((s) => s.tool);
   o.toolNode = resolved.toolNode && { ...resolved.toolNode, nvmDir: nvm.dir };
   if (o.toolNode && o.agents.includes('claude') && o.tools.includes('context-mode')) console.log('Context Mode on Claude Code runs as an MCP server on its own Node: its hooks and skills (the plugin) are not installed.');
-  if (o.project) o.terminals = [];
-  else if (!o.terminals) {
-    // Terminals are never installed, only detected; nothing found means no question.
+  if (o.project) {
+    o.terminals = [];
+    o.installTerminals = [];
+  } else if (!o.terminals) {
     const found = detectTerminals(o.home, { system: o.home === REAL_HOME });
     o.terminals = saved ? saved.terminals ?? [] : found;
-    if (!saved && found.length) {
-      const items = found.map((t) => ({ value: t, label: t, ask: `Add the ${t} agent integration?` }));
-      o.terminals = await p.multi({ message: 'Terminals found: add their agent integrations', items, defaults: found });
+    o.installTerminals = o.installTerminals ?? [];
+    if (!saved) {
+      const askIntegrate = found.map((t) => ({ value: t, label: `${t} integration (app already installed)`, ask: `Add the ${t} agent integration?` }));
+      const missing = TERMINALS.filter((t) => !found.includes(t));
+      const askInstall = missing.map((t) => ({ value: t, label: `Install ${t} + integration`, ask: `Install the ${t} app and its agent integration?` }));
+      
+      if (askIntegrate.length || askInstall.length) {
+        const picked = await p.multi({
+          message: 'Terminals (Warp, Orca)',
+          items: [...askIntegrate, ...askInstall],
+          defaults: found,
+        });
+        
+        o.terminals = picked;
+        o.installTerminals = o.installTerminals.concat(picked.filter(t => missing.includes(t)));
+      }
     }
+  } else {
+    const found = detectTerminals(o.home, { system: o.home === REAL_HOME });
+    o.installTerminals = o.installTerminals ?? [];
+    const implicitInstalls = o.terminals.filter(t => !found.includes(t));
+    o.installTerminals = [...new Set([...o.installTerminals, ...implicitInstalls])];
+    o.terminals = [...new Set([...o.terminals, ...o.installTerminals])];
   }
   await chooseNetwork(o, saved, p);
   if (o.network.outbound === 'off' && o.tools.includes('copilot-usage')) {
@@ -470,7 +493,7 @@ function buildPlan(o) {
   commands.push(...leanUpdateCommands(o.agents));
   if (o.tools.includes('coordinate')) commands.push(...coordinateCommands(o.agents));
   if (o.tools.includes('lean-migrate')) commands.push(...leanMigrateCommands(o.agents));
-  commands.push(...terminalCommands({ terminals: o.terminals, agents: o.agents, network: o.network, system: o.home === REAL_HOME }));
+  commands.push(...terminalCommands({ terminals: o.terminals, installTerminals: o.installTerminals, agents: o.agents, network: o.network, system: o.home === REAL_HOME, platform: process.platform }));
   actions.push(...gitBashActions({ home: o.home, terminals: o.terminals, agents: o.agents }));
   if (o.tools.includes('gsd')) {
     const r = gsdPlan(ROOT, o.home, o);

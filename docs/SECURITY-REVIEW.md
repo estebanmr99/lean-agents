@@ -78,6 +78,7 @@ Separate from the install-time commands above: code the agents download every ti
 | `npx -y context-mode@<pin>`, the Context Mode Claude plugin (tag and commit) | `context-mode`, `context-mode-plugin` | |
 | `npx -y codeburn@<pin>`, `autoskills@<pin>`, `@opengsd/gsd-core@<pin>`, `@tarquinen/opencode-dcp@<pin>` | `codeburn`, `autoskills`, `gsd-core`, `opencode-dcp` | |
 | `npx -y skills@<pin>` and the skill sources `owner/repo#<commit>` (the tag while a commit is not recorded) | `skills-cli`, `caveman`, `i-have-adhd`, `lean-update`, `orca-cli` | |
+| `curl` for the terminal app installers | `orca-app`, `warp-app` | |
 | `@dietrichgebert/ponytail@<pin>` (npm) and the Ponytail plugin (tag), `warp-opencode` | `ponytail`, `ponytail-plugin`, `warp-opencode` | |
 | Serena (`uvx --from git+https://github.com/oraios/serena@<commit>`) | `serena` | |
 | Bun zip and the agent installers (claude.ai, opencode.ai, antigravity.google, cursor.com), the Homebrew installer (pinned by commit, run only on a Mac without Homebrew), checked by SHA256. Cursor's installer downloads a tarball that is not checked (#206) | `bun`, `claude-installer`, `opencode-installer`, `antigravity-installer`, `cursor-installer`, `homebrew-installer` | |

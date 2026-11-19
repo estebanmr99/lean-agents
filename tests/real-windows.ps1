@@ -23,9 +23,19 @@ if (-not (Test-Path "$rtkDir\rtk.exe")) { throw 'rtk.exe is not at the top of th
 
 function Get-UserPath { [Environment]::GetEnvironmentVariable('Path', 'User') -split ';' }
 
-& "$repo\install.ps1" -Yes -Agents opencode-v1 -Tools playwright, ponytail, caveman, i-have-adhd, dcp -Privacy strict -Profile anthropic-api -Lang en --ponytail-mode lite --adhd-always
+& "$repo\install.ps1" -Yes -Agents opencode-v1 -Tools playwright, ponytail, caveman, i-have-adhd, dcp -Privacy strict -Profile anthropic-api -Lang en --ponytail-mode lite --adhd-always --install-terminal both
 if ((Get-UserPath) -notcontains $rtkDir) { throw 'rtk folder was not added to the user PATH' }
 if (-not (Test-Path "$dir\.agents\skills\caveman\SKILL.md")) { throw 'Caveman skills did not arrive' }
+
+Write-Host "Windows install path checks:"
+$orcaDir = "$env:LOCALAPPDATA\Programs\Orca"
+$warpDir = "$env:LOCALAPPDATA\Programs\Warp"
+if (-not (Test-Path $orcaDir)) { throw "Orca not installed in $orcaDir" }
+if (-not (Test-Path $warpDir)) { throw "Warp not installed in $warpDir" }
+Write-Host "Orca uninstaller: $(Test-Path "$orcaDir\Uninstall Orca.exe")"
+Write-Host "Warp uninstaller: $(Test-Path "$warpDir\unins000.exe")"
+$orcaPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+Write-Host "HKCU Path after Orca install: $orcaPath"
 if ((opencode debug skill | Out-String) -notmatch 'caveman') { throw 'OpenCode does not see the Caveman skills' }
 if (-not (Test-Path "$dir\.config\opencode\vendor\i-have-adhd\.opencode")) { throw 'i-have-adhd clone is missing' }
 # rtk ignores USERPROFILE and uses the OS profile folder, here the disposable runner's.
@@ -44,3 +54,5 @@ if ((Get-UserPath) -contains $rtkDir) { throw 'rtk folder was not removed from t
 if (Test-Path $rtkPlugin) { throw 'RTK plugin was not removed' }
 if (Test-Path "$dir\.config\opencode\vendor\i-have-adhd") { throw 'i-have-adhd clone was not removed' }
 if (Test-Path "$dir\.agents\skills\caveman") { throw 'Caveman skills were not removed' }
+if (Test-Path $orcaDir) { throw 'Orca was not removed' }
+if (Test-Path $warpDir) { throw 'Warp was not removed' }

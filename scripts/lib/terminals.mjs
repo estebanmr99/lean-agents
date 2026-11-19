@@ -4,7 +4,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { which, quiet } from './system.mjs';
 import { hasProxy } from './network.mjs';
-import { skillSource, skillsCli } from './pins.mjs';
+import { skillSource, skillsCli, PINS } from './pins.mjs';
+import { fileURLToPath } from 'node:url';
+
+const VERIFY = fileURLToPath(new URL('./verify-sha256.mjs', import.meta.url));
 
 export const TERMINALS = ['warp', 'orca'];
 // Skills CLI agent ids; VS Code Copilot reads ~/.copilot/skills like Copilot CLI.
@@ -40,8 +43,76 @@ export function parseTerminal(v) {
 // Commands only: OpenCode plugin entries go into the OpenCode adapter's own json edit, because two
 // json actions on one file would each start from the unedited text.
 // `system` is false for --home runs: Windows user env changes are real-machine only.
-export function terminalCommands({ terminals, agents, network = {}, platform = process.platform, env = process.env, system = true, readEnv = readWindowsEnv }) {
+export function terminalCommands({ terminals, installTerminals = [], agents, network = {}, platform = process.platform, env = process.env, system = true, readEnv = readWindowsEnv }) {
   const commands = [];
+  
+  const arch = platform === 'darwin' ? process.arch : 'x64';
+  const warpPin = PINS['warp-app'];
+  const orcaPin = PINS['orca-app'];
+
+  if (installTerminals.includes('warp')) {
+    if (platform === 'darwin') {
+      commands.push({
+        tool: 'warp',
+        desc: 'Install Warp app',
+        run: [['bash', '-c', 'if command -v brew >/dev/null 2>&1; then brew install --cask warp; else echo "Error: Homebrew is required to install Warp on macOS. Please install Warp manually from https://warp.dev" >&2; exit 1; fi']],
+        undo: [['bash', '-c', 'if command -v brew >/dev/null 2>&1; then brew uninstall --cask warp; fi']],
+      });
+    } else if (platform === 'win32') {
+      const url = warpPin.url['windows-x64'];
+      const sha = warpPin.sha256['windows-x64'];
+      const exe = `${env.TMP || env.TEMP || 'C:\\Windows\\Temp'}\\warp-installer.exe`;
+      commands.push({
+        tool: 'warp',
+        desc: 'Install Warp app',
+        run: [
+          ['curl', '-fsSL', '-o', exe, url],
+          ['node', VERIFY, exe, sha],
+          [exe, '/CURRENTUSER', '/VERYSILENT']
+        ],
+        undo: [ps(`if (Test-Path "$env:LOCALAPPDATA\\Programs\\Warp\\unins000.exe") { & "$env:LOCALAPPDATA\\Programs\\Warp\\unins000.exe" /VERYSILENT }`)],
+      });
+    }
+  }
+
+  if (installTerminals.includes('orca')) {
+    if (platform === 'darwin') {
+      const key = arch === 'arm64' ? 'darwin-arm64' : 'darwin-x64';
+      const url = orcaPin.url[key];
+      const sha = orcaPin.sha256[key];
+      const dmg = '/tmp/orca.dmg';
+      const mount = '/tmp/orca-mount';
+      commands.push({
+        tool: 'orca',
+        desc: 'Install Orca app',
+        run: [
+          ['curl', '-fsSL', '-o', dmg, url],
+          ['node', VERIFY, dmg, sha],
+          ['hdiutil', 'attach', '-nobrowse', '-readonly', '-mountpoint', mount, dmg],
+          ['ditto', `${mount}/Orca.app`, `${env.HOME || '~'}/Applications/Orca.app`]
+        ],
+        always: [
+          ['hdiutil', 'detach', mount, '-force']
+        ],
+        undo: [['rm', '-rf', `${env.HOME || '~'}/Applications/Orca.app`]],
+      });
+    } else if (platform === 'win32') {
+      const url = orcaPin.url['windows-x64'];
+      const sha = orcaPin.sha256['windows-x64'];
+      const exe = `${env.TMP || env.TEMP || 'C:\\Windows\\Temp'}\\orca-installer.exe`;
+      commands.push({
+        tool: 'orca',
+        desc: 'Install Orca app',
+        run: [
+          ['curl', '-fsSL', '-o', exe, url],
+          ['node', VERIFY, exe, sha],
+          [exe, '/S']
+        ],
+        undo: [ps(`if (Test-Path "$env:LOCALAPPDATA\\Programs\\Orca\\Uninstall Orca.exe") { & "$env:LOCALAPPDATA\\Programs\\Orca\\Uninstall Orca.exe" /S }`)],
+      });
+    }
+  }
+
   if (terminals.includes('warp') && agents.includes('claude')) {
     commands.push({
       tool: 'warp',

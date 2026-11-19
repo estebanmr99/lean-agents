@@ -4,6 +4,11 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Added
+
+- Optional install of Warp and Orca terminal apps (`--install-terminal warp|orca|both`, undone by `--uninstall`). Integraciones continue to be preselected if the app is already installed.
+
+
 ## [1.0.0] - 2026-11-18
 
 First stable release. Highlights since 0.8.0:

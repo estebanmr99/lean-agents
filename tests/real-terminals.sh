@@ -20,6 +20,15 @@ node "$repo/scripts/lean.mjs" --home "$HOME" --yes --agents "$target" --no-tools
   --privacy standard --lang en --profile anthropic-api </dev/null 2>&1 | tee "$HOME/install.txt"
 refute grep -qE '^ *! ' "$HOME/install.txt"
 
+node "$repo/scripts/lean.mjs" --home "$HOME" --yes --agents "$target" --no-tools --install-terminal both \
+  --privacy standard --lang en --profile anthropic-api </dev/null 2>&1 | tee "$HOME/install-term.txt"
+refute grep -qE '^ *! ' "$HOME/install-term.txt"
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  echo "macOS install path check:"
+  ls -ld "$HOME/Applications/Orca.app" || true
+fi
+
 case "$target" in
   claude)
     claude plugin list 2>&1 | tee "$HOME/plugins.txt"
@@ -35,6 +44,10 @@ esac
 
 node "$repo/scripts/lean.mjs" --home "$HOME" --uninstall --yes </dev/null 2>&1 | tee "$HOME/uninstall.txt"
 refute grep -qE '^ *! ' "$HOME/uninstall.txt"
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  refute test -e "$HOME/Applications/Orca.app"
+fi
 
 case "$target" in
   claude)
