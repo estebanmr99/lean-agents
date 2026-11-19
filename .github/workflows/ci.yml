@@ -1355,17 +1355,23 @@ jobs:
         run: |
           $h = Join-Path $env:RUNNER_TEMP "claude-win"
           New-Item -ItemType Directory -Force $h | Out-Null
+          $k = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $false)
+          $pathBefore = $k.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+          $k.Close()
           node scripts/lean.mjs --home $h --install-agent claude --yes
           if ($LASTEXITCODE -ne 0) { throw "install failed" }
           $exe = Join-Path $h ".local\bin\claude.exe"
           $v = & $exe --version
           $pin = node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.PINS['claude-code'].version))"
           if ($v -notmatch [regex]::Escape($pin)) { throw "version $v != pin $pin" }
-          $k = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $false)
-          $path = $k.GetValue('Path', '')
-          $k.Close()
-          if ($path -match [regex]::Escape(".local\bin")) { Write-Host "User PATH gained .local\bin" } else { Write-Host "User PATH did not gain .local\bin" }
+          $state = Get-Content "$h\.config\lean-agents\agents.json" | ConvertFrom-Json
+          if (-not $state.agents.claude.files) { throw "claude has no recorded files" }
           node scripts/lean.mjs --home $h --uninstall-agent claude --yes
           if ($LASTEXITCODE -ne 0) { throw "uninstall failed" }
           if (Test-Path $exe) { throw "claude.exe not gone" }
           if (Test-Path (Join-Path $h ".local\share\claude")) { throw "share\claude not gone" }
+          if (Test-Path (Join-Path $h ".claude\downloads")) { throw ".claude\downloads not gone" }
+          $k = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $false)
+          $pathAfter = $k.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+          $k.Close()
+          if ($pathAfter -ne $pathBefore) { throw "HKCU Path not restored" }

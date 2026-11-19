@@ -10,7 +10,7 @@ import { PINS } from './pins.mjs';
 import { sha256 } from './verify-sha256.mjs';
 import { run, which, version, antigravityPrereqs, packageManager, agyCandidates, BREW_AGY_LIMIT } from './system.mjs';
 import { writePrivate, privateDir } from './fsops.mjs';
-import { winPathDefault as winPath } from './opencode1.mjs';
+import { winPathDefault } from './opencode1.mjs';
 
 const VERIFY = fileURLToPath(new URL('./verify-sha256.mjs', import.meta.url));
 export const LIFECYCLE_AGENTS = ['claude', 'opencode-v2', 'copilot-cli', 'cursor', 'antigravity', 'vscode-copilot'];
@@ -135,6 +135,7 @@ async function vscodeLifecycle(o) {
 // o: { mode: 'install'|'uninstall', fromUpgrade (only --upgrade-agent may install 2.x next to 1.x), agents, home, realHome, platform, stateDir, dryRun, exec, yes, ask, yesNo, vscode }
 export async function agentLifecycle(o) {
   const log = console.log;
+  const winPath = o.winPath ?? winPathDefault;
   for (const a of o.agents) {
     if (a === 'opencode-v1') throw new Error('opencode-v1 is never installed or removed by lean-agents (work PCs run 1.x on purpose, #79)');
     if (!LIFECYCLE_AGENTS.includes(a)) throw new Error(`cannot ${o.mode} "${a}" (available: ${LIFECYCLE_AGENTS.join(', ')})`);
@@ -186,15 +187,15 @@ export async function agentLifecycle(o) {
       const ok = row.run.every((argv) => run(argv, { dryRun: false, log, env }));
       if (row.download) fs.rmSync(row.download, { force: true });
       const rec = diffSnapshots(before, snapshot(row.dirs));
+      let pathEntry = false;
+      if (pathDir && pathAbsent && winPath('has', pathDir) === 'present') {
+        pathEntry = true;
+      }
       if (!ok) {
         log(`  ! ${a}: install failed. Run the commands above by hand.`);
         process.exitCode = 1;
         // Keep what a half-run installer left, so --uninstall-agent can clean it.
-        if (!rec.files.length && !rec.dirs.length) continue;
-      }
-      let pathEntry = false;
-      if (pathDir && pathAbsent && winPath('has', pathDir) === 'present') {
-        pathEntry = true;
+        if (!rec.files.length && !rec.dirs.length && !pathEntry) continue;
       }
       state.agents[a] = { method: row.method, version: row.version, installedAt: new Date().toISOString(), uninstall: row.uninstall ?? null, ...rec };
       if (pathEntry) state.agents[a].pathEntryDir = pathDir;

@@ -141,7 +141,7 @@ First stable release. Highlights since 0.8.0:
 
 ### Added
 
-- `--install-agent claude` on Windows (#179 PC run): uses the pinned Windows `bootstrap.ps1`, registers `.local\bin\claude.exe` and its folders, and tracks whether it added the HKCU `Path` entry to remove it on `--uninstall`. Verified on a throwaway `USERPROFILE` in CI.
+- `--install-agent claude` on Windows (#179 PC run): uses the pinned Windows `bootstrap.ps1`, registers `.local\bin\claude.exe` and its folders, and tracks whether it added the HKCU `Path` entry to remove it on `--uninstall`.
 - Orca status for OpenCode 1.x on Windows (#78): with Orca selected, the installer writes the owned file `~/.config/opencode/plugins/lean-orca-status-shim.js` so Orca's status plugin runs in OpenCode 1.19's TUI worker (`--uninstall` removes it). Not reproduced in CI (new `real-orca-opencode-v1` job), so it rests on the work-PC report; details in `docs/compatibility.md`.
 - `--doctor` and the post-install checklist: restart Orca after changing `NO_PROXY` (Windows with a proxy), and the `~/.orca/keybindings.json` rebind that frees Ctrl+P for OpenCode (#78; never applied automatically).
 - `--upgrade-agent opencode` dry run and `--json` (#80, PR A): classifies the OpenCode 1.x config (the `--adopt` inventory plus `agent`, `compaction`, `autoupdate`, `disabled_providers`, `keybinds`, agent/command folders) as managed, user-translatable (one row of the translation table, with source) or user-manual (with reason); changes nothing, prints key names only. Apply and `--undo` answer "not in this release yet". New opt-in `lean-migrate` skill (`--tools lean-migrate`).

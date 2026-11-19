@@ -59,7 +59,7 @@ Never read, print or store my API keys or tokens.
 
 | Agent | macOS | Linux | Windows | Rules | Subagents | MCP tools | Real-binary CI job |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Claude Code | VERIFY | ✅ | ✅ | ✅ | ✅ | ✅ | `real-claude` |
+| Claude Code | VERIFY | ✅ | VERIFY | ✅ | ✅ | ✅ | `real-claude` |
 | OpenCode 1.x | VERIFY | ✅ | ✅ | ✅ | ✅ | ✅ | `real-opencode-v1`, `real-windows`, `real-opencode-shell` |
 | OpenCode 2.x | VERIFY | ✅ | VERIFY | ✅ | ✅ | ✅ | `real-opencode`, `real-opencode-shell` |
 | Copilot CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `real-copilot`, `real-copilot-windows` |
