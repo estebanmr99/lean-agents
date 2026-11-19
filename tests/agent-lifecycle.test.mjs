@@ -181,6 +181,40 @@ test('win32 path entry: absent before, present after -> recorded and removed', a
   assert.equal(has, false, 'removed from winPath');
 });
 
+test('win32 path entry: installer leaves it off PATH -> lean-agents adds, records and removes it', async () => {
+  const home = tmp();
+  const dir = path.join(home, '.local', 'bin');
+  let has = false;
+  const winPath = (op, d) => {
+    if (d !== dir) return 'absent';
+    if (op === 'has') return has ? 'present' : 'absent';
+    if (op === 'add') { has = true; return 'changed'; }
+    if (op === 'remove') { has = false; return 'changed'; }
+    return 'absent';
+  };
+  const row = {
+    method: 'script', version: '1', run: [],
+    bins: [], dirs: [dir]
+  };
+  row.run.every = (cb) => {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'claude.exe'), 'x');
+    return cb([process.execPath, '-e', 'process.exit(0)']);
+  };
+  const opts = asClaude(home, 'install', { platform: 'win32', winPath, table: { claude: row } });
+
+  const out = await quietly(() => agentLifecycle(opts));
+  assert.match(out, /added to PATH/);
+  const state = JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'agents.json'), 'utf8')).agents.claude;
+  assert.equal(state.pathEntryDir, dir, 'recorded pathEntryDir');
+  assert.equal(has, true, 'added to winPath');
+
+  const rmOpts = asClaude(home, 'uninstall', { platform: 'win32', winPath });
+  const rmOut = await quietly(() => agentLifecycle(rmOpts));
+  assert.match(rmOut, /removed from PATH/);
+  assert.equal(has, false, 'removed from winPath');
+});
+
 test('win32 path entry: present before -> not recorded, not removed', async () => {
   const home = tmp();
   const dir = path.join(home, '.local', 'bin');

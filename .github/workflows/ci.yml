@@ -1366,6 +1366,11 @@ jobs:
           if ($v -notmatch [regex]::Escape($pin)) { throw "version $v != pin $pin" }
           $state = Get-Content "$h\.config\lean-agents\agents.json" | ConvertFrom-Json
           if (-not $state.agents.claude.files) { throw "claude has no recorded files" }
+          $k = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $false)
+          $pathMid = $k.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+          $k.Close()
+          $bin = (Join-Path $h ".local\bin").TrimEnd('\')
+          if (-not ($pathMid -split ';' | Where-Object { $_.TrimEnd('\') -eq $bin })) { throw "claude .local\bin not added to HKCU Path" }
           node scripts/lean.mjs --home $h --uninstall-agent claude --yes
           if ($LASTEXITCODE -ne 0) { throw "uninstall failed" }
           if (Test-Path $exe) { throw "claude.exe not gone" }
