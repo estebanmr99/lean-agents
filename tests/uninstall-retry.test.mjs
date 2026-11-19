@@ -52,7 +52,7 @@ test('a state with one ok:false command whose undo fails: --uninstall --yes fini
   const first = lean(home, ['--uninstall'], true);
   assert.equal(first.status, 0, first.stdout + first.stderr);
   assert.match(first.stdout, /Uninstalled/);
-  assert.match(first.stdout, /\(it had failed, so nothing to remove\)/);
+  assert.match(first.stdout, /\(it did not finish, so there may be nothing to remove\)/);
   assert.equal(archived(home).length, 1);
   assert.equal(fs.existsSync(stateFile(home)), false);
 });

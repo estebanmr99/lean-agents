@@ -51,6 +51,7 @@ function Invoke-OpenCode {
   $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
   try { & $opencodeBin @args 2>&1 | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] } } finally { $ErrorActionPreference = $prev }
 }
+$v1 = ((Invoke-OpenCode '--version') | ForEach-Object { "$_" } | Where-Object { $_.Trim() } | Select-Object -Last 1).Trim()
 function Invoke-Lean {
   $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
   try {
@@ -189,23 +190,23 @@ try {
   $dataTree = Get-Tree $data ''
   $side = Invoke-LeanSide --dry-run
   Write-Output $side.Text
-  Assert-That 'opencode1 dry run exits 0 and names 1.19.0' (($side.Code -eq 0) -and ($side.Text -match 'OpenCode 1\.19\.0'))
-  Assert-That 'dry run leaves the user PATH unchanged and makes no binary copy' (((Get-UserPathRaw) -eq $pathBefore) -and (-not (Test-Path "$oc1\1.19.0")))
+  Assert-That "opencode1 dry run exits 0 and names $v1" (($side.Code -eq 0) -and ($side.Text -match "OpenCode $($v1 -replace '\.', '\.')"))
+  Assert-That 'dry run leaves the user PATH unchanged and makes no binary copy' (((Get-UserPathRaw) -eq $pathBefore) -and (-not (Test-Path "$oc1\$v1")))
   $side = Invoke-LeanSide --yes
   Write-Output $side.Text
   Assert-That 'opencode1 apply exits 0' ($side.Code -eq 0)
-  Assert-That 'binary copied to opencode1\1.19.0' (Test-Path "$oc1\1.19.0\opencode.exe")
+  Assert-That "binary copied to opencode1\$v1" (Test-Path "$oc1\$v1\opencode.exe")
   Assert-That 'opencode1.cmd and the sh shim written' ((Test-Path "$oc1\bin\opencode1.cmd") -and (Test-Path "$oc1\bin\opencode1"))
   Assert-That 'user PATH (HKCU, unexpanded) holds the shim folder' ((Get-UserPathRaw).Split(';') -contains "$oc1\bin")
-  Assert-That 'cmd: opencode1.cmd --version = 1.19.0 (by path)' ((Invoke-Cmd "$oc1\bin\opencode1.cmd --version").EndsWith('1.19.0'))
+  Assert-That "cmd: opencode1.cmd --version = $v1 (by path)" ((Invoke-Cmd "$oc1\bin\opencode1.cmd --version").EndsWith($v1))
   $env:Path = Get-FreshPath
-  Assert-That 'cmd: opencode1 --version = 1.19.0 (found through the new user PATH)' ((Invoke-Cmd 'opencode1 --version').EndsWith('1.19.0'))
+  Assert-That "cmd: opencode1 --version = $v1 (found through the new user PATH)" ((Invoke-Cmd 'opencode1 --version').EndsWith($v1))
   $gitBash = Join-Path $env:ProgramFiles 'Git\bin\bash.exe'
   if (Test-Path $gitBash) {
     $prevEap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     $gb = ((& $gitBash -c 'opencode1 --version' 2>&1 | ForEach-Object { "$_" }) -join "`n").Trim()
     $ErrorActionPreference = $prevEap
-    Assert-That 'Git Bash: opencode1 --version = 1.19.0 (the sh shim)' ($gb.EndsWith('1.19.0'))
+    Assert-That "Git Bash: opencode1 --version = $v1 (the sh shim)" ($gb.EndsWith($v1))
   } else { Write-Output 'skip  Git Bash not found' }
   Assert-That 'frozen copy still has 3 sessions' ((Get-SessionCount "$leanDir\opencode1\data\opencode") -eq 3)
   $null = Invoke-Cmd "$oc1\bin\opencode1.cmd session list"
@@ -223,7 +224,7 @@ try {
   $un = Invoke-LeanUninstall
   Write-Output $un.Text
   Assert-That 'uninstall exits 0' ($un.Code -eq 0)
-  Assert-That 'binary copy and shim folder removed' ((-not (Test-Path "$oc1\1.19.0")) -and (-not (Test-Path "$oc1\bin")))
+  Assert-That 'binary copy and shim folder removed' ((-not (Test-Path "$oc1\$v1")) -and (-not (Test-Path "$oc1\bin")))
   Assert-That 'user PATH entry removed, the rest of the PATH untouched' ((Get-UserPathRaw).TrimEnd(';') -eq $pathBefore.TrimEnd(';'))
   Assert-That 'frozen copy kept (4 sessions) and the backup kept' (((Get-SessionCount "$leanDir\opencode1\data\opencode") -eq 4) -and (Test-Path "$($bk[0].FullName)\MANIFEST.sha256"))
 
