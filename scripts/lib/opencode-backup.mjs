@@ -141,10 +141,12 @@ export function backupOpencode({ home, dryRun = false, log = console.log, now = 
   if (fs.existsSync(L.frozen)) problems.push(`a frozen copy already exists at ${L.frozen}: lean-agents does not overwrite it`);
   if (fs.existsSync(L.backup)) problems.push(`${L.backup} already exists: try again in a second`);
   let sessions = null;
-  try { sessions = countCopy(L.live, count); } catch (e) { problems.push(`could not copy the db to count sessions (${String(e.message).split('\n')[0]})`); }
-  if (sessions === null && !problems.length) problems.push('could not count the sessions (node:sqlite is not available on this Node): the backup could not be checked');
+  let countCopied = true;
+  try { sessions = countCopy(L.live, count); } catch (e) { countCopied = false; problems.push(`could not copy the db to count sessions (${String(e.message).split('\n')[0]})`); }
+  if (sessions === null && countCopied && (dryRun || !problems.length)) problems.push('could not count the sessions (node:sqlite is not available on this Node): the backup could not be checked');
   if (dryRun) {
-    log(`dry run: would copy ${src.data.length} data files + ${src.config.length} config files (${gb(bytes)}, ${sessions} sessions)`);
+    log(`dry run: would copy ${src.data.length} data files + ${src.config.length} config files (${gb(bytes)}, ${sessions === null ? 'unknown' : sessions} sessions)`);
+    log(`  free space:       ${gb(free)} free, ${gb(neededBytes(bytes, dbBytes))} needed (2 x data + db + 1 GB)`);
     log(`  permanent backup: ${L.backup}`);
     log(`  frozen copy:      ${L.frozen}`);
     if (problems.length) log(`blocker for apply: ${problems.join('; ')}`);

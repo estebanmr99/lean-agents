@@ -85,13 +85,13 @@ test('--update --dry-run on a hand-built machine without state.json says run --a
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
   fs.mkdirSync(path.join(home, '.claude', 'plugins'), { recursive: true });
   fs.writeFileSync(path.join(home, '.claude', 'settings.json'), '{"enabledPlugins": {"context-mode@latest": true}}');
-  const env = { PATH: path.dirname(process.execPath), HOME: home, USERPROFILE: home };
+  const env = { PATH: path.dirname(process.execPath), HOME: home, ...(process.env.NVM_DIR && { NVM_DIR: process.env.NVM_DIR }) };
   const run = (args) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, '--no-exec', '--yes', ...args], { encoding: 'utf8', env });
-  
+
   const r = run(['--update', '--dry-run']);
   assert.equal(r.status, 1);
   assert.match(r.stderr, /lean-agents is not installed; run --adopt --yes first/);
-  
+
   // also check that with nothing to adopt, it just says not installed
   fs.rmSync(path.join(home, '.claude'), { recursive: true, force: true });
   const r2 = run(['--update', '--dry-run']);
