@@ -4,6 +4,9 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Fixed
+- `installOpencode1`: uses a throwaway state dir for the copy validation to avoid writing WAL/migration changes into the frozen layout (#290).
+
 ## [1.0.0] - 2026-11-18
 
 First stable release. Highlights since 0.8.0:
