@@ -14,6 +14,7 @@ import { winPathDefault as winPath } from './opencode1.mjs';
 
 const VERIFY = fileURLToPath(new URL('./verify-sha256.mjs', import.meta.url));
 export const LIFECYCLE_AGENTS = ['claude', 'opencode-v2', 'copilot-cli', 'cursor', 'antigravity', 'vscode-copilot'];
+export const AGENT_CLIS = { claude: 'claude', 'opencode-v2': 'opencode', 'copilot-cli': 'copilot', cursor: 'agent', antigravity: 'agy' };
 const VSCODE = 'vscode-copilot';
 // VS Code owns the extension, so for vscode-copilot "install" only writes the adapter's files (the engine does it through o.vscode).
 export const VSCODE_NOTE = 'VS Code owns the GitHub Copilot extension: lean-agents never installs, updates or removes it. Install the extension and update it from VS Code (Extensions view).';
@@ -31,7 +32,7 @@ function script(pinKey, dir, args = [], ext = '.sh') {
 export function agentTable({ home, platform, dir, realHome, ver = {} }) {
   const at = (key) => ver[key] ?? PINS[key].version;
   const posix = platform !== 'win32';
-  const cmds = { claude: 'claude', 'opencode-v2': 'opencode', 'copilot-cli': 'copilot', cursor: 'agent', antigravity: 'agy' };
+  const cmds = AGENT_CLIS;
   const local = path.join(home, '.local');
   const bin = (...n) => n.map((x) => path.join(local, 'bin', x));
   const prefix = home === realHome ? [] : ['--prefix', local];
