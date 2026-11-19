@@ -303,6 +303,9 @@ export async function adopt(o) {
   if (o.yes && !o.dryRun && !o.json) return adoptApply(o);
   const r = await inventory(o);
   if (o.probePlugins) r.health.push(...await probePlugins(o.home)); // opt-in: starts a short-lived opencode serve
+  // What --yes does (the apply plan, not only the inventory rows): the pin's target Node and the removals, which need a yes (#179 PC run).
+  const ap = adoptPlan(r, { home: o.home, env: o.env ?? process.env, platform: o.platform ?? process.platform, realHome: o.realHome ?? os.homedir(), state: readState(o.stateDir ?? j(o.home, '.config', 'lean-agents')) });
+  r.apply = applyLines(ap, o.home);
   if (o.json) { process.stdout.write(`${JSON.stringify(r, null, 2)}\n`); return true; }
   const by = {};
   for (const i of r.items) by[`${i.kind}`] = (by[`${i.kind}`] ?? 0) + 1;
@@ -317,7 +320,23 @@ export async function adopt(o) {
   for (const f of r.health) console.log(`  health    ${f.plugin || 'probe'} [${f.id}] ${f.line}\n            fix: ${f.fix}`);
   for (const s of r.stopgaps) console.log(`  stopgap   ${s.file}${s.replaceWith ? `: replace with ${s.replaceWith}` : `: ${s.note}`}`);
   console.log(r.plan.length ? `Plan (${r.plan.length} steps; add --yes to apply, --confirm-removals to allow the removals):\n${r.plan.map((l) => `  - ${l}`).join('\n')}` : 'Plan: nothing to change.');
+  if (r.apply.length) console.log(`--yes does:\n${r.apply.map((l) => `  - ${l}`).join('\n')}`);
   return true;
+}
+
+// One line per action adoptApply takes, in its order.
+function applyLines(p, home) {
+  const rel = (f) => (f.startsWith(home) ? `~${f.slice(home.length)}` : f);
+  const yes = ' (needs a yes, or --confirm-removals)';
+  return [
+    ...(p.install ? [`install ${PINS['context-mode'].source}@${PINS['context-mode'].version} into Node ${p.install.node.version}${p.install.have ? ` (now ${p.install.have})` : ''}`] : []),
+    ...p.rewritten.map((w) => `re-register ${w.client} ${w.name} on Node ${p.tn.version} (${rel(w.file)})`),
+    ...[...p.edits.keys()].filter((f) => !p.rewritten.some((w) => w.file === f)).map((f) => `edit ${rel(f)} (remove stale keys of ours)`),
+    ...p.oldCopies.map((c) => `npm uninstall the old ${c.name}@${c.version} under Node ${c.node.version}${yes}`),
+    ...p.dupSkills.map((d) => `remove the duplicate skill folder ${rel(d)}${yes}`),
+    ...p.stopgaps.map((f) => `remove the stopgap ${rel(f)}${yes}`),
+    ...p.notes.map((n) => `note: ${n}`),
+  ];
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
