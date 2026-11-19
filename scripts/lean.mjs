@@ -926,7 +926,8 @@ async function undoUpgrade(o) {
   if (!ok) { process.exitCode = 1; return false; }
   const drift = configDrift(L, stamp.dir);
   if (drift.length) console.log(`! these config files differ from the 1.x snapshot in the backup (left as they are): ${drift.join(', ')}`);
-  console.log(`undone: OpenCode 1.x data and binary are back. The backup (${stamp.dir}) and the frozen copy (${L.frozen}) are kept.`);
+  const kept2x = journal.steps?.find((x) => x.id === 'install2x')?.kept2x;
+  console.log(`undone: OpenCode 1.x data${kept2x ? ' is back; OpenCode 2 stays (see the ! line above)' : ' and binary are back'}. The backup (${stamp.dir}) and the frozen copy (${L.frozen}) are kept.`);
   return true;
 }
 
