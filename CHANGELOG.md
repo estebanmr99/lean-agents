@@ -4,6 +4,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Added
+
+- Optional install of Warp and Orca terminal apps (`--install-terminal warp|orca|both`, undone by `--uninstall`). Integrations continue to be preselected if the app is already installed.
+
 ### Fixed
 
 - Claude Code installer pin refreshed after an upstream change to install.sh.

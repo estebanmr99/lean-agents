@@ -214,5 +214,5 @@ export function quiet(argv, timeout = 30000, env = {}) {
   return { ok: r.status === 0, failed: Boolean(r.error || r.signal), out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
 }
 
-export const exists = (p) => fs.existsSync(p);
+export const exists = (p) => Array.isArray(p) ? p.some(x => fs.existsSync(x)) : fs.existsSync(p);
 

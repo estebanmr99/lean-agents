@@ -306,7 +306,7 @@ curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/i
 <details>
 <summary>What the Warp and Orca integrations add</summary>
 
-If you already use [Warp](https://www.warp.dev) or [Orca](https://github.com/stablyai/orca), lean-agents adds their agent integrations for the agents you chose. It never installs the terminals. It looks for the app (or `warp-terminal` / `orca` on PATH), preselects what it finds, and asks nothing when neither is there. `--terminal warp|orca|both|none` overrides; `none` opts out.
+If you already use [Warp](https://www.warp.dev) or [Orca](https://github.com/stablyai/orca), lean-agents adds their agent integrations for the agents you chose. You can also ask lean-agents to install the terminals themselves (`--install-terminal warp|orca|both`, or interactively). It looks for the app (or `warp-terminal` / `orca` on PATH), preselects what it finds, and asks nothing when neither is there. `--terminal warp|orca|both|none` overrides; `none` opts out.
 
 - **Warp:** the Claude Code plugin `warp@claude-code-warp` (needs `jq`) and the OpenCode plugin `@warp-dot-dev/opencode-warp`.
 - **Orca:** the `orca-cli` skill for your agents. Orca manages its own status hooks (Settings > Agents, or `orca agent hooks on`); lean-agents does not touch them, but Orca's first launch writes them into `~/.claude/settings.json` and `~/.cursor/hooks.json`, and `--doctor` reports them. Its Agent Session Search indexes every agent chat on the machine and is on by default (Settings > Session History).

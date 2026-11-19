@@ -43,7 +43,7 @@ import { leanUpdateCommands, coordinateCommands, leanMigrateCommands } from './l
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
 import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
 import { unverifiedItems, notesFile } from './lib/unverified.mjs';
-import { detectTerminals, parseTerminal, terminalCommands, terminalPrivacyNotes, orcaEnvSet, gitBashActions, stillNeeded, shellNotice } from './lib/terminals.mjs';
+import { detectTerminals, TERMINALS, parseTerminal, terminalCommands, terminalPrivacyNotes, orcaEnvSet, gitBashActions, stillNeeded, shellNotice } from './lib/terminals.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ADAPTERS = { claude: claudeAdapter, 'opencode-v1': opencodeV1Adapter, 'opencode-v2': opencodeV2Adapter, 'copilot-cli': copilotAdapter, antigravity: antigravityAdapter };
@@ -96,6 +96,7 @@ function parseArgs(argv) {
       case '--everything': o.everything = true; break;
       case '--no-core': o.core = false; break;
       case '--terminal': o.terminals = parseTerminal(next()); break;
+      case '--install-terminal': o.installTerminals = parseTerminal(next()); break;
       case '--bun': o.bun = true; break;
       case '--no-bun': o.bun = false; break;
       case '--no-app': o.app = false; break;
@@ -177,6 +178,8 @@ const HELP = `Usage: lean-agents [options]
   --terminal warp|orca|both|none
                          Agent integrations for a terminal you already have (default: the detected ones;
                          ignored with --project)
+  --install-terminal warp|orca|both
+                         Install the terminal app and its agent integrations (macOS: Warp requires brew)
   --gh / --no-gh         Install GitHub CLI (gh) if it is missing (default: on; you run gh auth login yourself)
   --feedback-draft       After a failed install: read the error on stdin, print a redacted issue draft as JSON
                          (--feedback-kind update: the text is a finding from an update, not an error)
@@ -354,14 +357,47 @@ async function choose(o, saved) {
   o.deferred = resolved.skipped.map((s) => s.tool);
   o.toolNode = resolved.toolNode && { ...resolved.toolNode, nvmDir: nvm.dir };
   if (o.toolNode && o.agents.includes('claude') && o.tools.includes('context-mode')) console.log('Context Mode on Claude Code runs as an MCP server on its own Node: its hooks and skills (the plugin) are not installed.');
-  if (o.project) o.terminals = [];
-  else if (!o.terminals) {
-    // Terminals are never installed, only detected; nothing found means no question.
+  if (o.project) {
+    o.terminals = [];
+    o.installTerminals = [];
+  } else if (!o.terminals) {
     const found = detectTerminals(o.home, { system: o.home === REAL_HOME });
     o.terminals = saved ? saved.terminals ?? [] : found;
-    if (!saved && found.length) {
-      const items = found.map((t) => ({ value: t, label: t, ask: `Add the ${t} agent integration?` }));
-      o.terminals = await p.multi({ message: 'Terminals found: add their agent integrations', items, defaults: found });
+    o.installTerminals = o.installTerminals ?? saved?.installTerminals ?? [];
+    if (!saved) {
+      const askIntegrate = found.map((t) => ({ value: t, label: `${t} integration (app already installed)`, ask: `Add the ${t} agent integration?` }));
+      const missing = TERMINALS.filter((t) => !found.includes(t));
+      const askInstall = (o.home === REAL_HOME && (process.platform === 'darwin' || process.platform === 'win32'))
+        ? missing.map((t) => ({ value: t, label: `Install ${t} + integration`, ask: `Install the ${t} app and its agent integration?` }))
+        : [];
+      
+      if (askIntegrate.length || askInstall.length) {
+        const picked = await p.multi({
+          message: 'Terminals (Warp, Orca)',
+          items: [...askIntegrate, ...askInstall],
+          defaults: found,
+        });
+        
+        o.installTerminals = [...new Set([...o.installTerminals, ...picked.filter(t => missing.includes(t))])];
+        o.terminals = [...new Set([...picked, ...o.installTerminals])];
+      } else {
+        o.terminals = [...new Set([...o.terminals, ...o.installTerminals])];
+      }
+    } else {
+      o.terminals = [...new Set([...o.terminals, ...o.installTerminals])];
+    }
+  } else {
+    o.installTerminals = o.installTerminals ?? saved?.installTerminals ?? [];
+    o.terminals = [...new Set([...o.terminals, ...o.installTerminals])];
+  }
+  if (o.installTerminals?.length) {
+    const isReal = o.home === REAL_HOME;
+    const isSupported = process.platform === 'darwin' || process.platform === 'win32';
+    if (!isReal || !isSupported) {
+      for (const t of o.installTerminals) {
+        const reason = !isReal ? 'temp home' : `unsupported platform ${process.platform}`;
+        console.log(`! ${t} app: not installed (${reason})`);
+      }
     }
   }
   await chooseNetwork(o, saved, p);
@@ -470,7 +506,7 @@ function buildPlan(o) {
   commands.push(...leanUpdateCommands(o.agents));
   if (o.tools.includes('coordinate')) commands.push(...coordinateCommands(o.agents));
   if (o.tools.includes('lean-migrate')) commands.push(...leanMigrateCommands(o.agents));
-  commands.push(...terminalCommands({ terminals: o.terminals, agents: o.agents, network: o.network, system: o.home === REAL_HOME }));
+  commands.push(...terminalCommands({ home: o.home, terminals: o.terminals, installTerminals: o.installTerminals, agents: o.agents, network: o.network, system: o.home === REAL_HOME, platform: process.platform }));
   actions.push(...gitBashActions({ home: o.home, terminals: o.terminals, agents: o.agents }));
   if (o.tools.includes('gsd')) {
     const r = gsdPlan(ROOT, o.home, o);
@@ -725,7 +761,7 @@ async function install(o) {
       installedAt: previous?.installedAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       pins: pinVersions(),
-      options: o.migrate ? previous?.options ?? { migrateOnly: true, agents: o.agents, tools: [], privacy: o.privacy, network: o.network, gh: false, terminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false, shell: 'git-bash' } : { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, keepUpdater: !!o.keepUpdater, gh: o.gh, terminals: o.terminals, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun, shell: o.shell },
+      options: o.migrate ? previous?.options ?? { migrateOnly: true, agents: o.agents, tools: [], privacy: o.privacy, network: o.network, gh: false, terminals: [], installTerminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false, shell: 'git-bash' } : { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, keepUpdater: !!o.keepUpdater, gh: o.gh, terminals: o.terminals, installTerminals: o.installTerminals, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun, shell: o.shell },
       ...(o.toolNode && { toolNode: { version: o.toolNode.version, installedByLean: !!o.toolNode.install || (previous?.toolNode?.version === o.toolNode.version && !!previous.toolNode.installedByLean) } }),
       files: [...(previous?.files ?? []), ...files],
       ...(previous?.opencode1 && { opencode1: previous.opencode1 }),

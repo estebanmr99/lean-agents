@@ -1,10 +1,14 @@
 // Warp and Orca: detect the app, then plan the agent integrations for a user who already has it.
 // The terminal apps themselves are never installed.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { which, quiet } from './system.mjs';
 import { hasProxy } from './network.mjs';
-import { skillSource, skillsCli } from './pins.mjs';
+import { skillSource, skillsCli, PINS } from './pins.mjs';
+import { fileURLToPath } from 'node:url';
+
+const VERIFY = fileURLToPath(new URL('./verify-sha256.mjs', import.meta.url));
 
 export const TERMINALS = ['warp', 'orca'];
 // Skills CLI agent ids; VS Code Copilot reads ~/.copilot/skills like Copilot CLI.
@@ -40,8 +44,100 @@ export function parseTerminal(v) {
 // Commands only: OpenCode plugin entries go into the OpenCode adapter's own json edit, because two
 // json actions on one file would each start from the unedited text.
 // `system` is false for --home runs: Windows user env changes are real-machine only.
-export function terminalCommands({ terminals, agents, network = {}, platform = process.platform, env = process.env, system = true, readEnv = readWindowsEnv }) {
+export function terminalCommands({ home, terminals = [], installTerminals = [], agents = [], network = {}, platform = process.platform, env = process.env, system = true, readEnv = readWindowsEnv }) {
   const commands = [];
+  
+  const arch = platform === 'darwin' ? process.arch : 'x64';
+  const warpPin = PINS['warp-app'];
+  const orcaPin = PINS['orca-app'];
+  const canInstall = system && (platform === 'darwin' || platform === 'win32');
+
+  if (canInstall && installTerminals.includes('warp')) {
+    if (platform === 'darwin') {
+      commands.push({
+        tool: 'warp',
+        desc: 'Install Warp app',
+        skipIfExists: [path.join(home, 'Applications', 'Warp.app'), '/Applications/Warp.app'],
+        run: [['bash', '-c', 'if command -v brew >/dev/null 2>&1; then brew install --cask warp; else echo "Error: Homebrew is required to install Warp on macOS. Please install Warp manually from https://warp.dev" >&2; exit 1; fi']],
+        undo: [['bash', '-c', 'if command -v brew >/dev/null 2>&1; then brew uninstall --cask warp; fi']],
+      });
+    } else if (platform === 'win32') {
+      const url = warpPin.url['windows-x64'];
+      const sha = warpPin.sha256['windows-x64'];
+      const exe = path.join(os.tmpdir(), 'warp-installer.exe');
+      const local = env.LOCALAPPDATA;
+      commands.push({
+        tool: 'warp',
+        desc: 'Install Warp app',
+        skipIfExists: [`${local}\\Programs\\Warp`],
+        run: [
+          ['curl', '-fsSL', '-o', exe, url],
+          ['node', VERIFY, exe, sha],
+          [exe, '/CURRENTUSER', '/VERYSILENT']
+        ],
+        always: [
+          ps(`if (Test-Path "${exe}") { Remove-Item "${exe}" }`)
+        ],
+        // Inno Setup cancels silently while Warp runs and relaunches from %TEMP%; refuse, then wait for it.
+        undo: [ps(`$u = "$env:LOCALAPPDATA\\Programs\\Warp\\unins000.exe"; if (-not (Test-Path $u)) { exit 0 }; if (Get-Process -Name warp -ErrorAction SilentlyContinue) { Write-Error 'Warp is running: close it, then run --uninstall again'; exit 1 }; $p = Start-Process -FilePath $u -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru; for ($i = 0; $i -lt 30 -and (Test-Path $u); $i++) { Start-Sleep 2 }; if (Test-Path $u) { Write-Error "Warp uninstaller exit code $($p.ExitCode)"; exit 1 }`)],
+      });
+    }
+  }
+
+  if (canInstall && installTerminals.includes('orca')) {
+    if (platform === 'darwin') {
+      const key = arch === 'arm64' ? 'darwin-arm64' : 'darwin-x64';
+      const url = orcaPin.url[key];
+      const sha = orcaPin.sha256[key];
+      const script = `set -e
+DIR=$(mktemp -d)
+MOUNT="$DIR/mount"
+MOUNTED=0
+cleanup() {
+  if [ "$MOUNTED" -eq 1 ]; then
+    hdiutil detach "$MOUNT" -force >/dev/null 2>&1 || true
+  fi
+  rm -rf "$DIR"
+}
+trap cleanup EXIT
+curl -fsSL -o "$DIR/orca.dmg" "${url}"
+node "${VERIFY}" "$DIR/orca.dmg" "${sha}"
+hdiutil attach -nobrowse -readonly -mountpoint "$MOUNT" "$DIR/orca.dmg"
+MOUNTED=1
+mkdir -p "${home}/Applications"
+ditto "$MOUNT/Orca.app" "${home}/Applications/Orca.app"
+`;
+      commands.push({
+        tool: 'orca',
+        desc: 'Install Orca app',
+        skipIfExists: [path.join(home, 'Applications', 'Orca.app'), '/Applications/Orca.app'],
+        run: [
+          ['bash', '-c', script]
+        ],
+        undo: [['rm', '-rf', path.join(home, 'Applications', 'Orca.app')]],
+      });
+    } else if (platform === 'win32') {
+      const url = orcaPin.url['windows-x64'];
+      const sha = orcaPin.sha256['windows-x64'];
+      const exe = path.join(os.tmpdir(), 'orca-installer.exe');
+      const local = env.LOCALAPPDATA;
+      commands.push({
+        tool: 'orca',
+        desc: 'Install Orca app',
+        skipIfExists: [`${local}\\Programs\\Orca`],
+        run: [
+          ['curl', '-fsSL', '-o', exe, url],
+          ['node', VERIFY, exe, sha],
+          [exe, '/currentuser', '/S']
+        ],
+        always: [
+          ps(`if (Test-Path "${exe}") { Remove-Item "${exe}" }`)
+        ],
+        undo: [ps(`if (Test-Path "$env:LOCALAPPDATA\\Programs\\Orca\\Uninstall Orca.exe") { & "$env:LOCALAPPDATA\\Programs\\Orca\\Uninstall Orca.exe" /S }`)],
+      });
+    }
+  }
+
   if (terminals.includes('warp') && agents.includes('claude')) {
     commands.push({
       tool: 'warp',

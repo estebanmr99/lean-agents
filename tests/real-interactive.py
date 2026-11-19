@@ -108,7 +108,7 @@ print("zero-width terminal falls back to plain questions: ok")
 
 # Applying (files only, --no-exec) ends with the summary box.
 home = tempfile.mkdtemp(prefix="lean-tty-")
-argv = ["node", os.path.join(ROOT, "scripts", "lean.mjs"), "--home", home, "--no-exec", "--agents", "claude", "--no-tools", "--network", "on", "--lang", "en"]
+argv = ["node", os.path.join(ROOT, "scripts", "lean.mjs"), "--home", home, "--no-exec", "--agents", "claude", "--no-tools", "--network", "on", "--lang", "en", "--no-open"]
 pid, fd = pty.fork()
 if pid == 0:
     # No nvm, whatever the machine has: a missing NVM_DIR and an empty NVM_HOME, so an old Node always means the skip line.
@@ -131,7 +131,7 @@ home = tempfile.mkdtemp(prefix="lean-tty-")
 notes_src = os.path.join(tempfile.mkdtemp(prefix="lean-notes-"), "it.txt")
 with open(notes_src, "w") as f:
     f.write("Serena: keep the dashboard off\nproxy http://u:s3cret@127.0.0.1:8080\n")
-argv = ["node", os.path.join(ROOT, "scripts", "lean.mjs"), "--home", home, "--no-exec", "--agents", "claude", "--tools", "serena", "--network", "on", "--lang", "en", "--no-bun"]
+argv = ["node", os.path.join(ROOT, "scripts", "lean.mjs"), "--home", home, "--no-exec", "--agents", "claude", "--tools", "serena", "--network", "on", "--lang", "en", "--no-bun", "--no-open"]
 pid, fd = pty.fork()
 if pid == 0:
     # No nvm, whatever the machine has: a missing NVM_DIR and an empty NVM_HOME, so an old Node always means the skip line.
