@@ -321,6 +321,16 @@ for (const overwrite of [true, false]) {
     assert.equal(fs.existsSync(j(m.f.home, '.config', 'opencode', 'tui.json')), false, 'no tui.json stays absent');
   });
 
+  test(`apply with tui.json without dcp keeps it unchanged (${where})`, { skip }, async () => {
+    const m = await machine({ overwrite });
+    fs.mkdirSync(j(m.f.home, '.config', 'opencode'), { recursive: true });
+    const original = '{\n  // my comment\n  "plugin": ["other"]\n}\n';
+    fs.writeFileSync(j(m.f.home, '.config', 'opencode', 'tui.json'), original);
+    const r = await applyWith(m);
+    assert.equal(r.ok, true, m.log.join('\n'));
+    assert.equal(fs.readFileSync(j(m.f.home, '.config', 'opencode', 'tui.json'), 'utf8'), original, 'tui.json stays byte-for-byte unchanged');
+  });
+
   for (const step of STEPS) {
     test(`an injected failure after ${step} rolls back to the start state (${where})`, { skip }, async () => {
       const m = await machine({ overwrite });
