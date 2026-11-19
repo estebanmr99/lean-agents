@@ -656,6 +656,33 @@ async function install(o) {
   const update = saved && (o.dryRun || o.exec) ? updateInfo(o, saved) : null;
   const upgrades = update && o.exec ? upgradeCommands({ rows: update.rows, home: o.home, dir: stateDir(o.home), realHome: REAL_HOME, stamps: agentStamps(stateDir(o.home)) }) : [];
   const commands = [...(o.exec ? [...every?.commands ?? [], ...prereqCommands(o, behind).filter((c) => !owned.has(c.tool))] : []), ...agentCommands, ...upgrades];
+
+  if (o.exec) {
+    const AGENT_CLI = { claude: { cli: 'claude', name: 'Claude Code' }, 'opencode-v1': { cli: 'opencode', name: 'OpenCode 1.x' }, 'opencode-v2': { cli: 'opencode', name: 'OpenCode 2' }, 'copilot-cli': { cli: 'copilot', name: 'Copilot CLI' }, antigravity: { cli: 'agy', name: 'Antigravity' }, cursor: { cli: 'cursor', name: 'Cursor' }, windsurf: { cli: 'windsurf', name: 'Windsurf' } };
+    const missing = new Map();
+    for (const c of commands) {
+      if (c.agent && AGENT_CLI[c.agent]) {
+        const { cli, name } = AGENT_CLI[c.agent];
+        if (c.run?.some((argv) => argv[0] === cli) && !which(cli)) {
+          if (!missing.has(cli)) missing.set(cli, { agent: c.agent, name, steps: [] });
+          missing.get(cli).steps.push(c.desc);
+        }
+      }
+    }
+    if (missing.size > 0) {
+      for (const [cli, info] of missing) {
+        const others = o.agents.filter((a) => a !== info.agent).join(',') || 'none';
+        console.log(`! the ${cli} CLI is not on PATH: ${info.steps.length} steps need it (${info.steps.join(', ')}). Install ${info.name} first, or leave it out with --agents ${others}`);
+      }
+      if (!o.dryRun) {
+        p.close();
+        console.log('nothing changed');
+        process.exitCode = 1;
+        return;
+      }
+    }
+  }
+
   const noGit = migration ? null : gitHint(packageManager());
   if (noGit) console.log(noGit);
   if (o.json && o.dryRun) {
@@ -1011,9 +1038,13 @@ async function uninstall(o) {
     for (const c of [...state.commands].reverse()) {
       const bad = (c.undo ?? []).filter((argv) => !run(undoArgv(argv), { dryRun: false, log: console.log, env: c.env }));
       if (bad.length) {
-        console.log('  ! failed. Run the command above by hand.');
-        process.exitCode = 1;
-        failed.set(c, bad);
+        if (c.ok === false) {
+          console.log('  (it had failed, so nothing to remove)');
+        } else {
+          console.log('  ! failed. Run the command above by hand.');
+          process.exitCode = 1;
+          failed.set(c, bad);
+        }
       }
     }
   }

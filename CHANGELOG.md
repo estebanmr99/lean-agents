@@ -52,6 +52,8 @@ First stable release. Highlights since 0.8.0:
 - `tests/roundtrip.test.mjs`: one table-driven test runs install then `--uninstall` for each of the seven adapters in a temp HOME seeded with user files (a JSONC comment, a user MCP server, an agent and a skill named like managed ones) and asserts every file, path and bytes, equals the pre-install snapshot. Tests only (#164).
 
 ### Fixed
+- `--everything --agents claude` (and others) now refuses before writing anything if the agent's CLI is missing from PATH (#179 PC run).
+- `--uninstall` skips the `undo` of commands that had failed to run and only reported `ok: false`, allowing retry logic to complete without hanging (#179 PC run).
 - `--adopt --undo` keeps other recorded work (upgrade, opencode1, files, commands) and removes `state.json` only when it is a pure adopt-only run. `--uninstall` preserves an existing `--adopt` record as an adopt-only state, so `--adopt --undo` still works after it (#179 PC run).
 - The OpenCode 2 upgrade's DCP step now also pins the `tui.json` and `tui.jsonc` plugin entries if they exist, preventing a `spec-mismatch` health check warning (#307, #179 PC run).
 - `--adopt --dry-run` (text and `--json`) now lists what `--yes` will do: which Node the pin goes into, re-registered MCPs, and the npm uninstalls, folders and stopgaps that need a yes. Before, it showed only the inventory rows, so `upgrade ... (Node 22.17.0)` read as an in-place upgrade and the uninstall of that copy was hidden (`--json` adds `apply`) (#179 PC run).
