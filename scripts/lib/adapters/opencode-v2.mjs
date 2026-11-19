@@ -4,6 +4,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { parse } from 'jsonc-parser';
 import { OWNED_MARK } from '../fsops.mjs';
 import { tierFor, modelFor } from '../render.mjs';
 import { configHome } from '../system.mjs';
@@ -182,8 +183,23 @@ export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
   }
   if (tools.includes('ponytail')) edits.push({ path: ['plugins'], value: npmSpec('ponytail'), mode: 'arrayAdd', legacy: ['@dietrichgebert/ponytail'] });
   if (tools.includes('dcp')) {
+    const pkg = PINS['opencode-dcp'].source;
     edits.push({ path: ['plugins'], value: npmSpec('opencode-dcp'), mode: 'arrayAdd' });
     actions.push(dcpConfigAction(dir, profile));
+    for (const file of ['tui.json', 'tui.jsonc']) {
+      const p = path.join(dir, file);
+      if (fs.existsSync(p)) {
+        try {
+          const parsed = parse(fs.readFileSync(p, 'utf8'));
+          const plugins = Array.isArray(parsed?.plugin) ? parsed.plugin : [];
+          if (plugins.some(x => typeof x === 'string' && (x === pkg || x.startsWith(`${pkg}@`)))) {
+            actions.push({ kind: 'json', path: p, edits: [{ path: ['plugin'], value: npmSpec('opencode-dcp'), mode: 'arrayAdd', legacy: [`${pkg}@latest`, pkg] }] });
+          }
+        } catch (e) {
+          // skip
+        }
+      }
+    }
   }
   if (opts.terminals?.includes('warp')) edits.push({ path: ['plugins'], value: npmSpec('warp-opencode'), mode: 'arrayAdd', legacy: ['@warp-dot-dev/opencode-warp'] });
   if (opts.network.outbound === 'off') edits.push({ path: ['share'], value: 'disabled', mode: 'set' });
