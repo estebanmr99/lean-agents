@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Installs the Warp and Orca agent integrations with the real agent CLIs into a throwaway HOME,
-# checks what the agents resolved, then uninstalls. The terminal apps are GUI-only and never
-# installed: --terminal forces the choice. Used by CI; safe locally because HOME is a temp directory.
+# checks what the agents resolved, then uninstalls.
+# The terminal apps are never installed here: on Linux --install-terminal only prints that it cannot:
+# --terminal forces the choice. Used by CI; safe locally because HOME is a temp directory.
 # Usage: tests/real-terminals.sh <claude|opencode-v1|opencode-v2>
 set -euo pipefail
 
@@ -20,20 +21,15 @@ node "$repo/scripts/lean.mjs" --home "$HOME" --yes --agents "$target" --no-tools
   --privacy standard --lang en --profile anthropic-api </dev/null 2>&1 | tee "$HOME/install.txt"
 refute grep -qE '^ *! ' "$HOME/install.txt"
 
-node "$repo/scripts/lean.mjs" --home "$HOME" --yes --agents "$target" --no-tools --install-terminal both \
-  --privacy standard --lang en --profile anthropic-api </dev/null 2>&1 | tee "$HOME/install-term.txt"
-if [[ "$(uname -s)" == "Darwin" ]]; then
-  refute grep -qE '^ *! ' "$HOME/install-term.txt"
-else
+if [[ "$(uname -s)" == "Linux" ]]; then
+  node "$repo/scripts/lean.mjs" --home "$HOME" --yes --agents "$target" --no-tools --install-terminal both \
+    --privacy standard --lang en --profile anthropic-api </dev/null 2>&1 | tee "$HOME/install-term.txt"
   grep -q '! warp app: not installed' "$HOME/install-term.txt"
   grep -q '! orca app: not installed' "$HOME/install-term.txt"
   other_warns() { grep -E '^ *! ' "$HOME/install-term.txt" | grep -q -vE '! (warp|orca) app: not installed'; }
   refute other_warns
-fi
-
-if [[ "$(uname -s)" == "Darwin" ]]; then
-  echo "macOS install path check:"
-  ls -ld "$HOME/Applications/Orca.app" || true
+else
+  echo "skip: --install-terminal checks run on Linux only (they would install real apps)"
 fi
 
 case "$target" in
@@ -51,10 +47,6 @@ esac
 
 node "$repo/scripts/lean.mjs" --home "$HOME" --uninstall --yes </dev/null 2>&1 | tee "$HOME/uninstall.txt"
 refute grep -qE '^ *! ' "$HOME/uninstall.txt"
-
-if [[ "$(uname -s)" == "Darwin" ]]; then
-  refute test -e "$HOME/Applications/Orca.app"
-fi
 
 case "$target" in
   claude)
