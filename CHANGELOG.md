@@ -4,11 +4,6 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
-### Fixed
-- `--upgrade-agent opencode --backup --dry-run` now reports the expected sizes before listing a running `opencode` process as a blocker for apply (#270).
-- `--update --dry-run` on a hand-built machine without `state.json` now says `run --adopt --yes first` instead of `not installed` (#270).
-- `installOpencode1`: uses a throwaway state dir for the copy validation to avoid writing WAL/migration changes into the frozen layout (#290).
-
 ## [1.0.0] - 2026-11-18
 
 First stable release. Highlights since 0.8.0:
@@ -57,6 +52,9 @@ First stable release. Highlights since 0.8.0:
 - `tests/roundtrip.test.mjs`: one table-driven test runs install then `--uninstall` for each of the seven adapters in a temp HOME seeded with user files (a JSONC comment, a user MCP server, an agent and a skill named like managed ones) and asserts every file, path and bytes, equals the pre-install snapshot. Tests only (#164).
 
 ### Fixed
+- `--upgrade-agent opencode --backup --dry-run` now reports the expected sizes before listing a running `opencode` process as a blocker for apply (#270).
+- `--update --dry-run` on a hand-built machine without `state.json` now says `run --adopt --yes first` instead of `not installed` (#270).
+- `installOpencode1`: uses a throwaway state dir for the copy validation to avoid writing WAL/migration changes into the frozen layout (#290).
 - Final review (#287): the nvm undo removes only exactly `~/.nvm` of the home the state recorded, and keeps it (with a message) when any Node under it holds a global package beyond npm, corepack and the npm tools lean-agents installs, or a Node it did not install. `--uninstall` keeps a failed undo command in `state.json` and does not archive it, so a second `--uninstall` retries it; the archive rename retries a locked file (`renameRetry`). `--uninstall-agent vscode-copilot` resolves the `<lean-node>` placeholder like `--uninstall`. `loadWorkers` re-checks worker names, so a hand-edited `workers.json` cannot make `clean` remove another folder. Tests in `tests/prereqs.test.mjs`, `tests/uninstall-retry.test.mjs`, `tests/parallel.test.mjs`.
 - Review 9 fixes (#284): the verify prompt searches for duplicates only after the per-issue yes and with the redacted draft title, never the raw item name (`docs/privacy.md` and `docs/install-with-an-agent.md` match); `tests/real-update.sh` N-1 prints SKIP instead of a vacuous OK when the release pins equal the checkout's; an explicit `--auto-update on` (or the per-category menu, remembered by `--update`) and an exported `DISABLE_AUTOUPDATER` write no self-updater switch, and the install output says when an updater is left off because `--update` owns updates; `--update --undo` keys on "uninstalled or reinstalled since" (the agents.json stamp saved with each upgrade record) so an upgrade of a CLI the user already had stays undoable, and both undo paths use the same filter; a login probe that times out or is killed shows `unknown`, not `needed`; the `lean-update` backup snippet is marked untested on PowerShell 5.1 with a `.js` file fallback; the verify prompt's flags are checked against `--help` (skipped until `--filed-issue` lands with #181 PR3).
 - `--update --undo` follow-ups (#282): undo skips upgrade records of agents that are not in `agents.json`, and `--install-agent` / `--uninstall-agent` drop that agent's records (a removed or reinstalled agent was downgraded or brought back); `--update --undo --json` is refused with a clear message; undo with `--no-exec`, or without `--yes` and without a terminal, says "Not done" and exits 1 (`--dry-run` still exits 0); the `--json` apply output masks absolute paths outside the home in `commands[].desc` and `errors`. Tests now run `--update` twice with a stub that reports different versions (the dedupe by `desc` moves no record) and read versions from `core/pins.json`.
