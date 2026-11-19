@@ -212,6 +212,23 @@ test('removeOpencode1 never deletes outside <data>/lean-agents/opencode1', () =>
   assert.ok(fs.existsSync(j(f.L.frozen, 'opencode', 'opencode.db')));
 });
 
+test('installOpencode1: probes the copied binary using a throwaway state dir, not the frozen layout', () => {
+  const f = fixture();
+  const p = planOpencode1({ home: f.home, which: () => f.onPath, probe: () => '1.19.0', shell: '/bin/sh' });
+  let probedEnv = null;
+  const probe = (bin, env) => {
+    probedEnv = env;
+    return '1.19.0';
+  };
+  installOpencode1(p, { home: f.home, roots: [f.home], backupDir: j(f.home, 'bk'), apply, probe });
+  assert.ok(probedEnv, 'probe was called');
+  assert.notEqual(probedEnv.XDG_DATA_HOME, f.L.frozen);
+  assert.notEqual(probedEnv.XDG_STATE_HOME, f.L.state);
+  assert.equal(probedEnv.XDG_DATA_HOME, probedEnv.XDG_STATE_HOME);
+  assert.ok(probedEnv.XDG_DATA_HOME.includes('lean-probe-'), 'uses a throwaway dir');
+  assert.equal(fs.existsSync(probedEnv.XDG_DATA_HOME), false, 'throwaway dir is removed afterwards');
+});
+
 test('lean.mjs: dry run writes nothing; --yes sets up opencode1; --uninstall removes it and keeps the frozen copy', { skip: win && 'sh shim' }, () => {
   const f = fixture();
   const bin = j(f.home, 'fakebin');
