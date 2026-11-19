@@ -100,6 +100,7 @@ test('dry run writes nothing: the whole HOME tree hash is unchanged', () => {
   assert.match(logs.join('\n'), /dry run: would copy 5 data files \+ 1 config files.*3 sessions/);
   assert.match(logs.join('\n'), /free space:.*free,.*needed/);
   assert.match(logs.join('\n'), /blocker for apply:.*process is running/);
+  assert.match(logs.join('\n'), /counting the sessions on a temp copy of the db \(\d+\.\d\d GB/);
   fs.rmSync(f.home, { recursive: true, force: true });
 });
 

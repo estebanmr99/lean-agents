@@ -52,6 +52,7 @@ First stable release. Highlights since 0.8.0:
 - `tests/roundtrip.test.mjs`: one table-driven test runs install then `--uninstall` for each of the seven adapters in a temp HOME seeded with user files (a JSONC comment, a user MCP server, an agent and a skill named like managed ones) and asserts every file, path and bytes, equals the pre-install snapshot. Tests only (#164).
 
 ### Fixed
+- OpenCode session count: the child count timed out after 5 s, so on a large db (7 GB on a real Windows PC, 6 s to count) the backup refused, `--undo` stopped with "the data is not restored", and the message blamed a missing node:sqlite. The timeout is now 10 minutes, a timeout is named as one, and the backup says it copies the db to count (#179 PC run).
 - `--upgrade-agent opencode --backup --dry-run` now reports the expected sizes before listing a running `opencode` process as a blocker for apply (#270).
 - `--update --dry-run` on a hand-built machine without `state.json` now says `run --adopt --yes first` instead of `not installed` (#270).
 - `installOpencode1`: uses a throwaway state dir for the copy validation to avoid writing WAL/migration changes into the frozen layout (#290).
