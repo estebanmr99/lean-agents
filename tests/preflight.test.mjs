@@ -17,10 +17,12 @@ test('preflight: PATH without claude: --dry-run warns and exits 0, --yes exits 1
   const dry = engine(['--home', home, '--yes', '--dry-run', '--agents', 'claude'], env);
   assert.equal(dry.status, 0, dry.stderr);
   assert.match(dry.stdout, /! the claude CLI is not on PATH: \d steps need it/);
+  assert.match(dry.stdout, /--install-agent claude/);
 
   const exec = engine(['--home', home, '--yes', '--agents', 'claude'], env);
   assert.equal(exec.status, 1, exec.stderr);
   assert.match(exec.stdout, /! the claude CLI is not on PATH: \d steps need it/);
+  assert.match(exec.stdout, /--install-agent claude/);
   assert.match(exec.stdout, /nothing changed/);
   assert.equal(fs.existsSync(path.join(home, '.config', 'lean-agents', 'state.json')), false);
 });

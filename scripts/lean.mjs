@@ -658,21 +658,22 @@ async function install(o) {
   const commands = [...(o.exec ? [...every?.commands ?? [], ...prereqCommands(o, behind).filter((c) => !owned.has(c.tool))] : []), ...agentCommands, ...upgrades];
 
   if (o.exec) {
-    const AGENT_CLI = { claude: { cli: 'claude', name: 'Claude Code' }, 'opencode-v1': { cli: 'opencode', name: 'OpenCode 1.x' }, 'opencode-v2': { cli: 'opencode', name: 'OpenCode 2' }, 'copilot-cli': { cli: 'copilot', name: 'Copilot CLI' }, antigravity: { cli: 'agy', name: 'Antigravity' }, cursor: { cli: 'cursor', name: 'Cursor' }, windsurf: { cli: 'windsurf', name: 'Windsurf' } };
     const missing = new Map();
     for (const c of commands) {
-      if (c.agent && AGENT_CLI[c.agent]) {
-        const { cli, name } = AGENT_CLI[c.agent];
-        if (c.run?.some((argv) => argv[0] === cli) && !which(cli)) {
-          if (!missing.has(cli)) missing.set(cli, { agent: c.agent, name, steps: [] });
-          missing.get(cli).steps.push(c.desc);
+      if (c.agent) {
+        for (const argv of c.run ?? []) {
+          const cli = argv[0];
+          if (cli && typeof cli === 'string' && !cli.includes('/') && !cli.includes('\\') && !which(cli)) {
+            if (!missing.has(cli)) missing.set(cli, { agent: c.agent, steps: [] });
+            missing.get(cli).steps.push(c.desc);
+          }
         }
       }
     }
     if (missing.size > 0) {
       for (const [cli, info] of missing) {
         const others = o.agents.filter((a) => a !== info.agent).join(',') || 'none';
-        console.log(`! the ${cli} CLI is not on PATH: ${info.steps.length} steps need it (${info.steps.join(', ')}). Install ${info.name} first, or leave it out with --agents ${others}`);
+        console.log(`! the ${cli} CLI is not on PATH: ${info.steps.length} steps need it (${info.steps.join(', ')}). Install it first (--install-agent ${info.agent}), or leave it out with --agents ${others}`);
       }
       if (!o.dryRun) {
         p.close();

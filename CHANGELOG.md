@@ -4,6 +4,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Fixed
+
+- `--uninstall` still tries the undo of a command that had failed (`ok: false`), but its failure no longer keeps the record, so a half install can be uninstalled (#179 PC run).
+
 ## [1.0.0] - 2026-11-18
 
 First stable release. Highlights since 0.8.0:
