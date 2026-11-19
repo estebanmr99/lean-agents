@@ -278,6 +278,9 @@ for (const overwrite of [true, false]) {
 
   test(`full apply, then --undo: the machine is back (${where})`, { skip }, async () => {
     const m = await machine({ overwrite });
+    fs.mkdirSync(j(m.f.home, '.config', 'opencode'), { recursive: true });
+    fs.writeFileSync(j(m.f.home, '.config', 'opencode', 'tui.json'), '{\n  // my comment\n  "plugin": ["@tarquinen/opencode-dcp@latest", "other"]\n}\n');
+    m.start = liveTree(m.f.home);
     const r = await applyWith(m);
     assert.equal(r.ok, true, m.log.join('\n'));
     assert.equal(r.journal.status, 'applied');
@@ -286,6 +289,10 @@ for (const overwrite of [true, false]) {
     const cfg = fs.readFileSync(j(m.f.home, '.config', 'opencode', 'opencode.jsonc'), 'utf8');
     assert.match(cfg, /opencode-dcp/);
     assert.ok(fs.existsSync(j(m.f.home, '.config', 'opencode', 'dcp.jsonc')));
+    const tui = fs.readFileSync(j(m.f.home, '.config', 'opencode', 'tui.json'), 'utf8');
+    assert.match(tui, /opencode-dcp@\d+\.\d+\.\d+",/);
+    assert.doesNotMatch(tui, /@latest/);
+    assert.match(tui, /\/\/ my comment/);
     assert.ok(m.S.opencode1.binary, 'opencode1 is recorded');
     assert.equal(liveDiffers(m.f.L, r.stamp.dir), null, 'apply never touches the live data');
     // The user starts 2.x and it migrates the db; then they use opencode1 once.
@@ -295,6 +302,9 @@ for (const overwrite of [true, false]) {
     assert.equal(un, true, m.log.join('\n'));
     assert.equal(r.journal.status, 'undone');
     assert.equal(fs.readFileSync(j(m.f.L.live, 'opencode.db'), 'utf8'), '4');
+    const tuiUndo = fs.readFileSync(j(m.f.home, '.config', 'opencode', 'tui.json'), 'utf8');
+    assert.match(tuiUndo, /@tarquinen\/opencode-dcp@latest/);
+    assert.match(tuiUndo, /\/\/ my comment/);
     assert.equal(fakeProbe(m.oneX), '1.19.0', 'the 1.x binary is back');
     assert.equal(m.S.opencode1, undefined);
     // Everything but the db (now the frozen copy's 4 sessions) is what it was.
@@ -302,6 +312,13 @@ for (const overwrite of [true, false]) {
     assert.equal(strip(liveTree(m.f.home)), strip(m.start));
     assert.equal(fs.readFileSync(j(r.stamp.dir, 'data', 'opencode.db'), 'utf8'), '3', 'the backup is kept');
     assert.equal(fs.readFileSync(j(m.f.L.frozen, 'opencode', 'opencode.db'), 'utf8'), '4', 'the frozen copy is kept');
+  });
+
+  test(`apply with no tui.json keeps it absent (${where})`, { skip }, async () => {
+    const m = await machine({ overwrite });
+    const r = await applyWith(m);
+    assert.equal(r.ok, true, m.log.join('\n'));
+    assert.equal(fs.existsSync(j(m.f.home, '.config', 'opencode', 'tui.json')), false, 'no tui.json stays absent');
   });
 
   for (const step of STEPS) {

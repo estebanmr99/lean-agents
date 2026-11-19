@@ -182,8 +182,14 @@ export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
   }
   if (tools.includes('ponytail')) edits.push({ path: ['plugins'], value: npmSpec('ponytail'), mode: 'arrayAdd', legacy: ['@dietrichgebert/ponytail'] });
   if (tools.includes('dcp')) {
+    const pkg = PINS['opencode-dcp'].source;
     edits.push({ path: ['plugins'], value: npmSpec('opencode-dcp'), mode: 'arrayAdd' });
     actions.push(dcpConfigAction(dir, profile));
+    for (const file of ['tui.json', 'tui.jsonc']) {
+      if (fs.existsSync(path.join(dir, file))) {
+        actions.push({ kind: 'json', path: path.join(dir, file), edits: [{ path: ['plugin'], value: npmSpec('opencode-dcp'), mode: 'arrayAdd', legacy: [`${pkg}@latest`, pkg] }] });
+      }
+    }
   }
   if (opts.terminals?.includes('warp')) edits.push({ path: ['plugins'], value: npmSpec('warp-opencode'), mode: 'arrayAdd', legacy: ['@warp-dot-dev/opencode-warp'] });
   if (opts.network.outbound === 'off') edits.push({ path: ['share'], value: 'disabled', mode: 'set' });
