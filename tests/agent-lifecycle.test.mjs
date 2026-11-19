@@ -23,7 +23,7 @@ function fake(home) {
 const opts = (home, mode, extra = {}) => ({ mode, agents: ['fake'], home, realHome: '/nowhere', stateDir: path.join(home, '.config', 'lean-agents'), dryRun: false, exec: true, yes: true, ask: async (_q, d) => d, yesNo, table: fake(home), ...extra });
 const quietly = async (fn) => { const log = console.log; const out = []; console.log = (...a) => out.push(a.join(' ')); try { await fn(); } finally { console.log = log; } return out.join('\n'); };
 // 'fake' is not in the public list; the module checks it, so tests name a real agent and swap its table row.
-const asClaude = (home, mode, extra) => ({ ...opts(home, mode, extra), agents: ['claude'], table: { claude: fake(home).fake } });
+const asClaude = (home, mode, extra) => ({ ...opts(home, mode, extra), agents: ['claude'], table: extra?.table ?? { claude: fake(home).fake } });
 
 test('dry run prints the pinned plan for every agent and changes nothing', { skip: process.platform === 'win32' && 'Windows offers only Copilot CLI' }, () => {
   const home = tmp();
@@ -44,6 +44,17 @@ test('OpenCode 1.x is never installed or removed', () => {
   const r = lean(tmp(), '--install-agent', 'opencode-v1', '--dry-run');
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /never installed or removed/);
+});
+
+test('agentTable win32 claude', () => {
+  const home = '/tmp/fakehome';
+  const row = agentTable({ home, platform: 'win32', dir: home, realHome: home }).claude;
+  assert.equal(row.method, 'script');
+  assert.ok(!row.manual, 'should not be manual');
+  assert.deepEqual(row.bins, [path.join(home, '.local', 'bin', 'claude.exe')]);
+  assert.deepEqual(row.dirs, [path.join(home, '.local', 'bin'), path.join(home, '.local', 'share', 'claude'), path.join(home, '.claude', 'downloads')]);
+  assert.equal(row.run[0][0], 'curl.exe', 'downloader is curl.exe');
+  assert.equal(row.run[2][0], 'powershell', 'runner is powershell');
 });
 
 test('every script installer has a pinned url and sha256 in core/pins.json', () => {
@@ -140,4 +151,83 @@ test('--doctor says VS Code owns the Copilot extension', () => {
   const home = tmp();
   assert.equal(engine(home, '--install-agent', 'vscode-copilot', '--no-exec', '--yes', '--tools', 'caveman').status, 0);
   assert.match(engine(home, '--doctor', '--no-exec').stdout, /Copilot extension.*managed by VS Code/);
+});
+
+test('win32 path entry: absent before, present after -> recorded and removed', async () => {
+  const home = tmp();
+  const dir = path.join(home, '.local', 'bin');
+  let has = false;
+  const winPath = (op, d) => {
+    if (d !== dir) return 'absent';
+    if (op === 'has') return has ? 'present' : 'absent';
+    if (op === 'remove') { has = false; return 'changed'; }
+    return 'absent';
+  };
+  const row = {
+    method: 'script', version: '1', run: [],
+    bins: [], dirs: [dir]
+  };
+  row.run.every = (cb) => { has = true; return cb([process.execPath, '-e', 'process.exit(0)']); };
+  const opts = asClaude(home, 'install', { platform: 'win32', winPath, table: { claude: row } });
+  
+  const out = await quietly(() => agentLifecycle(opts));
+  const state = JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'agents.json'), 'utf8')).agents.claude;
+  assert.equal(state.pathEntryDir, dir, 'recorded pathEntryDir');
+
+  
+  const rmOpts = asClaude(home, 'uninstall', { platform: 'win32', winPath });
+  const rmOut = await quietly(() => agentLifecycle(rmOpts));
+  assert.match(rmOut, /removed from PATH/);
+  assert.equal(has, false, 'removed from winPath');
+});
+
+test('win32 path entry: present before -> not recorded, not removed', async () => {
+  const home = tmp();
+  const dir = path.join(home, '.local', 'bin');
+  let has = true;
+  const winPath = (op, d) => {
+    if (d !== dir) return 'absent';
+    if (op === 'has') return has ? 'present' : 'absent';
+    if (op === 'remove') { has = false; return 'changed'; }
+    return 'absent';
+  };
+  const row = {
+    method: 'script', version: '1', run: [],
+    bins: [], dirs: [dir]
+  };
+  row.run.every = (cb) => cb([process.execPath, '-e', 'process.exit(0)']);
+  const opts = asClaude(home, 'install', { platform: 'win32', winPath, table: { claude: row } });
+  
+  await quietly(() => agentLifecycle(opts));
+  const state = JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'agents.json'), 'utf8')).agents.claude;
+  assert.ok(!state.pathEntryDir, 'did not record pathEntryDir');
+  
+  const rmOpts = asClaude(home, 'uninstall', { platform: 'win32', winPath });
+  const rmOut = await quietly(() => agentLifecycle(rmOpts));
+  assert.doesNotMatch(rmOut, /removed from PATH/);
+  assert.equal(has, true, 'did not remove from winPath');
+});
+
+test('win32 path entry: failed install that added the entry -> still recorded', async () => {
+  const home = tmp();
+  const dir = path.join(home, '.local', 'bin');
+  let has = false;
+  const winPath = (op, d) => {
+    if (d !== dir) return 'absent';
+    if (op === 'has') return has ? 'present' : 'absent';
+    if (op === 'remove') { has = false; return 'changed'; }
+    return 'absent';
+  };
+  const row = {
+    method: 'script', version: '1', run: [],
+    bins: [], dirs: [dir]
+  };
+  row.run.every = (cb) => { has = true; return cb([process.execPath, '-e', 'process.exitCode = 1; process.exit(1)']); };
+  const opts = asClaude(home, 'install', { platform: 'win32', winPath, table: { claude: row } });
+  
+  await quietly(() => agentLifecycle(opts));
+  process.exitCode = 0; // reset
+  
+  const state = JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'agents.json'), 'utf8')).agents.claude;
+  assert.equal(state.pathEntryDir, dir, 'recorded pathEntryDir despite failure');
 });

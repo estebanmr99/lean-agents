@@ -10,6 +10,7 @@ import { PINS } from './pins.mjs';
 import { sha256 } from './verify-sha256.mjs';
 import { run, which, version, antigravityPrereqs, packageManager, agyCandidates, BREW_AGY_LIMIT } from './system.mjs';
 import { writePrivate, privateDir } from './fsops.mjs';
+import { winPathDefault } from './opencode1.mjs';
 
 const VERIFY = fileURLToPath(new URL('./verify-sha256.mjs', import.meta.url));
 export const LIFECYCLE_AGENTS = ['claude', 'opencode-v2', 'copilot-cli', 'cursor', 'antigravity', 'vscode-copilot'];
@@ -19,10 +20,10 @@ const VSCODE = 'vscode-copilot';
 export const VSCODE_NOTE = 'VS Code owns the GitHub Copilot extension: lean-agents never installs, updates or removes it. Install the extension and update it from VS Code (Extensions view).';
 
 // Pinned installer script: curl, verify, run. `args` go to the script (a version for Claude and OpenCode).
-function script(pinKey, dir, args = []) {
+function script(pinKey, dir, args = [], ext = '.sh') {
   const p = PINS[pinKey];
-  const file = path.join(dir, `${pinKey}.sh`);
-  return { version: null, download: file, run: [['curl', '-fsSL', '-o', file, p.url], [process.execPath, VERIFY, file, p.sha256], ['bash', file, ...args]] };
+  const file = path.join(dir, `${pinKey}${ext}`);
+  return { version: null, download: file, run: [[ext === '.ps1' ? 'curl.exe' : 'curl', '-fsSL', '-o', file, p.url], [process.execPath, VERIFY, file, p.sha256], ext === '.ps1' ? ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', file, ...args] : ['bash', file, ...args]] };
 }
 
 // One row per agent for this OS: how it is installed, where its binary lands and which dirs the install may write to.
@@ -38,7 +39,7 @@ export function agentTable({ home, platform, dir, realHome, ver = {} }) {
   const t = {};
   t.claude = posix
     ? { method: 'script', ...script('claude-installer', dir, [at('claude-code')]), bins: bin('claude'), dirs: [path.join(local, 'bin'), path.join(local, 'share', 'claude'), path.join(home, '.claude', 'downloads')] }
-    : { manual: 'Claude Code on Windows (claude.ai/install.ps1): not proven yet. VERIFY' };
+    : { method: 'script', ...script('claude-installer-win', dir, [at('claude-code')], '.ps1'), bins: bin('claude.exe'), dirs: [path.join(local, 'bin'), path.join(local, 'share', 'claude'), path.join(home, '.claude', 'downloads')] };
   t['opencode-v2'] = posix
     // --no-modify-path: the installer must not edit ~/.bashrc, which we could not undo.
     ? { method: 'script', ...script('opencode-installer', dir, ['--version', at('opencode-v2'), '--no-modify-path']), bins: [path.join(home, '.opencode', 'bin', 'opencode')], dirs: [path.join(home, '.opencode')] }
@@ -134,6 +135,7 @@ async function vscodeLifecycle(o) {
 // o: { mode: 'install'|'uninstall', fromUpgrade (only --upgrade-agent may install 2.x next to 1.x), agents, home, realHome, platform, stateDir, dryRun, exec, yes, ask, yesNo, vscode }
 export async function agentLifecycle(o) {
   const log = console.log;
+  const winPath = o.winPath ?? winPathDefault;
   for (const a of o.agents) {
     if (a === 'opencode-v1') throw new Error('opencode-v1 is never installed or removed by lean-agents (work PCs run 1.x on purpose, #79)');
     if (!LIFECYCLE_AGENTS.includes(a)) throw new Error(`cannot ${o.mode} "${a}" (available: ${LIFECYCLE_AGENTS.join(', ')})`);
@@ -141,7 +143,8 @@ export async function agentLifecycle(o) {
   if (o.agents.includes(VSCODE)) await vscodeLifecycle(o);
   const agents = o.agents.filter((a) => a !== VSCODE);
   const state = readAgents(o.stateDir);
-  const table = o.table ?? agentTable({ home: o.home, platform: o.platform ?? process.platform, dir: o.stateDir, realHome: o.realHome });
+  const platform = o.platform ?? process.platform;
+  const table = o.table ?? agentTable({ home: o.home, platform, dir: o.stateDir, realHome: o.realHome });
   const todo = [];
   for (const a of agents) {
     const row = table[a];
@@ -149,7 +152,7 @@ export async function agentLifecycle(o) {
     if (o.mode === 'install') {
       if (mine) log(`${a}: already installed by lean-agents (${mine.method}); nothing to do.`);
       // #211: a working agy outside PATH (Windows installer folders) counts too; never installed over.
-      else if (a === 'antigravity' && agyCandidates(o.home, o.platform ?? process.platform, o.home === o.realHome ? process.env : {}).some((c) => fs.existsSync(c))) log(`${a}: already installed, not by lean-agents; left alone.`);
+      else if (a === 'antigravity' && agyCandidates(o.home, platform, o.home === o.realHome ? process.env : {}).some((c) => fs.existsSync(c))) log(`${a}: already installed, not by lean-agents; left alone.`);
       else if (row.manual) log(`${a}: ${row.manual}`);
       // --upgrade-agent installs 2.x over a 1.x it already copied out and sha256-checked, so the 1.x binary being there is expected.
       else if (!(o.fromUpgrade && a === 'opencode-v2') && (row.bins.some((b) => fs.existsSync(b)) || ((o.home === o.realHome || row.method === 'brew') && which(row.cmd)))) log(`${a}: already installed, not by lean-agents; left alone.`);
@@ -175,21 +178,35 @@ export async function agentLifecycle(o) {
     if (o.mode === 'install') {
       const row = table[a];
       const before = snapshot(row.dirs);
+      let pathDir = null;
+      let pathAbsent = false;
+      if (a === 'claude' && platform === 'win32') {
+        pathDir = path.join(o.home, '.local', 'bin');
+        pathAbsent = winPath('has', pathDir) === 'absent';
+      }
       const ok = row.run.every((argv) => run(argv, { dryRun: false, log, env }));
       if (row.download) fs.rmSync(row.download, { force: true });
       const rec = diffSnapshots(before, snapshot(row.dirs));
+      let pathEntry = false;
+      if (pathDir && pathAbsent && winPath('has', pathDir) === 'present') {
+        pathEntry = true;
+      }
       if (!ok) {
         log(`  ! ${a}: install failed. Run the commands above by hand.`);
         process.exitCode = 1;
         // Keep what a half-run installer left, so --uninstall-agent can clean it.
-        if (!rec.files.length && !rec.dirs.length) continue;
+        if (!rec.files.length && !rec.dirs.length && !pathEntry) continue;
       }
       state.agents[a] = { method: row.method, version: row.version, installedAt: new Date().toISOString(), uninstall: row.uninstall ?? null, ...rec };
+      if (pathEntry) state.agents[a].pathEntryDir = pathDir;
       log(`${a}: installed; ${rec.files.length} files recorded.`);
     } else {
       const rec = state.agents[a];
       if (rec.uninstall && !rec.uninstall.every((argv) => run(argv, { dryRun: false, log, env }))) { log(`  ! ${a}: uninstall failed. Run the command above by hand.`); process.exitCode = 1; continue; }
       for (const [what, file] of removeRecorded(o.home, rec)) log(`  ${what.padEnd(24)} ${file}`);
+      if (rec.pathEntryDir && platform === 'win32') {
+        if (winPath('remove', rec.pathEntryDir) === 'changed') log(`  ${'removed from PATH'.padEnd(24)} ${rec.pathEntryDir}`);
+      }
       delete state.agents[a];
       log(`${a}: removed. Your config and data were not touched.`);
     }
