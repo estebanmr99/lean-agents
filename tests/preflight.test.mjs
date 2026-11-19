@@ -27,6 +27,19 @@ test('preflight: PATH without claude: --dry-run warns and exits 0, --yes exits 1
   assert.equal(fs.existsSync(path.join(home, '.config', 'lean-agents', 'state.json')), false);
 });
 
+test('preflight: --json --dry-run with no claude on PATH: stdout parses with JSON.parse, stderr has the warning', () => {
+  const home = tmp();
+  const env = { PATH: '', HOME: home };
+  if (process.env.NVM_DIR) env.NVM_DIR = process.env.NVM_DIR;
+
+  const dry = engine(['--home', home, '--yes', '--dry-run', '--json', '--agents', 'claude', '--tools', 'playwright'], env);
+  assert.equal(dry.status, 0, dry.stderr);
+  assert.doesNotThrow(() => JSON.parse(dry.stdout));
+  assert.match(dry.stderr, /! the claude CLI is not on PATH: \d steps need it/);
+  assert.match(dry.stderr, /--install-agent claude/);
+  assert.doesNotMatch(dry.stdout, /! the claude CLI is not on PATH/);
+});
+
 test('preflight: PATH with a stub claude: no warning', () => {
   const home = tmp();
   const stubDir = tmp();
