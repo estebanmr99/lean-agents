@@ -367,8 +367,12 @@ opencode serve --port $((20000 + RANDOM % 40000)) --hostname 127.0.0.1 >"$T/serv
 SERVE_PID=$!
 if wait_procs 1; then
   lean --dry-run >"$T/run.out" 2>&1; rc=$?
-  check "exit 1 while opencode serve runs" test "$rc" = 1
-  check "names the running process" grep -q 'process is running' "$T/run.out"
+  check "dry run: exit 0 while opencode serve runs (#270)" test "$rc" = 0
+  check "dry run: still prints the size and free-space lines" grep -q 'free space:' "$T/run.out"
+  check "dry run: names the running process as a blocker" grep -q 'blocker for apply:.*process is running' "$T/run.out"
+  lean --yes >"$T/run-yes.out" 2>&1; rc=$?
+  check "apply: exit 1 while opencode serve runs" test "$rc" = 1
+  check "apply: refused and names the running process" grep -q 'process is running' "$T/run-yes.out"
 else
   echo "FAIL  opencode serve did not start"; tail -n 5 "$T/serve.log"; fail=1
 fi

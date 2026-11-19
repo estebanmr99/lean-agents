@@ -255,7 +255,9 @@ try {
   $serve = Start-Process $serveBin -ArgumentList 'serve', '--port', (Get-Random -Minimum 20000 -Maximum 60000), '--hostname', '127.0.0.1' -NoNewWindow -PassThru
   for ($i = 0; $i -lt 20 -and -not (Get-Process -Name opencode -ErrorAction SilentlyContinue); $i++) { Start-Sleep -Seconds 1 }
   $busy = Invoke-Lean --dry-run
-  Assert-That 'exit 1 and names the running process while opencode serve runs' (($busy.Code -eq 1) -and ($busy.Text -match 'process is running'))
+  Assert-That 'dry run: exit 0, sizes and the running process as a blocker while opencode serve runs (#270)' (($busy.Code -eq 0) -and ($busy.Text -match 'free space:') -and ($busy.Text -match 'blocker for apply:.*process is running'))
+  $busy = Invoke-Lean --yes
+  Assert-That 'apply: exit 1 and names the running process while opencode serve runs' (($busy.Code -eq 1) -and ($busy.Text -match 'process is running'))
 } finally {
   Restore-Env
   Set-Location $repo
