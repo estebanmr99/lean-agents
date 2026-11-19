@@ -375,8 +375,8 @@ export function adoptPlan(r, { home, env, platform, realHome, state, fsx = fs })
     const p = it.kind === 'mcp' ? [...it.keyPath, it.name] : it.kind === 'plugin' && it.keyPath[0] === 'enabledPlugins' ? it.keyPath : null;
     if (p) addEdit(absOf(home, it.file), { path: p, mode: 'remove' });
   }
-  // The pinned package in the tool Node's prefix.
-  if (tn && out.rewritten.length) {
+  // The pinned package in the tool Node's prefix: needed by a rewritten MCP, or planned as `upgrade` for a drift copy there.
+  if (tn && (out.rewritten.length || r.items.some((i) => i.kind === 'npm' && i.pin === pin && i.node === tn.version && i.action === 'upgrade'))) {
     let have = null;
     try { have = JSON.parse(fsx.readFileSync(j(tn.modules, 'context-mode', 'package.json'), 'utf8')).version; } catch { /* not installed there */ }
     if (have !== PINS[pin].version) out.install = { have, node: tn };

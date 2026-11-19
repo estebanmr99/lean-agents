@@ -643,9 +643,9 @@ async function install(o) {
   if (o.command === 'update' && !saved) {
     let found = false;
     try { found = (await inventory({ home: o.home, env: process.env, realHome: REAL_HOME })).items.length > 0; } catch { /* the plain message below */ }
-    throw new Error(`nothing to update: lean-agents is not installed${found ? '; run --adopt --yes first' : ''}`);
+    throw new Error(`nothing to update: lean-agents is not installed${found ? '; run --adopt --yes, then install (--everything --yes)' : ''}`);
   }
-  if (o.command === 'update' && saved.options.migrateOnly) throw new Error('nothing to update: only --migrate ran here');
+  if (o.command === 'update' && saved.options.migrateOnly) throw new Error(`nothing to update: only ${saved.adoptOnly ? '--adopt' : '--migrate'} ran here; install first (--everything --yes)`);
   const p = await choose(o, saved?.options);
   const { planned, commands: agentCommands, migration } = buildPlan(o);
   if (migration && !migration.rows.length) { p.close(); console.log('Nothing to migrate: no rules, agents, skills, prompts, MCP servers or hooks found.'); return o.json && printApplied(o, [], [], []); }
@@ -701,6 +701,8 @@ async function install(o) {
       ...(o.toolNode && { toolNode: { version: o.toolNode.version, installedByLean: !!o.toolNode.install || (previous?.toolNode?.version === o.toolNode.version && !!previous.toolNode.installedByLean) } }),
       files: [...(previous?.files ?? []), ...files],
       ...(previous?.opencode1 && { opencode1: previous.opencode1 }),
+      // --adopt --undo reads this; `adoptOnly` is not carried, so --update works after the install.
+      ...(previous?.adopt && { adopt: previous.adopt }),
       ...(previous?.upgrade && { upgrade: previous.upgrade }),
       // A command that ran again replaces its earlier record, so --uninstall undoes it once.
       commands: [...(previous?.commands ?? []).filter((c) => !ran.some((r) => r.desc === c.desc)), ...ran].map(({ resumeKey, ...c }) => (finished ? c : { ...c, ...(resumeKey && { resumeKey }) })),

@@ -81,7 +81,7 @@ test('--update --dry-run --json carries update.rows and update.notes (temp HOME,
   assert.ok(update.notes.length > 0 && update.notes.every((n) => /^\d+\.\d+\.\d+$/.test(n.version)));
 });
 
-test('--update --dry-run on a hand-built machine without state.json says run --adopt --yes first', () => {
+test('--update --dry-run on a hand-built machine without state.json says run --adopt --yes, then install', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
   fs.mkdirSync(path.join(home, '.claude', 'plugins'), { recursive: true });
   fs.writeFileSync(path.join(home, '.claude', 'settings.json'), '{"enabledPlugins": {"context-mode@latest": true}}');
@@ -91,7 +91,21 @@ test('--update --dry-run on a hand-built machine without state.json says run --a
 
   const r = run(['--update', '--dry-run']);
   assert.equal(r.status, 1);
-  assert.match(r.stderr, /lean-agents is not installed; run --adopt --yes first/);
+  assert.match(r.stderr, /lean-agents is not installed; run --adopt --yes, then install \(--everything --yes\)/);
+
+  // after an adopt-only run (#179 PC): name --adopt, not --migrate, and the install that comes next
+  const st = path.join(home, '.config', 'lean-agents');
+  fs.mkdirSync(st, { recursive: true });
+  fs.writeFileSync(path.join(st, 'state.json'), JSON.stringify({ version: '1.0.0', adoptOnly: true, options: { migrateOnly: true, agents: [], tools: [] }, files: [], commands: [], adopt: {} }));
+  const a = run(['--update', '--dry-run']);
+  assert.equal(a.status, 1);
+  assert.match(a.stderr, /nothing to update: only --adopt ran here; install first \(--everything --yes\)/);
+  // the install it names keeps the adopt record (--adopt --undo reads it) and makes --update work
+  assert.equal(run(['--agents', 'claude']).status, 0);
+  const after = JSON.parse(fs.readFileSync(path.join(st, 'state.json'), 'utf8'));
+  assert.deepEqual([after.adopt, after.adoptOnly, after.options.migrateOnly], [{}, undefined, undefined]);
+  assert.equal(run(['--update', '--dry-run']).status, 0);
+  fs.rmSync(st, { recursive: true, force: true });
 
   // also check that with nothing to adopt, it just says not installed
   fs.rmSync(path.join(home, '.claude'), { recursive: true, force: true });
