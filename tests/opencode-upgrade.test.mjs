@@ -322,7 +322,7 @@ test('apply on Windows-like manual 2.x install fails at install2x and rolls back
   m.d.manual = 'OpenCode 2 on Windows: not proven yet';
   const r = await applyWith(m);
   assert.equal(r.ok, false);
-  assert.match(r.journal.error, /not proven yet.*by hand/);
+  assert.match(r.journal.error, /not proven yet.*--opencode1 --yes.*install OpenCode 2 by hand, then run this again/);
   assert.equal(liveTree(m.f.home), m.start);
   const n = await machine({ overwrite: false });
   n.d.manual = 'OpenCode 2 on Windows: not proven yet';
@@ -331,6 +331,25 @@ test('apply on Windows-like manual 2.x install fails at install2x and rolls back
   const s = await applyWith(n);
   assert.equal(s.ok, true, n.log.join('\n'));
   assert.equal(s.journal.steps.find((x) => x.id === 'install2x').method, 'existing');
+});
+
+// #179 PC run: the hand install overwrites the 1.x binary, so the message's order (--opencode1 first) is the only way through.
+test('Windows-like manual route in the refusal\'s order: --opencode1, hand install over the 1.x binary, then apply succeeds', { skip }, async () => {
+  const m = await machine({ overwrite: true });
+  m.d.manual = 'OpenCode 2 on Windows: not proven yet';
+  m.S.opencode1 = m.d.install1(m.d.plan1(), [], () => {});
+  fs.writeFileSync(m.ocBin, fakeBin('2.2.5'), { mode: 0o755 });
+  const r = await applyWith(m);
+  assert.equal(r.ok, true, m.log.join('\n'));
+  assert.equal(r.journal.steps.find((x) => x.id === 'opencode1').preexisting, true);
+  assert.equal(r.journal.steps.find((x) => x.id === 'install2x').method, 'existing');
+  // without --opencode1 first there is no 1.x binary left, and the step names that on one line
+  const n = await machine({ overwrite: true });
+  n.d.manual = 'OpenCode 2 on Windows: not proven yet';
+  fs.writeFileSync(n.ocBin, fakeBin('2.2.5'), { mode: 0o755 });
+  const s2 = await applyWith(n);
+  assert.equal(s2.ok, false);
+  assert.match(s2.journal.error, /^opencode1: no OpenCode 1\.x binary found[^\n]*$/);
 });
 
 test('apply after an earlier --undo (live data equals the frozen copy, not the backup): same rollback, no data move', { skip }, async () => {

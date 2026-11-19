@@ -352,7 +352,7 @@ export function createSteps(d) {
         // Set up earlier by `--opencode1 --yes`: kept as it is, and not ours to undo.
         if (d.state.opencode1 && fs.existsSync(d.state.opencode1.binary)) { rec.preexisting = true; rec.opencode1 = d.state.opencode1; d.log(`  already set up (${d.state.opencode1.binary}): kept`); return; }
         const p = d.plan1();
-        if (!p.ok) throw new Error(`opencode1: ${p.problems.join('; ')}`);
+        if (!p.ok) throw new Error(`opencode1: ${p.problems.join('; ').replace(/\n\s*/g, ' ')}`); // one line: the step log prints only the first
         rec.source = p.source;
         rec.entries = journaled(rec);
         d.install1(p, rec.entries, (record) => { rec.opencode1 = record; d.state.opencode1 = record; d.save(); });
@@ -370,7 +370,8 @@ export function createSteps(d) {
         rec.preSha = fs.existsSync(ocBin) ? sha256File(ocBin) : null;
         const have = find2x();
         if (have) { rec.method = 'existing'; rec.version = have.version; d.log(`  OpenCode ${have.version} is already there (${have.path}): kept`); return; }
-        if (d.manual) throw new Error(`${d.manual}. Install OpenCode 2 by hand (the 1.x copy is already safe), then run this again`);
+        // The hand install overwrites ~/.opencode/bin/opencode.exe, and the rollback removes this run's 1.x copy: --opencode1 keeps it (#179 PC run).
+        if (d.manual) throw new Error(`${d.manual}. In this order: run --upgrade-agent opencode --opencode1 --yes (keeps the 1.x binary), install OpenCode 2 by hand, then run this again`);
         rec.method = 'installer';
         rec.installAttempted = true;
         d.save();
