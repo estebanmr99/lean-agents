@@ -151,7 +151,9 @@ export function installOpencode1(p, { home, roots, backupDir, apply, files = [],
     fs.copyFileSync(p.source, part);
     if (!win) fs.chmodSync(part, 0o755);
     if (sha256File(part) !== sha256File(p.source)) throw new Error('sha256 differs after copying the binary');
-    const v = probe(part, { ...env, XDG_DATA_HOME: layout(home).frozen, XDG_STATE_HOME: layout(home).state });
+    const scratch = fs.mkdtempSync(j(os.tmpdir(), 'lean-probe-'));
+    let v;
+    try { v = probe(part, { ...env, XDG_DATA_HOME: scratch, XDG_STATE_HOME: scratch }); } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
     if (v !== p.version) throw new Error(`the copied binary reports "${v}", expected ${p.version}`);
     renameRetry(part, p.binary);
   }
