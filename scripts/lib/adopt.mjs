@@ -601,8 +601,13 @@ export async function adoptUndo(o) {
   }
   if (!ok) { console.log(`Undone with problems; the record and backup stay so you can retry: ${a.backupDir ?? '(no backup)'}`); return false; }
   if (a.backupDir) dropBackups(a.backupDir);
-  if (st.adoptOnly) fs.rmSync(stateFile(stateDir));
-  else { delete st.adopt; writePrivate(stateFile(stateDir), `${JSON.stringify(st, null, 2)}\n`); }
+  delete st.adopt;
+  const isBare = st.adoptOnly && (!st.files || st.files.length === 0) && (!st.commands || st.commands.length === 0) && !st.opencode1 && !st.upgrade;
+  if (isBare) fs.rmSync(stateFile(stateDir));
+  else {
+    delete st.adoptOnly;
+    writePrivate(stateFile(stateDir), `${JSON.stringify(st, null, 2)}\n`);
+  }
   try { fs.rmdirSync(stateDir); } catch { /* other lean-agents files live there */ }
   console.log(ok ? 'Undone.' : 'Undone, with the problems above.');
   return ok;

@@ -1032,6 +1032,16 @@ async function uninstall(o) {
     return;
   }
   renameRetry(stateFile, path.join(stateDir(o.home), `state.uninstalled-${Date.now()}.json`));
+  if (state.adopt) {
+    const adoptState = {
+      version: state.version, installedAt: state.installedAt, pins: state.pins, adoptOnly: true,
+      options: { migrateOnly: true, agents: [], tools: [], privacy: 'standard', gh: false, terminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false, shell: 'git-bash' },
+      files: [], commands: [],
+      adopt: state.adopt
+    };
+    writePrivate(stateFile, `${JSON.stringify(adoptState, null, 2)}\n`);
+    console.log('  kept: the --adopt record; undo it with --adopt --undo');
+  }
   // Backups are the only undo for edits we cannot revert, so they stay unless the user says yes (--yes keeps them).
   const backups = path.join(stateDir(o.home), 'backups');
   const q = await prompter(o.yes);

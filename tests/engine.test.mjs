@@ -1352,6 +1352,35 @@ test('the coordinate skill is opt-in: not by default, not with --all-tools, inst
   assert.match(fs.readFileSync(log, 'utf8'), /skills@\d[\d.]* remove coordinate -g -y/);
 });
 
+test('--uninstall preserves an --adopt record and points --update/--undo at it', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const env = { NVM_DIR: path.join(home, '.nvm'), PATH: `${path.join(home, '.nvm', 'versions', 'node', 'v22.20.0', 'bin')}${path.delimiter}${process.env.PATH}` };
+  
+  lean(home, ['--yes', '--no-exec', '--agents', 'opencode-v2', '--lang', 'en', '--profile', 'none'], env);
+  
+  const stateFile = path.join(home, '.config', 'lean-agents', 'state.json');
+  const st = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+  st.adopt = { files: [], dirs: [], npm: [], backupDir: null };
+  fs.writeFileSync(stateFile, JSON.stringify(st));
+  
+  const u = lean(home, ['--uninstall', '--yes', '--no-exec'], env);
+  assert.ok(u.includes(' kept: the --adopt record; undo it with --adopt --undo'), 'printed instructions');
+  
+  const after = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+  assert.equal(after.adoptOnly, true);
+  assert.ok(after.adopt);
+  assert.equal(after.options.migrateOnly, true, 'has options from adopt shape');
+  assert.equal(after.files.length, 0);
+  
+  const dr = lean(home, ['--adopt', '--undo', '--dry-run'], env);
+  assert.ok(dr.includes('--adopt --undo --dry-run: would restore'), 'can dry run undo');
+  
+  const engine = (args) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args], { encoding: 'utf8', env });
+  const ud = engine(['--update', '--dry-run']);
+  assert.notEqual(ud.status, 0);
+  assert.ok(ud.stderr.includes('only --adopt ran here'), ud.stderr);
+});
+
 test('--update prints old -> new for pins in use; --doctor --json lists them under behind', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
   lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--tools', 'caveman', '--lang', 'en', '--profile', 'none']);

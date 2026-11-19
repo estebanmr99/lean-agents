@@ -210,3 +210,33 @@ test('--confirm-removals never deletes through a symlinked folder', { skip: proc
   assert.ok(fs.existsSync(j(outside, 'dup-demo', 'SKILL.md')), 'the target outside HOME is untouched');
   fs.rmSync(outside, { recursive: true, force: true });
 });
+
+test('adopt-only state with opencode1 and upgrade keys; after --undo the state still has them and drops adopt; pure adopt-only removes the file', { skip }, async () => {
+  const s = await seeded();
+  const dir = j(s.home, '.config', 'lean-agents');
+  fs.mkdirSync(dir, { recursive: true });
+  
+  fs.writeFileSync(j(dir, 'state.json'), JSON.stringify({
+    version: '1', installedAt: '2026', pins: {}, adoptOnly: true, adopt: { files: [], dirs: [], npm: [], backupDir: null },
+    opencode1: { shim: j(s.home, 'shim') },
+    upgrade: { status: 'applied', backup: j(s.home, '.local', 'share', 'lean-agents', 'backups', 'opencode1-sessions-20261119T120000Z'), steps: [] }
+  }));
+  const u = lean(s.home, ['--undo']);
+  assert.equal(u.status, 0, u.stdout + u.stderr);
+  const st = JSON.parse(fs.readFileSync(j(dir, 'state.json'), 'utf8'));
+  assert.equal(st.adopt, undefined);
+  assert.equal(st.adoptOnly, undefined);
+  assert.equal(st.opencode1.shim, j(s.home, 'shim'));
+  assert.equal(st.upgrade.status, 'applied');
+  
+  const dr = spawnSync(process.execPath, [LEAN, '--home', s.home, '--no-exec', '--upgrade-agent', 'opencode', '--undo', '--dry-run'], { encoding: 'utf8', env: { ...process.env, NVM_DIR: s.env.NVM_DIR, PATH: s.env.PATH } });
+  assert.ok(dr.stdout.includes('the 1.x data comes back'), dr.stdout);
+
+  // 2. pure adoptOnly
+  fs.writeFileSync(j(dir, 'state.json'), JSON.stringify({
+    version: '1', installedAt: '2026', pins: {}, adoptOnly: true, adopt: { files: [], dirs: [], npm: [], backupDir: null }
+  }));
+  const u2 = lean(s.home, ['--undo']);
+  assert.equal(u2.status, 0, u2.stdout + u2.stderr);
+  assert.ok(!fs.existsSync(j(dir, 'state.json')));
+});
