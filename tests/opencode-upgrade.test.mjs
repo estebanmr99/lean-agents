@@ -343,6 +343,20 @@ test('Windows-like manual route in the refusal\'s order: --opencode1, hand insta
   assert.equal(r.ok, true, m.log.join('\n'));
   assert.equal(r.journal.steps.find((x) => x.id === 'opencode1').preexisting, true);
   assert.equal(r.journal.steps.find((x) => x.id === 'install2x').method, 'existing');
+  // --undo puts the 1.x binary back where the hand install wrote 2.x, and moves 2.x aside (#179 PC run: it used to stay)
+  const oneSha = sha256File(m.S.opencode1.binary);
+  assert.equal(await runUndo({ steps: r.steps, journal: r.journal, save: quiet, ctx: r.ctx, log: quiet, restore: r.restore }), true);
+  assert.equal(sha256File(m.ocBin), oneSha);
+  assert.equal(r.journal.steps.find((x) => x.id === 'install2x').kept2x, undefined);
+  assert.ok(fs.readdirSync(j(m.f.L.lean, 'backups')).some((n) => n.startsWith('opencode2-bin-')));
+  // a rollback is "as before the run": the hand-installed 2.x stays
+  const k = await machine({ overwrite: true });
+  k.d.manual = 'OpenCode 2 on Windows: not proven yet';
+  k.S.opencode1 = k.d.install1(k.d.plan1(), [], () => {});
+  fs.writeFileSync(k.ocBin, fakeBin('2.2.5'), { mode: 0o755 });
+  const twoSha = sha256File(k.ocBin);
+  assert.equal((await applyWith(k, 'config')).ok, false);
+  assert.equal(sha256File(k.ocBin), twoSha);
   // without --opencode1 first there is no 1.x binary left, and the step names that on one line
   const n = await machine({ overwrite: true });
   n.d.manual = 'OpenCode 2 on Windows: not proven yet';

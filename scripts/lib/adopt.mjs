@@ -307,7 +307,7 @@ export async function adopt(o) {
   const by = {};
   for (const i of r.items) by[`${i.kind}`] = (by[`${i.kind}`] ?? 0) + 1;
   console.log(`--adopt (dry run: nothing is changed; --yes applies). Found: ${Object.entries(by).map(([k, n]) => `${n} ${k}`).join(', ') || 'nothing'}`);
-  console.log(`tool Node: ${r.toolNode.range ? `${r.toolNode.range} -> ${r.toolNode.node ?? 'no matching Node installed, nvm not found'} (${r.toolNode.source ?? 'none'})` : 'not needed'}`);
+  console.log(`tool Node: ${r.toolNode.range ? `${r.toolNode.range} -> ${r.toolNode.node ?? 'no installed Node meets it (install one with nvm)'} (${r.toolNode.source ?? 'none'})` : 'not needed'}`);
   console.log(`OpenCode: major ${r.opencode.major ?? 'none'}, ${r.opencode.dbBytes} bytes of db, sessions ${r.opencode.sessions ?? 'unknown'}${r.opencode.note ? ` (${r.opencode.note})` : ''}`);
   for (const i of r.items.filter((x) => x.action !== 'keep' || x.owner === 'managed' || x.kind === 'hook' || x.kind === 'ide')) {
     console.log(`  ${i.action.padEnd(9)} ${i.owner.padEnd(8)} ${i.client} ${i.kind} ${i.name}${i.status.length ? `  [${i.status.join(', ')}]` : ''}${i.note ? `  (${i.note})` : ''}  (${i.file})`);

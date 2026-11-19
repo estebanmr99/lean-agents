@@ -284,6 +284,7 @@ export function makeCtx({ home, stamp, journal }) {
   return {
     restoreMd: j(stamp.dir, 'RESTORE.md'),
     step: (id) => journal.steps.find((s) => s.id === id),
+    undoing: () => journal.status === 'undoing',
     // The live data must still equal what it equaled when the apply started (the backup, or the frozen copy after an earlier --undo).
     liveDrift: () => (journal.baseline === 'frozen' ? frozenDiffers(backupLayout(home, 'x')) : liveDiffers(backupLayout(home, 'x'), stamp.dir)),
   };
@@ -369,7 +370,7 @@ export function createSteps(d) {
       async run(rec) {
         rec.preSha = fs.existsSync(ocBin) ? sha256File(ocBin) : null;
         const have = find2x();
-        if (have) { rec.method = 'existing'; rec.version = have.version; d.log(`  OpenCode ${have.version} is already there (${have.path}): kept`); return; }
+        if (have) { rec.method = 'existing'; rec.version = have.version; rec.path = have.path; d.log(`  OpenCode ${have.version} is already there (${have.path}): kept`); return; }
         // The hand install overwrites ~/.opencode/bin/opencode.exe, and the rollback removes this run's 1.x copy: --opencode1 keeps it (#179 PC run).
         if (d.manual) throw new Error(`${d.manual}. In this order: run --upgrade-agent opencode --opencode1 --yes (keeps the 1.x binary), install OpenCode 2 by hand, then run this again`);
         rec.method = 'installer';
@@ -394,11 +395,27 @@ export function createSteps(d) {
   // The installer writes the same path 1.x lived in (Windows, script installs): put the copied 1.x binary back, 2.x aside.
   async function restore1x(rec, ctx) {
     {
-        if (!rec.preSha || rec.method === 'existing') return;
-        if (fs.existsSync(ocBin) && sha256File(ocBin) === rec.preSha) return;
         const copy = ctx.step('opencode1')?.opencode1?.binary;
+        if (rec.method === 'existing') {
+          // A rollback leaves the 2.x that was there before the run. --undo means back to 1.x: a 2.x installed by hand (the Windows route)
+          // sits where 1.x lived, so the opencode1 copy goes back there and 2.x aside (#179 PC run).
+          if (!ctx.undoing?.()) return;
+          if (rec.path === ocBin && copy && fs.existsSync(copy) && fs.existsSync(ocBin)) return putBack(copy, sha256File(copy));
+          d.log(`  ! OpenCode ${rec.version} at ${rec.path} was there before this run and stays: start opencode1, not opencode, until you remove it (opencode would migrate the 1.x data again)`);
+          rec.kept2x = true;
+          return;
+        }
+        if (!rec.preSha) return;
+        if (fs.existsSync(ocBin) && sha256File(ocBin) === rec.preSha) return;
         // Overwritten and no verified copy to put back: stop, the opencode1 copy stays.
         if (!copy || !fs.existsSync(copy) || sha256File(copy) !== rec.preSha) throw new Error(`the file at ${ocBin} was replaced and the 1.x copy that matches it is missing or differs: not restored; the opencode1 copy is kept`);
+        return putBack(copy, rec.preSha);
+    }
+  }
+
+  // Moves the 2.x binary at ocBin aside and copies the 1.x binary there, sha256 checked against `want`.
+  function putBack(copy, want) {
+    {
         if (fs.existsSync(ocBin)) {
           const lean = backupLayout(d.home, 'x').lean;
           const aside = j(lean, 'backups', `opencode2-bin-${stampTs()}`);
@@ -411,7 +428,7 @@ export function createSteps(d) {
         const part = `${ocBin}.partial`;
         fs.copyFileSync(copy, part);
         if (!win) fs.chmodSync(part, 0o755);
-        if (sha256File(part) !== rec.preSha) { fs.rmSync(part, { force: true }); throw new Error('sha256 differs after copying the 1.x binary back'); }
+        if (sha256File(part) !== want) { fs.rmSync(part, { force: true }); throw new Error('sha256 differs after copying the 1.x binary back'); }
         renameRetry(part, ocBin);
         d.log(`  restored the 1.x binary at ${ocBin} (sha256 checked)`);
     }
