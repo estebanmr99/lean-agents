@@ -1,6 +1,7 @@
 # Real Copilot CLI and real tools on Windows through install.ps1, throwaway USERPROFILE. Used by CI.
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot
+$rtkVer = (Get-Content (Join-Path $repo 'core\pins.json') -Raw | ConvertFrom-Json).pins.rtk.version
 
 $dir = Join-Path $env:RUNNER_TEMP "lean agents $([guid]::NewGuid())"
 New-Item -ItemType Directory -Path $dir | Out-Null
@@ -18,7 +19,7 @@ if ($LASTEXITCODE -ne 0) { throw "npm install $spec failed" }
 copilot --version
 
 # winget is not on the runner image; install.ps1 falls back to the release zip.
-Invoke-WebRequest 'https://github.com/rtk-ai/rtk/releases/latest/download/rtk-x86_64-pc-windows-msvc.zip' -OutFile "$dir\rtk.zip"
+Invoke-WebRequest "https://github.com/rtk-ai/rtk/releases/download/$rtkVer/rtk-x86_64-pc-windows-msvc.zip" -OutFile "$dir\rtk.zip"
 Expand-Archive "$dir\rtk.zip" "$dir\tools\rtk"
 
 $copilot = "$dir\.copilot"
