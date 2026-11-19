@@ -363,11 +363,13 @@ async function choose(o, saved) {
   } else if (!o.terminals) {
     const found = detectTerminals(o.home, { system: o.home === REAL_HOME });
     o.terminals = saved ? saved.terminals ?? [] : found;
-    o.installTerminals = o.installTerminals ?? [];
+    o.installTerminals = o.installTerminals ?? saved?.installTerminals ?? [];
     if (!saved) {
       const askIntegrate = found.map((t) => ({ value: t, label: `${t} integration (app already installed)`, ask: `Add the ${t} agent integration?` }));
       const missing = TERMINALS.filter((t) => !found.includes(t));
-      const askInstall = missing.map((t) => ({ value: t, label: `Install ${t} + integration`, ask: `Install the ${t} app and its agent integration?` }));
+      const askInstall = (o.home === REAL_HOME && (process.platform === 'darwin' || process.platform === 'win32'))
+        ? missing.map((t) => ({ value: t, label: `Install ${t} + integration`, ask: `Install the ${t} app and its agent integration?` }))
+        : [];
       
       if (askIntegrate.length || askInstall.length) {
         const picked = await p.multi({
@@ -376,16 +378,27 @@ async function choose(o, saved) {
           defaults: found,
         });
         
-        o.terminals = picked;
-        o.installTerminals = o.installTerminals.concat(picked.filter(t => missing.includes(t)));
+        o.installTerminals = [...new Set([...o.installTerminals, ...picked.filter(t => missing.includes(t))])];
+        o.terminals = [...new Set([...picked, ...o.installTerminals])];
+      } else {
+        o.terminals = [...new Set([...o.terminals, ...o.installTerminals])];
       }
+    } else {
+      o.terminals = [...new Set([...o.terminals, ...o.installTerminals])];
     }
   } else {
-    const found = detectTerminals(o.home, { system: o.home === REAL_HOME });
-    o.installTerminals = o.installTerminals ?? [];
-    const implicitInstalls = o.terminals.filter(t => !found.includes(t));
-    o.installTerminals = [...new Set([...o.installTerminals, ...implicitInstalls])];
+    o.installTerminals = o.installTerminals ?? saved?.installTerminals ?? [];
     o.terminals = [...new Set([...o.terminals, ...o.installTerminals])];
+  }
+  if (o.installTerminals?.length) {
+    const isReal = o.home === REAL_HOME;
+    const isSupported = process.platform === 'darwin' || process.platform === 'win32';
+    if (!isReal || !isSupported) {
+      for (const t of o.installTerminals) {
+        const reason = !isReal ? 'temp home' : `unsupported platform ${process.platform}`;
+        console.log(`! ${t} app: not installed (${reason})`);
+      }
+    }
   }
   await chooseNetwork(o, saved, p);
   if (o.network.outbound === 'off' && o.tools.includes('copilot-usage')) {
@@ -493,7 +506,7 @@ function buildPlan(o) {
   commands.push(...leanUpdateCommands(o.agents));
   if (o.tools.includes('coordinate')) commands.push(...coordinateCommands(o.agents));
   if (o.tools.includes('lean-migrate')) commands.push(...leanMigrateCommands(o.agents));
-  commands.push(...terminalCommands({ terminals: o.terminals, installTerminals: o.installTerminals, agents: o.agents, network: o.network, system: o.home === REAL_HOME, platform: process.platform }));
+  commands.push(...terminalCommands({ home: o.home, terminals: o.terminals, installTerminals: o.installTerminals, agents: o.agents, network: o.network, system: o.home === REAL_HOME, platform: process.platform }));
   actions.push(...gitBashActions({ home: o.home, terminals: o.terminals, agents: o.agents }));
   if (o.tools.includes('gsd')) {
     const r = gsdPlan(ROOT, o.home, o);
@@ -720,7 +733,7 @@ async function install(o) {
       installedAt: previous?.installedAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       pins: pinVersions(),
-      options: o.migrate ? previous?.options ?? { migrateOnly: true, agents: o.agents, tools: [], privacy: o.privacy, network: o.network, gh: false, terminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false, shell: 'git-bash' } : { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, keepUpdater: !!o.keepUpdater, gh: o.gh, terminals: o.terminals, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun, shell: o.shell },
+      options: o.migrate ? previous?.options ?? { migrateOnly: true, agents: o.agents, tools: [], privacy: o.privacy, network: o.network, gh: false, terminals: [], installTerminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false, shell: 'git-bash' } : { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, keepUpdater: !!o.keepUpdater, gh: o.gh, terminals: o.terminals, installTerminals: o.installTerminals, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun, shell: o.shell },
       ...(o.toolNode && { toolNode: { version: o.toolNode.version, installedByLean: !!o.toolNode.install || (previous?.toolNode?.version === o.toolNode.version && !!previous.toolNode.installedByLean) } }),
       files: [...(previous?.files ?? []), ...files],
       ...(previous?.opencode1 && { opencode1: previous.opencode1 }),

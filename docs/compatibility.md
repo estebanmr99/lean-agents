@@ -63,7 +63,7 @@ Session 8. lean-agents never installs the apps; for a user who already has Warp 
 
 Detection (a run with `--home` looks only inside it; `orca` on Linux is the GNOME screen reader, so Linux Orca is not detected, **VERIFY** its AppImage location): `/Applications/Warp.app` or `Orca.app` (also `~/Applications`), `%LOCALAPPDATA%\Programs\Orca` (real install, #22, 2026-11-05) / `Warp` (**VERIFY** path), or `warp-terminal` / `orca` on PATH. Warp has no other official agent plugins (checked); Orca's other agent hook installers are not used.
 
-Installs: Optional `--install-terminal` user installs (no admin). **VERIFY**: Warp macOS: direct pinned dmg URL as a fallback if brew is missing. Orca Windows: `/S` silent flag, `%LOCALAPPDATA%\Programs\Orca` install path, and uninstaller. Warp Windows: `/CURRENTUSER /VERYSILENT` silent flag, `%LOCALAPPDATA%\Programs\Warp` install path, and uninstaller.
+Installs: Optional `--install-terminal` user installs (no admin). **VERIFY**: Warp macOS: Homebrew is required (no fallback). Orca Windows: `/S` silent flag, `%LOCALAPPDATA%\Programs\Orca` install path, and uninstaller. Warp Windows: `/CURRENTUSER /VERYSILENT` silent flag, `%LOCALAPPDATA%\Programs\Warp` install path, and uninstaller.
 
 **VERIFY:** `orca agent hooks on|off|status --json` (needs a running app? lean-agents does not run it, so `--uninstall` never turns off hooks you enabled yourself); Orca OpenCode plugin route; whether the Warp plugins are no-ops outside Warp; minimum Warp version; whether `TERM_PROGRAM=WarpTerminal` is set inside Warp; Orca `orchestration` and `computer-use` skills (only `orca-cli` is installed); Warp notifications and Orca status in the running GUI (not testable in CI).
 
