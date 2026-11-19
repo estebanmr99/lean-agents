@@ -376,7 +376,7 @@ export function adoptPlan(r, { home, env, platform, realHome, state, fsx = fs })
     const p = it.kind === 'mcp' ? [...it.keyPath, it.name] : it.kind === 'plugin' && it.keyPath[0] === 'enabledPlugins' ? it.keyPath : null;
     if (p) addEdit(absOf(home, it.file), { path: p, mode: 'remove' });
   }
-  // The pinned package in the tool Node's prefix: needed by a rewritten MCP, or by a drift copy planned as `upgrade` (on another Node, the next run lists it as a duplicate to remove).
+  // The pinned package in the tool Node's prefix: needed by a rewritten MCP, or by a drift copy planned as `upgrade` (a copy on another Node is then removed below).
   if (tn && (out.rewritten.length || r.items.some((i) => i.kind === 'npm' && i.pin === pin && i.action === 'upgrade'))) {
     let have = null;
     try { have = JSON.parse(fsx.readFileSync(j(tn.modules, 'context-mode', 'package.json'), 'utf8')).version; } catch { /* not installed there */ }
@@ -384,7 +384,17 @@ export function adoptPlan(r, { home, env, platform, realHome, state, fsx = fs })
   }
   if (!tn && r.toolNode.range && r.items.some((i) => i.kind === 'npm' && i.pin === pin && i.action === 'upgrade')) out.notes.push(`context-mode: no installed Node meets ${r.toolNode.range}; install one with nvm, then run --adopt again`);
   // (a) old npm copies under another Node; (b) a skill in both folders; stopgaps with their managed replacement installed.
-  if (tn) for (const it of r.items) if (it.kind === 'npm' && it.status.includes('duplicate') && it.node !== tn.version) { const n = nodes.find((x) => x.version === it.node); if (n) out.oldCopies.push({ node: n, pin: it.pin, name: PINS[it.pin].source, version: it.name.replace(/^.*@/, '') }); }
+  // A copy on another Node becomes a duplicate once this run installs the pin into the tool Node: removed now, a second --adopt --yes is refused (#179 PC run).
+  // Not a newer copy, and not one a user's own MCP or hook still runs on.
+  const userOn = (v) => r.items.find((i) => i.owner === 'user' && i.launch?.nodeVersion === v);
+  if (tn) for (const it of r.items) {
+    if (it.kind !== 'npm' || it.node === tn.version) continue;
+    const replaced = out.install && it.pin === pin && !it.status.includes('newer');
+    if (!it.status.includes('duplicate') && !replaced) continue;
+    const u = !it.status.includes('duplicate') && userOn(it.node);
+    if (u) { out.notes.push(`${it.name} under Node ${it.node} stays: your ${u.client} ${u.name} runs on that Node`); continue; }
+    const n = nodes.find((x) => x.version === it.node); if (n) out.oldCopies.push({ node: n, pin: it.pin, name: PINS[it.pin].source, version: it.name.replace(/^.*@/, '') });
+  }
   const shared = j(home, '.agents', 'skills');
   const claude = j(home, '.claude', 'skills');
   const otherAgents = fsx.existsSync(j(home, '.cursor')) || fsx.existsSync(envDir(home, 'COPILOT_HOME', j(home, '.copilot')));

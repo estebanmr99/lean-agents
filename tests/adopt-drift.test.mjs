@@ -101,5 +101,20 @@ test('a drift copy on a Node below the pin floor is not upgraded in place', { sk
   put(j(h, '.nvm', 'versions', 'node', 'v24.15.0', 'bin', 'node'), '#!/bin/sh\nexit 0\n'); fs.chmodSync(j(h, '.nvm', 'versions', 'node', 'v24.15.0', 'bin', 'node'), 0o755);
   const r2 = await run(h);
   assert.equal(r2.toolNode.version, '24.15.0');
-  assert.equal(adoptPlan(r2, { home: h, env, platform: process.platform, realHome: '/nowhere', state: null }).install?.node.version, '24.15.0');
+  const p2 = adoptPlan(r2, { home: h, env, platform: process.platform, realHome: '/nowhere', state: null });
+  assert.equal(p2.install?.node.version, '24.15.0');
+  // the 22.17.0 copy is removed in the same run (with a yes): a second --adopt --yes would be refused
+  assert.deepEqual(p2.oldCopies.map((c) => [c.node.version, c.version]), [['22.17.0', older]]);
+  // kept instead: a copy newer than the pin, or one a user's own MCP runs on
+  const r3 = await run(h);
+  const c22 = r3.items.find((i) => i.kind === 'npm' && i.node === '22.17.0');
+  Object.assign(c22, { status: ['newer'], action: 'keep' });
+  r3.items.push({ ...c22, node: '24.15.0', status: ['drift'], action: 'upgrade' }); // something else makes this run install the pin
+  const p3 = adoptPlan(r3, { home: h, env, platform: process.platform, realHome: '/nowhere', state: null });
+  assert.ok(p3.install);
+  assert.equal(p3.oldCopies.length, 0, 'a newer copy is not removed');
+  put(j(h, '.claude.json'), JSON.stringify({ mcpServers: { mine: { command: j(h, '.nvm', 'versions', 'node', 'v22.17.0', 'bin', 'node'), args: ['/opt/mine/server.js'] } } }));
+  const p4 = adoptPlan(await run(h), { home: h, env, platform: process.platform, realHome: '/nowhere', state: null });
+  assert.equal(p4.oldCopies.length, 0);
+  assert.ok(p4.notes.some((n) => n.includes('under Node 22.17.0 stays: your claude mine runs on that Node')), p4.notes.join('\n'));
 });
