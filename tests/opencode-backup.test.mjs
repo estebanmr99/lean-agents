@@ -93,11 +93,33 @@ test('dry run writes nothing: the whole HOME tree hash is unchanged', () => {
   const f = fixture();
   const before = tree(f.home);
   const logs = [];
-  const r = backupOpencode({ home: f.home, dryRun: true, now: NOW, list: none, statfs: roomy, count: () => ({ sessions: 3 }), log: (l) => logs.push(l) });
+  const r = backupOpencode({ home: f.home, dryRun: true, now: NOW, list: () => ['node', 'opencode'], statfs: roomy, count: () => ({ sessions: 3 }), log: (l) => logs.push(l) });
   assert.equal(r.ok, true);
   assert.deepEqual(tree(f.home), before);
   assert.equal(fs.existsSync(f.lean), false);
   assert.match(logs.join('\n'), /dry run: would copy 5 data files \+ 1 config files.*3 sessions/);
+  assert.match(logs.join('\n'), /free space:.*free,.*needed/);
+  assert.match(logs.join('\n'), /blocker for apply:.*process is running/);
+  fs.rmSync(f.home, { recursive: true, force: true });
+});
+
+test('dry run prints unknown sessions and lists the count problem when count returns null', () => {
+  const f = fixture();
+  const logs = [];
+  const r = backupOpencode({ home: f.home, dryRun: true, now: NOW, list: none, statfs: roomy, count: () => ({ sessions: null }), log: (l) => logs.push(l) });
+  assert.equal(r.ok, true);
+  assert.match(logs.join('\n'), /unknown sessions\)/);
+  assert.match(logs.join('\n'), /blocker for apply: could not count the sessions/);
+  fs.rmSync(f.home, { recursive: true, force: true });
+});
+
+test('dry run includes free space line and lists blocker when statfs too small', () => {
+  const f = fixture();
+  const logs = [];
+  const r = backupOpencode({ home: f.home, dryRun: true, now: NOW, list: none, statfs: () => ({ bavail: 1000, bsize: 4096 }), count: () => ({ sessions: 3 }), log: (l) => logs.push(l) });
+  assert.equal(r.ok, true);
+  assert.match(logs.join('\n'), /free space:.*free,.*needed/);
+  assert.match(logs.join('\n'), /blocker for apply: not enough free space/);
   fs.rmSync(f.home, { recursive: true, force: true });
 });
 

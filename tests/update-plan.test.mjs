@@ -80,3 +80,24 @@ test('--update --dry-run --json carries update.rows and update.notes (temp HOME,
   assert.equal(rowOf(update.rows, 'caveman').action, 'update');
   assert.ok(update.notes.length > 0 && update.notes.every((n) => /^\d+\.\d+\.\d+$/.test(n.version)));
 });
+
+test('--update --dry-run on a hand-built machine without state.json says run --adopt --yes first', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  fs.mkdirSync(path.join(home, '.claude', 'plugins'), { recursive: true });
+  fs.writeFileSync(path.join(home, '.claude', 'settings.json'), '{"enabledPlugins": {"context-mode@latest": true}}');
+  // NVM_DIR inside the temp HOME: a real one would make --adopt find the runner's Node
+  const env = { PATH: path.dirname(process.execPath), HOME: home, NVM_DIR: path.join(home, '.nvm') };
+  const run = (args) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, '--no-exec', '--yes', ...args], { encoding: 'utf8', env });
+
+  const r = run(['--update', '--dry-run']);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /lean-agents is not installed; run --adopt --yes first/);
+
+  // also check that with nothing to adopt, it just says not installed
+  fs.rmSync(path.join(home, '.claude'), { recursive: true, force: true });
+  const r2 = run(['--update', '--dry-run']);
+  assert.equal(r2.status, 1);
+  assert.match(r2.stderr, /nothing to update: lean-agents is not installed$/m);
+
+  fs.rmSync(home, { recursive: true, force: true });
+});
