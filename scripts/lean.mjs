@@ -23,7 +23,7 @@ import { adhdCommand } from './lib/adhd.mjs';
 import { version as binVersion, versionFull, gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPresent, which, run, quiet, exists, isolate, configHome, envDir } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
 import { probePlugins } from './lib/plugin-health.mjs';
-import { adopt, inventory } from './lib/adopt.mjs';
+import { adopt, inventory, saveState } from './lib/adopt.mjs';
 import { planPrereqs, pendingPrereqs, everythingAgents, undoArgv, nvmDirExistedBefore } from './lib/prereqs.mjs';
 import { upgradeInventory, formatUpgrade } from './lib/upgrade.mjs';
 import { backupOpencode, backupLayout, listProcesses, opencodeRunning } from './lib/opencode-backup.mjs';
@@ -1032,6 +1032,10 @@ async function uninstall(o) {
     return;
   }
   renameRetry(stateFile, path.join(stateDir(o.home), `state.uninstalled-${Date.now()}.json`));
+  if (state.adopt) {
+    saveState(stateDir(o.home), state.adopt);
+    console.log('  kept: the --adopt record; undo it with --adopt --undo');
+  }
   // Backups are the only undo for edits we cannot revert, so they stay unless the user says yes (--yes keeps them).
   const backups = path.join(stateDir(o.home), 'backups');
   const q = await prompter(o.yes);
