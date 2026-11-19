@@ -31,6 +31,29 @@ if (-not (Test-Path "$dir\.agents\skills\caveman\SKILL.md")) { throw 'Caveman sk
 Write-Output "Windows install path checks:"
 $orcaDir = "$env:LOCALAPPDATA\Programs\Orca"
 $warpDir = "$env:LOCALAPPDATA\Programs\Warp"
+
+$deadline = (Get-Date).AddSeconds(90)
+while ((Get-Date) -lt $deadline -and ((-not (Test-Path $orcaDir)) -or (-not (Test-Path $warpDir)))) {
+  Start-Sleep -Seconds 3
+}
+
+if ((-not (Test-Path $orcaDir)) -or (-not (Test-Path $warpDir))) {
+  Write-Output "Get-ChildItem `"$env:LOCALAPPDATA\Programs`" -Name:"
+  Get-ChildItem "$env:LOCALAPPDATA\Programs" -Name -ErrorAction SilentlyContinue | Write-Output
+  Write-Output "Test-Path `"$env:ProgramFiles\Orca`": $(Test-Path "$env:ProgramFiles\Orca")"
+  Write-Output "Test-Path `"$env:ProgramFiles\Warp`": $(Test-Path "$env:ProgramFiles\Warp")"
+  foreach ($hive in 'HKCU', 'HKLM') {
+    Write-Output "Uninstall entries in $hive matching Orca|Warp:"
+    Get-ItemProperty -Path "${hive}:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue |
+      Where-Object { $_.DisplayName -match 'Orca|Warp' } |
+      ForEach-Object {
+        Write-Output "  DisplayName: $($_.DisplayName)"
+        Write-Output "  InstallLocation: $($_.InstallLocation)"
+        Write-Output "  UninstallString: $($_.UninstallString)"
+      }
+  }
+}
+
 if (-not (Test-Path $orcaDir)) { throw "Orca not installed in $orcaDir" }
 if (-not (Test-Path $warpDir)) { throw "Warp not installed in $warpDir" }
 Write-Output "Orca uninstaller: $(Test-Path "$orcaDir\Uninstall Orca.exe")"

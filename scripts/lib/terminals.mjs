@@ -127,7 +127,7 @@ ditto "$MOUNT/Orca.app" "${home}/Applications/Orca.app"
         run: [
           ['curl', '-fsSL', '-o', exe, url],
           ['node', VERIFY, exe, sha],
-          [exe, '/S']
+          [exe, '/currentuser', '/S']
         ],
         always: [
           ps(`if (Test-Path "${exe}") { Remove-Item "${exe}" }`)

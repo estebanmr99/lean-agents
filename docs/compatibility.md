@@ -55,7 +55,7 @@ Session 8. lean-agents never installs the apps; for a user who already has Warp 
 | Terminal | Added | Source (2026-11-19) | Undo |
 | --- | --- | --- | --- |
 | Warp app (optional) | macOS: `brew install --cask warp`; Windows: `.exe /CURRENTUSER /VERYSILENT` | [Warp](https://www.warp.dev/) | macOS: `brew uninstall --cask warp`; Windows: `unins000.exe /VERYSILENT` |
-| Orca app (optional) | macOS: `curl`, `hdiutil attach`, `ditto` to `~/Applications/Orca.app`; Windows: `.exe /S` | [Orca](https://github.com/stablyai/orca/releases) | macOS: `rm -rf ~/Applications/Orca.app`; Windows: `Uninstall Orca.exe /S` |
+| Orca app (optional) | macOS: `curl`, `hdiutil attach`, `ditto` to `~/Applications/Orca.app`; Windows: `.exe /currentuser /S` | [Orca](https://github.com/stablyai/orca/releases) | macOS: `rm -rf ~/Applications/Orca.app`; Windows: `Uninstall Orca.exe /S` |
 | Warp, Claude Code | `claude plugin marketplace add warpdotdev/claude-code-warp`, `claude plugin install warp@claude-code-warp` (README shows the `/plugin` slash form; the shell form is the same command and is proven in CI `real-terminals`). Needs `jq` | [claude-code-warp](https://github.com/warpdotdev/claude-code-warp) | `claude plugin uninstall warp@claude-code-warp` |
 | Warp, OpenCode 2.x | `plugins` entry `@warp-dot-dev/opencode-warp` (OpenCode 2.0.18+) | [opencode-warp](https://github.com/warpdotdev/opencode-warp) | `--uninstall` reverts the json edit |
 | Warp, OpenCode 1.x | `plugin` entry `@warp-dot-dev/opencode-warp@0.1.7` (upstream asks for the pin) | same | same |
@@ -63,7 +63,7 @@ Session 8. lean-agents never installs the apps; for a user who already has Warp 
 
 Detection (a run with `--home` looks only inside it; `orca` on Linux is the GNOME screen reader, so Linux Orca is not detected, **VERIFY** its AppImage location): `/Applications/Warp.app` or `Orca.app` (also `~/Applications`), `%LOCALAPPDATA%\Programs\Orca` (real install, #22, 2026-11-05) / `Warp` (**VERIFY** path), or `warp-terminal` / `orca` on PATH. Warp has no other official agent plugins (checked); Orca's other agent hook installers are not used.
 
-Installs: Optional `--install-terminal` user installs (no admin). **VERIFY**: Warp macOS: Homebrew is required (no fallback). Orca Windows: `/S` silent flag, `%LOCALAPPDATA%\Programs\Orca` install path, and uninstaller. Warp Windows: `/CURRENTUSER /VERYSILENT` silent flag, `%LOCALAPPDATA%\Programs\Warp` install path, and uninstaller.
+Installs: Optional `--install-terminal` user installs (no admin). **VERIFY**: Warp macOS: Homebrew is required (no fallback). Orca Windows: `/currentuser` flag, `/S` silent flag, `%LOCALAPPDATA%\Programs\Orca` install path, and uninstaller. Warp Windows: `/CURRENTUSER /VERYSILENT` silent flag, `%LOCALAPPDATA%\Programs\Warp` install path, and uninstaller.
 
 **VERIFY:** `orca agent hooks on|off|status --json` (needs a running app? lean-agents does not run it, so `--uninstall` never turns off hooks you enabled yourself); Orca OpenCode plugin route; whether the Warp plugins are no-ops outside Warp; minimum Warp version; whether `TERM_PROGRAM=WarpTerminal` is set inside Warp; Orca `orchestration` and `computer-use` skills (only `orca-cli` is installed); Warp notifications and Orca status in the running GUI (not testable in CI).
 
