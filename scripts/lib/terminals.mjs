@@ -78,7 +78,8 @@ export function terminalCommands({ home, terminals = [], installTerminals = [], 
         always: [
           ps(`if (Test-Path "${exe}") { Remove-Item "${exe}" }`)
         ],
-        undo: [ps(`if (Test-Path "$env:LOCALAPPDATA\\Programs\\Warp\\unins000.exe") { & "$env:LOCALAPPDATA\\Programs\\Warp\\unins000.exe" /VERYSILENT }`)],
+        // Inno Setup relaunches unins000.exe from %TEMP% and exits early; wait until it is gone.
+        undo: [ps(`$u = "$env:LOCALAPPDATA\\Programs\\Warp\\unins000.exe"; if (Test-Path $u) { Start-Process -FilePath $u -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait; for ($i = 0; $i -lt 30 -and (Test-Path $u); $i++) { Start-Sleep 2 } }`)],
       });
     }
   }

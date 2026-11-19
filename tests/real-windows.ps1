@@ -80,4 +80,7 @@ if (Test-Path $rtkPlugin) { throw 'RTK plugin was not removed' }
 if (Test-Path "$dir\.config\opencode\vendor\i-have-adhd") { throw 'i-have-adhd clone was not removed' }
 if (Test-Path "$dir\.agents\skills\caveman") { throw 'Caveman skills were not removed' }
 if (Test-Path $orcaDir) { throw 'Orca was not removed' }
-if (Test-Path $warpDir) { throw 'Warp was not removed' }
+if (Test-Path $warpDir) {
+  Get-ChildItem $warpDir -Recurse -Name | Write-Output
+  throw 'Warp was not removed'
+}
