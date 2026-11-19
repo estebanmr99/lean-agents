@@ -8,6 +8,7 @@ $dir = Join-Path $env:RUNNER_TEMP "lean agents $([guid]::NewGuid())"
 New-Item -ItemType Directory -Path $dir | Out-Null
 $env:USERPROFILE = $dir
 $env:APPDATA = "$dir\AppData\Roaming"
+$env:LOCALAPPDATA = "$dir\AppData\Local"
 $env:NPM_CONFIG_PREFIX = "$dir\npm"
 New-Item -ItemType Directory -Path $env:NPM_CONFIG_PREFIX | Out-Null
 $env:Path = "$dir\npm;$env:Path"
