@@ -101,5 +101,8 @@ test('a drift copy on a Node below the pin floor is not upgraded in place', { sk
   put(j(h, '.nvm', 'versions', 'node', 'v24.15.0', 'bin', 'node'), '#!/bin/sh\nexit 0\n'); fs.chmodSync(j(h, '.nvm', 'versions', 'node', 'v24.15.0', 'bin', 'node'), 0o755);
   const r2 = await run(h);
   assert.equal(r2.toolNode.version, '24.15.0');
-  assert.equal(adoptPlan(r2, { home: h, env, platform: process.platform, realHome: '/nowhere', state: null }).install?.node.version, '24.15.0');
+  const p2 = adoptPlan(r2, { home: h, env, platform: process.platform, realHome: '/nowhere', state: null });
+  assert.equal(p2.install?.node.version, '24.15.0');
+  // the 22.17.0 copy is removed in the same run (with a yes): a second --adopt --yes would be refused
+  assert.deepEqual(p2.oldCopies.map((c) => [c.node.version, c.version]), [['22.17.0', older]]);
 });
