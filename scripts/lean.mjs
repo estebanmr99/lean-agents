@@ -640,7 +640,11 @@ function updateInfo(o, saved) {
 async function install(o) {
   if (o.json && !o.yes) throw new Error('--json needs --yes: the menus would write questions to stdout');
   const saved = o.command === 'update' ? readState(o.home) : null;
-  if (o.command === 'update' && !saved) throw new Error('nothing to update: lean-agents is not installed');
+  if (o.command === 'update' && !saved) {
+    const r = await inventory({ home: o.home });
+    if (r.items.length) throw new Error('nothing to update: lean-agents is not installed; run --adopt --yes first');
+    throw new Error('nothing to update: lean-agents is not installed');
+  }
   if (o.command === 'update' && saved.options.migrateOnly) throw new Error('nothing to update: only --migrate ran here');
   const p = await choose(o, saved?.options);
   const { planned, commands: agentCommands, migration } = buildPlan(o);

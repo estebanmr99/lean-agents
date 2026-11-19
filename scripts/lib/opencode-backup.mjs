@@ -143,12 +143,20 @@ export function backupOpencode({ home, dryRun = false, log = console.log, now = 
   let sessions = null;
   try { sessions = countCopy(L.live, count); } catch (e) { problems.push(`could not copy the db to count sessions (${String(e.message).split('\n')[0]})`); }
   if (sessions === null && !problems.length) problems.push('could not count the sessions (node:sqlite is not available on this Node): the backup could not be checked');
+  if (dryRun) {
+    log(`dry run: would copy ${src.data.length} data files + ${src.config.length} config files (${gb(bytes)}, ${sessions} sessions)`);
+    log(`  permanent backup: ${L.backup}`);
+    log(`  frozen copy:      ${L.frozen}`);
+    if (problems.length) log(`blocker for apply: ${problems.join('; ')}`);
+    log('dry run: nothing was written');
+    return { ok: true, sessions, backup: L.backup, frozen: L.frozen };
+  }
+
   if (problems.length) return refuse(problems);
 
-  log(`${dryRun ? 'dry run: would copy' : 'copying'} ${src.data.length} data files + ${src.config.length} config files (${gb(bytes)}, ${sessions} sessions)`);
+  log(`copying ${src.data.length} data files + ${src.config.length} config files (${gb(bytes)}, ${sessions} sessions)`);
   log(`  permanent backup: ${L.backup}`);
   log(`  frozen copy:      ${L.frozen}`);
-  if (dryRun) { log('dry run: nothing was written'); return { ok: true, sessions, backup: L.backup, frozen: L.frozen }; }
 
   const part = `${L.backup}.partial`;
   const fpart = `${L.frozen}.partial`;

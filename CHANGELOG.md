@@ -4,6 +4,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Fixed
+- `--upgrade-agent opencode --backup --dry-run` now reports the expected sizes before listing a running `opencode` process as a blocker for apply.
+- `--update --dry-run` on a hand-built machine without `state.json` now says `run --adopt --yes first` instead of `not installed`.
+
 ## [1.0.0] - 2026-11-18
 
 First stable release. Highlights since 0.8.0:

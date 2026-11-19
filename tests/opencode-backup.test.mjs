@@ -93,11 +93,12 @@ test('dry run writes nothing: the whole HOME tree hash is unchanged', () => {
   const f = fixture();
   const before = tree(f.home);
   const logs = [];
-  const r = backupOpencode({ home: f.home, dryRun: true, now: NOW, list: none, statfs: roomy, count: () => ({ sessions: 3 }), log: (l) => logs.push(l) });
+  const r = backupOpencode({ home: f.home, dryRun: true, now: NOW, list: () => ['node', 'opencode'], statfs: roomy, count: () => ({ sessions: 3 }), log: (l) => logs.push(l) });
   assert.equal(r.ok, true);
   assert.deepEqual(tree(f.home), before);
   assert.equal(fs.existsSync(f.lean), false);
   assert.match(logs.join('\n'), /dry run: would copy 5 data files \+ 1 config files.*3 sessions/);
+  assert.match(logs.join('\n'), /blocker for apply:.*process is running/);
   fs.rmSync(f.home, { recursive: true, force: true });
 });
 
