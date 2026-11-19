@@ -400,7 +400,12 @@ export function createSteps(d) {
           // A rollback leaves the 2.x that was there before the run. --undo means back to 1.x: a 2.x installed by hand (the Windows route)
           // sits where 1.x lived, so the opencode1 copy goes back there and 2.x aside (#179 PC run).
           if (!ctx.undoing?.()) return;
-          if (rec.path === ocBin && copy && fs.existsSync(copy) && fs.existsSync(ocBin)) return putBack(copy, sha256File(copy));
+          if (rec.path === ocBin && copy && fs.existsSync(copy)) {
+            const want = sha256File(copy);
+            // Safe to run again: already back (an earlier --undo), or 2.x already moved aside by a put-back that failed later.
+            if (fs.existsSync(ocBin) && sha256File(ocBin) === want) return;
+            return putBack(copy, want);
+          }
           d.log(`  ! OpenCode ${rec.version} at ${rec.path} was there before this run and stays: start opencode1, not opencode, until you remove it (opencode would migrate the 1.x data again)`);
           rec.kept2x = true;
           return;

@@ -349,6 +349,16 @@ test('Windows-like manual route in the refusal\'s order: --opencode1, hand insta
   assert.equal(sha256File(m.ocBin), oneSha);
   assert.equal(r.journal.steps.find((x) => x.id === 'install2x').kept2x, undefined);
   assert.ok(fs.readdirSync(j(m.f.L.lean, 'backups')).some((n) => n.startsWith('opencode2-bin-')));
+  // a second put-back (journal not saved) leaves 1.x alone; with ocBin gone (2.x moved, copy failed) 1.x still comes back
+  const asides = () => fs.readdirSync(j(m.f.L.lean, 'backups')).filter((n) => n.startsWith('opencode2-bin-')).length;
+  const before = asides();
+  const install2x = r.steps.find((x) => x.id === 'install2x');
+  r.journal.status = 'undoing'; // as a retried --undo
+  await install2x.undo(r.journal.steps.find((x) => x.id === 'install2x'), r.ctx);
+  assert.equal(asides(), before);
+  fs.rmSync(m.ocBin);
+  await install2x.undo(r.journal.steps.find((x) => x.id === 'install2x'), r.ctx);
+  assert.equal(sha256File(m.ocBin), oneSha);
   // a rollback is "as before the run": the hand-installed 2.x stays
   const k = await machine({ overwrite: true });
   k.d.manual = 'OpenCode 2 on Windows: not proven yet';
