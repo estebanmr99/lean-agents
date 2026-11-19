@@ -671,7 +671,9 @@ async function install(o) {
     if (missing.size > 0) {
       for (const [cli, info] of missing) {
         const others = o.agents.filter((a) => a !== info.agent).join(',') || 'none';
-        console.log(`! the ${cli} CLI is not on PATH: ${info.steps.length} steps need it (${info.steps.join(', ')}). Install it first (--install-agent ${info.agent}), or leave it out with --agents ${others}`);
+        const warn = `! the ${cli} CLI is not on PATH: ${info.steps.length} steps need it (${info.steps.join(', ')}). Install it first (--install-agent ${info.agent}), or leave it out with --agents ${others}`;
+        if (o.json) console.error(warn);
+        else console.log(warn);
       }
       if (!o.dryRun) {
         p.close();
@@ -1038,7 +1040,7 @@ async function uninstall(o) {
       const bad = (c.undo ?? []).filter((argv) => !run(undoArgv(argv), { dryRun: false, log: console.log, env: c.env }));
       if (bad.length) {
         if (c.ok === false) {
-          console.log('  (it had failed, so nothing to remove)');
+          console.log('  (it did not finish, so there may be nothing to remove)');
         } else {
           console.log('  ! failed. Run the command above by hand.');
           process.exitCode = 1;
