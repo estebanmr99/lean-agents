@@ -92,7 +92,14 @@ test('a drift copy on a Node below the pin floor is not upgraded in place', { sk
   put(j(h, '.claude.json'), JSON.stringify({ mcpServers: { playwright: { command: 'npx', args: ['-y', `@playwright/mcp@${PINS['playwright-mcp'].version}`] } } }));
   const r = await run(h);
   assert.equal(r.toolNode.range, PINS['context-mode'].node);
-  assert.notEqual(r.toolNode.version, '22.17.0');
-  const p = adoptPlan(r, { home: h, env: { NVM_DIR: j(h, '.nvm'), HOME: h, PATH: '/usr/bin' }, platform: process.platform, realHome: '/nowhere', state: null });
+  assert.equal(r.toolNode.version, null);
+  const env = { NVM_DIR: j(h, '.nvm'), HOME: h, PATH: '/usr/bin' };
+  const p = adoptPlan(r, { home: h, env, platform: process.platform, realHome: '/nowhere', state: null });
   assert.equal(p.install, null);
+  assert.ok(p.notes.some((n) => n.includes(`no installed Node meets ${PINS['context-mode'].node}`)));
+  // with a Node that meets the floor, the pin goes there
+  put(j(h, '.nvm', 'versions', 'node', 'v24.15.0', 'bin', 'node'), '#!/bin/sh\nexit 0\n'); fs.chmodSync(j(h, '.nvm', 'versions', 'node', 'v24.15.0', 'bin', 'node'), 0o755);
+  const r2 = await run(h);
+  assert.equal(r2.toolNode.version, '24.15.0');
+  assert.equal(adoptPlan(r2, { home: h, env, platform: process.platform, realHome: '/nowhere', state: null }).install?.node.version, '24.15.0');
 });

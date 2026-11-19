@@ -376,12 +376,13 @@ export function adoptPlan(r, { home, env, platform, realHome, state, fsx = fs })
     const p = it.kind === 'mcp' ? [...it.keyPath, it.name] : it.kind === 'plugin' && it.keyPath[0] === 'enabledPlugins' ? it.keyPath : null;
     if (p) addEdit(absOf(home, it.file), { path: p, mode: 'remove' });
   }
-  // The pinned package in the tool Node's prefix: needed by a rewritten MCP, or planned as `upgrade` for a drift copy there.
-  if (tn && (out.rewritten.length || r.items.some((i) => i.kind === 'npm' && i.pin === pin && i.node === tn.version && i.action === 'upgrade'))) {
+  // The pinned package in the tool Node's prefix: needed by a rewritten MCP, or by a drift copy planned as `upgrade` (on another Node, the next run lists it as a duplicate to remove).
+  if (tn && (out.rewritten.length || r.items.some((i) => i.kind === 'npm' && i.pin === pin && i.action === 'upgrade'))) {
     let have = null;
     try { have = JSON.parse(fsx.readFileSync(j(tn.modules, 'context-mode', 'package.json'), 'utf8')).version; } catch { /* not installed there */ }
     if (have !== PINS[pin].version) out.install = { have, node: tn };
   }
+  if (!tn && r.toolNode.range && r.items.some((i) => i.kind === 'npm' && i.pin === pin && i.action === 'upgrade')) out.notes.push(`context-mode: no installed Node meets ${r.toolNode.range}; install one with nvm, then run --adopt again`);
   // (a) old npm copies under another Node; (b) a skill in both folders; stopgaps with their managed replacement installed.
   if (tn) for (const it of r.items) if (it.kind === 'npm' && it.status.includes('duplicate') && it.node !== tn.version) { const n = nodes.find((x) => x.version === it.node); if (n) out.oldCopies.push({ node: n, pin: it.pin, name: PINS[it.pin].source, version: it.name.replace(/^.*@/, '') }); }
   const shared = j(home, '.agents', 'skills');
