@@ -190,6 +190,14 @@ export async function agentLifecycle(o) {
       let pathEntry = false;
       if (pathDir && pathAbsent && winPath('has', pathDir) === 'present') {
         pathEntry = true;
+      // bootstrap.ps1 only prints a note when ~\.local\bin is not on PATH (#179, 2026-11-19).
+      } else if (ok && pathDir && pathAbsent && fs.existsSync(path.join(pathDir, 'claude.exe'))) {
+        let added = false;
+        try { added = winPath('add', pathDir) === 'changed'; } catch (e) { log(`  ! could not add ${pathDir} to your user PATH (${e.message.split('\n')[0]}); add it by hand`); }
+        if (added) {
+          pathEntry = true;
+          log(`  ${'added to PATH'.padEnd(24)} ${pathDir} (open a new terminal)`);
+        }
       }
       if (!ok) {
         log(`  ! ${a}: install failed. Run the commands above by hand.`);
