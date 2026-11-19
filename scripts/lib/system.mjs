@@ -199,12 +199,26 @@ export function bunInstall(home, dir, platform, pm, arch = process.arch) {
 
 export const bunPresent = (home) => Boolean(which('bun')) || fs.existsSync(path.join(home, '.bun', 'bin', isWin ? 'bun.exe' : 'bun'));
 
+// Node < 24.20 on Windows can abort on exit after the skills CLI finished (nodejs/node#56645); its "Done!" is the proof.
+export const exitCrashAfterDone = (argv, status, out) => status !== 0 && argv.some((a) => /^skills@/.test(a)) && /Done!/.test(out) && /UV_HANDLE_CLOSING/.test(out);
+
 // `codes` collects the exit status; `json` sends the child's stdout to stderr so stdout stays one JSON object.
 export function run(argv, { dryRun, log, env, json, codes }) {
   log(`  $ ${argv.join(' ')}`);
   if (dryRun) return true;
-  const r = spawnSync(argv[0], argv.slice(1), { stdio: json ? ['inherit', 2, 2] : 'inherit', shell: useShell(argv[0]), env: { ...allowedEnv(), ...env } });
+  const isSkills = argv.some((a) => /^skills@/.test(a));
+  const r = isSkills
+    ? spawnSync(argv[0], argv.slice(1), { stdio: ['inherit', 'pipe', 'pipe'], encoding: 'utf8', shell: useShell(argv[0]), env: { ...allowedEnv(), ...env } })
+    : spawnSync(argv[0], argv.slice(1), { stdio: json ? ['inherit', 2, 2] : 'inherit', shell: useShell(argv[0]), env: { ...allowedEnv(), ...env } });
+  if (isSkills) {
+    (json ? process.stderr : process.stdout).write(r.stdout ?? '');
+    process.stderr.write(r.stderr ?? '');
+  }
   codes?.push(r.status ?? -1);
+  if (exitCrashAfterDone(argv, r.status, `${r.stdout ?? ''}${r.stderr ?? ''}`)) {
+    log('  (the skills CLI finished, then Node crashed on exit: nodejs/node#56645, fixed in Node 24.20; counted as done)');
+    return true;
+  }
   return r.status === 0;
 }
 

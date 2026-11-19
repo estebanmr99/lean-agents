@@ -12,6 +12,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 - Claude Code installer pin refreshed after an upstream change to install.sh.
 - `--uninstall` still tries the undo of a command that had failed (`ok: false`), but its failure no longer keeps the record, so a half install can be uninstalled (#179 PC run).
+- On Windows with Node older than 24.20, a skills install or removal that finished no longer counts as failed when Node crashes on exit (nodejs/node#56645), so `--uninstall` can complete (#179 PC run).
 
 ## [1.0.0] - 2026-11-18
 
