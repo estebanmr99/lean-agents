@@ -118,3 +118,18 @@ test('a drift copy on a Node below the pin floor is not upgraded in place', { sk
   assert.equal(p4.oldCopies.length, 0);
   assert.ok(p4.notes.some((n) => n.includes('under Node 22.17.0 stays: your claude mine runs on that Node')), p4.notes.join('\n'));
 });
+
+// PC run (#179): the dry run shows what --yes does, the pin's target Node and the removal, in text and --json.
+test('--adopt --dry-run lists the install into the tool Node and the old copy it removes', { skip }, () => {
+  const h = home([['22.17.0', older]]);
+  put(j(h, '.claude.json'), JSON.stringify({ mcpServers: { playwright: { command: 'npx', args: ['-y', `@playwright/mcp@${PINS['playwright-mcp'].version}`] } } }));
+  put(j(h, '.nvm', 'versions', 'node', 'v24.15.0', 'bin', 'node'), '#!/bin/sh\nexit 0\n'); fs.chmodSync(j(h, '.nvm', 'versions', 'node', 'v24.15.0', 'bin', 'node'), 0o755);
+  const env = { PATH: process.env.PATH, NVM_DIR: j(h, '.nvm'), HOME: h };
+  const want = [`install context-mode@${pin} into Node 24.15.0`, `npm uninstall the old context-mode@${older} under Node 22.17.0 (needs a yes, or --confirm-removals)`];
+  const json = JSON.parse(spawnSync(process.execPath, [LEAN, '--home', h, '--no-exec', '--adopt', '--json'], { encoding: 'utf8', env }).stdout);
+  assert.ok(json.apply.some((l) => l.startsWith(want[0])), json.apply.join('\n'));
+  assert.ok(json.apply.includes(want[1]), json.apply.join('\n'));
+  const text = spawnSync(process.execPath, [LEAN, '--home', h, '--no-exec', '--adopt'], { encoding: 'utf8', env }).stdout;
+  assert.match(text, /--yes does:\n {2}- install context-mode@\S+ into Node 24\.15\.0/);
+  assert.ok(text.includes(want[1]));
+});
