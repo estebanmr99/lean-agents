@@ -1,6 +1,7 @@
 // Warp and Orca: detect the app, then plan the agent integrations for a user who already has it.
 // The terminal apps themselves are never installed.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { which, quiet } from './system.mjs';
 import { hasProxy } from './network.mjs';
@@ -63,8 +64,8 @@ export function terminalCommands({ home, terminals = [], installTerminals = [], 
     } else if (platform === 'win32') {
       const url = warpPin.url['windows-x64'];
       const sha = warpPin.sha256['windows-x64'];
-      const exe = `${env.TMP || env.TEMP || 'D:\\tools'}\\warp-installer.exe`;
-      const local = env.LOCALAPPDATA || (home ? path.join(home, 'AppData', 'Local') : 'D:\\localappdata');
+      const exe = path.join(os.tmpdir(), 'warp-installer.exe');
+      const local = env.LOCALAPPDATA;
       commands.push({
         tool: 'warp',
         desc: 'Install Warp app',
@@ -117,8 +118,8 @@ ditto "$MOUNT/Orca.app" "${home}/Applications/Orca.app"
     } else if (platform === 'win32') {
       const url = orcaPin.url['windows-x64'];
       const sha = orcaPin.sha256['windows-x64'];
-      const exe = `${env.TMP || env.TEMP || 'D:\\tools'}\\orca-installer.exe`;
-      const local = env.LOCALAPPDATA || (home ? path.join(home, 'AppData', 'Local') : 'D:\\localappdata');
+      const exe = path.join(os.tmpdir(), 'orca-installer.exe');
+      const local = env.LOCALAPPDATA;
       commands.push({
         tool: 'orca',
         desc: 'Install Orca app',

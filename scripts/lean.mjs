@@ -30,7 +30,7 @@ import { backupOpencode, backupLayout, listProcesses, opencodeRunning } from './
 import { readBackupStamp } from './lib/backup-stamp.mjs';
 import { isActive, failAt, applyPreflight, verifyBackup, configDrift, createSteps, makeCtx, runApply, runUndo, restoreData } from './lib/opencode-upgrade.mjs';
 import { planOpencode1, installOpencode1, removeOpencode1, layout as opencode1Layout } from './lib/opencode1.mjs';
-import { agentLifecycle, agentTable, upgradeCommands, undoPlan, undoUpgrades, agentOf, agentStamps, VSCODE_NOTE } from './lib/agent-lifecycle.mjs';
+import { agentLifecycle, agentTable, upgradeCommands, undoPlan, undoUpgrades, agentOf, agentStamps, VSCODE_NOTE, AGENT_CLIS } from './lib/agent-lifecycle.mjs';
 import { copilotUsage } from './lib/copilot-usage.mjs';
 import { draftIssue, addFiledIssue } from './lib/feedback.mjs';
 import { buildSummary } from './lib/summary-data.mjs';
@@ -692,6 +692,34 @@ async function install(o) {
   const update = saved && (o.dryRun || o.exec) ? updateInfo(o, saved) : null;
   const upgrades = update && o.exec ? upgradeCommands({ rows: update.rows, home: o.home, dir: stateDir(o.home), realHome: REAL_HOME, stamps: agentStamps(stateDir(o.home)) }) : [];
   const commands = [...(o.exec ? [...every?.commands ?? [], ...prereqCommands(o, behind).filter((c) => !owned.has(c.tool))] : []), ...agentCommands, ...upgrades];
+
+  if (o.exec) {
+    const missing = new Map();
+    for (const c of commands) {
+      if (c.agent && AGENT_CLIS[c.agent]) {
+        const cli = AGENT_CLIS[c.agent];
+        if ((c.run ?? []).some((argv) => argv[0] === cli) && !which(cli)) {
+          if (!missing.has(cli)) missing.set(cli, { agent: c.agent, steps: [] });
+          missing.get(cli).steps.push(c.desc);
+        }
+      }
+    }
+    if (missing.size > 0) {
+      for (const [cli, info] of missing) {
+        const others = o.agents.filter((a) => a !== info.agent).join(',') || 'none';
+        const warn = `! the ${cli} CLI is not on PATH: ${info.steps.length} steps need it (${info.steps.join(', ')}). Install it first (--install-agent ${info.agent}), or leave it out with --agents ${others}`;
+        if (o.json) console.error(warn);
+        else console.log(warn);
+      }
+      if (!o.dryRun) {
+        p.close();
+        console.log('nothing changed');
+        process.exitCode = 1;
+        return;
+      }
+    }
+  }
+
   const noGit = migration ? null : gitHint(packageManager());
   if (noGit) console.log(noGit);
   if (o.json && o.dryRun) {
@@ -1047,9 +1075,13 @@ async function uninstall(o) {
     for (const c of [...state.commands].reverse()) {
       const bad = (c.undo ?? []).filter((argv) => !run(undoArgv(argv), { dryRun: false, log: console.log, env: c.env }));
       if (bad.length) {
-        console.log('  ! failed. Run the command above by hand.');
-        process.exitCode = 1;
-        failed.set(c, bad);
+        if (c.ok === false) {
+          console.log('  (it did not finish, so there may be nothing to remove)');
+        } else {
+          console.log('  ! failed. Run the command above by hand.');
+          process.exitCode = 1;
+          failed.set(c, bad);
+        }
       }
     }
   }

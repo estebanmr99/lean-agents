@@ -131,7 +131,9 @@ wait_procs() { # wait_procs <0|1>: 0 = none left, 1 = at least one, up to 20 s
   return 1
 }
 
-echo "== setup: $(uname -s), node $(node -v), opencode $(opencode --version 2>/dev/null | tail -n 1)"
+v1="$(opencode --version 2>/dev/null | tail -n 1 | tr -d '\r')"
+[ -n "$v1" ] || { echo "could not read opencode version" >&2; exit 1; }
+echo "== setup: $(uname -s), node $(node -v), opencode $v1"
 MOCK_LLM_PORT=0 MOCK_LLM_COMMAND='echo seed' MOCK_LLM_TOOL=bash node "$repo/tests/fixtures/mock-llm.mjs" >"$T/mock.log" 2>&1 &
 MOCK_PID=$!
 port=""
@@ -207,20 +209,20 @@ pre1="$(tree)"
 lean1 --dry-run >"$T/oc1-dry.out" 2>&1; rc=$?
 sed 's/^/  /' "$T/oc1-dry.out"
 check "opencode1 dry run exits 0" test "$rc" = 0
-check "opencode1 dry run names 1.19.0" grep -q 'OpenCode 1\.19\.0' "$T/oc1-dry.out"
+check "opencode1 dry run names $v1" grep -q "OpenCode $v1" "$T/oc1-dry.out"
 check "opencode1 dry run leaves the HOME tree unchanged" test "$(tree)" = "$pre1"
-check "no binary copy after the dry run" test ! -e "$OC1/1.19.0"
+check "no binary copy after the dry run" test ! -e "$OC1/$v1"
 lean1 --yes >"$T/oc1.out" 2>&1; rc=$?
 sed 's/^/  /' "$T/oc1.out"
 check "opencode1 apply exits 0" test "$rc" = 0
-check "binary copied to opencode1/1.19.0" test -s "$OC1/1.19.0/$bin1"
+check "binary copied to opencode1/$v1" test -s "$OC1/$v1/$bin1"
 check "shim written" test -s "$OC1/bin/opencode1"
 if [ "$is_win" = 1 ]; then check "opencode1.cmd written" test -s "$OC1/bin/opencode1.cmd"; else check "PATH block in a shell rc file" grep -rq 'lean-agents:start' "$HOME/.profile" "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.bash_profile" 2>/dev/null; fi
 binp="$OC1/bin"; if [ "$is_win" = 1 ]; then binp="$(cygpath -u "$binp")"; fi
-check "opencode1 --version = 1.19.0 (shim by path)" test "$("$OC1/bin/opencode1" --version 2>/dev/null | tail -n 1)" = "1.19.0"
-check "opencode1 --version = 1.19.0 (found on PATH)" test "$(PATH="$binp:$PATH" opencode1 --version 2>/dev/null | tail -n 1)" = "1.19.0"
+check "opencode1 --version = $v1 (shim by path)" test "$("$OC1/bin/opencode1" --version 2>/dev/null | tail -n 1 | tr -d '\r')" = "$v1"
+check "opencode1 --version = $v1 (found on PATH)" test "$(PATH="$binp:$PATH" opencode1 --version 2>/dev/null | tail -n 1 | tr -d '\r')" = "$v1"
 if [ "$is_win" = 1 ]; then
-  check "opencode1.cmd --version = 1.19.0 from cmd" test "$(PATH="$binp:$PATH" cmd //c "opencode1.cmd --version" 2>/dev/null | tr -d '\r' | tail -n 1)" = "1.19.0"
+  check "opencode1.cmd --version = $v1 from cmd" test "$(PATH="$binp:$PATH" cmd //c "opencode1.cmd --version" 2>/dev/null | tr -d '\r' | tail -n 1)" = "$v1"
 fi
 check "frozen copy still has 3 sessions" test "$(count "$frozen")" = 3
 PATH="$binp:$PATH" opencode1 session list >"$T/oc1-list.out" 2>&1; rc=$?
@@ -237,7 +239,7 @@ check "live data still 3 sessions" test "$(count "$LIVE")" = 3
 node "$repo/scripts/lean.mjs" --home "$HOME" --no-exec --uninstall --yes >"$T/oc1-un.out" 2>&1; rc=$?
 sed 's/^/  /' "$T/oc1-un.out"
 check "uninstall exits 0" test "$rc" = 0
-check "binary copy removed" test ! -e "$OC1/1.19.0"
+check "binary copy removed" test ! -e "$OC1/$v1"
 check "shim folder removed" test ! -e "$OC1/bin"
 if [ "$is_win" = 0 ]; then refute "PATH block removed from the rc files" grep -rq 'lean-agents:start' "$HOME/.profile" "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.bash_profile" 2>/dev/null; fi
 check "frozen copy kept (4 sessions)" test "$(count "$frozen")" = 4
@@ -272,7 +274,7 @@ round() {
   check "failure after $step: live data byte-identical" test "$(dtree)" = "$LIVE_DATA"
   check "failure after $step: no shim folder left" test ! -e "$OC1/bin"
   check "failure after $step: backup and frozen copy kept" test -s "$bk/MANIFEST.sha256" -a -s "$frozen/opencode.db"
-  check "failure after $step: a 1.x opencode still runs" test "$(opencode --version 2>/dev/null | tail -n 1)" = "1.19.0"
+  check "failure after $step: a 1.x opencode still runs" test "$(opencode --version 2>/dev/null | tail -n 1 | tr -d '\r')" = "$v1"
 }
 # LEAN_TEST_FAIL_AT without the guard is refused before anything runs.
 env LEAN_TEST_FAIL_AT=config node "$repo/scripts/lean.mjs" --home "$HOME" --upgrade-agent opencode --yes >"$T/guard.out" 2>&1; rc=$?
@@ -296,7 +298,7 @@ else
   check "apply exits 0" test "$rc" = 0
   check "journal says applied" test "$(jstatus)" = applied
   check "the 2.x binary reports 2.x" test "$(ver "$ocbin" | cut -d. -f1)" = 2
-  check "opencode1 still reports 1.19.0" test "$(ver "$OC1/bin/opencode1")" = "1.19.0"
+  check "opencode1 still reports $v1" test "$(ver "$OC1/bin/opencode1")" = "$v1"
   check "DCP is in the 2.x config" grep -q 'opencode-dcp' "$CFG/opencode.jsonc"
   check "dcp.jsonc written" test -s "$CFG/dcp.jsonc"
   check "the mock provider (a user key) is kept" grep -q '"mock"' "$CFG/opencode.jsonc"
@@ -333,7 +335,7 @@ else
   check "--undo exits 0" test "$rc" = 0
   check "journal says undone" test "$(jstatus)" = undone
   check "no 2.x binary left" test ! -e "$ocbin"
-  check "opencode --version = 1.19.0" test "$(opencode --version 2>/dev/null | tail -n 1)" = "1.19.0"
+  check "opencode --version = $v1" test "$(opencode --version 2>/dev/null | tail -n 1 | tr -d '\r')" = "$v1"
   check "live data is the frozen copy again: backup 3 + 1 made by opencode1 = 4 sessions" test "$(count "$LIVE")" = 4
   check "live data sha256 = frozen copy" node "$T/h.mjs" same "$LIVE" "$frozen" data
   check "the 2.x db was moved aside, not deleted" test -s "$(first_dir "$LEAN"/backups/opencode2-db-*)/opencode.db"
@@ -346,7 +348,7 @@ else
   src1x="$(node --input-type=module -e "import { candidates } from '$repo/scripts/lib/opencode1.mjs'; console.log(candidates({ home: process.argv[1], whichPath: process.argv[2] })[0] ?? '')" "$HOME" "$(command -v opencode)")"
   mkdir -p "$HOME/.opencode/bin"
   cp "$src1x" "$ocbin" && chmod 755 "$ocbin"
-  check "the copy in ~/.opencode/bin reports 1.19.0" test "$(ver "$ocbin")" = "1.19.0"
+  check "the copy in ~/.opencode/bin reports $v1" test "$(ver "$ocbin")" = "$v1"
   sha_1x="$(shaf "$ocbin")"
   leanu --yes >"$T/up2.out" 2>&1; rc=$?
   tail -n 25 "$T/up2.out" | sed 's/^/  /'

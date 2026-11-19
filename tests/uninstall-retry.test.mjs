@@ -46,6 +46,17 @@ test('a failed undo command stays recorded, nothing is archived, and a second --
   assert.equal(fs.existsSync(stateFile(home)), false);
 });
 
+test('a state with one ok:false command whose undo fails: --uninstall --yes finishes ("Uninstalled")', () => {
+  const gate = [process.execPath, '-e', 'process.exit(1)'];
+  const home = installed([{ agent: 'x', ok: false, undo: [gate] }]);
+  const first = lean(home, ['--uninstall'], true);
+  assert.equal(first.status, 0, first.stdout + first.stderr);
+  assert.match(first.stdout, /Uninstalled/);
+  assert.match(first.stdout, /\(it did not finish, so there may be nothing to remove\)/);
+  assert.equal(archived(home).length, 1);
+  assert.equal(fs.existsSync(stateFile(home)), false);
+});
+
 test('--uninstall-agent vscode-copilot runs an undo that starts with the <lean-node> placeholder', () => {
   const home = installed([{ agent: 'vscode-copilot', undo: [[UNDO_NODE, '-e', 'process.exit(0)']] }]);
   const r = lean(home, ['--uninstall-agent', 'vscode-copilot'], true);
