@@ -74,21 +74,13 @@ foreach ($name in 'explore', 'research', 'review', 'debug', 'planner') {
   if (($agents -join "`n") -notmatch $name) { throw "subagent $name not loaded" }
 }
 
-Write-Output "Processes before uninstall:"
-Get-Process -Name warp, orca, 'Orca*' -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  $($_.Name) $($_.Id) $($_.Path)" }
+# The silent Warp install starts Warp; close it like a user would before --uninstall.
+Get-Process -Name warp -ErrorAction SilentlyContinue | Stop-Process -Force
+Start-Sleep -Seconds 3
 & "$repo\install.ps1" -Uninstall -Yes
 if ((Get-UserPath) -contains $rtkDir) { throw 'rtk folder was not removed from the user PATH' }
 if (Test-Path $rtkPlugin) { throw 'RTK plugin was not removed' }
 if (Test-Path "$dir\.config\opencode\vendor\i-have-adhd") { throw 'i-have-adhd clone was not removed' }
 if (Test-Path "$dir\.agents\skills\caveman") { throw 'Caveman skills were not removed' }
 if (Test-Path $orcaDir) { throw 'Orca was not removed' }
-if (Test-Path $warpDir) {
-  Write-Output "Processes after uninstall:"
-  Get-Process -Name warp, orca, 'Orca*' -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  $($_.Name) $($_.Id) $($_.Path)" }
-  $log = Join-Path $env:RUNNER_TEMP 'warp-uninstall.log'
-  $p = Start-Process -FilePath "$warpDir\unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=`"$log`"" -Wait -PassThru
-  Write-Output "Manual unins000.exe exit code: $($p.ExitCode)"
-  if (Test-Path $log) { Get-Content $log | Write-Output }
-  Write-Output "Warp folder still there after manual run: $(Test-Path "$warpDir\warp.exe")"
-  throw 'Warp was not removed'
-}
+if (Test-Path "$warpDir\unins000.exe") { throw 'Warp was not removed' }

@@ -33,6 +33,10 @@ test('terminalCommands: installTerminals with system true on win32 gives install
   assert.equal(warp.manual, undefined);
   assert.deepEqual(warp.skipIfExists, ['D:\\localappdata\\Programs\\Warp']);
   assert.ok(warp.run.length > 0);
+  const undo = warp.undo[0].at(-1);
+  assert.match(undo, /Get-Process -Name warp/);
+  assert.match(undo, /exit 1/);
+  assert.match(undo, /unins000\.exe/);
 
   assert.ok(orca);
   assert.equal(orca.manual, undefined);
