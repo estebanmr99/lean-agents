@@ -142,8 +142,9 @@ export function backupOpencode({ home, dryRun = false, log = console.log, now = 
   if (fs.existsSync(L.backup)) problems.push(`${L.backup} already exists: try again in a second`);
   let sessions = null;
   let countCopied = true;
+  log(`counting the sessions on a temp copy of the db (${gb(dbBytes)}; minutes on a large db)`);
   try { sessions = countCopy(L.live, count); } catch (e) { countCopied = false; problems.push(`could not copy the db to count sessions (${String(e.message).split('\n')[0]})`); }
-  if (sessions === null && countCopied && (dryRun || !problems.length)) problems.push('could not count the sessions (node:sqlite is not available on this Node): the backup could not be checked');
+  if (sessions === null && countCopied && (dryRun || !problems.length)) problems.push('could not count the sessions (no Node with node:sqlite answered: missing, too old or timed out): the backup could not be checked');
   if (dryRun) {
     log(`dry run: would copy ${src.data.length} data files + ${src.config.length} config files (${gb(bytes)}, ${sessions === null ? 'unknown' : sessions} sessions)`);
     log(`  free space:       ${gb(free)} free, ${gb(neededBytes(bytes, dbBytes))} needed (2 x data + db + 1 GB)`);

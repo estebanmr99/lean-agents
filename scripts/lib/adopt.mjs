@@ -74,9 +74,10 @@ export function countInChild(dbCopy, toolNode) {
   for (const c of cands) {
     tried.push(c.label);
     try {
-      const out = execFileSync(c.node, [...c.flags, '-e', COUNT_SCRIPT, dbCopy], { encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      // A real 7 GB db took 6 s to count (#179 PC run): 5 s made backup and --undo refuse. 10 min covers far larger dbs.
+      const out = execFileSync(c.node, [...c.flags, '-e', COUNT_SCRIPT, dbCopy], { encoding: 'utf8', timeout: 600000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
       if (/^\d+$/.test(out)) return { sessions: Number(out) }; // empty output is a failure, not 0
-    } catch { /* next candidate */ }
+    } catch (e) { if (e.code === 'ETIMEDOUT') tried[tried.length - 1] += ' (timed out)'; }
   }
   return { tried };
 }

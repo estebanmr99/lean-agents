@@ -156,7 +156,7 @@ export function restoreData({ home, backupDir, now = new Date(), count, statfs =
     src = backupData;
     n = want;
   }
-  if (n === null) throw new Error('could not count the sessions (node:sqlite is not available on this Node): the data is not restored');
+  if (n === null) throw new Error('could not count the sessions (no Node with node:sqlite answered: missing, too old or timed out): the data is not restored');
   const items = listSource({ live: src, config: j(src, '.none') }).data;
   const bytes = items.reduce((t, f) => t + f.size, 0);
   const dbBytes = items.filter((f) => f.rel.startsWith('opencode.db')).reduce((t, f) => t + f.size, 0);
