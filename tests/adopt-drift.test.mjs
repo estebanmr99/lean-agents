@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { inventory } from '../scripts/lib/adopt.mjs';
+import { adoptPlan, inventory } from '../scripts/lib/adopt.mjs';
 import { PINS } from '../scripts/lib/pins.mjs';
 
 const j = path.join;
@@ -69,4 +69,18 @@ test('a pre-release copy is drift below its pin, newer when its core is above th
   assert.ok((await one(`${maj}.${min}.${pat}-beta.1`)).includes('drift'));
   assert.ok((await one(`${maj}.${min}.${pat + 1}-beta.1`)).includes('newer'));
   assert.deepEqual(await one(pin), []);
+});
+
+// PC run (#179): a drift copy in the tool Node with its MCP already on that Node is still upgraded by --adopt --yes.
+test('a drift copy in the tool Node is installed even when no MCP is rewritten', { skip }, async () => {
+  const h = home([['24.15.0', older]]);
+  const dir = j(h, '.nvm', 'versions', 'node', 'v24.15.0');
+  put(j(h, '.claude.json'), JSON.stringify({ mcpServers: { 'context-mode': { command: j(dir, 'bin', 'node'), args: [j(dir, 'lib', 'node_modules', 'context-mode', 'cli.mjs'), 'server'] } } }));
+  const plan = async () => adoptPlan(await run(h), { home: h, env: { NVM_DIR: j(h, '.nvm'), HOME: h, PATH: '/usr/bin' }, platform: process.platform, realHome: '/nowhere', state: null });
+  const p = await plan();
+  assert.equal(p.rewritten.length, 0);
+  assert.deepEqual([p.install?.have, p.install?.node.version], [older, '24.15.0']);
+  // a copy newer than the pin is kept: nothing to install
+  put(j(dir, 'lib', 'node_modules', 'context-mode', 'package.json'), JSON.stringify({ name: 'context-mode', version: newer }));
+  assert.equal((await plan()).install, null);
 });
