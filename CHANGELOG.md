@@ -6,6 +6,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- Claude Code installer pin refreshed after an upstream change to install.sh.
 - `--uninstall` still tries the undo of a command that had failed (`ok: false`), but its failure no longer keeps the record, so a half install can be uninstalled (#179 PC run).
 
 ## [1.0.0] - 2026-11-18
