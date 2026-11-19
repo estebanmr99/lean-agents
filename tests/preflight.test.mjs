@@ -39,3 +39,18 @@ test('preflight: PATH with a stub claude: no warning', () => {
   assert.equal(dry.status, 0, dry.stderr);
   assert.doesNotMatch(dry.stdout, /! the claude CLI is not on PATH/);
 });
+
+test('preflight: ignores non-agent CLIs in agent commands (e.g. npx)', () => {
+  const home = tmp();
+  const stubDir = tmp();
+  const stubPath = path.join(stubDir, process.platform === 'win32' ? 'claude.cmd' : 'claude');
+  fs.writeFileSync(stubPath, process.platform === 'win32' ? 'exit 0' : '#!/bin/sh\nexit 0');
+  fs.chmodSync(stubPath, 0o755);
+  const env = { PATH: stubDir, HOME: home };
+
+  // Context Mode generates an npx command for claude's MCP config.
+  const dry = engine(['--home', home, '--yes', '--dry-run', '--agents', 'claude', '--tools', 'context-mode'], env);
+  assert.equal(dry.status, 0, dry.stderr);
+  assert.doesNotMatch(dry.stdout, /! the npx CLI is not on PATH/);
+  assert.doesNotMatch(dry.stdout, /! the .* CLI is not on PATH/);
+});

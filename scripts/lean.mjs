@@ -30,7 +30,7 @@ import { backupOpencode, backupLayout, listProcesses, opencodeRunning } from './
 import { readBackupStamp } from './lib/backup-stamp.mjs';
 import { isActive, failAt, applyPreflight, verifyBackup, configDrift, createSteps, makeCtx, runApply, runUndo, restoreData } from './lib/opencode-upgrade.mjs';
 import { planOpencode1, installOpencode1, removeOpencode1, layout as opencode1Layout } from './lib/opencode1.mjs';
-import { agentLifecycle, agentTable, upgradeCommands, undoPlan, undoUpgrades, agentOf, agentStamps, VSCODE_NOTE } from './lib/agent-lifecycle.mjs';
+import { agentLifecycle, agentTable, upgradeCommands, undoPlan, undoUpgrades, agentOf, agentStamps, VSCODE_NOTE, AGENT_CLIS } from './lib/agent-lifecycle.mjs';
 import { copilotUsage } from './lib/copilot-usage.mjs';
 import { draftIssue, addFiledIssue } from './lib/feedback.mjs';
 import { buildSummary } from './lib/summary-data.mjs';
@@ -660,13 +660,11 @@ async function install(o) {
   if (o.exec) {
     const missing = new Map();
     for (const c of commands) {
-      if (c.agent) {
-        for (const argv of c.run ?? []) {
-          const cli = argv[0];
-          if (cli && typeof cli === 'string' && !cli.includes('/') && !cli.includes('\\') && !which(cli)) {
-            if (!missing.has(cli)) missing.set(cli, { agent: c.agent, steps: [] });
-            missing.get(cli).steps.push(c.desc);
-          }
+      if (c.agent && AGENT_CLIS[c.agent]) {
+        const cli = AGENT_CLIS[c.agent];
+        if ((c.run ?? []).some((argv) => argv[0] === cli) && !which(cli)) {
+          if (!missing.has(cli)) missing.set(cli, { agent: c.agent, steps: [] });
+          missing.get(cli).steps.push(c.desc);
         }
       }
     }
