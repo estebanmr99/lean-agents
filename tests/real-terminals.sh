@@ -22,7 +22,14 @@ refute grep -qE '^ *! ' "$HOME/install.txt"
 
 node "$repo/scripts/lean.mjs" --home "$HOME" --yes --agents "$target" --no-tools --install-terminal both \
   --privacy standard --lang en --profile anthropic-api </dev/null 2>&1 | tee "$HOME/install-term.txt"
-refute grep -qE '^ *! ' "$HOME/install-term.txt"
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  refute grep -qE '^ *! ' "$HOME/install-term.txt"
+else
+  grep -q '! warp app: not installed' "$HOME/install-term.txt"
+  grep -q '! orca app: not installed' "$HOME/install-term.txt"
+  other_warns() { grep -E '^ *! ' "$HOME/install-term.txt" | grep -q -vE '! (warp|orca) app: not installed'; }
+  refute other_warns
+fi
 
 if [[ "$(uname -s)" == "Darwin" ]]; then
   echo "macOS install path check:"

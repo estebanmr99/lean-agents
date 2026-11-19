@@ -27,15 +27,15 @@ function Get-UserPath { [Environment]::GetEnvironmentVariable('Path', 'User') -s
 if ((Get-UserPath) -notcontains $rtkDir) { throw 'rtk folder was not added to the user PATH' }
 if (-not (Test-Path "$dir\.agents\skills\caveman\SKILL.md")) { throw 'Caveman skills did not arrive' }
 
-Write-Host "Windows install path checks:"
+Write-Output "Windows install path checks:"
 $orcaDir = "$env:LOCALAPPDATA\Programs\Orca"
 $warpDir = "$env:LOCALAPPDATA\Programs\Warp"
 if (-not (Test-Path $orcaDir)) { throw "Orca not installed in $orcaDir" }
 if (-not (Test-Path $warpDir)) { throw "Warp not installed in $warpDir" }
-Write-Host "Orca uninstaller: $(Test-Path "$orcaDir\Uninstall Orca.exe")"
-Write-Host "Warp uninstaller: $(Test-Path "$warpDir\unins000.exe")"
+Write-Output "Orca uninstaller: $(Test-Path "$orcaDir\Uninstall Orca.exe")"
+Write-Output "Warp uninstaller: $(Test-Path "$warpDir\unins000.exe")"
 $orcaPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-Write-Host "HKCU Path after Orca install: $orcaPath"
+Write-Output "HKCU Path after Orca install: $orcaPath"
 if ((opencode debug skill | Out-String) -notmatch 'caveman') { throw 'OpenCode does not see the Caveman skills' }
 if (-not (Test-Path "$dir\.config\opencode\vendor\i-have-adhd\.opencode")) { throw 'i-have-adhd clone is missing' }
 # rtk ignores USERPROFILE and uses the OS profile folder, here the disposable runner's.
