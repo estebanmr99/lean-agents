@@ -351,7 +351,7 @@ const relIn = (home, f) => (f.startsWith(home + path.sep) ? path.relative(home, 
 // State file: --adopt adds `adopt` to an existing state.json, or creates one that only holds it (`adoptOnly`).
 const stateFile = (stateDir) => j(stateDir, 'state.json');
 const readState = (stateDir) => readJson(stateFile(stateDir));
-function saveState(stateDir, adoptState) {
+export function saveState(stateDir, adoptState) {
   const st = readState(stateDir) ?? {
     version: JSON.parse(fs.readFileSync(j(ROOT, 'package.json'), 'utf8')).version, installedAt: new Date().toISOString(), pins: pinVersions(), adoptOnly: true,
     options: { migrateOnly: true, agents: [], tools: [], privacy: 'standard', gh: false, terminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false, shell: 'git-bash' },
@@ -605,7 +605,6 @@ export async function adoptUndo(o) {
   const isBare = st.adoptOnly && (!st.files || st.files.length === 0) && (!st.commands || st.commands.length === 0) && !st.opencode1 && !st.upgrade;
   if (isBare) fs.rmSync(stateFile(stateDir));
   else {
-    delete st.adoptOnly;
     writePrivate(stateFile(stateDir), `${JSON.stringify(st, null, 2)}\n`);
   }
   try { fs.rmdirSync(stateDir); } catch { /* other lean-agents files live there */ }
