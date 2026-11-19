@@ -84,3 +84,15 @@ test('a drift copy in the tool Node is installed even when no MCP is rewritten',
   put(j(dir, 'lib', 'node_modules', 'context-mode', 'package.json'), JSON.stringify({ name: 'context-mode', version: newer }));
   assert.equal((await plan()).install, null);
 });
+
+// PC run (#179): the npm copies' own pins set the tool Node floor, so context-mode (>=24.15.0) is never installed on Node 22.
+test('a drift copy on a Node below the pin floor is not upgraded in place', { skip }, async () => {
+  const h = home([['22.17.0', older]]);
+  // no context-mode MCP: only the npm copy names its pin (the PC had Playwright, >=18, as the only MCP)
+  put(j(h, '.claude.json'), JSON.stringify({ mcpServers: { playwright: { command: 'npx', args: ['-y', `@playwright/mcp@${PINS['playwright-mcp'].version}`] } } }));
+  const r = await run(h);
+  assert.equal(r.toolNode.range, PINS['context-mode'].node);
+  assert.notEqual(r.toolNode.version, '22.17.0');
+  const p = adoptPlan(r, { home: h, env: { NVM_DIR: j(h, '.nvm'), HOME: h, PATH: '/usr/bin' }, platform: process.platform, realHome: '/nowhere', state: null });
+  assert.equal(p.install, null);
+});

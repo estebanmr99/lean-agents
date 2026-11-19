@@ -256,7 +256,8 @@ export async function inventory({ home, env = process.env, platform = process.pl
   // --- npm copies under each nvm Node, and the one Node the tools should use
   const nvm = findNvm({ env, home, platform, realHome });
   const copies = nvm ? npmCopies(nvm) : [];
-  const toolPins = Object.fromEntries([...new Set(items.map((i) => i.pin).filter(Boolean))].map((k) => [k, PINS[k]]));
+  // The npm copies count too: a context-mode copy with no context-mode MCP still needs its Node floor (#179 PC run).
+  const toolPins = Object.fromEntries([...new Set([...items.map((i) => i.pin), ...copies.map((c) => c.pin)].filter(Boolean))].map((k) => [k, PINS[k]]));
   // active '0.0.0': the question is which Node the tools should run on, whatever Node runs this command.
   const r = resolveToolNodes({ pins: toolPins, active: '0.0.0', nvm, latest: null });
   const ranges = Object.values(toolPins).map((p) => p.node).filter(Boolean);
