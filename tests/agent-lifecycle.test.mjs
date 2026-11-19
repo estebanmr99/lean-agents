@@ -46,6 +46,17 @@ test('OpenCode 1.x is never installed or removed', () => {
   assert.match(r.stderr, /never installed or removed/);
 });
 
+test('agentTable win32 claude', () => {
+  const home = '/tmp/fakehome';
+  const row = agentTable({ home, platform: 'win32', dir: home, realHome: home }).claude;
+  assert.equal(row.method, 'script');
+  assert.ok(!row.manual, 'should not be manual');
+  assert.deepEqual(row.bins, [path.join(home, '.local', 'bin', 'claude.exe')]);
+  assert.deepEqual(row.dirs, [path.join(home, '.local', 'bin'), path.join(home, '.local', 'share', 'claude'), path.join(home, '.claude', 'downloads')]);
+  assert.equal(row.run[0][0], 'curl.exe', 'downloader is curl.exe');
+  assert.equal(row.run[2][0], 'powershell', 'runner is powershell');
+});
+
 test('every script installer has a pinned url and sha256 in core/pins.json', () => {
   const home = tmp();
   for (const [a, row] of Object.entries(agentTable({ home, platform: 'linux', dir: home, realHome: '/nowhere' }))) {

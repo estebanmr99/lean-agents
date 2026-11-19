@@ -59,7 +59,7 @@ Nunca leas, muestres ni guardes mis claves o tokens.
 
 | Agente | macOS | Linux | Windows | Reglas | Subagentes | Herramientas MCP | Job de CI con binario real |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Claude Code | VERIFY | ✅ | VERIFY | ✅ | ✅ | ✅ | `real-claude` |
+| Claude Code | VERIFY | ✅ | ✅ | ✅ | ✅ | ✅ | `real-claude` |
 | OpenCode 1.x | VERIFY | ✅ | ✅ | ✅ | ✅ | ✅ | `real-opencode-v1`, `real-windows`, `real-opencode-shell` |
 | OpenCode 2.x | VERIFY | ✅ | VERIFY | ✅ | ✅ | ✅ | `real-opencode`, `real-opencode-shell` |
 | Copilot CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `real-copilot`, `real-copilot-windows` |
