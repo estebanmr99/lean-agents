@@ -133,7 +133,8 @@ ditto "$MOUNT/Orca.app" "${home}/Applications/Orca.app"
         always: [
           ps(`if (Test-Path "${exe}") { Remove-Item "${exe}" }`)
         ],
-        undo: [ps(`if (Test-Path "$env:LOCALAPPDATA\\Programs\\Orca\\Uninstall Orca.exe") { & "$env:LOCALAPPDATA\\Programs\\Orca\\Uninstall Orca.exe" /S }`)],
+        // The NSIS uninstaller relaunches itself from %TEMP% and returns at once: wait until it has removed itself.
+        undo: [ps(`$u = "$env:LOCALAPPDATA\\Programs\\Orca\\Uninstall Orca.exe"; if (-not (Test-Path $u)) { exit 0 }; Start-Process -FilePath $u -ArgumentList '/S' -Wait; for ($i = 0; $i -lt 60 -and (Test-Path $u); $i++) { Start-Sleep 2 }; if (Test-Path $u) { Write-Error 'Orca uninstaller did not finish in 120 s'; exit 1 }`)],
       });
     }
   }
