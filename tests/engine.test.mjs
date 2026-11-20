@@ -1000,6 +1000,31 @@ test('playwright-extension: opt-in, written for agents without a browser, never 
   assert.deepEqual(after, before);
 });
 
+test('code-mode (#304): opt-in, sets the Claude user env only when absent, warns, and is undone', () => {
+  const args = ['--yes', '--no-exec', '--lang', 'en', '--privacy', 'standard', '--profile', 'none', '--agents', 'claude'];
+  const env = (h) => parse(fs.readFileSync(path.join(h, '.claude', 'settings.json'), 'utf8')).env ?? {};
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const all = lean(home, [...args, '--all-tools', '--dry-run']);
+  assert.ok(!/tools: .*code-mode/.test(all));
+
+  const before = snapshot(home);
+  const out = lean(home, [...args, '--tools', 'code-mode']);
+  assert.match(out, /resumes only with it on/);
+  assert.equal(env(home).CLAUDE_CODE_EXPERIMENTAL_CODE_MODE, '1');
+  lean(home, ['--uninstall', '--yes', '--no-exec']);
+  const after = Object.fromEntries(Object.entries(snapshot(home)).filter(([f]) => !f.startsWith('.config/lean-agents/')));
+  assert.deepEqual(after, before);
+
+  // The user's own value (here: off) is kept on install and on uninstall.
+  const mine = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  fs.mkdirSync(path.join(mine, '.claude'));
+  fs.writeFileSync(path.join(mine, '.claude', 'settings.json'), '{ "env": { "CLAUDE_CODE_EXPERIMENTAL_CODE_MODE": "0" } }\n');
+  lean(mine, [...args, '--tools', 'code-mode']);
+  assert.equal(env(mine).CLAUDE_CODE_EXPERIMENTAL_CODE_MODE, '0');
+  lean(mine, ['--uninstall', '--yes', '--no-exec']);
+  assert.equal(env(mine).CLAUDE_CODE_EXPERIMENTAL_CODE_MODE, '0');
+});
+
 test('bunInstall: pinned zip, SHA256 check before extraction, undo only for what it installs', () => {
   const { version, sha256 } = PINS.bun;
   const linux = bunInstall('/h', '/h/state', 'linux', null, 'x64');

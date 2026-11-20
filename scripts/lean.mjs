@@ -53,11 +53,12 @@ const FIXED_PROFILE = { claude: 'claude-subscription', 'copilot-cli': 'github-co
 Object.assign(ADAPTERS, { 'vscode-copilot': vscodeCopilotAdapter, cursor: cursorAdapter });
 FIXED_PROFILE['vscode-copilot'] = 'github-copilot';
 // Extensions cannot be installed silently without admin policy, so the user installs it.
+const CODE_MODE_NOTE = 'Claude Code Code Mode is experimental (Claude Code 2.1.323 or newer, interactive terminal only, a direct Anthropic subscription or Console login; not Vertex, Bedrock or a gateway). A session started with it resumes only with it on; --uninstall turns it off';
 const EXTENSION_NOTE = 'install the Playwright Extension yourself from https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm . Each session asks you to approve the connection; optional auto-approve: docs/browser-extension.md';
 const MINIMAL_TOOLS = ['rtk', 'context-mode'];
 const OPTIONAL_TOOLS = ['serena', 'playwright', 'ponytail', 'caveman', 'i-have-adhd', 'dcp', 'codeburn', 'copilot-usage'];
 // Asked for one by one and never part of --all-tools.
-const OPT_IN_TOOLS = ['gsd', 'autoskills', 'playwright-extension', 'coordinate', 'lean-migrate'];
+const OPT_IN_TOOLS = ['gsd', 'autoskills', 'playwright-extension', 'coordinate', 'lean-migrate', 'code-mode'];
 const TOOL_INFO = {
   serena: 'Serena MCP: symbol-level code navigation, so agents read less code',
   playwright: 'Playwright MCP: lets agents drive a browser to check web UIs',
@@ -71,6 +72,7 @@ const TOOL_INFO = {
   gsd: 'GSD Core: spec-driven workflow skills and agents (large install)',
   'lean-migrate': 'lean-migrate skill: guides the OpenCode 1.x to 2.x upgrade through --upgrade-agent opencode (dry run first)',
   coordinate: 'Coordinate skill: playbook, session prompt and watcher to run several agents in separate git worktrees',
+  'code-mode': 'Claude Code Code Mode (experimental): Claude runs tool calls from small scripts; needs a direct Anthropic login, sessions started with it resume only with it on',
   autoskills: 'AutoSkills: picks skills per project, run with npx (CC BY-NC 4.0: non-commercial use only)',
 };
 
@@ -648,6 +650,7 @@ function printPlan(o, planned, commands, behind = new Set()) {
   const net = proxyReport();
   if (net.length) console.log(`  proxy and CA (passed to every command): ${net.join(' ')}`);
   if (o.tools.includes('playwright-extension')) console.log(`  signed-in browser: ${EXTENSION_NOTE}`);
+  if (o.tools.includes('code-mode') && o.agents.includes('claude')) console.log(`  code mode: ${CODE_MODE_NOTE}`);
   if (o.notes.length) console.log(`  your notes for undocumented settings (saved, never applied): ${o.notes.map((n) => path.basename(n.path, '.md')).join(', ')}`);
   console.log('');
   console.log('Files:');
@@ -891,6 +894,7 @@ async function install(o) {
   const todo = stillNeeded({ home: o.home, terminals: o.terminals, agents: o.agents });
   if (todo.length) console.log(`Still needed from you:\n${todo.map((t) => `  - ${t.text}`).join('\n')}`);
   if (o.tools.includes('playwright-extension')) console.log(`Signed-in browser: ${EXTENSION_NOTE}`);
+  if (o.tools.includes('code-mode') && o.agents.includes('claude')) console.log(`Code Mode: ${CODE_MODE_NOTE}`);
   if (o.gh) console.log('GitHub CLI: run `gh auth login` yourself; lean-agents never handles tokens.');
   for (const n of o.notes) console.log(`Notes saved: ${n.path}. Ask your agent to apply them, showing you each change first.`);
   if (o.network.telemetry === 'off' && o.agents.includes('claude')) {

@@ -4,6 +4,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Added
+
+- `--tools code-mode` (opt-in, never in `--all-tools`): sets `CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1` in the user `env` of `~/.claude/settings.json` when it is not set, and prints the limits: experimental, Claude Code 2.1.323+, interactive terminal, direct Anthropic login, sessions resume only with it on. `--uninstall` removes it ([#304](https://github.com/estebanmr99/lean-agents/issues/304)).
+
 ## [1.0.0] - 2026-11-20
 
 First stable release. Highlights since 0.8.0:

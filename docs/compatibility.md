@@ -736,7 +736,7 @@ A Python 3.10+ plugin with hooks and a `te` CLI, not a proxy or an MCP server. I
 
 Decision: **watch**. A single 0.1.0 release with nothing to pin by hash, per-repo settings files outside lean-agents' file/json/block actions, and no confirmed clean uninstall. Revisit when it ships a registry package and an uninstall.
 
-### Claude Code Code Mode (#304, checked 2026-11-20): candidate opt-in, not shipped
+### Claude Code Code Mode (#304, checked 2026-11-20): opt-in `--tools code-mode`
 
 The model writes one script that runs several tool calls and returns a summary. Turned on by `CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1` in the user `env` of `~/.claude/settings.json` (project settings ignore it; `0` in any layer, including managed settings, keeps it off).
 
@@ -750,4 +750,4 @@ The model writes one script that runs several tool calls and returns a summary. 
 | OpenCode: Code Mode (`execute` tool) is already the default for MCP servers (`codemode: false` per server opts out) | [tools](https://opencode.ai/docs/tools/), [MCP servers](https://opencode.ai/docs/mcp-servers/) | 2026-11-20 |
 | Copilot CLI, Antigravity CLI, Cursor CLI: no equivalent found, **VERIFY** | [Copilot CLI reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference), [Antigravity](https://antigravity.google/docs/features/), [Cursor SDK](https://cursor.com/docs/sdk/typescript) | 2026-11-20 |
 
-If shipped: an explicit opt-in (`json` action on the user `env`, undone by `--uninstall`, with the resume warning), never a managed-settings value, and a real-binary CI check of the RTK and context-mode hooks first.
+Shipped as `--tools code-mode` (opt-in, never in `--all-tools`): a `json` edit sets `env.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE` to `1` in the user `~/.claude/settings.json` only when absent, never a managed-settings value; the plan and the summary print the resume, terminal and login limits; `--uninstall` removes only the value lean-agents wrote. **VERIFY:** the RTK and context-mode hooks with Code Mode on: CI cannot log in, so this is checked by hand on a subscription login.
