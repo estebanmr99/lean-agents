@@ -30,7 +30,7 @@ test('dry run: every class shows up with the planned action', { skip }, async ()
   const s = await seeded();
   const r = await run(s);
   assert.equal(r.version, 1);
-  assert.deepEqual(Object.keys(r).sort(), ['health', 'items', 'ok', 'opencode', 'os', 'plan', 'stopgaps', 'toolNode', 'version']);
+  assert.deepEqual(Object.keys(r).sort(), ['byHand', 'health', 'items', 'ok', 'opencode', 'os', 'plan', 'stopgaps', 'toolNode', 'version']);
 
   const bare = find(r, 'mcp', 'context-mode', 'claude');
   assert.equal(bare.owner, 'managed'); assert.equal(bare.launch.style, 'npx-path'); assert.ok(bare.status.includes('wrong-node')); assert.equal(bare.action, 'reinstall');

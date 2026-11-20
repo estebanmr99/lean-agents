@@ -12,6 +12,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- `--adopt` no longer lists skill copies that are links to one folder as plan steps (`--yes` leaves them alone); it lists them once under "Fix by hand: remove the extra link" (#226).
 - The OpenCode 1.x session backup checks again, just before it finishes, that OpenCode is not running; if OpenCode started during the copy, the backup fails and leaves nothing behind (#253).
 - `--everything` on Linux without Homebrew installs RTK from its pinned release tarball into `~/.local/bin` (SHA-256 checked, undone by `--uninstall`) instead of asking you to install it by hand (#308).
 - `--everything` on Linux finds the uv and uvx it just installed in `~/.local/bin`. `install.ps1` no longer replaces the session PATH when winget fails to install Node.js, which hid winget from the engine (uv and RTK became manual steps) (#308).
