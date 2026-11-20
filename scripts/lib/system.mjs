@@ -176,6 +176,8 @@ export function bunPathCommand(home) {
     tool: 'bun', desc: `put ~\\.bun\\bin on your user PATH`, optional: true,
     run: [psRun(psAddPath(bin))],
     undo: [psRun(psRemovePath(bin))],
+    // Already in the saved user PATH (only this shell is stale): skip, so --uninstall never removes an entry the user made.
+    skipIfOutput: { cmd: psRun(`if (([string][Environment]::GetEnvironmentVariable('Path', 'User') -split ';') -contains '${psQ(bin)}') { exit 0 } else { exit 1 }`) },
   };
 }
 
