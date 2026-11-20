@@ -719,3 +719,35 @@ Read-only status by exit code only (the output can hold an account name, so it i
 | Copilot CLI | `copilot`, then `/login` | none documented: **VERIFY** | [docs](https://docs.github.com/en/copilot/how-tos/copilot-cli/cli-getting-started) | 2026-11-18 |
 | Antigravity (`agy`) | `agy` | none: **VERIFY** | | |
 | VS Code Copilot | sign in from the Accounts menu | no CLI: text only | | |
+
+## Investigated, not shipped
+
+### microsoft/TokenEconomizer (#303, checked 2026-11-20): watch
+
+A Python 3.10+ plugin with hooks and a `te` CLI, not a proxy or an MCP server. It learns per repo across sessions: it injects repo facts at session start, prunes unused tools through each agent's settings, and runs a judge that redirects stuck turns. That complements RTK, context-mode, DCP, caveman and ponytail; it replaces none of them.
+
+| Item | Source | Checked |
+| --- | --- | --- |
+| Agents: Claude Code, Codex, Copilot CLI, Pi; experimental: OpenCode (no 1.x/2.x split stated, **VERIFY**), Cursor, Antigravity and others | [README](https://github.com/microsoft/TokenEconomizer) | 2026-11-20 |
+| Release: only `v0.1.0`, git install (clone or marketplace), no PyPI or npm package, so no integrity hash to pin | [releases](https://github.com/microsoft/TokenEconomizer/releases), [pyproject](https://github.com/microsoft/TokenEconomizer/blob/main/pyproject.toml) | 2026-11-20 |
+| Writes per-repo settings (`.claude/settings.local.json`, `.codex/config.toml`, `.github/copilot/settings.local.json`), `~/.tokeneconomizer` and `.git/info/exclude`; full uninstall steps **VERIFY**; proxy support undocumented, **VERIFY** | README | 2026-11-20 |
+| Privacy: no own API key or telemetry documented (source not audited, **VERIFY**); its judge calls go through the agent's own model login | README | 2026-11-20 |
+| Savings: the authors report 18.4–30.9% lower mean cost on 277 SWE-Bench tasks (not reproduced here; `bench-code-nav` not run) | README | 2026-11-20 |
+
+Decision: **watch**. A single 0.1.0 release with nothing to pin by hash, per-repo settings files outside lean-agents' file/json/block actions, and no confirmed clean uninstall. Revisit when it ships a registry package and an uninstall.
+
+### Claude Code Code Mode (#304, checked 2026-11-20): candidate opt-in, not shipped
+
+The model writes one script that runs several tool calls and returns a summary. Turned on by `CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1` in the user `env` of `~/.claude/settings.json` (project settings ignore it; `0` in any layer, including managed settings, keeps it off).
+
+| Item | Source | Checked |
+| --- | --- | --- |
+| Experimental, off by default, from v2.1.323; "may change or be removed in any release". npm `latest` is 2.1.329, `stable` 2.1.311 (below the minimum) | [Code Mode docs](https://code.claude.com/docs/en/code-mode), [CHANGELOG](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md), npm registry | 2026-11-20 |
+| A session started with it resumes only with it on: removing it (an `--uninstall`) strands those sessions | Code Mode docs | 2026-11-20 |
+| Interactive terminal only (not `-p`, the SDK, VS Code, Desktop or cloud); needs a direct Anthropic subscription or Console account (not Bedrock, Vertex, Foundry or a gateway) | Code Mode docs | 2026-11-20 |
+| Each call from the script still passes deny/ask rules and `PreToolUse` hooks under its own name; the `REPL` tool can be hooked too. Whether RTK's Bash rewrite fires on script calls (commands can arrive as `cd 'app' && …`) and whether context-mode's routing doubles the script's summary: **VERIFY** with a real binary | Code Mode docs | 2026-11-20 |
+| OpenTelemetry and `DISABLE_TELEMETRY` blocked it per the docs table; the 2.1.329 changelog says both now work: the sources disagree, **VERIFY** | docs, CHANGELOG | 2026-11-20 |
+| OpenCode: Code Mode (`execute` tool) is already the default for MCP servers (`codemode: false` per server opts out) | [tools](https://opencode.ai/docs/tools/), [MCP servers](https://opencode.ai/docs/mcp-servers/) | 2026-11-20 |
+| Copilot CLI, Antigravity CLI, Cursor CLI: no equivalent found, **VERIFY** | [Copilot CLI reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference), [Antigravity](https://antigravity.google/docs/features/), [Cursor SDK](https://cursor.com/docs/sdk/typescript) | 2026-11-20 |
+
+If shipped: an explicit opt-in (`json` action on the user `env`, undone by `--uninstall`, with the resume warning), never a managed-settings value, and a real-binary CI check of the RTK and context-mode hooks first.
