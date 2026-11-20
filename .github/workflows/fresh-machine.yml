@@ -89,6 +89,8 @@ jobs:
           foreach ($c in 'node', 'npm', 'git', 'gh', 'nvm') {
             if (Get-Command $c -ErrorAction SilentlyContinue) { throw "$c is still visible" }
           }
+          # The image points npm's global prefix at C:\npm\prefix (npm_config_prefix); a real PC has npm's default.
+          Remove-Item Env:npm_config_prefix, Env:NPM_CONFIG_PREFIX -ErrorAction SilentlyContinue
           $home2 = Join-Path $env:RUNNER_TEMP 'fresh-home'
           New-Item -ItemType Directory -Path $home2 | Out-Null
           $env:USERPROFILE = $home2
