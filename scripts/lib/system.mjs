@@ -167,8 +167,8 @@ export function antigravityPrereqs(pm, platform, home, app = true) {
 const VERIFY = fileURLToPath(new URL('./verify-sha256.mjs', import.meta.url));
 const psQ = (s) => s.replace(/'/g, "''"); // PowerShell single-quote escape for a profile path like O'Neil
 const psRun = (script) => ['powershell', '-NoProfile', '-NonInteractive', '-Command', script];
-const psAddPath = (bin) => `$p = [string][Environment]::GetEnvironmentVariable('Path', 'User'); if (($p -split ';') -notcontains '${psQ(bin)}') { [Environment]::SetEnvironmentVariable('Path', ($p.TrimEnd(';') + ';${psQ(bin)}'), 'User') }`;
-const psRemovePath = (bin) => `$p = [string][Environment]::GetEnvironmentVariable('Path', 'User'); [Environment]::SetEnvironmentVariable('Path', (($p -split ';' | Where-Object { $_ -and $_ -ne '${psQ(bin)}' }) -join ';'), 'User')`;
+const psAddPath = (bin) => `$p = [string][Environment]::GetEnvironmentVariable('Path', 'User'); if (($p -split ';').TrimEnd('\\') -notcontains '${psQ(bin)}'.TrimEnd('\\')) { [Environment]::SetEnvironmentVariable('Path', ($p.TrimEnd(';') + ';${psQ(bin)}'), 'User') }`;
+const psRemovePath = (bin) => `$p = [string][Environment]::GetEnvironmentVariable('Path', 'User'); [Environment]::SetEnvironmentVariable('Path', (($p -split ';' | Where-Object { $_ -and $_.TrimEnd('\\') -ne '${psQ(bin)}'.TrimEnd('\\') }) -join ';'), 'User')`;
 
 export function bunPathCommand(home) {
   const bin = path.join(home, '.bun', 'bin');
@@ -178,7 +178,7 @@ export function bunPathCommand(home) {
     run: [psRun(psAddPath(bin))],
     undo: [psRun(psRemovePath(bin))],
     // Already in the saved user PATH (only this shell is stale): skip, so --uninstall never removes an entry the user made.
-    skipIfOutput: { cmd: psRun(`if (([string][Environment]::GetEnvironmentVariable('Path', 'User') -split ';') -contains '${psQ(bin)}') { exit 0 } else { exit 1 }`) },
+    skipIfOutput: { cmd: psRun(`if (([string][Environment]::GetEnvironmentVariable('Path', 'User') -split ';').TrimEnd('\\') -contains '${psQ(bin)}'.TrimEnd('\\')) { exit 0 } else { exit 1 }`) },
   };
 }
 

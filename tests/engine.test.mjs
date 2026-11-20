@@ -1028,10 +1028,20 @@ test('bunPathCommand returns the same PowerShell strings as bunInstall on Window
   assert.match(b.run[0].at(-1), /SetEnvironmentVariable\('Path'/);
   assert.match(b.run[0].at(-1), /O''Neil/);
   assert.match(b.undo[0].at(-1), /Environment\]::SetEnvironmentVariable\('Path'/);
-  assert.match(b.skipIfOutput.cmd.at(-1), /-contains '[^']*O''Neil[^']*'\) \{ exit 0 \}/);
+  assert.match(b.skipIfOutput.cmd.at(-1), /-contains '[^']*O''Neil[^']*'\.TrimEnd\('\\'\)\) \{ exit 0 \}/);
   const win = bunInstall("C:\\Users\\O'Neil", 'C:\\s', 'win32', 'winget', 'x64');
   assert.ok(win.run[2].at(-1).includes(b.run[0].at(-1))); // bunInstall's run script contains the path-add part
   assert.equal(win.undo[1].at(-1), b.undo[0].at(-1)); // undo path-remove part is exactly the same
+});
+
+test('bunPathCommand and bunInstall normalize Windows PATH entries by trimming trailing backslashes', () => {
+  const b = bunPathCommand("C:\\Users\\O'Neil");
+  assert.ok(b.run[0].at(-1).includes("TrimEnd('\\')"));
+  assert.ok(b.undo[0].at(-1).includes("TrimEnd('\\')"));
+  assert.ok(b.skipIfOutput.cmd.at(-1).includes("TrimEnd('\\')"));
+  const win = bunInstall("C:\\Users\\O'Neil", 'C:\\s', 'win32', 'winget', 'x64');
+  assert.ok(win.run[2].at(-1).includes(b.run[0].at(-1)));
+  assert.equal(win.undo[1].at(-1), b.undo[0].at(-1));
 });
 
 test('verify-sha256: a mismatch deletes the file and exits 1 so the chain stops before extraction', () => {
