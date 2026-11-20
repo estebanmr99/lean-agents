@@ -109,6 +109,26 @@ test('uninstall restores untouched files and removes only our keys from edited o
   assert.deepEqual(left.sort(), Object.keys(before).sort(), 'no files may be left behind');
 });
 
+test('--uninstall --dry-run lists what it undoes without running commands', () => {
+  const home = userHome();
+  lean(home, ALL);
+  const stateFile = path.join(home, '.config', 'lean-agents', 'state.json');
+  const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+  state.commands = [
+    { desc: 'do something', undo: ['echo 1'] },
+    { desc: 'do another thing', agent: 'claude', undo: ['echo 2'] },
+    { desc: 'do without undo', undo: [] },
+  ];
+  fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+
+  const out = lean(home, ['--uninstall', '--yes', '--no-exec', '--dry-run']);
+  assert.match(out, /This restores \d+ files and undoes 3 commands\./);
+  assert.match(out, /- undo: do another thing \(claude\)/);
+  assert.match(out, /- undo: do something/);
+  assert.doesNotMatch(out, /do without undo/);
+  assert.match(out, /Nothing changed\./);
+});
+
 test('existing unmanaged agent files are not overwritten', () => {
   const home = userHome();
   fs.mkdirSync(path.join(home, '.claude', 'agents'));
