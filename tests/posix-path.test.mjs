@@ -90,7 +90,7 @@ test('macOS with a pending Homebrew step -> the brew shellenv line', () => {
   const home = tmpHome();
   const actions = posixPathBlock({ home, platform: 'darwin', envPath: '/usr/bin:/bin', brew: '/opt/homebrew', dirs: [] });
   assert.equal(actions.length, 1);
-  assert.match(actions[0].body, /^eval "\$\(\/opt\/homebrew\/bin\/brew shellenv\)"$/);
+  assert.match(actions[0].body, /^\[ -x \/opt\/homebrew\/bin\/brew \] && eval "\$\(\/opt\/homebrew\/bin\/brew shellenv\)"$/);
 });
 
 test('engine run with private Node appends private node bin to PATH', () => {
@@ -107,9 +107,10 @@ test('real engine: dry-run plans the block, apply writes it and prints notice, u
     encoding: 'utf8', env,
   });
 
+  fs.writeFileSync(path.join(home, '.profile'), 'export MINE=1\n');
   const dry = runLean('--dry-run');
   assert.equal(dry.status, 0, dry.stderr);
-  assert.match(dry.stdout, /create\s+~\/\.profile/);
+  assert.match(dry.stdout, /modify\s+~\/\.profile/);
 
   const applyRun = runLean();
   assert.equal(applyRun.status, 0, applyRun.stderr);
@@ -122,5 +123,5 @@ test('real engine: dry-run plans the block, apply writes it and prints notice, u
     encoding: 'utf8', env,
   });
   assert.equal(unRun.status, 0, unRun.stderr);
-  assert.ok(!fs.existsSync(path.join(home, '.profile')) || !fs.readFileSync(path.join(home, '.profile'), 'utf8').includes('lean-agents:path:start'));
+  assert.equal(fs.readFileSync(path.join(home, '.profile'), 'utf8'), 'export MINE=1\n', 'uninstall leaves the user lines and removes only the block');
 });

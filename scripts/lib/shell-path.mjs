@@ -14,7 +14,7 @@ export function posixPathBlock({ home, platform, envPath = '', dirs = [], brew =
   if (platform === 'win32') return [];
   const have = new Set(envPath.split(':').map((d) => d.replace(/\/+$/, '')));
   const lines = [];
-  if (brew && !have.has(`${brew}/bin`)) lines.push(`eval "$(${brew}/bin/brew shellenv)"`);
+  if (brew && !have.has(`${brew}/bin`)) lines.push(`[ -x ${brew}/bin/brew ] && eval "$(${brew}/bin/brew shellenv)"`); // a failed Homebrew install must not break every shell
   const add = dirs.filter((d) => !have.has(path.join(home, d)));
   if (add.length) lines.push(`export PATH="${add.map((d) => `$HOME/${d}`).join(':')}:$PATH"`);
   if (privateNode) lines.push('export PATH="$PATH:$HOME/.config/lean-agents/node/bin"');
