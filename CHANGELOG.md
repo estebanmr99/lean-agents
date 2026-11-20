@@ -4,10 +4,6 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
-### Fixed
-
-- OpenCode 2: lean-agents no longer installs the RTK plugin, which rtk writes for the 1.x plugin API and OpenCode 2 refuses to load (#179). Installs from before keep the step on record, so `--uninstall` still removes the plugin; to drop it now, run `rtk init -g --opencode --uninstall`.
-
 ### Added
 
 - `--install-agent opencode-v2` and `--upgrade-agent opencode` install OpenCode 2 on Windows through Git Bash with the pinned installer, and put `~\.opencode\bin` first on the user PATH (removed again by `--uninstall-agent`) (#179).
@@ -15,6 +11,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- OpenCode 2: lean-agents no longer installs the RTK plugin, which rtk writes for the 1.x plugin API and OpenCode 2 refuses to load (#179). Installs from before keep the step on record, so `--uninstall` still removes the plugin; to drop it now, run `rtk init -g --opencode --uninstall`.
 - `--uninstall` on Windows waits for the Orca uninstaller to finish (it relaunches itself and returned at once, so the Orca folder could still be there).
 - `--dry-run` and `--update --dry-run` mark an install that is already there (the Orca or Warp app, a vendor checkout) as "already there, skipped" instead of listing its install commands; the real run already skipped it (#179).
 - `--doctor` checks Context Mode on the Node lean-agents installed it on, not on PATH (#179 PC run).

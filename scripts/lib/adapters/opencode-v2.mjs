@@ -130,7 +130,7 @@ export function opencodeShared({ home, dir, core, profile, opts, v2 = false }) {
   for (const agent of core.agents) {
     actions.push({ kind: 'file', path: path.join(dir, 'agents', `${agent.name}.md`), content: renderOpenCodeAgent(agent, profile) });
   }
-  // rtk <pin> writes a 1.x plugin that OpenCode 2 refuses to load (#179); VERIFY again when rtk supports the 2.x API.
+  // rtk (up to 1.2.1) writes a 1.x plugin that OpenCode 2 refuses to load (#179); VERIFY again when rtk supports the 2.x API.
   if (tools.includes('rtk') && !v2) {
     commands.push({ tool: 'rtk', desc: 'RTK plugin for OpenCode', run: [['rtk', 'init', '-g', '--opencode']], undo: [['rtk', 'init', '-g', '--opencode', '--uninstall']] });
   }
