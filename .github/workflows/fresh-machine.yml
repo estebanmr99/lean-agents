@@ -69,6 +69,15 @@ jobs:
         with:
           name: dist
           path: dist
+      # The runner image has no winget, which a real Windows PC has: install it like real-winget does, so the winget routes run.
+      - name: Install winget
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          Install-Module Microsoft.WinGet.Client -Force -Repository PSGallery
+          Repair-WinGetPackageManager -Latest -Force
+          winget --version
       - name: Install everything with Node.js, git, gh and nvm off PATH
         shell: powershell
         run: |

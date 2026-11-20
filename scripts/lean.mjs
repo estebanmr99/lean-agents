@@ -760,6 +760,11 @@ async function install(o) {
   try { if (!yesNo(await q.ask('Apply these changes?', 'y'))) { console.log('Cancelled.'); return; } } finally { q.close(); }
   // A Homebrew that this run installs is not on this process's PATH yet.
   if (every && process.platform === 'darwin' && pendingPrereqs(every.steps).some((s) => s.id === 'homebrew')) process.env.PATH = `/opt/homebrew/bin${path.delimiter}/usr/local/bin${path.delimiter}${process.env.PATH ?? ''}`;
+  // winget --scope user puts command links (uv, rtk, jq) and Git.Git's git.exe here, and on the saved user PATH, which only new terminals see. VERIFY (nightly)
+  if (every && process.platform === 'win32' && pendingPrereqs(every.steps).some((s) => s.commands.some((argv) => argv[0] === 'winget'))) {
+    const local = process.env.LOCALAPPDATA ?? path.join(o.home, 'AppData', 'Local');
+    process.env.PATH = [path.join(local, 'Microsoft', 'WinGet', 'Links'), path.join(local, 'Programs', 'Git', 'cmd'), process.env.PATH ?? ''].join(path.delimiter);
+  }
   const ui = q.menus ? await menuProgress() : null;
   Object.assign(process.env, childEnv(o.network));
 
