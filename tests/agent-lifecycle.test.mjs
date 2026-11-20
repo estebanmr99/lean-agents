@@ -57,6 +57,23 @@ test('agentTable win32 claude', () => {
   assert.equal(row.run[2][0], 'powershell', 'runner is powershell');
 });
 
+test('agentTable win32 opencode-v2', () => {
+  const home = '/tmp/fakehome';
+  const pf = '/tmp/fakegit';
+  fs.mkdirSync(path.join(pf, 'Git', 'bin'), { recursive: true });
+  fs.writeFileSync(path.join(pf, 'Git', 'bin', 'bash.exe'), '');
+  const row = agentTable({ home, platform: 'win32', dir: home, realHome: home, env: { ProgramFiles: pf } })['opencode-v2'];
+  assert.equal(row.method, 'script');
+  assert.equal(row.run[0][0], 'curl.exe');
+  assert.ok(row.run[2][0].endsWith('bash.exe'));
+  assert.ok(row.bins[0].endsWith(path.join('.opencode', 'bin', 'opencode.exe')));
+  assert.equal(row.pathFirst, true);
+  fs.rmSync(pf, { recursive: true, force: true });
+  
+  const manualRow = agentTable({ home, platform: 'win32', dir: home, realHome: home, env: {} })['opencode-v2'];
+  assert.match(manualRow.manual, /Git Bash/);
+});
+
 test('every script installer has a pinned url and sha256 in core/pins.json', () => {
   const home = tmp();
   for (const [a, row] of Object.entries(agentTable({ home, platform: 'linux', dir: home, realHome: '/nowhere' }))) {
@@ -165,7 +182,7 @@ test('win32 path entry: absent before, present after -> recorded and removed', a
   };
   const row = {
     method: 'script', version: '1', run: [],
-    bins: [], dirs: [dir]
+    bins: [path.join(dir, 'claude.exe')], dirs: [dir], pathDir: dir
   };
   row.run.every = (cb) => { has = true; return cb([process.execPath, '-e', 'process.exit(0)']); };
   const opts = asClaude(home, 'install', { platform: 'win32', winPath, table: { claude: row } });
@@ -185,16 +202,17 @@ test('win32 path entry: installer leaves it off PATH -> lean-agents adds, record
   const home = tmp();
   const dir = path.join(home, '.local', 'bin');
   let has = false;
+  let addedWithOp = null;
   const winPath = (op, d) => {
     if (d !== dir) return 'absent';
     if (op === 'has') return has ? 'present' : 'absent';
-    if (op === 'add') { has = true; return 'changed'; }
+    if (op === 'add' || op === 'prepend') { has = true; addedWithOp = op; return 'changed'; }
     if (op === 'remove') { has = false; return 'changed'; }
     return 'absent';
   };
   const row = {
     method: 'script', version: '1', run: [],
-    bins: [], dirs: [dir]
+    bins: [path.join(dir, 'claude.exe')], dirs: [dir], pathDir: dir
   };
   row.run.every = (cb) => {
     fs.mkdirSync(dir, { recursive: true });
@@ -208,8 +226,56 @@ test('win32 path entry: installer leaves it off PATH -> lean-agents adds, record
   const state = JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'agents.json'), 'utf8')).agents.claude;
   assert.equal(state.pathEntryDir, dir, 'recorded pathEntryDir');
   assert.equal(has, true, 'added to winPath');
+  assert.equal(addedWithOp, 'add');
 
   const rmOpts = asClaude(home, 'uninstall', { platform: 'win32', winPath });
+  const rmOut = await quietly(() => agentLifecycle(rmOpts));
+  assert.match(rmOut, /removed from PATH/);
+  assert.equal(has, false, 'removed from winPath');
+});
+
+test('win32 path entry opencode-v2: installer leaves it off PATH -> lean-agents prepends, records and removes it', async () => {
+  const home = tmp();
+  const dir = path.join(home, '.opencode', 'bin');
+  let has = false;
+  let addedWithOp = null;
+  const winPath = (op, d) => {
+    if (d !== dir) return 'absent';
+    if (op === 'has') return has ? 'present' : 'absent';
+    if (op === 'add' || op === 'prepend') { has = true; addedWithOp = op; return 'changed'; }
+    if (op === 'remove') { has = false; return 'changed'; }
+    return 'absent';
+  };
+  const row = {
+    method: 'script', version: '1', run: [],
+    bins: [path.join(dir, 'opencode.exe')], dirs: [dir], pathDir: dir, pathFirst: true
+  };
+  row.run.every = (cb) => {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'opencode.exe'), 'x');
+    return cb([process.execPath, '-e', 'process.exit(0)']);
+  };
+  // Fake asClaude for opencode-v2:
+  const opts = {
+    mode: 'install',
+    agents: ['opencode-v2'],
+    home,
+    realHome: home,
+    stateDir: path.join(home, '.config', 'lean-agents'),
+    dryRun: false, exec: true, yes: true, ask: async () => {}, yesNo: () => true,
+    platform: 'win32',
+    winPath,
+    table: { 'opencode-v2': row }
+  };
+
+  const out = await quietly(() => agentLifecycle(opts));
+  assert.match(out, /added to PATH/);
+  const state = JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'agents.json'), 'utf8')).agents['opencode-v2'];
+  assert.equal(state.pathEntryDir, dir, 'recorded pathEntryDir');
+  assert.equal(has, true, 'added to winPath');
+  assert.equal(addedWithOp, 'prepend');
+
+  const rmOpts = { ...opts, mode: 'uninstall' };
   const rmOut = await quietly(() => agentLifecycle(rmOpts));
   assert.match(rmOut, /removed from PATH/);
   assert.equal(has, false, 'removed from winPath');
@@ -228,7 +294,7 @@ test('win32 path entry: adding to PATH throws -> install still recorded, warning
   };
   const row = {
     method: 'script', version: '1', run: [],
-    bins: [], dirs: [dir]
+    bins: [path.join(dir, 'claude.exe')], dirs: [dir], pathDir: dir
   };
   row.run.every = (cb) => {
     fs.mkdirSync(dir, { recursive: true });
@@ -257,7 +323,7 @@ test('win32 path entry: present before -> not recorded, not removed', async () =
   };
   const row = {
     method: 'script', version: '1', run: [],
-    bins: [], dirs: [dir]
+    bins: [path.join(dir, 'claude.exe')], dirs: [dir], pathDir: dir
   };
   row.run.every = (cb) => cb([process.execPath, '-e', 'process.exit(0)']);
   const opts = asClaude(home, 'install', { platform: 'win32', winPath, table: { claude: row } });
@@ -284,7 +350,7 @@ test('win32 path entry: failed install that added the entry -> still recorded', 
   };
   const row = {
     method: 'script', version: '1', run: [],
-    bins: [], dirs: [dir]
+    bins: [path.join(dir, 'claude.exe')], dirs: [dir], pathDir: dir
   };
   row.run.every = (cb) => { has = true; return cb([process.execPath, '-e', 'process.exitCode = 1; process.exit(1)']); };
   const opts = asClaude(home, 'install', { platform: 'win32', winPath, table: { claude: row } });

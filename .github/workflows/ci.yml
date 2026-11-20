@@ -1380,3 +1380,34 @@ jobs:
           $pathAfter = $k.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
           $k.Close()
           if ($pathAfter -ne $pathBefore) { throw "HKCU Path not restored" }
+      - name: --install-agent opencode-v2 on Windows
+        shell: powershell
+        run: |
+          $h = Join-Path $env:RUNNER_TEMP "opencode-win"
+          New-Item -ItemType Directory -Force $h | Out-Null
+          $env:USERPROFILE = $h
+          $env:HOME = $h
+          $k = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $false)
+          $pathBefore = $k.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+          $k.Close()
+          node scripts/lean.mjs --home $h --install-agent opencode-v2 --yes
+          if ($LASTEXITCODE -ne 0) { throw "install failed" }
+          $exe = Join-Path $h ".opencode\bin\opencode.exe"
+          $v = & $exe --version
+          $pin = node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.PINS['opencode-v2'].version))"
+          if ($v -notmatch [regex]::Escape($pin)) { throw "version $v != pin $pin" }
+          $state = Get-Content "$h\.config\lean-agents\agents.json" | ConvertFrom-Json
+          if (-not $state.agents.'opencode-v2'.files) { throw "opencode-v2 has no recorded files" }
+          $k = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $false)
+          $pathMid = $k.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+          $k.Close()
+          $bin = (Join-Path $h ".opencode\bin").TrimEnd('\')
+          $first = ($pathMid -split ';')[0].TrimEnd('\')
+          if ($first -ne $bin) { throw "opencode-v2 .opencode\bin not first in HKCU Path: $first" }
+          node scripts/lean.mjs --home $h --uninstall-agent opencode-v2 --yes
+          if ($LASTEXITCODE -ne 0) { throw "uninstall failed" }
+          if (Test-Path $exe) { throw "opencode.exe not gone" }
+          $k = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $false)
+          $pathAfter = $k.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+          $k.Close()
+          if ($pathAfter -ne $pathBefore) { throw "HKCU Path not restored" }

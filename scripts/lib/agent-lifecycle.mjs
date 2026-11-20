@@ -11,6 +11,7 @@ import { sha256 } from './verify-sha256.mjs';
 import { run, which, version, antigravityPrereqs, packageManager, agyCandidates, BREW_AGY_LIMIT } from './system.mjs';
 import { writePrivate, privateDir } from './fsops.mjs';
 import { winPathDefault } from './opencode1.mjs';
+import { gitBashPath } from './terminals.mjs';
 
 const VERIFY = fileURLToPath(new URL('./verify-sha256.mjs', import.meta.url));
 export const LIFECYCLE_AGENTS = ['claude', 'opencode-v2', 'copilot-cli', 'cursor', 'antigravity', 'vscode-copilot'];
@@ -29,7 +30,7 @@ function script(pinKey, dir, args = [], ext = '.sh') {
 // One row per agent for this OS: how it is installed, where its binary lands and which dirs the install may write to.
 // `manual` is a reason, not a command: that agent/OS route is not proven yet (VERIFY in docs/compatibility.md).
 // `ver`: version per pin key to install instead of the release pin (the saved previous version, for an undo).
-export function agentTable({ home, platform, dir, realHome, ver = {} }) {
+export function agentTable({ home, platform, dir, realHome, ver = {}, env = process.env }) {
   const at = (key) => ver[key] ?? PINS[key].version;
   const posix = platform !== 'win32';
   const cmds = AGENT_CLIS;
@@ -39,11 +40,17 @@ export function agentTable({ home, platform, dir, realHome, ver = {} }) {
   const t = {};
   t.claude = posix
     ? { method: 'script', ...script('claude-installer', dir, [at('claude-code')]), bins: bin('claude'), dirs: [path.join(local, 'bin'), path.join(local, 'share', 'claude'), path.join(home, '.claude', 'downloads')] }
-    : { method: 'script', ...script('claude-installer-win', dir, [at('claude-code')], '.ps1'), bins: bin('claude.exe'), dirs: [path.join(local, 'bin'), path.join(local, 'share', 'claude'), path.join(home, '.claude', 'downloads')] };
+    : { method: 'script', ...script('claude-installer-win', dir, [at('claude-code')], '.ps1'), bins: bin('claude.exe'), dirs: [path.join(local, 'bin'), path.join(local, 'share', 'claude'), path.join(home, '.claude', 'downloads')], pathDir: path.join(local, 'bin') };
+  const bashExe = gitBashPath({ platform, env });
   t['opencode-v2'] = posix
     // --no-modify-path: the installer must not edit ~/.bashrc, which we could not undo.
     ? { method: 'script', ...script('opencode-installer', dir, ['--version', at('opencode-v2'), '--no-modify-path']), bins: [path.join(home, '.opencode', 'bin', 'opencode')], dirs: [path.join(home, '.opencode')] }
-    : { manual: 'OpenCode 2 on Windows (Git Bash installer): install-dir and PATH not proven yet. VERIFY' };
+    : (bashExe ? (() => {
+        const sc = script('opencode-installer', dir, ['--version', at('opencode-v2'), '--no-modify-path']);
+        sc.run[0][0] = 'curl.exe';
+        sc.run[2][0] = bashExe;
+        return { method: 'script', ...sc, bins: [path.join(home, '.opencode', 'bin', 'opencode.exe')], dirs: [path.join(home, '.opencode')], pathDir: path.join(home, '.opencode', 'bin'), pathFirst: true };
+      })() : { manual: 'OpenCode 2 on Windows needs Git for Windows (Git Bash): install it, then run this again' });
   t['copilot-cli'] = {
     method: 'npm', version: at('copilot-cli'),
     run: [['npm', 'install', '-g', ...prefix, `${PINS['copilot-cli'].source}@${at('copilot-cli')}`]], uninstall: [['npm', 'uninstall', '-g', ...prefix, PINS['copilot-cli'].source]],
@@ -144,7 +151,7 @@ export async function agentLifecycle(o) {
   const agents = o.agents.filter((a) => a !== VSCODE);
   const state = readAgents(o.stateDir);
   const platform = o.platform ?? process.platform;
-  const table = o.table ?? agentTable({ home: o.home, platform, dir: o.stateDir, realHome: o.realHome });
+  const table = o.table ?? agentTable({ home: o.home, platform, dir: o.stateDir, realHome: o.realHome, env: o.env ?? process.env });
   const todo = [];
   for (const a of agents) {
     const row = table[a];
@@ -180,8 +187,8 @@ export async function agentLifecycle(o) {
       const before = snapshot(row.dirs);
       let pathDir = null;
       let pathAbsent = false;
-      if (a === 'claude' && platform === 'win32') {
-        pathDir = path.join(o.home, '.local', 'bin');
+      if (platform === 'win32' && row.pathDir) {
+        pathDir = row.pathDir;
         pathAbsent = winPath('has', pathDir) === 'absent';
       }
       const ok = row.run.every((argv) => run(argv, { dryRun: false, log, env }));
@@ -190,10 +197,10 @@ export async function agentLifecycle(o) {
       let pathEntry = false;
       if (pathDir && pathAbsent && winPath('has', pathDir) === 'present') {
         pathEntry = true;
-      // bootstrap.ps1 only prints a note when ~\.local\bin is not on PATH (#179, 2026-11-19).
-      } else if (ok && pathDir && pathAbsent && fs.existsSync(path.join(pathDir, 'claude.exe'))) {
+      // The Windows installers (Claude bootstrap.ps1, OpenCode under Git Bash) do not put their bin folder on PATH (#179, 2026-11-19).
+      } else if (ok && pathDir && pathAbsent && row.bins.some((b) => fs.existsSync(b))) {
         let added = false;
-        try { added = winPath('add', pathDir) === 'changed'; } catch (e) { log(`  ! could not add ${pathDir} to your user PATH (${e.message.split('\n')[0]}); add it by hand`); }
+        try { added = winPath(row.pathFirst ? 'prepend' : 'add', pathDir) === 'changed'; } catch (e) { log(`  ! could not add ${pathDir} to your user PATH (${e.message.split('\n')[0]}); add it by hand`); }
         if (added) {
           pathEntry = true;
           log(`  ${'added to PATH'.padEnd(24)} ${pathDir} (open a new terminal)`);
@@ -228,16 +235,16 @@ export async function agentLifecycle(o) {
 // installer at the version it had, saved in state.json next to the command; undoUpgrades() runs it.
 // Cursor and Antigravity have no version pin, so they never get a row and are not moved (VERIFY in docs/compatibility.md).
 const UPGRADE = { 'claude-code': 'claude', 'opencode-v2': 'opencode-v2', 'copilot-cli': 'copilot-cli' };
-export function upgradeCommands({ rows, home, platform = process.platform, dir, realHome, stamps = {} }) {
+export function upgradeCommands({ rows, home, platform = process.platform, dir, realHome, stamps = {}, env = process.env }) {
   const out = [];
   for (const r of rows) {
     const a = UPGRADE[r.tool];
     if (!a || r.action !== 'update') continue;
-    const argvs = (ver) => { const row = agentTable({ home, platform, dir, realHome, ver: { [r.tool]: ver } })[a]; return row.manual ? null : row; };
+    const argvs = (ver) => { const row = agentTable({ home, platform, dir, realHome, ver: { [r.tool]: ver }, env })[a]; return row.manual ? null : row; };
     const to = argvs(r.pinned);
     const raw = r.raw ?? r.installed;
     const from = { raw, row: argvs(raw) };
-    if (!to) { console.log(`! ${a}: ${agentTable({ home, platform, dir, realHome })[a].manual}`); continue; }
+    if (!to) { console.log(`! ${a}: ${agentTable({ home, platform, dir, realHome, env })[a].manual}`); continue; }
     // The downloaded installer is removed by a final step that runs even when an earlier step failed.
     const cleanup = (row) => (row.download ? [[process.execPath, '-e', "require('fs').rmSync(process.argv[1],{force:true})", row.download]] : []);
     out.push({ tool: r.tool, desc: `upgrade ${a} ${from.raw} -> ${r.pinned}`, run: to.run, always: cleanup(to), undo: [], from: from.raw, owner: stamps[a] ?? null, reinstall: from.row.run, reinstallAlways: cleanup(from.row) });
