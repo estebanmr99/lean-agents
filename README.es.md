@@ -76,7 +76,7 @@ En Windows, los agentes funcionan mejor con Git Bash instalado (RTK y los comand
 <!-- details -->
 ## Detalles
 
-lean-agents funciona con Claude Code, OpenCode 1.x y 2.x, GitHub Copilot CLI, Antigravity CLI, VS Code Copilot y Cursor en macOS, Linux y Windows. Dale una estrella al repo para enterarte cuando salga `v1.0.0`.
+lean-agents funciona con Claude Code, OpenCode 1.x y 2.x, GitHub Copilot CLI, Antigravity CLI, VS Code Copilot y Cursor en macOS, Linux y Windows.
 
 **Contenido**
 
