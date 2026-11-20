@@ -32,6 +32,23 @@ test('--everything text plan lists prerequisites before the agent plan; --agents
   assert.match(r.stdout, /Dry run: nothing was changed/);
 });
 
+test('--everything installs a missing agent CLI through --install-agent; without it the run still stops', { skip: process.platform === 'win32' }, () => {
+  const home = tmpHome();
+  const bin = path.join(home, 'bin'); // node only: no claude, no opencode
+  fs.mkdirSync(bin);
+  fs.symlinkSync(process.execPath, path.join(bin, 'node'));
+  const run = (...args) => spawnSync(process.execPath, [LEAN, '--home', home, '--dry-run', '--yes', '--agents', 'claude,opencode-v2', ...args], {
+    encoding: 'utf8', input: '', env: { PATH: `${bin}${path.delimiter}/usr/bin${path.delimiter}/bin`, NVM_DIR: path.join(home, 'no-nvm'), HOME: home },
+  });
+  const every = run('--everything');
+  assert.equal(every.status, 0, every.stderr);
+  assert.match(every.stdout, /- install the claude CLI \(/);
+  assert.match(every.stdout, /- install the opencode CLI \(/);
+  assert.doesNotMatch(every.stdout, /CLI is not on PATH/);
+  assert.ok(every.stdout.indexOf('install the claude CLI') < every.stdout.indexOf('Ponytail plugin'), 'the CLI comes before the steps that need it');
+  assert.match(run().stdout, /! the claude CLI is not on PATH/);
+});
+
 test('--everything resumes: a prerequisite finished in a saved run is skipped', () => {
   const home = tmpHome();
   const dir = path.join(home, '.config', 'lean-agents');
