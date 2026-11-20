@@ -620,7 +620,7 @@ function printApplied(o, files, commands, errors) {
   }, null, 2)}\n`);
 }
 
-function printPlan(o, planned, commands) {
+function printPlan(o, planned, commands, behind = new Set()) {
   console.log(`\nlean-agents plan for ${o.agents.join(', ') || 'no agents'}`);
   if (o.project) console.log(`  project: ${o.project}`);
   for (const n of o.agentNotes ?? []) console.log(`  agents ${n}`);
@@ -642,7 +642,10 @@ function printPlan(o, planned, commands) {
   if (commands.length) {
     console.log('\nCommands:');
     for (const c of commands) {
-      console.log(`  - ${c.desc}${c.agent ? ` (${c.agent})` : ''}`);
+      // Same check as the run below: an install already there at its pin is skipped, so do not list its commands.
+      const there = !behind.has(c.tool) && ((c.skipIfExists && exists(c.skipIfExists)) || (o.exec && c.skipIfOutput && quiet(c.skipIfOutput.cmd).ok));
+      console.log(`  - ${c.desc}${c.agent ? ` (${c.agent})` : ''}${there ? ': already there, skipped' : ''}`);
+      if (there) continue;
       for (const argv of [...c.run, ...(c.always ?? [])]) console.log(`      $ ${argv.join(' ')}`);
     }
   }
@@ -729,7 +732,7 @@ async function install(o) {
   if (migration) printMigration(o, migration, o.exec ? commands : []);
   else {
     if (every) printPrereqs(every.steps, o.exec);
-    printPlan(o, planned, commands);
+    printPlan(o, planned, commands, behind);
   }
   if (update) { const text = formatUpdatePlan(update.rows, update.notes); if (text) console.log(text); }
   else if (saved) {

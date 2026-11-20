@@ -10,6 +10,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- `--dry-run` and `--update --dry-run` mark an install that is already there (the Orca or Warp app, a vendor checkout) as "already there, skipped" instead of listing its install commands; the real run already skipped it (#179).
 - `--install-agent claude` on Windows adds `~\.local\bin` to the user PATH (the upstream installer only prints a note), and `--uninstall-agent claude` removes it (#179 PC run).
 - Claude Code installer pin refreshed after an upstream change to install.sh.
 - `--uninstall` still tries the undo of a command that had failed (`ok: false`), but its failure no longer keeps the record, so a half install can be uninstalled (#179 PC run).
