@@ -778,15 +778,15 @@ test('--update keeps the network choice of a state file that only has privacy', 
 
 test('proxy variables are shown redacted, shared in both cases, and never written to disk', async () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-proxy-'));
-  const env = { ...process.env, https_proxy: 'http://alice:s3cret@127.0.0.1:3128', NO_PROXY: 'localhost', NODE_EXTRA_CA_CERTS: '/etc/corp-ca.pem' };
+  const env = { ...process.env, https_proxy: 'http://lean-proxy-user-x7:s3cret@127.0.0.1:39187', NO_PROXY: 'localhost', NODE_EXTRA_CA_CERTS: '/etc/corp-ca.pem' };
   delete env.HTTPS_PROXY; delete env.no_proxy;
   const out = lean(home, ['--yes', '--no-exec', '--agents', 'claude,opencode-v2', '--all-tools', '--network', 'off', '--lang', 'en', '--profile', 'none'], env);
   assert.match(out, /HTTPS_PROXY=set NO_PROXY=set \(loopback missing: 127\.0\.0\.1, ::1\) NODE_EXTRA_CA_CERTS=set/);
-  assert.ok(!out.includes('s3cret') && !out.includes('corp-ca'));
-  for (const [f, text] of Object.entries(snapshot(home))) assert.ok(!text.includes('s3cret') && !text.includes('127.0.0.1:3128'), f);
+  assert.ok(!out.includes('s3cret') && !out.includes('corp-ca') && !out.includes('lean-proxy-user-x7'));
+  for (const [f, text] of Object.entries(snapshot(home))) assert.ok(!text.includes('s3cret') && !text.includes('lean-proxy-user-x7') && !text.includes('127.0.0.1:39187'), f);
   const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, '--doctor', '--no-exec'], { encoding: 'utf8', env });
   assert.match(r.stdout, /network env\s+HTTPS_PROXY=set/);
-  assert.ok(!r.stdout.includes('s3cret') && !r.stdout.includes('127.0.0.1:3128'));
+  assert.ok(!r.stdout.includes('s3cret') && !r.stdout.includes('lean-proxy-user-x7') && !r.stdout.includes('127.0.0.1:39187'));
   const { shareProxy, redactUrl } = await import('../scripts/lib/network.mjs');
   assert.equal(redactUrl('http://ci:p@ss@host:3128'), 'http://***@host:3128');
   const e = { https_proxy: 'http://p:1', NO_PROXY: 'x', NODE_USE_ENV_PROXY: '0' };
