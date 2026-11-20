@@ -14,6 +14,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 - `--upgrade-agent opencode --dry-run` reports the verified backup the apply will use, instead of `backup: null` (#297).
 - `--upgrade-agent opencode` with `--home` pointing elsewhere no longer runs the real `opencode --version` (it wrote logs); the report says `not probed (--home)` (#226).
+- `--everything` installs the Claude Code and OpenCode 2 CLIs it configures when they are missing (the same pinned install as `--install-agent`, undone by `--uninstall-agent`), so one command works on a fresh machine (#308, #179).
 - OpenCode 2: lean-agents no longer installs the RTK plugin, which rtk writes for the 1.x plugin API and OpenCode 2 refuses to load (#179). Installs from before keep the step on record, so `--uninstall` still removes the plugin; to drop it now, run `rtk init -g --opencode --uninstall`, then run the lean-agents install again (that command also removes RTK's Claude Code hook).
 - Windows: when Bun is in `~\.bun\bin` but not on PATH, lean-agents now puts that folder on the user PATH (`--uninstall` takes it off again) instead of only warning (#179). An entry with a trailing backslash counts as the same folder.
 - `--uninstall` on Windows waits for the Orca uninstaller to finish (it relaunches itself and returned at once, so the Orca folder could still be there).

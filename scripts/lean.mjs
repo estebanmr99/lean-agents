@@ -549,9 +549,18 @@ function prereqCommands(o, behind = new Set()) {
   if (o.bun && o.tools.includes('context-mode') && !bunPresent(o.home)) {
     const b = bunInstall(o.home, stateDir(o.home), process.platform, pm);
     if (b) out.push(b);
-    else console.log('! Bun needs Homebrew here: install it from https://bun.com/docs/installation. Context Mode will run on Node.');
+    else if (!o.everything) console.log('! Bun needs Homebrew here: install it from https://bun.com/docs/installation. Context Mode will run on Node.'); // --everything: the planner installs Homebrew, then Bun
   }
   return out;
+}
+
+// The agents --everything configures whose CLI is missing and that --install-agent can install. Not recorded in state.json:
+// agents.json records them, and --uninstall-agent removes them, like a separate --install-agent run.
+function everythingCliInstalls(o) {
+  const table = agentTable({ home: o.home, platform: process.platform, dir: stateDir(o.home), realHome: REAL_HOME });
+  return o.agents.filter((a) => AGENT_CLIS[a] && table[a] && !table[a].manual && !which(AGENT_CLIS[a])).map((a) => ({
+    desc: `install the ${AGENT_CLIS[a]} CLI (${table[a].method}${table[a].version ? ` ${table[a].version}` : ''})`, run: [], undo: [], lifecycle: a, bins: table[a].bins,
+  }));
 }
 
 // --everything: the planner's steps as engine commands. Probes the machine here; the planner itself stays pure.
@@ -697,11 +706,14 @@ async function install(o) {
   const update = saved && (o.dryRun || o.exec) ? updateInfo(o, saved) : null;
   const upgrades = update && o.exec ? upgradeCommands({ rows: update.rows, home: o.home, dir: stateDir(o.home), realHome: REAL_HOME, stamps: agentStamps(stateDir(o.home)) }) : [];
   const commands = [...(o.exec ? [...every?.commands ?? [], ...prereqCommands(o, behind).filter((c) => !owned.has(c.tool))] : []), ...agentCommands, ...upgrades];
+  // --everything on a fresh machine: install the agent CLIs it configures (the --install-agent path), after the prerequisites.
+  const cliInstalls = every && o.exec ? everythingCliInstalls(o) : [];
+  commands.splice(commands.length - agentCommands.length - upgrades.length, 0, ...cliInstalls);
 
   if (o.exec) {
     const missing = new Map();
     for (const c of commands) {
-      if (c.agent && AGENT_CLIS[c.agent]) {
+      if (c.agent && AGENT_CLIS[c.agent] && !cliInstalls.some((x) => x.lifecycle === c.agent)) {
         const cli = AGENT_CLIS[c.agent];
         if ((c.run ?? []).some((argv) => argv[0] === cli) && !which(cli)) {
           if (!missing.has(cli)) missing.set(cli, { agent: c.agent, steps: [] });
@@ -787,7 +799,9 @@ async function install(o) {
   const report = [];
   const errors = [];
   if (o.exec) {
+    const noCli = new Set(); // agents whose CLI install failed above: their steps would only fail again
     for (const [i, c] of commands.entries()) {
+      if (noCli.has(c.agent)) { console.log(`  skipped: ${c.desc} (no ${AGENT_CLIS[c.agent]} CLI)`); continue; }
       // gh is on by default, so having no installer for it (no brew or winget) must not fail the run.
       if (c.manual) { console.log(`! ${c.desc}`); if (!c.optional) { failed++; errors.push(c.desc); } continue; }
       const there = (c.skipIfExists && exists(c.skipIfExists)) || (c.skipIfOutput && quiet(c.skipIfOutput.cmd).ok);
@@ -803,6 +817,16 @@ async function install(o) {
       }
       if (ui) ui.step(i + 1, commands.length, c.desc);
       else console.log(`- ${c.desc}`);
+      if (c.lifecycle) {
+        await agentLifecycle({ mode: 'install', agents: [c.lifecycle], home: o.home, realHome: REAL_HOME, stateDir: stateDir(o.home), dryRun: false, exec: true, yes: true, ask: async (_q, def) => def, yesNo });
+        const bin = c.bins.find((b) => fs.existsSync(b));
+        // The installer's PATH change reaches new terminals only: put its folder first here so the agent's steps below find it.
+        if (bin) process.env.PATH = `${path.dirname(bin)}${path.delimiter}${process.env.PATH ?? ''}`;
+        else { failed++; errors.push(c.desc); noCli.add(c.lifecycle); }
+        report.push({ desc: c.desc, ok: !!bin, exit: null });
+        if (ui) ui.result(!!bin, c.desc);
+        continue;
+      }
       // Recorded before it runs, so a command killed midway can still be undone.
       const rec = { desc: c.desc, ok: false, undo: c.undo, ...(c.reinstall && { from: c.from, owner: c.owner, reinstall: c.reinstall, reinstallAlways: c.reinstallAlways }), ...(c.env && { env: c.env }), ...(c.resumeKey && { resumeKey: c.resumeKey }) };
       ran.push(rec);
