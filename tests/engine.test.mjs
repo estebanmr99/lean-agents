@@ -1002,7 +1002,8 @@ test('bunInstall: pinned zip, SHA256 check before extraction, undo only for what
 
 test('bunPathCommand returns the same PowerShell strings as bunInstall on Windows', () => {
   const b = bunPathCommand("C:\\Users\\O'Neil");
-  assert.equal(b.desc, 'put ~\\.bun\\bin on your user PATH');
+  assert.equal(b.desc, 'put ~\\.bun\\bin on your user PATH (open a new terminal)');
+  assert.equal(b.tool, 'bun-path');
   assert.equal(b.run[0][0], 'powershell');
   assert.match(b.run[0].at(-1), /SetEnvironmentVariable\('Path'/);
   assert.match(b.run[0].at(-1), /O''Neil/);

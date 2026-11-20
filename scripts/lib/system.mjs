@@ -173,7 +173,8 @@ const psRemovePath = (bin) => `$p = [string][Environment]::GetEnvironmentVariabl
 export function bunPathCommand(home) {
   const bin = path.join(home, '.bun', 'bin');
   return {
-    tool: 'bun', desc: `put ~\\.bun\\bin on your user PATH`, optional: true,
+    // tool bun-path, not bun: a moved Bun pin must not undo and re-record this PATH entry.
+    tool: 'bun-path', desc: 'put ~\\.bun\\bin on your user PATH (open a new terminal)', optional: true,
     run: [psRun(psAddPath(bin))],
     undo: [psRun(psRemovePath(bin))],
     // Already in the saved user PATH (only this shell is stale): skip, so --uninstall never removes an entry the user made.
