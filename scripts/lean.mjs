@@ -556,9 +556,11 @@ function prereqCommands(o, behind = new Set()) {
 
 // The agents --everything configures whose CLI is missing and that --install-agent can install. Not recorded in state.json:
 // agents.json records them, and --uninstall-agent removes them, like a separate --install-agent run.
-function everythingCliInstalls(o) {
-  const table = agentTable({ home: o.home, platform: process.platform, dir: stateDir(o.home), realHome: REAL_HOME });
-  return o.agents.filter((a) => AGENT_CLIS[a] && table[a] && !table[a].manual && !which(AGENT_CLIS[a])).map((a) => ({
+function everythingCliInstalls(o, gitPending) {
+  const table = agentTable({ home: o.home, platform: process.platform, dir: stateDir(o.home), realHome: REAL_HOME, gitBash: gitPending ? 'bash.exe' : undefined });
+  const missing = o.agents.filter((a) => AGENT_CLIS[a] && table[a] && !which(AGENT_CLIS[a]));
+  for (const a of missing) if (table[a].manual) console.log(`! ${a}: ${table[a].manual}`);
+  return missing.filter((a) => !table[a].manual).map((a) => ({
     desc: `install the ${AGENT_CLIS[a]} CLI (${table[a].method}${table[a].version ? ` ${table[a].version}` : ''})`, run: [], undo: [], lifecycle: a, bins: table[a].bins,
   }));
 }
@@ -707,7 +709,7 @@ async function install(o) {
   const upgrades = update && o.exec ? upgradeCommands({ rows: update.rows, home: o.home, dir: stateDir(o.home), realHome: REAL_HOME, stamps: agentStamps(stateDir(o.home)) }) : [];
   const commands = [...(o.exec ? [...every?.commands ?? [], ...prereqCommands(o, behind).filter((c) => !owned.has(c.tool))] : []), ...agentCommands, ...upgrades];
   // --everything on a fresh machine: install the agent CLIs it configures (the --install-agent path), after the prerequisites.
-  const cliInstalls = every && o.exec ? everythingCliInstalls(o) : [];
+  const cliInstalls = every && o.exec ? everythingCliInstalls(o, pendingPrereqs(every.steps).some((s) => s.id === 'git')) : [];
   commands.splice(commands.length - agentCommands.length - upgrades.length, 0, ...cliInstalls);
 
   if (o.exec) {

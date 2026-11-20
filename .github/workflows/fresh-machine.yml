@@ -112,6 +112,9 @@ jobs:
           Get-ChildItem $diag -Filter 'Git.Git*.log' -ErrorAction SilentlyContinue | ForEach-Object { "== $($_.Name)"; Get-Content $_.FullName -Tail 40 }
           Get-ChildItem $env:TEMP -Filter 'Setup Log*.txt' -ErrorAction SilentlyContinue | ForEach-Object { "== $($_.Name)"; Get-Content $_.FullName -Tail 40 }
           "where rtk:"; where.exe rtk 2>&1
+          $env:Path = "$env:Path;$([Environment]::GetEnvironmentVariable('Path', 'User'))"
+          "npm prefix -g:"; npm prefix -g 2>&1
+          "where context-mode / opencode:"; where.exe context-mode opencode 2>&1
 
   linux:
     needs: dist

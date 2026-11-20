@@ -30,7 +30,8 @@ function script(pinKey, dir, args = [], ext = '.sh') {
 // One row per agent for this OS: how it is installed, where its binary lands and which dirs the install may write to.
 // `manual` is a reason, not a command: that agent/OS route is not proven yet (VERIFY in docs/compatibility.md).
 // `ver`: version per pin key to install instead of the release pin (the saved previous version, for an undo).
-export function agentTable({ home, platform, dir, realHome, ver = {}, env = process.env }) {
+// gitBash: plan as if Git Bash were there (--everything installs Git first; the run builds the table again with the real path).
+export function agentTable({ home, platform, dir, realHome, ver = {}, env = process.env, gitBash }) {
   const at = (key) => ver[key] ?? PINS[key].version;
   const posix = platform !== 'win32';
   const cmds = AGENT_CLIS;
@@ -41,7 +42,7 @@ export function agentTable({ home, platform, dir, realHome, ver = {}, env = proc
   t.claude = posix
     ? { method: 'script', ...script('claude-installer', dir, [at('claude-code')]), bins: bin('claude'), dirs: [path.join(local, 'bin'), path.join(local, 'share', 'claude'), path.join(home, '.claude', 'downloads')] }
     : { method: 'script', ...script('claude-installer-win', dir, [at('claude-code')], '.ps1'), bins: bin('claude.exe'), dirs: [path.join(local, 'bin'), path.join(local, 'share', 'claude'), path.join(home, '.claude', 'downloads')], pathDir: path.join(local, 'bin') };
-  const bashExe = gitBashPath({ platform, env });
+  const bashExe = gitBashPath({ platform, env }) ?? gitBash;
   t['opencode-v2'] = posix
     // --no-modify-path: the installer must not edit ~/.bashrc, which we could not undo.
     ? { method: 'script', ...script('opencode-installer', dir, ['--version', at('opencode-v2'), '--no-modify-path']), bins: [path.join(home, '.opencode', 'bin', 'opencode')], dirs: [path.join(home, '.opencode')] }
