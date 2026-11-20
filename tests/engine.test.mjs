@@ -1513,6 +1513,11 @@ test('DCP plugin spec (#212): an existing DCP entry (@latest, bare or a version)
     apply(plan(actions.filter((x) => x.path === f.file), [], [f.home]), path.join(f.home, 'b'), f.home);
     return f.read();
   };
+  const kept = setup('plugin', ['mine', `${pkg}@latest`]);
+  lean(kept.home, ['--yes', '--no-exec', '--agents', 'opencode-v1', '--tools', 'dcp', '--lang', 'en', '--profile', 'none']);
+  fs.writeFileSync(kept.file, fs.readFileSync(kept.file, 'utf8').replace('{', '{"theme":"x",')); // keeps uninstall on the per-key path
+  lean(kept.home, ['--yes', '--no-exec', '--uninstall']);
+  assert.deepEqual(kept.read(), ['mine', `${pkg}@latest`], 'uninstall leaves the kept entry');
   for (const run of [v1, v2]) {
     assert.deepEqual(run(['mine']), ['mine', dcp], run.name);
     assert.deepEqual(run(['mine', `${pkg}@latest`]), ['mine', `${pkg}@latest`], run.name);
