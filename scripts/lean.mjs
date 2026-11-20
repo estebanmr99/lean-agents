@@ -1222,8 +1222,9 @@ async function main() {
     const env = process.env;
     const inv = await inventory({ home: o.home, env, realHome: REAL_HOME });
     const bin = which('opencode');
-    // Skip version probe on dry run to prevent the binary from leaving log files.
-    const binVer = bin && o.exec ? (o.dryRun ? 'not probed (dry run)' : binVersion('opencode')) : null;
+    // With --home elsewhere, `opencode --version` would still run the real agent (it writes logs): report it as not probed.
+    const own = path.resolve(o.home) === path.resolve(REAL_HOME);
+    const binVer = bin && o.exec ? (own ? binVersion('opencode') : 'not probed (--home)') : null;
     const r = upgradeInventory(inv, { home: o.home, binary: { path: bin, version: binVer } });
     if (o.json) process.stdout.write(`${JSON.stringify(r, null, 2)}\n`); else console.log(formatUpgrade(r));
     return process.exit(0);
