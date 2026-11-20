@@ -5,7 +5,7 @@ import { sha } from './fsops.mjs';
 import { PINS, npmSpec, behindPins, nodeRange } from './pins.mjs';
 import { version, quiet, findAgy, antigravityFootprint } from './system.mjs';
 import { redactText } from './redact.mjs';
-import { satisfies, nodeSkipLine, minVersion, findNvm, nodeAt } from './node-runtime.mjs';
+import { satisfies, compare, nodeSkipLine, minVersion, findNvm, nodeAt } from './node-runtime.mjs';
 import { mcpLaunches, classify, duplicateSkills, skillDirs } from './inventory.mjs';
 import { stillNeeded, shellNotice } from './terminals.mjs';
 import { adhdSkillFiles } from './adhd.mjs';
@@ -80,7 +80,7 @@ function checkInventory({ home, exec, run, env, platform, fsx }, add) {
     const detail = v.status === 'wrong-node'
       ? `${m.pin} needs Node ${v.range} but this entry runs Node ${nodeVersion} (${launch.style}); run --update to register an absolute Node ${major}+ command (docs/manual-install.md)`
       : v.status === 'unknown' ? `${m.pin} needs Node ${v.range}; the Node behind this ${launch.style} entry could not be read`
-        : `Node ${nodeVersion} (${launch.style})${v.fragile ? '; follows nvm use or PATH, so it can change' : ''}`;
+        : `Node ${nodeVersion} (${launch.style})${v.fragile ? '; follows nvm use or PATH, so it can change, and VS Code or Cursor started outside this shell can resolve another Node' : ''}`;
     add(`node for ${where}`, status, detail);
     return { client: m.client, name: m.name, pin: m.pin, style: launch.style, node: rel(launch.node), nodeVersion, range: v.range, status };
   });
@@ -112,7 +112,30 @@ export function npxFailDetail(out, opts) {
   return line;
 }
 
-export function doctor({ home, state, exec, nodeVersion = process.versions.node, json = false, run = quiet, env = process.env, platform = process.platform, fsx = fs, probe = [], collect = null }) {
+// The active Node against the nearest package.json engines.node, from cwd up to home (or the root).
+export function projectNode({ cwd, home, nodeVersion, fsx = fs }) {
+  for (let dir = path.resolve(cwd); ; dir = path.dirname(dir)) {
+    const pkg = path.join(dir, 'package.json');
+    if (fsx.existsSync(pkg)) {
+      let range;
+      try { range = JSON.parse(fsx.readFileSync(pkg, 'utf8')).engines?.node; } catch { return null; }
+      if (typeof range !== 'string' || !range.trim()) return null;
+      const rel = pkg.startsWith(home) ? `~${pkg.slice(home.length).replaceAll('\\', '/')}` : pkg;
+      const gui = '; VS Code or Cursor started outside this shell can resolve another Node';
+      // shortcut: only an exact version and >=a.b.c are checked; ^, ~, x and || ranges get a note, add a parser when a real project needs one.
+      let fits;
+      try { fits = /^\d+\.\d+\.\d+$/.test(range.trim()) ? compare(nodeVersion, range.trim()) === 0 : satisfies(nodeVersion, range); } catch {
+        return { item: 'project Node', status: 'note', detail: `Node ${nodeVersion} is active; ${rel} asks for engines.node ${range}, which lean-agents does not check${gui}` };
+      }
+      return fits
+        ? { item: 'project Node', status: 'ok', detail: `Node ${nodeVersion} fits engines.node ${range} in ${rel}${gui}` }
+        : { item: 'project Node', status: 'note', detail: `Node ${nodeVersion} is active but ${rel} asks for engines.node ${range}: run nvm use (or your version manager) in this project${gui}` };
+    }
+    if (dir === path.resolve(home) || path.dirname(dir) === dir) return null;
+  }
+}
+
+export function doctor({ home, state, exec, nodeVersion = process.versions.node, json = false, run = quiet, env = process.env, platform = process.platform, fsx = fs, cwd = process.cwd(), probe = [], collect = null }) {
   const rows = [];
   const add = (item, status, detail = '') => rows.push({ item, status, detail });
   if (!state) {
@@ -127,6 +150,9 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
     const nodeNote = o.tools.includes('context-mode') && !state.toolNode && !satisfies(nodeVersion, nodeRange('context-mode')) ? nodeSkipLine('context-mode', nodeRange('context-mode'), nodeVersion) : '';
     if (nodeNote) o.tools = o.tools.filter((t) => t !== 'context-mode');
     add('lean-agents', 'ok', `v${state.version}, agents: ${o.agents.join(', ')}, privacy: ${o.privacy}`);
+    const active = (exec && /\d+\.\d+\.\d+/.exec(version('node') ?? '')?.[0]) || nodeVersion;
+    const pn = projectNode({ cwd, home, nodeVersion: active, fsx });
+    if (pn) add(pn.item, pn.status, pn.detail);
     if (nodeNote) add('context-mode', 'note', nodeNote);
     if (o.agents.includes('opencode-v1')) add('OpenCode 1.x: supported; lean-agents will not upgrade it', 'ok');
     const shell = shellNotice();
