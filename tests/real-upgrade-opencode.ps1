@@ -6,9 +6,8 @@
 # through it lands in the frozen copy (3 -> 4) while the live data hash stays equal, and `--uninstall` removes the shim, the copy and
 # the PATH entry but keeps the backup and the frozen copy.
 # Then the upgrade (P6): an apply without a backup stamp is refused, LEAN_TEST_FAIL_AT without LEAN_AGENTS_TEST=1 is refused, and an
-# injected failure after backup and after opencode1 rolls back to a byte-identical config, ~/.opencode, data and user PATH. The 2.x
-# install is manual on Windows (VERIFY), so a plain apply stops at that step and rolls back the same way; the Linux job (the sh half)
-# runs the full apply and --undo.
+# injected failure after backup and after opencode1 rolls back to a byte-identical config, ~/.opencode, data and user PATH. A plain
+# apply installs 2.x through Git Bash with ~\.opencode\bin first on the user PATH, and --undo takes both back.
 param([string]$Binary = 'opencode')
 $opencodeBin = $Binary
 $ErrorActionPreference = 'Stop'
@@ -244,10 +243,15 @@ try {
     Assert-That "failure after ${step}: live data byte-identical" ((Get-Tree $data '') -eq $liveData)
     Assert-That "failure after ${step}: no shim folder; backup and frozen copy kept" ((-not (Test-Path "$oc1\bin")) -and (Test-Path "$($bk[0].FullName)\MANIFEST.sha256") -and (Test-Path "$leanDir\opencode1\data\opencode\opencode.db"))
   }
-  $manual = Invoke-LeanUpgrade @('--yes') ''
-  Write-Output (($manual.Text -split "`n" | Select-Object -Last 10) -join "`n")
-  Assert-That 'plain apply: stops at install2x (the Windows 2.x install is manual) and names it' (($manual.Code -eq 1) -and ($manual.Text -match 'not proven yet'))
-  Assert-That 'plain apply: rolled back, config, ~/.opencode, user PATH and data byte-identical' (((Get-JournalStatus) -eq 'rolled-back') -and ((Get-LiveState) -eq $liveState) -and ((Get-Tree $data '') -eq $liveData))
+  $apply = Invoke-LeanUpgrade @('--yes') ''
+  Write-Output (($apply.Text -split "`n" | Select-Object -Last 10) -join "`n")
+  Assert-That 'plain apply: exit 0 and the journal says applied (2.x through Git Bash)' (($apply.Code -eq 0) -and ((Get-JournalStatus) -eq 'applied'))
+  Assert-That 'plain apply: ~\.opencode\bin is first on the user PATH' ((Get-UserPathRaw).Split(';')[0].TrimEnd('\') -eq "$live\.opencode\bin")
+  Assert-That 'plain apply: live data byte-identical' ((Get-Tree $data '') -eq $liveData)
+  $undo = Invoke-LeanUpgrade @('--undo', '--yes') ''
+  Write-Output (($undo.Text -split "`n" | Select-Object -Last 10) -join "`n")
+  Assert-That '--undo: exit 0 and the journal says undone' (($undo.Code -eq 0) -and ((Get-JournalStatus) -eq 'undone'))
+  Assert-That '--undo: no 2.x binary; user PATH and live data as before' ((-not (Test-Path "$live\.opencode\bin\opencode.exe")) -and ((Get-UserPathRaw).TrimEnd(';') -eq $pathBefore.TrimEnd(';')) -and ((Get-Tree $data '') -eq $liveData))
   Assert-That 'a 1.x opencode still runs' ((Invoke-OpenCode --version | Select-Object -Last 1) -match '^1\.19\.0')
 
   Write-Output '== refused while an opencode process runs'

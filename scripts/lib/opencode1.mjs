@@ -91,9 +91,13 @@ try { $raw = [string]$k.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptio
 $parts = @($raw -split ';' | Where-Object { $_ })
 $has = @($parts | Where-Object { (Get-Norm $_) -eq (Get-Norm $dir) }).Count -gt 0
 if ($env:LEAN_PATH_OP -eq 'has') { if ($has) { 'present' } else { 'absent' }; exit 0 }
-if ($env:LEAN_PATH_OP -eq 'add') {
+if ($env:LEAN_PATH_OP -eq 'add' -or $env:LEAN_PATH_OP -eq 'prepend') {
   if ($has) { 'present'; exit 0 }
-  if (-not $raw) { $new = $dir } elseif ($raw.EndsWith(';')) { $new = "$raw$dir" } else { $new = "$raw;$dir" }
+  if ($env:LEAN_PATH_OP -eq 'prepend') {
+    if (-not $raw) { $new = $dir } else { $new = "$dir;" + $raw.TrimStart(';') }
+  } else {
+    if (-not $raw) { $new = $dir } elseif ($raw.EndsWith(';')) { $new = "$raw$dir" } else { $new = "$raw;$dir" }
+  }
 } else {
   if (-not $has) { 'absent'; exit 0 }
   $new = @($parts | Where-Object { (Get-Norm $_) -ne (Get-Norm $dir) }) -join ';'
