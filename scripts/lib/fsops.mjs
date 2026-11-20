@@ -260,11 +260,8 @@ export function apply(planned, backupDir, home, roots = [home], entries = []) {
     }
     // The folders this write creates, deepest first: undo removes them again once they are empty (#223).
     const dirs = [];
-    const first = fs.mkdirSync(path.dirname(p.path), { recursive: true });
-    if (first && path.dirname(p.path).startsWith(first)) {
-      for (let d = path.dirname(p.path); d !== first; d = path.dirname(d)) dirs.push(d);
-      dirs.push(first);
-    }
+    for (let d = path.dirname(p.path); !fs.existsSync(d); d = path.dirname(d)) dirs.push(d);
+    fs.mkdirSync(path.dirname(p.path), { recursive: true });
     entries.push({ path: p.path, kind: p.kind, created: p.before === null, backup, hash: sha(p.after), applied: p.applied, noRestore: p.applied?.some((e) => e.upgraded), keepEmpty: p.keepEmpty, ...(dirs.length && { dirs }) });
     fs.writeFileSync(p.path, p.after);
   }
