@@ -71,6 +71,36 @@ test('the CLI dry run prints the table and --json the doc, writes nothing and le
   for (const out of [text.stdout, json.stdout]) for (const v of SECRETS) assert.ok(!out.includes(v), `${v} leaked`);
 });
 
+test('dry run finds the backup and does not start opencode', { skip }, async () => {
+  const { home, env } = await seeded();
+  
+  // Bug 2: fake opencode on PATH
+  const binDir = j(home, 'bin');
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(j(binDir, 'opencode'), `#!/bin/sh\ntouch "${j(home, 'marker')}"\necho "1.0.0"\n`);
+  fs.chmodSync(j(binDir, 'opencode'), 0o755);
+  
+  // Bug 1: fake verified backup
+  const b = j(home, '.local', 'share', 'lean-agents', 'backups', 'opencode1-sessions-20261119T120000Z');
+  fs.mkdirSync(b, { recursive: true });
+  const frozenDir = j(home, '.local', 'share', 'lean-agents', 'opencode1', 'data', 'opencode');
+  fs.mkdirSync(frozenDir, { recursive: true });
+  fs.writeFileSync(j(frozenDir, 'opencode.db'), 'fake db');
+  fs.writeFileSync(j(b, 'MANIFEST.sha256'), 'fake hash');
+  const stamp = { verified: true, ts: 123456, sessions: 10 };
+  fs.writeFileSync(j(b, 'STAMP.json'), JSON.stringify(stamp));
+  
+  const testEnv = { ...process.env, ...env, PATH: `${binDir}${path.delimiter}${env.PATH}` };
+  const json = spawnSync(process.execPath, [LEAN, '--home', home, '--upgrade-agent', 'opencode', '--dry-run', '--json'], { encoding: 'utf8', env: testEnv });
+  assert.equal(json.status, 0, json.stderr);
+  
+  const r = JSON.parse(json.stdout);
+  assert.equal(r.upgrade.backup.verified, true);
+  assert.equal(r.upgrade.backup.sessions, 10);
+  assert.equal(r.upgrade.binary.version, 'not probed (dry run)');
+  assert.ok(!fs.existsSync(j(home, 'marker')), 'dry run spawned the real binary');
+});
+
 test('apply needs a verified backup stamp, and --undo has nothing to undo: both leave the tree alone (P6)', { skip }, async () => {
   const { home } = await seeded();
   const before = treeHash(home);

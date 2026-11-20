@@ -1222,7 +1222,9 @@ async function main() {
     const env = process.env;
     const inv = await inventory({ home: o.home, env, realHome: REAL_HOME });
     const bin = which('opencode');
-    const r = upgradeInventory(inv, { home: o.home, binary: { path: bin, version: bin && o.exec ? binVersion('opencode') : null } });
+    // Skip version probe on dry run to prevent the binary from leaving log files.
+    const binVer = bin && o.exec ? (o.dryRun ? 'not probed (dry run)' : binVersion('opencode')) : null;
+    const r = upgradeInventory(inv, { home: o.home, binary: { path: bin, version: binVer } });
     if (o.json) process.stdout.write(`${JSON.stringify(r, null, 2)}\n`); else console.log(formatUpgrade(r));
     return process.exit(0);
   }

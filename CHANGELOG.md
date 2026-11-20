@@ -4,6 +4,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Fixed
+- upgrade dry run reports the verified backup the real apply uses (#297)
+- upgrade dry run skips the agent version probe to avoid touching the host environment (#226)
+
 ### Added
 
 - `--everything` installs `jq` (Homebrew or winget) when you pick the Warp plugin for Claude Code and jq is missing, since the plugin's hooks need it; `--uninstall` removes it (#179).

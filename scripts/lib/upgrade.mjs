@@ -138,7 +138,7 @@ export function upgradeInventory(inv, { home, fsx = fs, binary = { path: null, v
       from: 'opencode-v1', to: 'opencode-v2',
       binary: { path: rel(binary.path), version: binary.version, via: installVia(binary.path) },
       layout: { configDir: rel(ocDir), dataDir: inv.opencode.dataDir, sessions: inv.opencode.sessions, major: inv.opencode.major },
-      backup: null, // PR B: the permanent session backup
+      backup: readBackupStamp(home, fsx) ?? null,
       counts, plan,
     },
   };
