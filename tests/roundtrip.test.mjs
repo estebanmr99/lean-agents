@@ -108,3 +108,61 @@ for (const agent of Object.keys(userFiles('/h'))) {
     assert.deepEqual(after.dirs.filter((d) => !before.dirs.includes(d) && !/^\.config(\/lean-agents(\/backups(\/[^/]+.*)?)?)?$/.test(d)), []);
   });
 }
+
+// Property test (#305 S4): random starting configs, same check. A failure prints its seed; LEAN_SEED=<n> reruns that case.
+// mulberry32: small seeded PRNG, so every case can be rerun exactly.
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => { a = (a + 0x6d2b79f5) >>> 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+
+// A JSON(C) text with random user keys, optional comments, trailing commas, indent, CRLF and final newline.
+function randomJsonc(r, entries) {
+  const pick = (xs) => xs[Math.floor(r() * xs.length)];
+  const ind = pick(['  ', '    ', '\t']);
+  const nl = r() < 0.2 ? '\r\n' : '\n';
+  const lines = entries.filter(() => r() < 0.7).map(([k, v]) => `${ind}${r() < 0.3 ? `// note on ${k}${nl}${ind}` : ''}${JSON.stringify(k)}: ${JSON.stringify(v)}`);
+  return `{${nl}${lines.join(`,${nl}`)}${lines.length && r() < 0.3 ? ',' : ''}${nl}}${r() < 0.8 ? nl : ''}`;
+}
+
+const AGENTS = Object.keys(userFiles('/h'));
+function randomCase(seed, home) {
+  const r = rng(seed);
+  const server = { command: 'npx', args: ['-y', 'my-server'] };
+  const files = {
+    '.claude/settings.json': randomJsonc(r, [['model', 'opus'], ['env', { FOO: '1', BASH_MAX_OUTPUT_LENGTH: '9000' }], ['permissions', { allow: ['Bash(ls:*)'] }], ['statusLine', { type: 'command', command: 'echo hi' }]]),
+    '.claude/CLAUDE.md': r() < 0.5 ? '# My rules\n\n- be brief\n' : 'no trailing newline',
+    '.config/opencode/opencode.jsonc': randomJsonc(r, [['theme', 'dark'], ['instructions', ['mine.md']], ['plugin', ['my-plugin@1.0.0']], ['mcp', { mine: { type: 'local', command: ['mine'] } }]]),
+    '.config/opencode/AGENTS.md': '# Mine\n',
+    '.copilot/mcp-config.json': randomJsonc(r, [['mcpServers', { mine: server }]]),
+    '.cursor/mcp.json': randomJsonc(r, [['mcpServers', { mine: server }]]),
+    [path.relative(home, path.join(vscodeUserDir(home), 'mcp.json'))]: randomJsonc(r, [['servers', { mine: server }], ['inputs', []]]),
+    '.zshrc': 'export PATH="$HOME/bin:$PATH"\n',
+  };
+  const kept = Object.fromEntries(Object.entries(files).filter(() => r() < 0.75));
+  const agents = AGENTS.filter(() => r() < 0.5).filter((a, _, xs) => a !== 'opencode-v1' || !xs.includes('opencode-v2')); // the engine refuses both: same files
+  if (!agents.length) agents.push(AGENTS[Math.floor(r() * AGENTS.length)]);
+  const args = ['--yes', '--no-exec', '--agents', agents.join(','), '--privacy', r() < 0.5 ? 'standard' : 'strict', ...(r() < 0.5 ? ['--all-tools'] : ['--tools', 'serena,code-mode'])];
+  return { files: kept, args };
+}
+
+const seeds = process.env.LEAN_SEED ? [Number(process.env.LEAN_SEED)] : Array.from({ length: 12 }, (_, i) => 1000 + i);
+for (const seed of seeds) {
+  test(`random config (seed ${seed}): install then --uninstall leaves HOME as it was`, (t) => {
+    const home = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'lean-roundtrip-')));
+    t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+    const { files, args } = randomCase(seed, home);
+    for (const [rel, text] of Object.entries(files)) {
+      fs.mkdirSync(path.dirname(path.join(home, rel)), { recursive: true });
+      fs.writeFileSync(path.join(home, rel), text);
+    }
+    const before = snapshot(home);
+    lean(home, args);
+    lean(home, ['--uninstall', '--yes', '--no-exec']);
+    const after = snapshot(home);
+    const why = `rerun with LEAN_SEED=${seed}; args: ${args.join(' ')}`;
+    assert.deepEqual(withoutBackups(after.files, before.files), before.files, why);
+    assert.deepEqual(before.dirs.filter((d) => !after.dirs.includes(d)), [], why);
+    assert.deepEqual(after.dirs.filter((d) => !before.dirs.includes(d) && !/^\.config(\/lean-agents(\/backups(\/[^/]+.*)?)?)?$/.test(d)), [], why);
+  });
+}
