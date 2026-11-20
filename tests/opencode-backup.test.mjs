@@ -89,6 +89,18 @@ test('apply: backup and frozen copy equal the source, live data untouched', () =
   fs.rmSync(f.home, { recursive: true, force: true });
 });
 
+test('an opencode that starts during the copy fails the backup and leaves no partial (#253)', () => {
+  const f = fixture();
+  const logs = [];
+  let calls = 0;
+  const list = () => (++calls > 1 ? ['opencode'] : []); // idle at preflight, running at the final check
+  const r = backupOpencode({ home: f.home, now: NOW, list, statfs: roomy, count: () => ({ sessions: 3 }), log: (l) => logs.push(l) });
+  assert.equal(r.ok, false);
+  assert.match(logs.join('\n'), /started during the copy/);
+  assert.deepEqual(fs.readdirSync(j(f.lean, 'backups')), [], 'no backup and no .partial');
+  fs.rmSync(f.home, { recursive: true, force: true });
+});
+
 test('dry run writes nothing: the whole HOME tree hash is unchanged', () => {
   const f = fixture();
   const before = tree(f.home);
