@@ -56,6 +56,9 @@ test('Windows: git only when a tool needs it; nvm-windows setup is hash-checked;
   const nvm = by(none, 'nvm');
   assert.equal(nvm.commands.length, 3);
   assert.match(nvm.commands[1].join(' '), /[0-9a-f]{64}/);
+  // nvm is not on this process's PATH right after its setup: the Node 24 step finds nvm.exe through NVM_HOME.
+  assert.equal(by(none, 'node-24').commands[0][0], 'powershell');
+  assert.match(by(none, 'node-24').commands[0].at(-1), /NVM_HOME.*nvm\.exe'\) install 24/);
   assert.equal(by(none, 'uv').commands[0][0], 'winget');
   assert.equal(by(none, 'rtk').commands[0].includes('rtk-ai.rtk'), true);
   const g = planPrereqs(bare('win32', { has: { winget: true }, needsGit: true }));

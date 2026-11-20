@@ -49,7 +49,8 @@ export function agentTable({ home, platform, dir, realHome, ver = {}, env = proc
         const sc = script('opencode-installer', dir, ['--version', at('opencode-v2'), '--no-modify-path']);
         sc.run[0][0] = 'curl.exe';
         sc.run[2][0] = bashExe;
-        return { method: 'script', ...sc, bins: [path.join(home, '.opencode', 'bin', 'opencode.exe')], dirs: [path.join(home, '.opencode')], pathDir: path.join(home, '.opencode', 'bin'), pathFirst: true };
+        // Git Bash takes HOME from the environment, which can differ from --home: the installer writes to $HOME/.opencode.
+        return { method: 'script', ...sc, env: { HOME: home }, bins: [path.join(home, '.opencode', 'bin', 'opencode.exe')], dirs: [path.join(home, '.opencode')], pathDir: path.join(home, '.opencode', 'bin'), pathFirst: true };
       })() : { manual: 'OpenCode 2 on Windows needs Git for Windows (Git Bash): install it, then run this again' });
   t['copilot-cli'] = {
     method: 'npm', version: at('copilot-cli'),
@@ -191,7 +192,7 @@ export async function agentLifecycle(o) {
         pathDir = row.pathDir;
         pathAbsent = winPath('has', pathDir) === 'absent';
       }
-      const ok = row.run.every((argv) => run(argv, { dryRun: false, log, env }));
+      const ok = row.run.every((argv) => run(argv, { dryRun: false, log, env: { ...env, ...row.env } }));
       if (row.download) fs.rmSync(row.download, { force: true });
       const rec = diffSnapshots(before, snapshot(row.dirs));
       let pathEntry = false;
