@@ -105,6 +105,7 @@ jobs:
         if: failure()
         shell: powershell
         run: |
+          $ErrorActionPreference = 'Continue'  # a where.exe miss must not end the diagnostics
           $links = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links'
           "Links ($links):"; Get-ChildItem $links -ErrorAction SilentlyContinue | ForEach-Object { "  $($_.Name) $($_.LinkType) -> $($_.Target)" }
           "User Path entries:"; ([Environment]::GetEnvironmentVariable('Path', 'User') -split ';') | ForEach-Object { "  $_" }
