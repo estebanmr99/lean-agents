@@ -154,7 +154,7 @@ export function planPrereqs(probe) {
 
   const bun = (probe.bunInstall ?? bunInstall)(home, tmp, platform, pm, arch); // probe.bunInstall: tests only
   add({
-    id: 'bun', label: 'Bun', why: 'Lets Context Mode run JS and TS.', skipIf: has.bun ? 'bun is on PATH' : null,
+    id: 'bun', label: 'Bun', why: 'Lets Context Mode run JS and TS.', skipIf: has.bun ? 'bun is installed' : null,
     // the zip lands in tmp
     commands: bun ? [...(mac ? [] : [[node, '-e', 'require("fs").mkdirSync(process.argv[1], { recursive: true })', tmp]]), ...bun.run] : [],
     undo: bun?.undo ?? null,

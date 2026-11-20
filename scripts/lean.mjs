@@ -20,7 +20,7 @@ import { projectPlan, projectStateDir } from './lib/project.mjs';
 import { gsdPlan } from './lib/gsd.mjs';
 import { MIGRATE_SOURCES, MIGRATE_TARGETS, readSource, detectSources, migratePlan, finishRows, formatTable } from './lib/migrate.mjs';
 import { adhdCommand } from './lib/adhd.mjs';
-import { version as binVersion, versionFull, gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPresent, which, run, quiet, exists, isolate, configHome, envDir } from './lib/system.mjs';
+import { version as binVersion, versionFull, gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPathCommand, bunPresent, which, run, quiet, exists, isolate, configHome, envDir } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
 import { probePlugins } from './lib/plugin-health.mjs';
 import { adopt, inventory, saveState } from './lib/adopt.mjs';
@@ -543,7 +543,8 @@ function prereqCommands(o, behind = new Set()) {
     }
   }
   if (o.bun && o.tools.includes('context-mode') && process.platform !== 'linux' && !which('bun') && bunPresent(o.home)) {
-    console.log('! Bun is in ~/.bun/bin but not on PATH; Context Mode needs it on PATH here. Add that folder to PATH.');
+    if (process.platform === 'win32') out.push(bunPathCommand(o.home));
+    else console.log('! Bun is in ~/.bun/bin but not on PATH; Context Mode needs it on PATH here. Add that folder to PATH.');
   }
   if (o.bun && o.tools.includes('context-mode') && !bunPresent(o.home)) {
     const b = bunInstall(o.home, stateDir(o.home), process.platform, pm);

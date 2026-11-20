@@ -1000,6 +1000,21 @@ test('bunInstall: pinned zip, SHA256 check before extraction, undo only for what
   assert.match(bunInstall("C:\\Users\\O'Neil", 'C:\\s', 'win32', 'winget', 'x64').run[2].at(-1), /O''Neil/);
 });
 
+test('bunPathCommand returns the same PowerShell strings as bunInstall on Windows', async () => {
+  const { bunPathCommand } = await import('../scripts/lib/system.mjs');
+  const b = bunPathCommand("C:\\Users\\O'Neil");
+  assert.equal(b.desc, 'put ~\\.bun\\bin on your user PATH');
+  assert.equal(b.run[0][0], 'powershell');
+  assert.match(b.run[0].at(-1), /SetEnvironmentVariable\('Path'/);
+  assert.match(b.run[0].at(-1), /O''Neil/);
+  assert.match(b.undo[0].at(-1), /Environment\]::SetEnvironmentVariable\('Path'/);
+  
+  const { bunInstall } = await import('../scripts/lib/system.mjs');
+  const win = bunInstall("C:\\Users\\O'Neil", 'C:\\s', 'win32', 'winget', 'x64');
+  assert.ok(win.run[2].at(-1).includes(b.run[0].at(-1))); // bunInstall's run script contains the path-add part
+  assert.equal(win.undo[1].at(-1), b.undo[0].at(-1)); // undo path-remove part is exactly the same
+});
+
 test('verify-sha256: a mismatch deletes the file and exits 1 so the chain stops before extraction', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-sha-'));
   const file = path.join(dir, 'bun.zip');

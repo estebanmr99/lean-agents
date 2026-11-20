@@ -129,6 +129,8 @@ test('bun step keeps the undo of the install it plans, and a manual hint when th
   assert.deepEqual(none.commands, []);
   assert.equal(none.undo, null);
   assert.match(none.manual, /^https:\/\/bun\.sh\//);
+  
+  assert.equal(by(planPrereqs(bare('win32', { has: { bun: true } })), 'bun').skipIf, 'bun is installed');
 });
 
 test('Homebrew installer is the commit-pinned script, hash-checked before it runs', () => {
