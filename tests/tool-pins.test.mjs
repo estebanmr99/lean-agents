@@ -5,12 +5,12 @@ import { PINS, pinVersions, toolPins } from '../scripts/lib/pins.mjs';
 import { latestVersion, isNewer, notesUrl } from '../scripts/version-watch.mjs';
 import { bump } from '../scripts/bump-pins.mjs';
 
-const KEYS = ['rtk', 'uv', 'gh', 'antigravity-cask', 'bun'];
+const KEYS = ['rtk', 'uv', 'gh', 'jq', 'antigravity-cask', 'bun'];
 
 test('rtk, uv, gh, the Antigravity cask and Bun are tracked with a source, version and check date', () => {
   assert.deepEqual(toolPins().map((t) => t.key).sort(), [...KEYS].sort());
   for (const k of KEYS) {
-    assert.match(PINS[k].version, /^v?\d+\.\d+\.\d+$/, k);
+    assert.match(PINS[k].version, /^(?:jq-)?v?\d+\.\d+\.\d+$/, k);
     assert.match(PINS[k].verified, /^\d{4}-\d{2}-\d{2}$/, k);
     assert.ok(PINS[k].source && PINS[k].ci, k);
   }

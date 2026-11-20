@@ -69,6 +69,29 @@ test('Windows without winget: manual links instead of commands', () => {
   assert.ok(by(steps, 'uv').manual);
 });
 
+test('jq is planned only when terminals include warp and agents include claude', () => {
+  const needs = planPrereqs(bare('win32', { has: { winget: true }, terminals: ['warp'], agents: ['claude'] }));
+  assert.ok(ids(needs).includes('jq'));
+  assert.equal(by(needs, 'jq').commands[0].includes('jqlang.jq'), true);
+
+  const skipped = planPrereqs(bare('win32', { has: { winget: true, jq: true }, terminals: ['warp'], agents: ['claude'] }));
+  assert.ok(by(skipped, 'jq').skipIf);
+
+  const missingWarp = planPrereqs(bare('win32', { has: { winget: true }, terminals: ['orca'], agents: ['claude'] }));
+  assert.ok(!ids(missingWarp).includes('jq'));
+
+  const missingClaude = planPrereqs(bare('win32', { has: { winget: true }, terminals: ['warp'], agents: ['opencode-v2'] }));
+  assert.ok(!ids(missingClaude).includes('jq'));
+
+  const mac = planPrereqs(bare('darwin', { terminals: ['warp'], agents: ['claude'] }));
+  assert.equal(by(mac, 'jq').commands[0][0], 'brew');
+  assert.equal(by(mac, 'jq').undo[0][1], 'uninstall');
+
+  const linux = planPrereqs(bare('linux', { terminals: ['warp'], agents: ['claude'] }));
+  assert.deepEqual(by(linux, 'jq').commands, []);
+  assert.match(by(linux, 'jq').manual, /^https:/);
+});
+
 test('resume stamps skip finished steps and nothing else', () => {
   const steps = planPrereqs(bare('darwin', { done: ['prereq:xcode-clt', 'prereq:homebrew'] }));
   assert.deepEqual(ids(pendingPrereqs(steps)), ['nvm', 'node-24', 'uv', 'rtk', 'bun']);

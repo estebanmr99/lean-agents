@@ -181,7 +181,7 @@ Every flag from `--help`. In PowerShell the same flags are PascalCase (`-DryRun`
 | `--tools a,b` | Optional tools on top of RTK and Context Mode: serena, playwright, ponytail, caveman, i-have-adhd, dcp, codeburn, copilot-usage, gsd, autoskills, playwright-extension, coordinate, lean-migrate |
 | `--all-tools` | Every optional tool except gsd, autoskills, playwright-extension, coordinate and lean-migrate |
 | `--no-tools` | No optional tools |
-| `--everything` | Fresh-machine preset: plans the missing prerequisites first (Homebrew, nvm, Node 24 under nvm, uv, RTK, Bun), then Claude Code + OpenCode 2 (on Windows also the Copilot CLI, VS Code Copilot and Antigravity that are installed; missing ones are listed as skipped in the plan) with every optional tool, shows one plan and asks once (`--yes` accepts; `--dry-run --json` prints it; a rerun resumes). Your own Node stays the default. `--agents` and `--tools` still override it |
+| `--everything` | Fresh-machine preset: plans the missing prerequisites first (Homebrew, nvm, Node 24 under nvm, uv, RTK, jq, Bun), then Claude Code + OpenCode 2 (on Windows also the Copilot CLI, VS Code Copilot and Antigravity that are installed; missing ones are listed as skipped in the plan) with every optional tool, shows one plan and asks once (`--yes` accepts; `--dry-run --json` prints it; a rerun resumes). Your own Node stays the default. `--agents` and `--tools` still override it |
 | `--no-core` | Leave out RTK and Context Mode; install only the `--tools` you list |
 | `--privacy` standard or strict | Same as `--network on` (standard) or `--network off` (strict) |
 | `--network` on or off | Preset for telemetry, auto-updates and other outbound calls |
@@ -237,7 +237,7 @@ curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/i
 & ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) --everything
 ```
 
-- **Plans:** only what is missing. Prerequisites first: Xcode Command Line Tools and Homebrew (macOS), nvm and Node.js 24 under nvm (your own Node stays the default), uv, RTK, Bun. Then Claude Code and OpenCode 2 with every optional tool. On Windows it also sets up the Copilot CLI, VS Code Copilot and Antigravity that are already on the PC. `--agents` and `--tools` override it.
+- **Plans:** only what is missing. Prerequisites first: Xcode Command Line Tools and Homebrew (macOS), nvm and Node.js 24 under nvm (your own Node stays the default), uv, RTK, jq, Bun. Then Claude Code and OpenCode 2 with every optional tool. On Windows it also sets up the Copilot CLI, VS Code Copilot and Antigravity that are already on the PC. `--agents` and `--tools` override it.
 - **Asks:** one question, `Apply these changes?` (`--yes` accepts it). Homebrew's own installer asks for your macOS password. On Windows nothing is meant to need admin (nvm-windows without admin is still **VERIFY**).
 - **Corporate PC or proxy, in five lines:** (1) read [docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md) first; (2) set `HTTPS_PROXY`, `NO_PROXY` and `NODE_EXTRA_CA_CERTS` in your own terminal (never written to disk); (3) add `--network off` for a work PC; (4) `--dry-run` shows every host and command before anything runs; (5) already on OpenCode 1.x? Use `--adopt`, not `--everything`. More: [On a work PC](#on-a-work-pc-proxy-network-and-security-review).
 - **Interrupted?** Run the same command again: finished steps are skipped.
