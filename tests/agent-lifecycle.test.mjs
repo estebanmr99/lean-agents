@@ -58,8 +58,8 @@ test('agentTable win32 claude', () => {
 });
 
 test('agentTable win32 opencode-v2', () => {
-  const home = '/tmp/fakehome';
-  const pf = '/tmp/fakegit';
+  const home = tmp();
+  const pf = tmp();
   fs.mkdirSync(path.join(pf, 'Git', 'bin'), { recursive: true });
   fs.writeFileSync(path.join(pf, 'Git', 'bin', 'bash.exe'), '');
   const row = agentTable({ home, platform: 'win32', dir: home, realHome: home, env: { ProgramFiles: pf } })['opencode-v2'];
@@ -68,8 +68,7 @@ test('agentTable win32 opencode-v2', () => {
   assert.ok(row.run[2][0].endsWith('bash.exe'));
   assert.ok(row.bins[0].endsWith(path.join('.opencode', 'bin', 'opencode.exe')));
   assert.equal(row.pathFirst, true);
-  fs.rmSync(pf, { recursive: true, force: true });
-  
+
   const manualRow = agentTable({ home, platform: 'win32', dir: home, realHome: home, env: {} })['opencode-v2'];
   assert.match(manualRow.manual, /Git Bash/);
 });
@@ -255,7 +254,6 @@ test('win32 path entry opencode-v2: installer leaves it off PATH -> lean-agents 
     fs.writeFileSync(path.join(dir, 'opencode.exe'), 'x');
     return cb([process.execPath, '-e', 'process.exit(0)']);
   };
-  // Fake asClaude for opencode-v2:
   const opts = {
     mode: 'install',
     agents: ['opencode-v2'],
