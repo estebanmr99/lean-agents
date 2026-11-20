@@ -1222,7 +1222,11 @@ async function main() {
     const env = process.env;
     const inv = await inventory({ home: o.home, env, realHome: REAL_HOME });
     const bin = which('opencode');
-    const r = upgradeInventory(inv, { home: o.home, binary: { path: bin, version: bin && o.exec ? binVersion('opencode') : null } });
+    // With --home elsewhere, `opencode --version` would still run the real agent (it writes logs): report it as not probed.
+    const norm = (p) => (process.platform === 'win32' ? path.resolve(p).toLowerCase() : path.resolve(p));
+    const own = norm(o.home) === norm(REAL_HOME);
+    const binVer = bin && o.exec ? (own ? binVersion('opencode') : 'not probed (--home)') : null;
+    const r = upgradeInventory(inv, { home: o.home, binary: { path: bin, version: binVer } });
     if (o.json) process.stdout.write(`${JSON.stringify(r, null, 2)}\n`); else console.log(formatUpgrade(r));
     return process.exit(0);
   }
