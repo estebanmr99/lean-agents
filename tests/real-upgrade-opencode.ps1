@@ -243,6 +243,24 @@ try {
     Assert-That "failure after ${step}: live data byte-identical" ((Get-Tree $data '') -eq $liveData)
     Assert-That "failure after ${step}: no shim folder; backup and frozen copy kept" ((-not (Test-Path "$oc1\bin")) -and (Test-Path "$($bk[0].FullName)\MANIFEST.sha256") -and (Test-Path "$leanDir\opencode1\data\opencode\opencode.db"))
   }
+  Write-Output '== refused while an opencode process runs'
+  # npm installs an extensionless sh shim next to opencode.cmd; Start-Process needs the .cmd (or .exe).
+  $serveBin = (Get-Command $opencodeBin -CommandType Application | Where-Object { $_.Extension -in '.exe', '.cmd' } | Select-Object -First 1).Source
+  # A scratch data folder: serve would write to the live db, and the apply below then refuses (data changed since the backup).
+  $xdg = @{}; foreach ($n in 'XDG_DATA_HOME', 'XDG_STATE_HOME', 'XDG_CACHE_HOME') { $xdg[$n] = [Environment]::GetEnvironmentVariable($n); [Environment]::SetEnvironmentVariable($n, (Join-Path $root 'serve-scratch')) }
+  try { $serve = Start-Process $serveBin -ArgumentList 'serve', '--port', (Get-Random -Minimum 20000 -Maximum 60000), '--hostname', '127.0.0.1' -NoNewWindow -PassThru }
+  finally { foreach ($n in $xdg.Keys) { [Environment]::SetEnvironmentVariable($n, $xdg[$n]) } }
+  for ($i = 0; $i -lt 20 -and -not (Get-Process -Name opencode -ErrorAction SilentlyContinue); $i++) { Start-Sleep -Seconds 1 }
+  $busy = Invoke-Lean --dry-run
+  Assert-That 'dry run: exit 0, sizes and the running process as a blocker while opencode serve runs (#270)' (($busy.Code -eq 0) -and ($busy.Text -match 'free space:') -and ($busy.Text -match 'blocker for apply:.*process is running'))
+  $busy = Invoke-Lean --yes
+  Assert-That 'apply: exit 1 and names the running process while opencode serve runs' (($busy.Code -eq 1) -and ($busy.Text -match 'process is running'))
+  # opencode serve must be gone before the apply below.
+  if ($serve -and -not $serve.HasExited) { Stop-Process -Id $serve.Id -Force; $serve.WaitForExit(30000) | Out-Null }
+  Get-Process -Name opencode -ErrorAction SilentlyContinue | Stop-Process -Force
+  Start-Sleep -Seconds 2
+
+  Write-Output '== plain apply and --undo'
   $apply = Invoke-LeanUpgrade @('--yes') ''
   Write-Output (($apply.Text -split "`n" | Select-Object -Last 10) -join "`n")
   Assert-That 'plain apply: exit 0 and the journal says applied (2.x through Git Bash)' (($apply.Code -eq 0) -and ((Get-JournalStatus) -eq 'applied'))
@@ -251,18 +269,10 @@ try {
   $undo = Invoke-LeanUpgrade @('--undo', '--yes') ''
   Write-Output (($undo.Text -split "`n" | Select-Object -Last 10) -join "`n")
   Assert-That '--undo: exit 0 and the journal says undone' (($undo.Code -eq 0) -and ((Get-JournalStatus) -eq 'undone'))
-  Assert-That '--undo: no 2.x binary; user PATH and live data as before' ((-not (Test-Path "$live\.opencode\bin\opencode.exe")) -and ((Get-UserPathRaw).TrimEnd(';') -eq $pathBefore.TrimEnd(';')) -and ((Get-Tree $data '') -eq $liveData))
+  Assert-That '--undo: no 2.x binary' (-not (Test-Path "$live\.opencode\bin\opencode.exe"))
+  Assert-That '--undo: user PATH as before' ((Get-UserPathRaw).TrimEnd(';') -eq $pathBefore.TrimEnd(';'))
+  Assert-That '--undo: live data is the frozen copy again (4 sessions)' ((Get-SessionCount $data) -eq 4)
   Assert-That 'a 1.x opencode still runs' ((Invoke-OpenCode --version | Select-Object -Last 1) -match '^1\.19\.0')
-
-  Write-Output '== refused while an opencode process runs'
-  # npm installs an extensionless sh shim next to opencode.cmd; Start-Process needs the .cmd (or .exe).
-  $serveBin = (Get-Command $opencodeBin -CommandType Application | Where-Object { $_.Extension -in '.exe', '.cmd' } | Select-Object -First 1).Source
-  $serve = Start-Process $serveBin -ArgumentList 'serve', '--port', (Get-Random -Minimum 20000 -Maximum 60000), '--hostname', '127.0.0.1' -NoNewWindow -PassThru
-  for ($i = 0; $i -lt 20 -and -not (Get-Process -Name opencode -ErrorAction SilentlyContinue); $i++) { Start-Sleep -Seconds 1 }
-  $busy = Invoke-Lean --dry-run
-  Assert-That 'dry run: exit 0, sizes and the running process as a blocker while opencode serve runs (#270)' (($busy.Code -eq 0) -and ($busy.Text -match 'free space:') -and ($busy.Text -match 'blocker for apply:.*process is running'))
-  $busy = Invoke-Lean --yes
-  Assert-That 'apply: exit 1 and names the running process while opencode serve runs' (($busy.Code -eq 1) -and ($busy.Text -match 'process is running'))
 } finally {
   Restore-Env
   Set-Location $repo
