@@ -261,7 +261,10 @@ export function apply(planned, backupDir, home, roots = [home], entries = []) {
     // The folders this write creates, deepest first: undo removes them again once they are empty (#223).
     const dirs = [];
     const first = fs.mkdirSync(path.dirname(p.path), { recursive: true });
-    if (first) for (let d = path.dirname(p.path); d.length >= first.length; d = path.dirname(d)) dirs.push(d);
+    if (first && path.dirname(p.path).startsWith(first)) {
+      for (let d = path.dirname(p.path); d !== first; d = path.dirname(d)) dirs.push(d);
+      dirs.push(first);
+    }
     entries.push({ path: p.path, kind: p.kind, created: p.before === null, backup, hash: sha(p.after), applied: p.applied, noRestore: p.applied?.some((e) => e.upgraded), keepEmpty: p.keepEmpty, ...(dirs.length && { dirs }) });
     fs.writeFileSync(p.path, p.after);
   }
@@ -280,7 +283,7 @@ export function undo(entries, roots = []) {
     const blocked = unsafe(e.path, roots);
     if (blocked) { report.push(['left (symlink)', e.path]); continue; }
     const now = read(e.path);
-    if (now === null) continue;
+    if (now === null) { removeEmptyDirs(e.dirs); continue; }
     const untouched = sha(now) === e.hash;
     if (untouched && e.created) {
       fs.rmSync(e.path);
