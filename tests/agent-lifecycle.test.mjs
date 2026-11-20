@@ -68,6 +68,7 @@ test('agentTable win32 opencode-v2', () => {
   assert.ok(row.run[2][0].endsWith('bash.exe'));
   assert.ok(row.bins[0].endsWith(path.join('.opencode', 'bin', 'opencode.exe')));
   assert.equal(row.pathFirst, true);
+  assert.equal(row.env.HOME, home, 'Git Bash installs into --home, not its own HOME');
 
   const manualRow = agentTable({ home, platform: 'win32', dir: home, realHome: home, env: {} })['opencode-v2'];
   assert.match(manualRow.manual, /Git Bash/);

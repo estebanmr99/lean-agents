@@ -19,6 +19,10 @@ const NVM_WIN = {
   url: 'https://github.com/coreybutler/nvm-windows/releases/download/v2.0.1/nvm-2.0.1-x64-setup.exe',
   sha256: '2ba6ab6290fdc7d1e608e76c97577ca6e1df772b2d59ab8ebc01e10788de8e57',
 };
+// The setup just ran, so this process has no nvm on PATH: read NVM_HOME and NVM_SYMLINK from the saved user or machine environment. VERIFY
+const NVM_WIN_INSTALL_24 = ['powershell', '-NoProfile', '-NonInteractive', '-Command',
+  "foreach ($n in 'NVM_HOME', 'NVM_SYMLINK') { $v = [Environment]::GetEnvironmentVariable($n, 'User'); if (-not $v) { $v = [Environment]::GetEnvironmentVariable($n, 'Machine') }; if ($v) { Set-Item \"env:$n\" $v } }; " +
+  "if (-not $env:NVM_HOME) { Write-Error 'NVM_HOME is not set: nvm-windows did not install'; exit 1 }; & (Join-Path $env:NVM_HOME 'nvm.exe') install 24; exit $LASTEXITCODE"];
 // Homebrew installer: commit and sha256 pinned in core/pins.json. VERIFY (unattended behaviour).
 // The uv installer is unpinned (current script). VERIFY
 const BREW = PINS['homebrew-installer'];
@@ -128,7 +132,7 @@ export function planPrereqs(probe) {
   const haveFloor = (nodeActive && satisfies(nodeActive, floor)) || nvmNodes.some((v) => satisfies(v, floor));
   add({
     id: 'node-24', label: 'Node 24 (under nvm)', why: `Context Mode and GSD need Node ${floorText(floor)}+; your own Node stays the default.`,
-    commands: [win ? ['nvm', 'install', '24'] : ['env', `NVM_DIR=${nvmDir}`, ...nvmInstallArgv(24)]], // nvm-windows `install 24` accepts a major: VERIFY
+    commands: [win ? NVM_WIN_INSTALL_24 : ['env', `NVM_DIR=${nvmDir}`, ...nvmInstallArgv(24)]], // nvm-windows `install 24` accepts a major: VERIFY
     skipIf: haveFloor ? `Node ${floorText(floor)}+ is already available` : null,
   });
 
