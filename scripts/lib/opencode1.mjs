@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { rcFiles } from './shell-path.mjs';
 import { execFileSync } from 'node:child_process';
 import { backupLayout, sha256File } from './opencode-backup.mjs';
 import { which as findOnPath } from './system.mjs';
@@ -74,11 +75,6 @@ export function findBinary({ home, platform, whichPath, probe, env, fsx = fs }) 
   }
   return { tried };
 }
-
-const rcFiles = (home, shell, fsx) => {
-  const have = ['.zshrc', '.bashrc', '.bash_profile'].filter((f) => fsx.existsSync(j(home, f)));
-  return (have.length ? have : [/zsh$/.test(shell ?? '') ? '.zshrc' : '.profile']).map((f) => j(home, f));
-};
 
 // User PATH on Windows, read and written unexpanded like install.ps1 does. Prints present | absent | changed.
 const WIN_PATH_PS = `
