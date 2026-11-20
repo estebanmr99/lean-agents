@@ -22,6 +22,7 @@ Instructions for coding agents (Claude Code, OpenCode, Copilot CLI) that work **
 | Real `--migrate` check (needs `opencode` 2 and `claude` on PATH; OpenCode's background service needs a free port) | `bash tests/real-migrate.sh` |
 | Real Copilot CLI check (needs `copilot`, `rtk` and `uvx` on PATH) | `bash tests/real-copilot.sh` |
 | Real Antigravity check (needs `agy`, `rtk` and `uvx` on PATH) | `bash tests/real-antigravity.sh` |
+| Behavior diff against a base ref (local, temp HOMEs, `--no-exec`; exit 1 on any change) | `bash scripts/behavior-diff.sh [origin/main]` |
 | Interactive menus in a pseudo-terminal (macOS, Linux; temp HOME, dry run) | `python3 tests/real-interactive.py` |
 
 ## Hard rules
