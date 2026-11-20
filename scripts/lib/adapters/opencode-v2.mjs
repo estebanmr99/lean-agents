@@ -185,7 +185,7 @@ export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
   if (tools.includes('ponytail')) edits.push({ path: ['plugins'], value: npmSpec('ponytail'), mode: 'arrayAdd', legacy: ['@dietrichgebert/ponytail'] });
   if (tools.includes('dcp')) {
     const pkg = PINS['opencode-dcp'].source;
-    edits.push({ path: ['plugins'], value: npmSpec('opencode-dcp'), mode: 'arrayAdd' });
+    edits.push({ path: ['plugins'], value: npmSpec('opencode-dcp'), mode: 'arrayAdd', legacy: [] }); // any DCP entry already there is the user's: kept, nothing appended (#212)
     actions.push(dcpConfigAction(dir, profile));
     for (const file of ['tui.json', 'tui.jsonc']) {
       const p = path.join(dir, file);

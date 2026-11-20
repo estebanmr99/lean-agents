@@ -1492,6 +1492,35 @@ test('pinned OpenCode plugins: an old unversioned entry is replaced in place, a 
   assert.deepEqual(own.plugins(), ['@dietrichgebert/ponytail@1.2.3']);
 });
 
+test('DCP plugin spec (#212): an existing DCP entry (@latest, bare or a version) is kept and no second one is appended', async () => {
+  const pkg = PINS['opencode-dcp'].source;
+  const dcp = npmSpec('opencode-dcp');
+  const { opencodeV2Adapter } = await import('../scripts/lib/adapters/opencode-v2.mjs');
+  const { loadCore } = await import('../scripts/lib/render.mjs');
+  const { plan, apply } = await import('../scripts/lib/fsops.mjs');
+  const setup = (key, initial) => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+    const file = path.join(home, '.config', 'opencode', 'opencode.jsonc');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ [key]: initial }));
+    return { home, file, read: () => parse(fs.readFileSync(file, 'utf8'))[key].filter((v) => v === 'mine' || v.startsWith(pkg)) };
+  };
+  // OpenCode 1.x: a normal install. OpenCode 2: the upgrade's dcp step, which applies the 2.x adapter's actions.
+  const v1 = (initial) => { const f = setup('plugin', initial); lean(f.home, ['--yes', '--no-exec', '--agents', 'opencode-v1', '--tools', 'dcp', '--lang', 'en', '--profile', 'none']); return f.read(); };
+  const v2 = (initial) => {
+    const f = setup('plugins', initial);
+    const { actions } = opencodeV2Adapter({ home: f.home, core: loadCore(ROOT), profile: null, opts: { tools: ['dcp'], network: {}, terminals: [], platform: 'linux', env: {}, shell: 'default' }, rulesPath: path.join(f.home, 'rules.md') });
+    apply(plan(actions.filter((x) => x.path === f.file), [], [f.home]), path.join(f.home, 'b'), f.home);
+    return f.read();
+  };
+  for (const run of [v1, v2]) {
+    assert.deepEqual(run(['mine']), ['mine', dcp], run.name);
+    assert.deepEqual(run(['mine', `${pkg}@latest`]), ['mine', `${pkg}@latest`], run.name);
+    assert.deepEqual(run([pkg]), [pkg], run.name);
+    assert.deepEqual(run([`${pkg}@3.1.15`]), [`${pkg}@3.1.15`], run.name);
+  }
+});
+
 test('--version prints the package.json version and writes nothing', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-version-'));
   const out = lean(home, ['--version']);
