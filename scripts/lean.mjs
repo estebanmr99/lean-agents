@@ -39,7 +39,7 @@ import { loginRows } from './lib/logins.mjs';
 import { renderSummary, canOffer, openArgv } from './lib/summary-html.mjs';
 import { planUpdate, changelogNotes, formatUpdatePlan } from './lib/update-plan.mjs';
 import { PINS, pinVersions, behindPins, pinTool, nodeRange, npmSpec } from './lib/pins.mjs';
-import { findNvm, installedNodes, resolveToolNodes, nvmLatest, nvmInstallArgv, nvmEnv, toolEnv, satisfies } from './lib/node-runtime.mjs';
+import { findNvm, installedNodes, resolveToolNodes, nvmLatest, nvmInstallArgv, nvmEnv, toolEnv, satisfies, compare } from './lib/node-runtime.mjs';
 import { leanUpdateCommands, coordinateCommands, leanMigrateCommands } from './lib/lean-update.mjs';
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
 import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
@@ -54,6 +54,8 @@ Object.assign(ADAPTERS, { 'vscode-copilot': vscodeCopilotAdapter, cursor: cursor
 FIXED_PROFILE['vscode-copilot'] = 'github-copilot';
 // Extensions cannot be installed silently without admin policy, so the user installs it.
 const CODE_MODE_NOTE = 'Claude Code Code Mode is experimental (Claude Code 2.1.323 or newer, interactive terminal only, a direct Anthropic subscription or Console login; not Vertex, Bedrock or a gateway). A session started with it resumes only with it on; --uninstall turns it off';
+// Code Mode needs Claude Code 2.1.323+; lean-agents installs the pinned version, so say when the pin is older.
+const codeModeNote = () => `${CODE_MODE_NOTE}${compare(PINS['claude-code'].version, '2.1.323') < 0 ? `. The pinned Claude Code ${PINS['claude-code'].version} is older than 2.1.323: the setting is written now and takes effect once the pin moves` : ''}`;
 const EXTENSION_NOTE = 'install the Playwright Extension yourself from https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm . Each session asks you to approve the connection; optional auto-approve: docs/browser-extension.md';
 const MINIMAL_TOOLS = ['rtk', 'context-mode'];
 const OPTIONAL_TOOLS = ['serena', 'playwright', 'ponytail', 'caveman', 'i-have-adhd', 'dcp', 'codeburn', 'copilot-usage'];
@@ -126,6 +128,7 @@ function parseArgs(argv) {
       case '--adhd-always': o.adhdAlways = true; break;
       case '--ponytail-mode': o.ponytailMode = next(); break;
       case '--update': o.command = 'update'; break;
+      case '--add-tools': o.command = 'update'; o.addTools = list(next()); break;
       case '--uninstall': o.command = 'uninstall'; break;
       case '--doctor': o.command = 'doctor'; break;
       case '--summary': o.command = 'summary'; break;
@@ -203,6 +206,7 @@ const HELP = `Usage: lean-agents [options]
   --shell default|git-bash  OpenCode on Windows: set its shell to Git Bash when found (default: git-bash;
                          never overwrites a shell you set yourself; "default" opts out)
   --update               Re-apply with your saved choices
+  --add-tools a,b        --update that also adds these tools to your saved ones (agents, profile and the rest kept)
   --update --undo [--yes]
                          Put each agent CLI that --update upgraded back on the version it had before its first upgrade
                          (plan first, then a confirm; a failed step is reported and the rest run). --uninstall leaves
@@ -343,6 +347,7 @@ async function choose(o, saved) {
       o.tools.push(...await p.multi({ message, items, defaults: [] }));
     }
   }
+  if (o.addTools) o.tools = [...new Set([...o.tools, ...o.addTools])];
   if (!o.core) o.tools = o.tools.filter((t) => !MINIMAL_TOOLS.includes(t));
   const known = [...MINIMAL_TOOLS, ...OPTIONAL_TOOLS, ...OPT_IN_TOOLS];
   const unknown = o.tools.filter((t) => !known.includes(t));
@@ -650,7 +655,7 @@ function printPlan(o, planned, commands, behind = new Set()) {
   const net = proxyReport();
   if (net.length) console.log(`  proxy and CA (passed to every command): ${net.join(' ')}`);
   if (o.tools.includes('playwright-extension')) console.log(`  signed-in browser: ${EXTENSION_NOTE}`);
-  if (o.tools.includes('code-mode') && o.agents.includes('claude')) console.log(`  code mode: ${CODE_MODE_NOTE}`);
+  if (o.tools.includes('code-mode') && o.agents.includes('claude')) console.log(`  code mode: ${codeModeNote()}`);
   if (o.notes.length) console.log(`  your notes for undocumented settings (saved, never applied): ${o.notes.map((n) => path.basename(n.path, '.md')).join(', ')}`);
   console.log('');
   console.log('Files:');
@@ -715,6 +720,13 @@ async function install(o) {
   }
   if (o.command === 'update' && saved.options.migrateOnly) throw new Error(`nothing to update: only ${saved.adoptOnly ? '--adopt' : '--migrate'} ran here; install first (--everything --yes)`);
   const p = await choose(o, saved?.options);
+  // A plain re-run starts fresh: say so when it changes the saved agents or profile (#304, seen on a real PC).
+  const prior = o.command !== 'update' && !o.json && !o.project && !o.migrate && !o.adopt ? readState(o.home)?.options : null;
+  const same = (a, b) => [...a].sort().join() === [...b].sort().join();
+  const profile = (v) => (v === 'none' ? null : v ?? null);
+  if (prior?.agents && (!same(prior.agents, o.agents) || profile(prior.profile) !== profile(o.profile))) {
+    console.log(`Note: your saved setup is ${prior.agents.join(', ')} with profile ${prior.profile ?? 'none'}; this run changes it. To keep it, use --update, or --add-tools a,b to add tools.`);
+  }
   const every = o.everything && !o.migrate ? everythingPrereqs(o, readState(o.home)) : null;
   const { planned, commands: agentCommands, migration } = buildPlan(o, every);
   if (migration && !migration.rows.length) { p.close(); console.log('Nothing to migrate: no rules, agents, skills, prompts, MCP servers or hooks found.'); return o.json && printApplied(o, [], [], []); }
@@ -894,7 +906,7 @@ async function install(o) {
   const todo = stillNeeded({ home: o.home, terminals: o.terminals, agents: o.agents });
   if (todo.length) console.log(`Still needed from you:\n${todo.map((t) => `  - ${t.text}`).join('\n')}`);
   if (o.tools.includes('playwright-extension')) console.log(`Signed-in browser: ${EXTENSION_NOTE}`);
-  if (o.tools.includes('code-mode') && o.agents.includes('claude')) console.log(`Code Mode: ${CODE_MODE_NOTE}`);
+  if (o.tools.includes('code-mode') && o.agents.includes('claude')) console.log(`Code Mode: ${codeModeNote()}`);
   if (o.gh) console.log('GitHub CLI: run `gh auth login` yourself; lean-agents never handles tokens.');
   for (const n of o.notes) console.log(`Notes saved: ${n.path}. Ask your agent to apply them, showing you each change first.`);
   if (o.network.telemetry === 'off' && o.agents.includes('claude')) {
