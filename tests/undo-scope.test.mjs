@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { bunInstall } from '../scripts/lib/system.mjs';
+import { bunInstall, rtkInstall } from '../scripts/lib/system.mjs';
 import { opencodeShared } from '../scripts/lib/adapters/opencode-v2.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -48,6 +48,16 @@ test('Bun undo refuses a hand-edited dir that is not ~/.bun', () => {
   const argv = bunUndo(home, 'linux').slice(0, -1).concat(outside);
   assert.notEqual(runUndo(argv, home).status, 0);
   assert.ok(fs.existsSync(path.join(outside, 'bin', 'bun')));
+});
+
+test('rtk undo removes only the binary and keeps other files in ~/.local/bin', () => {
+  const home = tmp();
+  const rtk = rtkInstall(home, path.join(home, 'state'), 'linux', 'x64');
+  touch(path.join(home, '.local', 'bin', 'rtk'));
+  touch(path.join(home, '.local', 'bin', 'uv'));
+  assert.equal(runUndo(rtk.undo[0], home).status, 0);
+  assert.ok(!fs.existsSync(path.join(home, '.local', 'bin', 'rtk')));
+  assert.ok(fs.existsSync(path.join(home, '.local', 'bin', 'uv')));
 });
 
 test('vendor undo removes the vendor dir it installed', () => {

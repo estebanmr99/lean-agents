@@ -55,6 +55,8 @@ OpenCode 1 uses the same commands and files, with these config differences:
 
 Windows without winget: download `rtk-x86_64-pc-windows-msvc.zip` from the [RTK releases](https://github.com/rtk-ai/rtk/releases) and extract it into `%USERPROFILE%\tools\rtk`. `install.ps1` adds that folder to your user PATH; open a new terminal afterwards.
 
+Linux without Homebrew: download `rtk-<arch>-unknown-linux-musl.tar.gz` from the [RTK releases](https://github.com/rtk-ai/rtk/releases) and extract `rtk` into `~/.local/bin`.
+
 Copilot CLI and Antigravity CLI:
 
 | Tool | Copilot CLI | Antigravity CLI |

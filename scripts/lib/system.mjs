@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { npmSpec, bunPin } from './pins.mjs';
+import { npmSpec, bunPin, rtkPin } from './pins.mjs';
 import { allowedEnv } from './network.mjs';
 
 const isWin = process.platform === 'win32';
@@ -208,6 +208,28 @@ export function bunInstall(home, dir, platform, pm, arch = process.arch) {
   return {
     tool: 'bun', desc: `install bun ${version}`, optional: true,
     run: [download, verify, ['mkdir', '-p', path.join(bunDir, 'bin')], ['unzip', '-q', '-j', '-o', zip, `${name}/bun`, '-d', path.join(bunDir, 'bin')]],
+    undo: [rm],
+  };
+}
+
+export function rtkInstall(home, dir, platform, arch = process.arch) {
+  if (platform !== 'linux') return null;
+  const P = path.posix; // Linux steps, even when planned (tests) on Windows
+  const { version, sha256 } = rtkPin();
+  const aarch = arch === 'arm64' || arch === 'aarch64' ? 'aarch64' : (arch === 'x64' || arch === 'x86_64' ? 'x64' : null);
+  if (!aarch) return null;
+  const hash = sha256?.[`linux-${aarch}`];
+  if (!hash) return null;
+  const triple = `${aarch === 'aarch64' ? 'aarch64' : 'x86_64'}-unknown-linux-musl`;
+  const tarball = P.join(dir, `rtk-${triple}-${version}.tar.gz`);
+  const download = ['curl', '-fsSL', '--create-dirs', '-o', tarball, `https://github.com/rtk-ai/rtk/releases/download/${version}/rtk-${triple}.tar.gz`];
+  const verify = [process.execPath, VERIFY, tarball, hash];
+  const binDir = P.join(home, '.local', 'bin');
+  const bin = P.join(binDir, 'rtk');
+  const rm = [process.execPath, '-e', 'require("fs").rmSync(process.argv[1], { force: true })', bin]; // only the binary: ~/.local/bin holds other tools
+  return {
+    tool: 'rtk', desc: `install rtk ${version}`, optional: true,
+    run: [download, verify, ['mkdir', '-p', binDir], ['tar', '-xzf', tarball, '-C', binDir, 'rtk']],
     undo: [rm],
   };
 }

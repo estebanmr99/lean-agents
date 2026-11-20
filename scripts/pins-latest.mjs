@@ -12,7 +12,7 @@ export async function bump(pins, get) {
   const moved = [];
   for (const [key, p] of Object.entries(pins)) {
     let next = null;
-    if (p.kind === 'download') continue; // (tool and cask pins move in the runner copy too, so the nightly shows the newest rtk/uv/gh/Antigravity)
+    if (p.kind === 'download' || p.sha256) continue; // a sha256 map (Bun, RTK's Linux tarball) only fits its own version (tool and cask pins move in the runner copy too, so the nightly shows the newest rtk/uv/gh/Antigravity)
     // Bun: the sha256 map is copied by hand from SHASUMS256.txt
     try {
       next = await latestVersion(p, get);

@@ -41,7 +41,7 @@ test('Mac without nvm: installer keeps the shell profile alone and undo removes 
   assert.ok(!nvm.undo[0].includes('rm'));
 });
 
-test('Linux: no Xcode or Homebrew, git and unzip manual when no apt, uv by script, rtk manual, bun by pinned zip', () => {
+test('Linux: no Xcode or Homebrew, git and unzip manual when no apt, uv by script, rtk by pinned release, bun by pinned zip', () => {
   const steps = planPrereqs(bare('linux', { needsGit: true }));
   assert.deepEqual(ids(steps), ['git', 'unzip', 'nvm', 'node-24', 'uv', 'rtk', 'bun']);
   assert.deepEqual(by(steps, 'git').commands, []);
@@ -49,9 +49,34 @@ test('Linux: no Xcode or Homebrew, git and unzip manual when no apt, uv by scrip
   assert.deepEqual(by(steps, 'unzip').commands, []);
   assert.match(by(steps, 'unzip').manual, /^https:\/\/infozip\.sourceforge\.net\//);
   assert.equal(by(steps, 'uv').commands.length, 2);
-  assert.deepEqual(by(steps, 'rtk').commands, []);
-  assert.match(by(steps, 'rtk').manual, /^https:/);
+  const rtk = by(steps, 'rtk');
+  assert.equal(rtk.commands.length, 4);
+  assert.match(rtk.commands[0].join(' '), /curl.*rtk-x86_64-unknown-linux-musl-v1\.2\.0\.tar\.gz.*github\.com\/rtk-ai\/rtk\/releases\/download\/v1\.2\.0\/rtk-x86_64-unknown-linux-musl\.tar\.gz/);
+  assert.equal(rtk.commands[1][3], '70fee7b4a548c43dde94c77e2335550981b0bc2fb013691d8c8109b5bd0eda37');
+  assert.deepEqual(rtk.commands[2], ['mkdir', '-p', '/tmp/x/.local/bin']);
+  assert.deepEqual(rtk.commands[3], ['tar', '-xzf', '/tmp/x/.cache/lean-agents/rtk-x86_64-unknown-linux-musl-v1.2.0.tar.gz', '-C', '/tmp/x/.local/bin', 'rtk']);
+  assert.ok(rtk.undo && rtk.undo.length > 0);
+  assert.equal(rtk.undo[0].at(-1), '/tmp/x/.local/bin/rtk');
   assert.equal(by(steps, 'bun').commands.length, 5); // mkdir tmp, download, verify, mkdir, unzip
+});
+
+test('Linux arm64: rtk uses aarch64 hash and triple', () => {
+  const steps = planPrereqs(bare('linux', { arch: 'arm64' }));
+  const rtk = by(steps, 'rtk');
+  assert.equal(rtk.commands.length, 4);
+  assert.match(rtk.commands[0].join(' '), /curl.*rtk-aarch64-unknown-linux-musl-v1\.2\.0\.tar\.gz.*github\.com\/rtk-ai\/rtk\/releases\/download\/v1\.2\.0\/rtk-aarch64-unknown-linux-musl\.tar\.gz/);
+  assert.equal(rtk.commands[1][3], 'f91a06e94e5fad7dfa87946c811a4bcbc500e6da119fd47033f2a8940bf64f93');
+  assert.deepEqual(rtk.commands[2], ['mkdir', '-p', '/tmp/x/.local/bin']);
+  assert.deepEqual(rtk.commands[3], ['tar', '-xzf', '/tmp/x/.cache/lean-agents/rtk-aarch64-unknown-linux-musl-v1.2.0.tar.gz', '-C', '/tmp/x/.local/bin', 'rtk']);
+  assert.ok(rtk.undo && rtk.undo.length > 0);
+});
+
+test('Linux with unsupported arch falls back to manual rtk route', () => {
+  const steps = planPrereqs(bare('linux', { arch: 'riscv64' }));
+  const rtk = by(steps, 'rtk');
+  assert.deepEqual(rtk.commands, []);
+  assert.match(rtk.manual, /^https:\/\/github\.com\/rtk-ai\/rtk#installation/);
+  assert.equal(rtk.undo, null);
 });
 
 test('Linux with apt: installs git and unzip using apt-get', () => {
@@ -126,7 +151,8 @@ test('resume stamps skip finished steps and nothing else', () => {
 test('proxy env names ride along on steps that download; no values', () => {
   const steps = planPrereqs(bare('linux', { proxyEnv: ['HTTPS_PROXY', 'NODE_EXTRA_CA_CERTS'] }));
   assert.deepEqual(by(steps, 'nvm').proxyEnv, ['HTTPS_PROXY', 'NODE_EXTRA_CA_CERTS']);
-  assert.equal(by(steps, 'rtk').proxyEnv, undefined); // manual: no commands
+  assert.deepEqual(by(steps, 'rtk').proxyEnv, ['HTTPS_PROXY', 'NODE_EXTRA_CA_CERTS']);
+  assert.equal(by(planPrereqs(bare('linux', { proxyEnv: ['HTTPS_PROXY'], rtkInstall: () => null })), 'rtk').proxyEnv, undefined); // manual: no commands
 });
 
 test('planning is pure: the same probe gives the same plan and does not mutate it', () => {
