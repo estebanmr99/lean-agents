@@ -62,3 +62,8 @@ test('each upgrade row names its own file, so the two opencode-dcp rows read apa
   assert.deepEqual(dcp.map((i) => i.file).sort(), ['~/.config/opencode/opencode.jsonc', '~/.config/opencode/tui.json']);
   for (const line of formatUpgrade(r).split('\n').filter((l) => /opencode-dcp/.test(l))) assert.match(line, /\(~\/\.config\/opencode\/(opencode\.jsonc|tui\.json)\)$/);
 });
+
+test('the dry run says up front that OpenCode 2 migrates the sessions on first start', () => {
+  const out = formatUpgrade({ upgrade: { binary: {}, layout: {}, counts: { managed: 0, 'user-translatable': 0, 'user-manual': 0 } }, items: [] });
+  assert.match(out.split('\n')[1], /migrates your sessions the first time it starts/);
+});

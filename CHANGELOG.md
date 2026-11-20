@@ -12,6 +12,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- The `--upgrade-agent opencode` dry run says first that OpenCode 2 migrates your sessions the first time it starts, and how to keep a 1.x copy (`--backup --yes`) and go back (`--undo --yes`).
 - macOS and Linux: `--everything` adds one marked PATH block to your shell rc file (`~/.zshrc`, `~/.bashrc`, `~/.bash_profile` or `~/.profile`) for the folders it installs into that are not on PATH yet, so a new terminal finds claude, opencode, rtk, uvx and context-mode; `--uninstall` removes it (#335).
 - The OpenCode 2 installer is pinned to an upstream commit (`raw.githubusercontent.com/anomalyco/opencode/<sha>/install`) instead of `opencode.ai/v2/install`, whose content changes with every upstream edit and broke the SHA-256 check on 2026-11-20. The pinned file is the same one checked before.
 - `--upgrade-agent opencode` on macOS and Linux no longer breaks your shell: the `opencode1` PATH block in `~/.zshrc` / `~/.bashrc` / `~/.profile` used `<!-- -->` markers, a syntax error in bash and zsh. It now uses `# lean-agents:opencode1:start` / `:end`, and `--uninstall` removes only that block.
