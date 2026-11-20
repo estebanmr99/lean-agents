@@ -46,7 +46,7 @@ test('--everything installs a missing agent CLI through --install-agent; without
   assert.match(every.stdout, /- install the opencode CLI \(/);
   assert.doesNotMatch(every.stdout, /CLI is not on PATH/);
   assert.ok(every.stdout.indexOf('install the claude CLI') < every.stdout.indexOf('Ponytail plugin'), 'the CLI comes before the steps that need it');
-  assert.match(run().stdout, /! the claude CLI is not on PATH/);
+  assert.match(run('--all-tools').stdout, /! the claude CLI is not on PATH/); // all tools: on Node 22 the defaults have no claude step
 });
 
 test('--everything resumes: a prerequisite finished in a saved run is skipped', () => {
