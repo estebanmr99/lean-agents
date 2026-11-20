@@ -41,13 +41,34 @@ test('Mac without nvm: installer keeps the shell profile alone and undo removes 
   assert.ok(!nvm.undo[0].includes('rm'));
 });
 
-test('Linux: no Xcode or Homebrew, uv by script, rtk manual, bun by pinned zip', () => {
-  const steps = planPrereqs(bare('linux'));
-  assert.deepEqual(ids(steps), ['nvm', 'node-24', 'uv', 'rtk', 'bun']);
+test('Linux: no Xcode or Homebrew, git and unzip manual when no apt, uv by script, rtk manual, bun by pinned zip', () => {
+  const steps = planPrereqs(bare('linux', { needsGit: true }));
+  assert.deepEqual(ids(steps), ['git', 'unzip', 'nvm', 'node-24', 'uv', 'rtk', 'bun']);
+  assert.deepEqual(by(steps, 'git').commands, []);
+  assert.match(by(steps, 'git').manual, /^https:\/\/git-scm\.com\//);
+  assert.deepEqual(by(steps, 'unzip').commands, []);
+  assert.match(by(steps, 'unzip').manual, /^https:\/\/infozip\.sourceforge\.net\//);
   assert.equal(by(steps, 'uv').commands.length, 2);
   assert.deepEqual(by(steps, 'rtk').commands, []);
   assert.match(by(steps, 'rtk').manual, /^https:/);
   assert.equal(by(steps, 'bun').commands.length, 5); // mkdir tmp, download, verify, mkdir, unzip
+});
+
+test('Linux with apt: installs git and unzip using apt-get', () => {
+  // Non-root (adds sudo)
+  const steps = planPrereqs(bare('linux', { has: { apt: true, sudo: true }, needsGit: true }));
+  assert.match(by(planPrereqs(bare('linux', { has: { apt: true }, needsGit: true })), 'git').manual, /git-scm/, 'no sudo and not root: manual');
+  const git = by(steps, 'git');
+  assert.deepEqual(git.commands[0], ['sudo', '-E', 'apt-get', 'update', '-qq']);
+  assert.deepEqual(git.commands[1], ['sudo', '-E', 'apt-get', 'install', '-y', '-qq', '--no-install-recommends', 'git']);
+  assert.deepEqual(git.undo[0], ['sudo', '-E', 'apt-get', 'remove', '-y', '-qq', 'git']);
+
+  // Root (no sudo), git skipped, bun installed so unzip skipped/omitted
+  const root = planPrereqs(bare('linux', { has: { apt: true, git: true, bun: true }, needsGit: true, root: true }));
+  assert.equal(by(root, 'git').skipIf, 'git is on PATH');
+  assert.equal(by(root, 'unzip'), undefined); // step omitted because bun is installed
+  const rootBare = planPrereqs(bare('linux', { has: { apt: true }, needsGit: true, root: true }));
+  assert.deepEqual(by(rootBare, 'unzip').commands[1], ['apt-get', 'install', '-y', '-qq', '--no-install-recommends', 'unzip']); // root: no sudo (the CI container has none)
 });
 
 test('Windows: git only when a tool needs it; nvm-windows setup is hash-checked; winget routes', () => {
@@ -63,6 +84,7 @@ test('Windows: git only when a tool needs it; nvm-windows setup is hash-checked;
   assert.equal(by(none, 'rtk').commands[0].includes('rtk-ai.rtk'), true);
   const g = planPrereqs(bare('win32', { has: { winget: true }, needsGit: true }));
   assert.equal(ids(g)[0], 'git');
+  assert.deepEqual(by(g, 'git').undo, [['winget', 'uninstall', '--id', 'Git.Git', '-e']]);
   assert.equal(by(planPrereqs(bare('win32', { has: { winget: true, git: true }, needsGit: true })), 'git').skipIf !== null, true);
 });
 

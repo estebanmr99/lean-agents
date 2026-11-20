@@ -568,14 +568,14 @@ function everythingPrereqs(o, saved) {
   const mac = process.platform === 'darwin';
   const has = {
     brew: !!which('brew'), winget: !!which('winget'), uv: !!which('uv'), rtk: !!which('rtk'), jq: !!which('jq'), bun: bunPresent(o.home), git: !!which('git'),
-    clt: mac && quiet(['xcode-select', '-p']).ok, nvm: !!o.nvm,
+    clt: mac && quiet(['xcode-select', '-p']).ok, nvm: !!o.nvm, apt: !!which('apt-get'), sudo: !!which('sudo'), unzip: !!which('unzip'),
   };
   const steps = planPrereqs({
     nvmDirExisted: nvmDirExistedBefore(saved?.commands, fs.existsSync(path.join(o.home, '.nvm'))),
-    platform: process.platform, arch: process.arch, home: o.home, tmp: stateDir(o.home), execPath: process.execPath, has,
+    platform: process.platform, arch: process.arch, home: o.home, tmp: stateDir(o.home), execPath: process.execPath, has, root: process.getuid?.() === 0,
     nodeActive: NODE_VERSION, nvmNodes: o.nvm ? installedNodes(o.nvm).map((n) => n.version) : [],
     proxyEnv: proxyReport().map((l) => l.split('=')[0]), done: (saved?.commands ?? []).filter((c) => c.ok && c.resumeKey).map((c) => c.resumeKey),
-    terminals: o.terminals, agents: o.agents,
+    needsGit: true, terminals: o.terminals, agents: o.agents,
   });
   const commands = pendingPrereqs(steps).map((s) => s.commands.length
     ? { tool: s.id === 'node-24' ? 'node' : s.id, desc: `prerequisite: ${s.label}`, run: s.commands, undo: s.undo ?? [], optional: s.id === 'bun', resumeKey: s.resumeKey, ...(s.id === 'node-24' && o.nvm && { env: nvmEnv(o.nvm.dir) }) }
