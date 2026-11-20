@@ -215,7 +215,7 @@ test('a failed install command exits 1 and still records state', { skip: process
   const args = ['--yes', '--agents', 'opencode-v1', '--tools', 'rtk', '--privacy', 'standard', '--lang', 'en', '--profile', 'none'];
   const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args], { encoding: 'utf8', env: { ...process.env, PATH: bin } });
   assert.equal(r.status, 1, r.stdout);
-  assert.match(r.stdout, /step\(s\) failed/);
+  assert.match(r.stdout, /2 step\(s\) failed/);
   assert.ok(fs.existsSync(path.join(home, '.config', 'lean-agents', 'state.json')));
 });
 

@@ -6,7 +6,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
-- OpenCode 2: lean-agents no longer installs the RTK plugin, which rtk writes for the 1.x plugin API and OpenCode 2 refuses to load (#179). existing installs: run `rtk init -g --opencode --uninstall` once.
+- OpenCode 2: lean-agents no longer installs the RTK plugin, which rtk writes for the 1.x plugin API and OpenCode 2 refuses to load (#179). Installs from before keep the step on record, so `--uninstall` still removes the plugin; to drop it now, run `rtk init -g --opencode --uninstall`.
 
 ### Added
 

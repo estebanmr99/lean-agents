@@ -7,7 +7,7 @@ What lean-agents configures per agent, how, and when each command or key was las
 | Global rules | `@` import in `~/.claude/CLAUDE.md` | `instructions` entry | `instructions` entry | marked block in `~/.copilot/copilot-instructions.md` | `~/.gemini/config/rules/lean-agents.md` |
 | Subagents by tier | `~/.claude/agents/*.md` | `~/.config/opencode/agents/*.md` | `~/.config/opencode/agents/*.md` | `~/.copilot/agents/*.agent.md` | `~/.gemini/config/agents/*.md` (`subagent: true`) |
 | Primary agent models | `model` in settings (only if unset) | `agents.plan` / `agents.build` from profile | `agent.plan` / `agent.build` from profile | planned | planned |
-| RTK | `rtk init -g --auto-patch` (hook) | `rtk init -g --opencode` (plugin) | `rtk init -g --opencode` (plugin) | `rtk init -g --copilot` | `rtk init -g --agent antigravity` |
+| RTK | `rtk init -g --auto-patch` (hook) | ➖ skipped: rtk writes a 1.x plugin that OpenCode 2 refuses to load (#179, 2026-11-19, **VERIFY** on each rtk release) | `rtk init -g --opencode` (plugin) | `rtk init -g --copilot` | `rtk init -g --agent antigravity` |
 | Context Mode | plugin `context-mode@context-mode` | MCP (`mcp.servers`) | `plugin` entry, needs Node.js 24.15+ (Context Mode 2) | `npm i -g context-mode@2.1.4`, then `copilot mcp add context-mode` (see `context-mode setup --print copilot-cli`) | not supported by Context Mode 2.x (skipped with a note) |
 | Serena, Playwright | `claude mcp add --scope user` | `mcp.servers` | flat `mcp.<name>` | `~/.copilot/mcp-config.json` | `~/.gemini/config/mcp_config.json` |
 | Ponytail | plugin `ponytail@ponytail` | `plugins` entry | `plugin` entry | ➖ | ➖ |
