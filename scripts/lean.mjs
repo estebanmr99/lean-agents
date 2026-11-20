@@ -801,10 +801,10 @@ async function install(o) {
   if (o.exec) {
     const noCli = new Set(); // agents whose CLI install failed above: their steps would only fail again
     for (const [i, c] of commands.entries()) {
-      if (noCli.has(c.agent) && c.run.some((argv) => argv[0] === AGENT_CLIS[c.agent])) { console.log(`  skipped: ${c.desc} (no ${AGENT_CLIS[c.agent]} CLI)`); continue; }
+      if (noCli.has(c.agent) && (c.run ?? []).some((argv) => argv[0] === AGENT_CLIS[c.agent])) { console.log(`  skipped: ${c.desc} (no ${AGENT_CLIS[c.agent]} CLI)`); continue; }
       // gh is on by default, so having no installer for it (no brew or winget) must not fail the run.
-      // Planned before the prerequisites ran: --everything may have installed it since (uv brings uvx).
-      if (c.manual && c.bin && which(c.bin)) continue;
+      // Planned before the prerequisites ran: --everything may have installed it since (macOS: brew's uv brings uvx). Not for --update's behind tools.
+      if (c.manual && c.bin && !behind.has(c.tool) && which(c.bin)) continue;
       if (c.manual) { console.log(`! ${c.desc}`); if (!c.optional) { failed++; errors.push(c.desc); } continue; }
       const there = (c.skipIfExists && exists(c.skipIfExists)) || (c.skipIfOutput && quiet(c.skipIfOutput.cmd).ok);
       if (there) {
