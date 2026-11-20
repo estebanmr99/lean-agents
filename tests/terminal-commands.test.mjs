@@ -42,6 +42,8 @@ test('terminalCommands: installTerminals with system true on win32 gives install
   assert.equal(orca.manual, undefined);
   assert.deepEqual(orca.skipIfExists, ['D:\\localappdata\\Programs\\Orca']);
   assert.ok(orca.run.length > 0);
+  // The NSIS uninstaller returns before it is done: the undo waits for it.
+  assert.match(orca.undo[0].at(-1), /-Wait; for \(\$i = 0; \$i -lt 60 -and \(Test-Path \$u\)/);
 });
 
 test('terminalCommands: installTerminals with system true on linux gives no install commands', () => {

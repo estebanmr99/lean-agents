@@ -11,6 +11,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- `--uninstall` on Windows waits for the Orca uninstaller to finish (it relaunches itself and returned at once, so the Orca folder could still be there).
 - `--dry-run` and `--update --dry-run` mark an install that is already there (the Orca or Warp app, a vendor checkout) as "already there, skipped" instead of listing its install commands; the real run already skipped it (#179).
 - `--doctor` checks Context Mode on the Node lean-agents installed it on, not on PATH (#179 PC run).
 - `--doctor` shows why `codeburn runs` / `autoskills runs` failed, with a hint for a broken npx cache entry (#179 PC run).
