@@ -96,6 +96,7 @@ test('dry run finds the backup and does not start opencode', { skip }, async () 
   const r = JSON.parse(json.stdout);
   assert.equal(r.upgrade.backup.verified, true);
   assert.equal(r.upgrade.backup.sessions, 10);
+  assert.ok(!json.stdout.includes(home), 'the report shows home paths as ~');
   assert.equal(r.upgrade.binary.version, 'not probed (--home)');
   assert.ok(!fs.existsSync(j(home, 'marker')), 'dry run spawned the real binary');
 });
