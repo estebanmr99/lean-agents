@@ -134,7 +134,7 @@ export function planOpencode1({ home, configSnapshot = null, exec = true, platfo
   const actions = win
     ? [{ kind: 'file', path: j(L.bin, 'opencode1.cmd'), content: shimText('cmd', text) }, { kind: 'file', path: j(L.bin, 'opencode1'), content: shimText('sh', text) }]
     : [{ kind: 'file', path: j(L.bin, 'opencode1'), content: shimText('sh', text) },
-      ...rcFiles(home, shell, fsx).map((p) => ({ kind: 'block', path: p, body: `export PATH=${sq(L.bin)}:"$PATH"` }))];
+      ...rcFiles(home, shell, fsx).map((p) => ({ kind: 'block', id: 'opencode1', path: p, body: `export PATH=${sq(L.bin)}:"$PATH"` }))];
   return { ok: true, problems, version: found.version, source: found.path, binary, actions, pathDir: L.bin, root: L.root, configSnapshot, configDir: j(L.config, 'opencode') };
 }
 
