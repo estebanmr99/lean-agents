@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { doctor, npxFailDetail } from '../scripts/lib/doctor.mjs';
+import { doctor, npxFailDetail, projectNode } from '../scripts/lib/doctor.mjs';
 import { preset } from '../scripts/lib/network.mjs';
 
 const fsx = (files = [], links = {}) => ({ existsSync: (p) => files.includes(p) || p in links, realpathSync: (p) => links[p] ?? p });
@@ -181,4 +181,68 @@ test('npxFailDetail extracts the first error line and appends a hint for broken 
     npxFailDetail('npm error enoent Could not read package.json: npm-cache\\_npx\\beef\\package.json'),
     'npm error enoent Could not read package.json: npm-cache\\_npx\\beef\\package.json (broken npx cache entry: delete npm-cache\\_npx\\beef, then run again)'
   );
+});
+
+test('projectNode: no package.json up to home -> null', () => {
+  const h = tmp();
+  const nested = path.join(h, 'a', 'b');
+  fs.mkdirSync(nested, { recursive: true });
+  assert.equal(projectNode({ cwd: nested, home: h, nodeVersion: '24.1.0' }), null);
+
+  const fakeFsx = {
+    existsSync: (p) => p === path.resolve('/package.json'),
+    readFileSync: () => '{"engines":{"node":">=22"}}',
+  };
+  assert.equal(projectNode({ cwd: path.join(h, 'sub'), home: h, nodeVersion: '24.1.0', fsx: fakeFsx }), null);
+});
+
+test('projectNode: package.json without engines -> null', () => {
+  const h = tmp();
+  const proj = path.join(h, 'proj');
+  fs.mkdirSync(proj, { recursive: true });
+  fs.writeFileSync(path.join(proj, 'package.json'), JSON.stringify({ name: 'no-engines' }));
+  assert.equal(projectNode({ cwd: proj, home: h, nodeVersion: '24.1.0' }), null);
+
+  fs.writeFileSync(path.join(proj, 'package.json'), '{invalid json');
+  assert.equal(projectNode({ cwd: proj, home: h, nodeVersion: '24.1.0' }), null);
+});
+
+test('projectNode: nested cwd finds parent package.json with range checks', () => {
+  const h = tmp();
+  const proj = path.join(h, 'proj');
+  const nested = path.join(proj, 'sub', 'nested');
+  fs.mkdirSync(nested, { recursive: true });
+
+  const pkgPath = path.join(proj, 'package.json');
+  fs.writeFileSync(pkgPath, JSON.stringify({ engines: { node: '>=22' } }));
+  const ok24 = projectNode({ cwd: nested, home: h, nodeVersion: '24.1.0' });
+  assert.equal(ok24.status, 'ok');
+  assert.equal(ok24.item, 'project Node');
+  assert.equal(ok24.detail, 'Node 24.1.0 fits engines.node >=22 in ~/proj/package.json; VS Code or Cursor started outside this shell can resolve another Node');
+
+  fs.writeFileSync(pkgPath, JSON.stringify({ engines: { node: '22.12.0' } }));
+  const note24 = projectNode({ cwd: nested, home: h, nodeVersion: '24.1.0' });
+  assert.equal(note24.status, 'note');
+  assert.equal(note24.detail, 'Node 24.1.0 is active but ~/proj/package.json asks for engines.node 22.12.0: run nvm use (or your version manager) in this project; VS Code or Cursor started outside this shell can resolve another Node');
+
+  const ok22 = projectNode({ cwd: nested, home: h, nodeVersion: '22.12.0' });
+  assert.equal(ok22.status, 'ok');
+  assert.equal(ok22.detail, 'Node 22.12.0 fits engines.node 22.12.0 in ~/proj/package.json; VS Code or Cursor started outside this shell can resolve another Node');
+});
+
+test('doctor: with exec false and a cwd at a temp project includes a project Node row', () => {
+  const h = tmp();
+  const proj = path.join(h, 'my-app');
+  fs.mkdirSync(proj, { recursive: true });
+  fs.writeFileSync(path.join(proj, 'package.json'), JSON.stringify({ engines: { node: '>=22' } }));
+
+  const rows = [];
+  doctor({ home: h, state, exec: false, cwd: proj, nodeVersion: '24.1.0', collect: rows });
+  const row = rows.find((r) => r.item === 'project Node');
+  assert.ok(row, 'found project Node row');
+  assert.equal(row.status, 'ok');
+  assert.equal(row.detail, 'Node 24.1.0 fits engines.node >=22 in ~/my-app/package.json; VS Code or Cursor started outside this shell can resolve another Node');
+  const leanIdx = rows.findIndex((r) => r.item === 'lean-agents');
+  const projIdx = rows.findIndex((r) => r.item === 'project Node');
+  assert.equal(projIdx, leanIdx + 1);
 });
