@@ -11,6 +11,9 @@ Closes #
 - [ ] Real-binary CI job shows the change works (name it, or "docs only")
 - [ ] Tested on: macOS / Windows / CI only
 - [ ] New commands or config keys verified upstream (date in `docs/compatibility.md`)
+- [ ] Install, update or uninstall change: `bash scripts/behavior-diff.sh` output below, or "no behavior change"
+- [ ] Bug fix: the test that failed before this PR and passes now: <name>
+- [ ] Checks added or changed (a mistake seen twice becomes a test or lint rule): <name, or "none">
 
 ## Repo rules (AGENTS.md "Git")
 

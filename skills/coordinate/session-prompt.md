@@ -19,6 +19,8 @@ Not in scope: <files or topics the worker must not touch; the other worker's fil
 
 Done when: <a check a machine can run, ideally a CI job with real binaries>.
 
+Checks added or changed: <the test or lint rule this session adds so the same mistake fails CI next time, or "none">.
+
 Rules:
 - Plan first: write the plan to `<coord-dir>/plan-<n>.md` (at most 30 lines), then stop and wait for approval.
 - Use cheap subagents for searching and upstream research.

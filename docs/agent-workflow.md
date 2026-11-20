@@ -43,6 +43,8 @@ Pick the tier by the work, not by the session's size. Tiers, not model IDs: map 
 - Fix a failing CI job in a local sandbox first: a temp HOME and tool prefix (`T=$(mktemp -d); HOME=$T/home NPM_CONFIG_PREFIX=$T/npm PATH=$T/npm/bin:$PATH`). Reproduce, fix, push once. Pushing to see what happens burns CI minutes and your time.
 - When a job fails, send the worker the exact cause and the smallest fix; summarize long logs instead of pasting them.
 - PR body: one `Closes #n` per line, so each issue closes on merge.
+- Evidence in the PR: the `scripts/behavior-diff.sh` output for install, update or uninstall changes, and for a bug fix the test that failed before and passes after.
+- A mistake seen twice becomes a check (a test or lint rule) in the same PR, named under "Checks added or changed" in the session prompt.
 - Merge **one PR at a time**, after CI is green on the head commit. Then close any issue that did not auto-close, remove that worker's worktree (`git worktree remove <path>`; with Orca also close its terminal), and tell the other worker to rebase.
 - At the end, list worktrees and terminals before and after, and remove only what you created.
 
