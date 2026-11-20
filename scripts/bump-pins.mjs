@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isNewer, latestVersion, notesUrl, tagSha } from './version-watch.mjs';
+import { hashUrl, rehash } from './pins-latest.mjs';
 import { compare, minVersion } from './lib/node-runtime.mjs';
 
 const FILE = fileURLToPath(new URL('../core/pins.json', import.meta.url));
@@ -52,10 +53,18 @@ async function checks(p, version, get) {
   return extra;
 }
 
-export async function bump({ text, get, now = Date.now(), today = new Date(now).toISOString().slice(0, 10), log = console.log }) {
+export async function bump({ text, get, hash, now = Date.now(), today = new Date(now).toISOString().slice(0, 10), log = console.log }) {
   const pins = JSON.parse(text).pins;
   const changes = [];
   for (const [key, p] of Object.entries(pins)) {
+    // A fixed-URL installer script has no release date, so no 14-day rule: the new hash is what this green run fetched.
+    if (p.version === 'script' && hash) {
+      try {
+        const m = await rehash(key, p, hash);
+        if (m) { text = applyBump(text, key, 'script', today, { sha256: p.sha256 }); changes.push({ ...m, ci: p.ci, notes: p.url, published: '-' }); }
+      } catch (e) { log(`! ${key}: ${e.message}`); }
+      continue;
+    }
     // Bun and RTK's sha256 maps are copied by hand; a cask has no release date for the 14-day rule: both are reported by version-watch.
     if (SKIP.has(key) || p.kind === 'download' || p.kind === 'cask' || p.sha256) continue;
     if (p.hold) { log(`held: ${key} ${p.version} (${p.hold})`); continue; }
@@ -86,6 +95,7 @@ export const render = (changes) => [
   ...changes.map((c) => `| ${c.key} | ${c.from} | ${c.to} | ${nodeCell(c)} | ${c.published} | ${c.notes} | ${c.ci} |`),
   '',
   'Merge only when the `ci` job named for each pin is green for this head commit (VERIFY: the checks come from the workflow dispatch, not from a PR event).',
+  ...(changes.some((c) => c.published === '-') ? ['', 'A `sha256` row is an installer script at a fixed URL that changed without a version: read the script at that URL before merging.'] : []),
 ].join('\n');
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -97,7 +107,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     if (!r.ok) throw new Error(`${url}: ${r.status}`);
     return r.json();
   };
-  const { text, changes } = await bump({ text: fs.readFileSync(FILE, 'utf8'), get });
+  const { text, changes } = await bump({ text: fs.readFileSync(FILE, 'utf8'), get, hash: hashUrl });
   if (!changes.length) { console.log('nothing to bump'); process.exit(0); }
   fs.writeFileSync(FILE, text);
   fs.writeFileSync(body, `${render(changes)}\n`);
