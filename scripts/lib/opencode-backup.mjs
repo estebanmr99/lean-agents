@@ -175,6 +175,8 @@ export function backupOpencode({ home, dryRun = false, log = console.log, now = 
     manifestCount = manifest.length;
     fs.writeFileSync(j(part, 'MANIFEST.sha256'), manifest.map((m) => `${m.sha}  ${m.rel}`).join('\n') + '\n', { mode: 0o600 });
     fs.writeFileSync(j(part, 'RESTORE.md'), restoreText(L, ts, sessions), { mode: 0o600 });
+    // OpenCode may have started during the copy, which then can miss its last writes (#253).
+    if (opencodeRunning(list())) throw new Error('an opencode process started during the copy: close it and run this again');
     renameRetry(part, L.backup);
     log('backup: every file sha256 equals its source');
   } catch (e) {
