@@ -246,7 +246,10 @@ try {
   Write-Output '== refused while an opencode process runs'
   # npm installs an extensionless sh shim next to opencode.cmd; Start-Process needs the .cmd (or .exe).
   $serveBin = (Get-Command $opencodeBin -CommandType Application | Where-Object { $_.Extension -in '.exe', '.cmd' } | Select-Object -First 1).Source
-  $serve = Start-Process $serveBin -ArgumentList 'serve', '--port', (Get-Random -Minimum 20000 -Maximum 60000), '--hostname', '127.0.0.1' -NoNewWindow -PassThru
+  # A scratch data folder: serve would write to the live db, and the apply below then refuses (data changed since the backup).
+  $xdg = @{}; foreach ($n in 'XDG_DATA_HOME', 'XDG_STATE_HOME', 'XDG_CACHE_HOME') { $xdg[$n] = [Environment]::GetEnvironmentVariable($n); [Environment]::SetEnvironmentVariable($n, (Join-Path $root 'serve-scratch')) }
+  try { $serve = Start-Process $serveBin -ArgumentList 'serve', '--port', (Get-Random -Minimum 20000 -Maximum 60000), '--hostname', '127.0.0.1' -NoNewWindow -PassThru }
+  finally { foreach ($n in $xdg.Keys) { [Environment]::SetEnvironmentVariable($n, $xdg[$n]) } }
   for ($i = 0; $i -lt 20 -and -not (Get-Process -Name opencode -ErrorAction SilentlyContinue); $i++) { Start-Sleep -Seconds 1 }
   $busy = Invoke-Lean --dry-run
   Assert-That 'dry run: exit 0, sizes and the running process as a blocker while opencode serve runs (#270)' (($busy.Code -eq 0) -and ($busy.Text -match 'free space:') -and ($busy.Text -match 'blocker for apply:.*process is running'))
