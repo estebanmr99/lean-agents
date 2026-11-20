@@ -69,10 +69,10 @@ export function everythingAgents({ platform, detected = {}, project = false }) {
 // winget ids, brew formulas `rtk` and `uv`, and `--scope user` for Git.Git are unverified on a fresh machine. VERIFY
 const WINGET = (id) => ['winget', 'install', '--id', id, '-e', '--scope', 'user', '--accept-source-agreements', '--accept-package-agreements'];
 
-// probe: { platform, arch, home, tmp, execPath, has: { brew, winget, uv, rtk, bun, git, clt, nvm }, nodeActive: '22.20.0' | null,
+// probe: { platform, arch, home, tmp, execPath, has: { brew, winget, uv, rtk, bun, git, clt, nvm, jq }, nodeActive: '22.20.0' | null,
 //   nvmNodes: ['24.15.0'], nvmDirExisted: true (~/.nvm was there before this run, so its undo is empty), proxyEnv: ['HTTPS_PROXY'] (names only), needsGit: false, done: ['prereq:nvm'] (resume stamps), bunInstall: stub for tests }
 export function planPrereqs(probe) {
-  const { platform, arch = 'x64', home, has = {}, nodeActive = null, nvmNodes = [], nvmDirExisted = false, proxyEnv = [], needsGit = false, done = [] } = probe;
+  const { platform, arch = 'x64', home, has = {}, nodeActive = null, nvmNodes = [], nvmDirExisted = false, proxyEnv = [], needsGit = false, done = [], terminals = [], agents = [] } = probe;
   const win = platform === 'win32', mac = platform === 'darwin';
   const P = win ? path.win32 : path.posix;
   const tmp = probe.tmp ?? P.join(home, '.cache', 'lean-agents');
@@ -145,6 +145,12 @@ export function planPrereqs(probe) {
   tool('rtk', 'RTK', 'Compresses command output for the agents.', has.rtk,
     route(['brew', 'install', 'rtk'], 'rtk-ai.rtk', 'https://github.com/rtk-ai/rtk#installation'),
     pm === 'brew' ? { undo: [['brew', 'uninstall', 'rtk']] } : pm === 'winget' ? { undo: [['winget', 'uninstall', '--id', 'rtk-ai.rtk', '-e']] } : {});
+
+  if (terminals.includes('warp') && agents.includes('claude')) {
+    tool('jq', 'jq', 'The Warp plugin for Claude Code reads hook JSON with jq.', has.jq,
+      route(['brew', 'install', 'jq'], 'jqlang.jq', 'https://jqlang.org/download/'),
+      pm === 'brew' ? { undo: [['brew', 'uninstall', 'jq']] } : pm === 'winget' ? { undo: [['winget', 'uninstall', '--id', 'jqlang.jq', '-e']] } : {});
+  }
 
   const bun = (probe.bunInstall ?? bunInstall)(home, tmp, platform, pm, arch); // probe.bunInstall: tests only
   add({
