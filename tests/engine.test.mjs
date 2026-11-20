@@ -1454,3 +1454,13 @@ test('--version prints the package.json version and writes nothing', () => {
   assert.equal(out.trim(), JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version);
   assert.deepEqual(fs.readdirSync(home), []);
 });
+
+test('--dry-run marks an install that is already there as skipped and lists none of its commands', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const args = ['--no-exec', '--yes', '--dry-run', '--agents', 'opencode-v2', '--tools', 'i-have-adhd', '--privacy', 'standard', '--lang', 'en'];
+  assert.match(lean(home, args), /git clone/);
+  fs.mkdirSync(path.join(home, '.config', 'opencode', 'vendor', 'i-have-adhd'), { recursive: true });
+  const out = lean(home, args);
+  assert.match(out, /i-have-adhd checkout for OpenCode \(opencode-v2\)?: already there, skipped/);
+  assert.doesNotMatch(out, /git clone/);
+});
