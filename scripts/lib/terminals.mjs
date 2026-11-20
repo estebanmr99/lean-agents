@@ -208,7 +208,8 @@ function orcaWindowsCommands({ network, env, readEnv }) {
 // MSYSTEM alone (a shell started from Git Bash) carries no path, so it is not a source here.
 export function gitBashPath({ platform = process.platform, env = process.env } = {}) {
   if (platform !== 'win32') return null;
-  const roots = [env.ProgramFiles, env['ProgramFiles(x86)'], env.LOCALAPPDATA && path.join(env.LOCALAPPDATA, 'Programs')];
+  // USERPROFILE too: winget's user-scope Git follows the profile folder, which differs from LOCALAPPDATA when USERPROFILE is overridden.
+  const roots = [env.ProgramFiles, env['ProgramFiles(x86)'], env.LOCALAPPDATA && path.join(env.LOCALAPPDATA, 'Programs'), env.USERPROFILE && path.join(env.USERPROFILE, 'AppData', 'Local', 'Programs')];
   for (const d of roots) {
     if (!d) continue;
     const p = path.join(d, 'Git', 'bin', 'bash.exe');

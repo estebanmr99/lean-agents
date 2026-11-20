@@ -72,6 +72,10 @@ test('agentTable win32 opencode-v2', () => {
 
   const manualRow = agentTable({ home, platform: 'win32', dir: home, realHome: home, env: {} })['opencode-v2'];
   assert.match(manualRow.manual, /Git Bash/);
+  // --everything installs Git first: plan the script row, the run finds the real bash.exe.
+  const planned = agentTable({ home, platform: 'win32', dir: home, realHome: home, env: {}, gitBash: 'bash.exe' })['opencode-v2'];
+  assert.equal(planned.run[2][0], 'bash.exe');
+  assert.ok(planned.bins[0].endsWith(path.join('.opencode', 'bin', 'opencode.exe')));
 });
 
 test('every script installer has a pinned url and sha256 in core/pins.json', () => {
