@@ -271,7 +271,7 @@ curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/i
 | --- | --- | --- | --- | --- | --- |
 | Reglas globales (AGENTS.md) | ✅ | ✅ | ✅ | ✅ | ⚠️ se escriben, carga sin probar |
 | Subagentes por costo | ✅ | ✅ | ✅ | ✅ | ✅ flash, pro |
-| RTK (comprime la salida del shell) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| RTK (comprime la salida del shell) | ✅ | ➖ plugin rechazado (#179) | ✅ | ✅ | ✅ |
 | Context Mode | ✅ plugin | ✅ MCP | ✅ plugin | ✅ MCP | ➖ omitido (sin setup v2) |
 | Serena + Playwright MCP | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Navegador con tu sesión (opcional) | ➖ Claude in Chrome | ✅ opcional | ✅ opcional | ✅ opcional | ➖ |

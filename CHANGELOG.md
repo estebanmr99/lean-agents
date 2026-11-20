@@ -4,6 +4,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Fixed
+
+- OpenCode 2: lean-agents no longer installs the RTK plugin, which rtk writes for the 1.x plugin API and OpenCode 2 refuses to load (#179). existing installs: run `rtk init -g --opencode --uninstall` once.
+
 ### Added
 
 - `--install-agent opencode-v2` and `--upgrade-agent opencode` install OpenCode 2 on Windows through Git Bash with the pinned installer, and put `~\.opencode\bin` first on the user PATH (removed again by `--uninstall-agent`) (#179).

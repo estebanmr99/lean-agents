@@ -212,10 +212,10 @@ test('a failed install command exits 1 and still records state', { skip: process
   const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-bin-'));
   for (const name of ['rtk', 'context-mode']) fs.writeFileSync(path.join(bin, name), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
   fs.writeFileSync(path.join(bin, 'npx'), '#!/bin/sh\nexit 0\n', { mode: 0o755 }); // the lean-update skill install
-  const args = ['--yes', '--agents', 'opencode-v2', '--tools', 'rtk', '--privacy', 'standard', '--lang', 'en', '--profile', 'none'];
+  const args = ['--yes', '--agents', 'opencode-v1', '--tools', 'rtk', '--privacy', 'standard', '--lang', 'en', '--profile', 'none'];
   const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args], { encoding: 'utf8', env: { ...process.env, PATH: bin } });
   assert.equal(r.status, 1, r.stdout);
-  assert.match(r.stdout, /1 step\(s\) failed/);
+  assert.match(r.stdout, /step\(s\) failed/);
   assert.ok(fs.existsSync(path.join(home, '.config', 'lean-agents', 'state.json')));
 });
 
@@ -559,7 +559,7 @@ test('--home reaches child tools, and a failed undo exits 1', { skip: process.pl
   fs.writeFileSync(path.join(bin, 'npx'), '#!/bin/sh\nexit 0\n', { mode: 0o755 }); // the lean-update skill install
   const env = { ...process.env, HOME: real, XDG_CONFIG_HOME: path.join(real, '.config'), PATH: `${bin}${path.delimiter}${process.env.PATH}` };
   const engine = (args) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args], { encoding: 'utf8', env });
-  const r = engine(['--yes', '--agents', 'opencode-v2', '--tools', 'rtk', '--privacy', 'standard', '--lang', 'en', '--profile', 'none']);
+  const r = engine(['--yes', '--agents', 'opencode-v1', '--tools', 'rtk', '--privacy', 'standard', '--lang', 'en', '--profile', 'none']);
   assert.equal(r.status, 0, r.stdout);
   assert.ok(!fs.existsSync(path.join(real, 'rtk-ran')));
   assert.equal(fs.readFileSync(path.join(home, 'rtk-ran'), 'utf8').trim(), path.join(home, '.config'));

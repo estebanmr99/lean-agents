@@ -131,7 +131,11 @@ export function opencodeShared({ home, dir, core, profile, opts, v2 = false }) {
     actions.push({ kind: 'file', path: path.join(dir, 'agents', `${agent.name}.md`), content: renderOpenCodeAgent(agent, profile) });
   }
   if (tools.includes('rtk')) {
-    commands.push({ tool: 'rtk', desc: 'RTK plugin for OpenCode', run: [['rtk', 'init', '-g', '--opencode']], undo: [['rtk', 'init', '-g', '--opencode', '--uninstall']] });
+    if (!v2) {
+      commands.push({ tool: 'rtk', desc: 'RTK plugin for OpenCode', run: [['rtk', 'init', '-g', '--opencode']], undo: [['rtk', 'init', '-g', '--opencode', '--uninstall']] });
+    } else {
+      // rtk <pin> writes a 1.x plugin that OpenCode 2 refuses to load (#179); VERIFY again when rtk supports the 2.x API.
+    }
   }
   if (tools.includes('i-have-adhd')) {
     const vendor = path.join(dir, 'vendor', 'i-have-adhd');
