@@ -225,6 +225,10 @@ test('projectNode: nested cwd finds parent package.json with range checks', () =
   assert.equal(note24.status, 'note');
   assert.equal(note24.detail, 'Node 24.1.0 is active but ~/proj/package.json asks for engines.node 22.12.0: run nvm use (or your version manager) in this project; VS Code or Cursor started outside this shell can resolve another Node');
 
+  assert.equal(projectNode({ cwd: nested, home: h, nodeVersion: '22.5.0' }).status, 'note', 'below an exact pin');
+  fs.writeFileSync(pkgPath, JSON.stringify({ engines: { node: '^22' } }));
+  assert.match(projectNode({ cwd: nested, home: h, nodeVersion: '24.1.0' }).detail, /\^22, which lean-agents does not check/);
+  fs.writeFileSync(pkgPath, JSON.stringify({ engines: { node: '22.12.0' } }));
   const ok22 = projectNode({ cwd: nested, home: h, nodeVersion: '22.12.0' });
   assert.equal(ok22.status, 'ok');
   assert.equal(ok22.detail, 'Node 22.12.0 fits engines.node 22.12.0 in ~/proj/package.json; VS Code or Cursor started outside this shell can resolve another Node');

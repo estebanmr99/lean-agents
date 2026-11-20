@@ -5,7 +5,7 @@ import { sha } from './fsops.mjs';
 import { PINS, npmSpec, behindPins, nodeRange } from './pins.mjs';
 import { version, quiet, findAgy, antigravityFootprint } from './system.mjs';
 import { redactText } from './redact.mjs';
-import { satisfies, nodeSkipLine, minVersion, findNvm, nodeAt } from './node-runtime.mjs';
+import { satisfies, compare, nodeSkipLine, minVersion, findNvm, nodeAt } from './node-runtime.mjs';
 import { mcpLaunches, classify, duplicateSkills, skillDirs } from './inventory.mjs';
 import { stillNeeded, shellNotice } from './terminals.mjs';
 import { adhdSkillFiles } from './adhd.mjs';
@@ -112,43 +112,27 @@ export function npxFailDetail(out, opts) {
   return line;
 }
 
-// Active Node compared to the project's engines.node; stops at home or root.
+// The active Node against the nearest package.json engines.node, from cwd up to home (or the root).
 export function projectNode({ cwd, home, nodeVersion, fsx = fs }) {
-  if (!cwd) return null;
-  let dir = path.resolve(cwd);
-  const rootHome = home ? path.resolve(home) : null;
-  while (true) {
+  for (let dir = path.resolve(cwd); ; dir = path.dirname(dir)) {
     const pkg = path.join(dir, 'package.json');
     if (fsx.existsSync(pkg)) {
-      let data;
-      try { data = JSON.parse(fsx.readFileSync(pkg, 'utf8')); } catch { return null; }
-      const range = data?.engines?.node;
+      let range;
+      try { range = JSON.parse(fsx.readFileSync(pkg, 'utf8')).engines?.node; } catch { return null; }
       if (typeof range !== 'string' || !range.trim()) return null;
-      // shortcut: ranges are lower-bound only; exact pins compare major numbers.
-      let fits = false;
-      try {
-        fits = /^\d+\.\d+\.\d+$/.test(range.trim())
-          ? Number(String(nodeVersion).replace(/^v/, '').split('.')[0]) === Number(range.trim().split('.')[0])
-          : satisfies(nodeVersion, range);
-      } catch {
-        fits = false;
+      const rel = pkg.startsWith(home) ? `~${pkg.slice(home.length).replaceAll('\\', '/')}` : pkg;
+      const gui = '; VS Code or Cursor started outside this shell can resolve another Node';
+      // shortcut: only an exact version and >=a.b.c are checked; ^, ~, x and || ranges get a note, add a parser when a real project needs one.
+      let fits;
+      try { fits = /^\d+\.\d+\.\d+$/.test(range.trim()) ? compare(nodeVersion, range.trim()) === 0 : satisfies(nodeVersion, range); } catch {
+        return { item: 'project Node', status: 'note', detail: `Node ${nodeVersion} is active; ${rel} asks for engines.node ${range}, which lean-agents does not check${gui}` };
       }
-      const isUnder = rootHome && (pkg === rootHome || pkg.startsWith(rootHome + path.sep) || pkg.startsWith(rootHome + '/'));
-      const rel = isUnder
-        ? `~${pkg.slice(rootHome.length).startsWith('/') || pkg.slice(rootHome.length).startsWith('\\') ? '' : '/'}${pkg.slice(rootHome.length).replaceAll('\\', '/')}`
-        : pkg;
-      const status = fits ? 'ok' : 'note';
-      const detail = fits
-        ? `Node ${nodeVersion} fits engines.node ${range} in ${rel}; VS Code or Cursor started outside this shell can resolve another Node`
-        : `Node ${nodeVersion} is active but ${rel} asks for engines.node ${range}: run nvm use (or your version manager) in this project; VS Code or Cursor started outside this shell can resolve another Node`;
-      return { item: 'project Node', status, detail };
+      return fits
+        ? { item: 'project Node', status: 'ok', detail: `Node ${nodeVersion} fits engines.node ${range} in ${rel}${gui}` }
+        : { item: 'project Node', status: 'note', detail: `Node ${nodeVersion} is active but ${rel} asks for engines.node ${range}: run nvm use (or your version manager) in this project${gui}` };
     }
-    if (rootHome && dir === rootHome) break;
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
+    if (dir === path.resolve(home) || path.dirname(dir) === dir) return null;
   }
-  return null;
 }
 
 export function doctor({ home, state, exec, nodeVersion = process.versions.node, json = false, run = quiet, env = process.env, platform = process.platform, fsx = fs, cwd = process.cwd(), probe = [], collect = null }) {
