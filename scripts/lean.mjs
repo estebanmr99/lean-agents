@@ -568,7 +568,7 @@ function everythingPrereqs(o, saved) {
   const mac = process.platform === 'darwin';
   const has = {
     brew: !!which('brew'), winget: !!which('winget'), uv: !!which('uv'), rtk: !!which('rtk'), jq: !!which('jq'), bun: bunPresent(o.home), git: !!which('git'),
-    clt: mac && quiet(['xcode-select', '-p']).ok, nvm: !!o.nvm, apt: !!which('apt-get'), unzip: !!which('unzip'),
+    clt: mac && quiet(['xcode-select', '-p']).ok, nvm: !!o.nvm, apt: !!which('apt-get'), sudo: !!which('sudo'), unzip: !!which('unzip'),
   };
   const steps = planPrereqs({
     nvmDirExisted: nvmDirExistedBefore(saved?.commands, fs.existsSync(path.join(o.home, '.nvm'))),

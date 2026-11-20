@@ -56,11 +56,12 @@ test('Linux: no Xcode or Homebrew, git and unzip manual when no apt, uv by scrip
 
 test('Linux with apt: installs git and unzip using apt-get', () => {
   // Non-root (adds sudo)
-  const steps = planPrereqs(bare('linux', { has: { apt: true }, needsGit: true }));
+  const steps = planPrereqs(bare('linux', { has: { apt: true, sudo: true }, needsGit: true }));
+  assert.match(by(planPrereqs(bare('linux', { has: { apt: true }, needsGit: true })), 'git').manual, /git-scm/, 'no sudo and not root: manual');
   const git = by(steps, 'git');
-  assert.deepEqual(git.commands[0], ['sudo', 'apt-get', 'update', '-qq']);
-  assert.deepEqual(git.commands[1], ['sudo', 'apt-get', 'install', '-y', '-qq', '--no-install-recommends', 'git']);
-  assert.deepEqual(git.undo[0], ['sudo', 'apt-get', 'remove', '-y', '-qq', 'git']);
+  assert.deepEqual(git.commands[0], ['sudo', '-E', 'apt-get', 'update', '-qq']);
+  assert.deepEqual(git.commands[1], ['sudo', '-E', 'apt-get', 'install', '-y', '-qq', '--no-install-recommends', 'git']);
+  assert.deepEqual(git.undo[0], ['sudo', '-E', 'apt-get', 'remove', '-y', '-qq', 'git']);
 
   // Root (no sudo), git skipped, bun installed so unzip skipped/omitted
   const root = planPrereqs(bare('linux', { has: { apt: true, git: true, bun: true }, needsGit: true, root: true }));
@@ -83,6 +84,7 @@ test('Windows: git only when a tool needs it; nvm-windows setup is hash-checked;
   assert.equal(by(none, 'rtk').commands[0].includes('rtk-ai.rtk'), true);
   const g = planPrereqs(bare('win32', { has: { winget: true }, needsGit: true }));
   assert.equal(ids(g)[0], 'git');
+  assert.deepEqual(by(g, 'git').undo, [['winget', 'uninstall', '--id', 'Git.Git', '-e']]);
   assert.equal(by(planPrereqs(bare('win32', { has: { winget: true, git: true }, needsGit: true })), 'git').skipIf !== null, true);
 });
 

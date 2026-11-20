@@ -15,6 +15,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - `--everything` on a fresh machine: a tool it reported missing at plan time (uvx) counts as present once the prerequisites installed it; after a failed agent CLI install only that CLI's own steps are skipped; on Windows Node 24 installs through the nvm-windows it just set up, and OpenCode 2 installs into the home lean-agents configures (#308).
 - `--everything` on Windows: the tools winget just installed (uv, RTK, jq, Git) work in the same run; before, only a new terminal found them (#308).
 - `--everything` on Linux installs git and unzip with apt-get (sudo unless root) when they are missing; `--uninstall` removes them again (#308).
+- `--everything` on Linux installs git and unzip with apt-get (`sudo -E` unless root, so a proxy still works) when they are missing, and Windows installs Git with winget; `--uninstall` removes them again (#308).
 - `--upgrade-agent opencode --dry-run` reports the verified backup the apply will use, instead of `backup: null` (#297).
 - `--upgrade-agent opencode` with `--home` pointing elsewhere no longer runs the real `opencode --version` (it wrote logs); the report says `not probed (--home)` (#226).
 - `--everything` installs the Claude Code and OpenCode 2 CLIs it configures when they are missing (the same pinned install as `--install-agent`, undone by `--uninstall-agent`), so one command works on a fresh machine (#308, #179).

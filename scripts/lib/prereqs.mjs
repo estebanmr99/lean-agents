@@ -104,13 +104,16 @@ export function planPrereqs(probe) {
     add({
       id: 'git', label: 'Git', why: 'A selected tool needs git (the release itself does not).',
       commands: has.winget ? [WINGET('Git.Git')] : [], manual: has.winget ? undefined : 'https://git-scm.com/downloads',
+      undo: has.winget ? [['winget', 'uninstall', '--id', 'Git.Git', '-e']] : null,
       skipIf: has.git ? 'git is on PATH' : null,
     });
   }
 
   if (platform === 'linux') {
-    const sudo = probe.root ? [] : ['sudo'];
-    const apt = (pkg) => has.apt ? {
+    // -E: apt needs the proxy variables, which sudo drops by default. A user with no sudo gets the manual link.
+    const sudo = probe.root ? [] : ['sudo', '-E'];
+    const aptOk = has.apt && (probe.root || has.sudo);
+    const apt = (pkg) => aptOk ? {
       commands: [[...sudo, 'apt-get', 'update', '-qq'], [...sudo, 'apt-get', 'install', '-y', '-qq', '--no-install-recommends', pkg]],
       undo: [[...sudo, 'apt-get', 'remove', '-y', '-qq', pkg]],
     } : { commands: [] };
@@ -118,14 +121,14 @@ export function planPrereqs(probe) {
     if (needsGit) {
       add({
         id: 'git', label: 'Git', why: "The agents' plugin and skill installs clone with git.",
-        ...apt('git'), manual: has.apt ? undefined : 'https://git-scm.com/downloads',
+        ...apt('git'), manual: aptOk ? undefined : 'https://git-scm.com/downloads',
         skipIf: has.git ? 'git is on PATH' : null,
       });
     }
     if (!has.bun) {
       add({
         id: 'unzip', label: 'unzip', why: 'Unpacks the pinned Bun zip.',
-        ...apt('unzip'), manual: has.apt ? undefined : 'https://infozip.sourceforge.net/UnZip.html',
+        ...apt('unzip'), manual: aptOk ? undefined : 'https://infozip.sourceforge.net/UnZip.html',
         skipIf: has.unzip ? 'unzip is on PATH' : null,
       });
     }
