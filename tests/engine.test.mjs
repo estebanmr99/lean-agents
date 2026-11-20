@@ -10,7 +10,7 @@ import { parse } from 'jsonc-parser';
 import { applyJsonEdits, revertJsonEdits, plan as planActions, apply as applyActions, undo as undoActions } from '../scripts/lib/fsops.mjs';
 import { diffModels } from '../scripts/models-refresh.mjs';
 import { releaseNotes } from '../scripts/release.mjs';
-import { prereqFor, antigravityPrereqs, bunInstall } from '../scripts/lib/system.mjs';
+import { prereqFor, antigravityPrereqs, bunInstall, bunPathCommand } from '../scripts/lib/system.mjs';
 import { doctor } from '../scripts/lib/doctor.mjs';
 import { detectTerminals, terminalCommands, gitBashActions, stillNeeded, shellNotice, gitBashPath } from '../scripts/lib/terminals.mjs';
 import { vscodeUserDir } from '../scripts/lib/adapters/vscode-copilot.mjs';
@@ -998,6 +998,20 @@ test('bunInstall: pinned zip, SHA256 check before extraction, undo only for what
   assert.match(win.run[2].at(-1), /Expand-Archive.*bun\.exe.*SetEnvironmentVariable/s);
   assert.match(win.undo[1].at(-1), /SetEnvironmentVariable/);
   assert.match(bunInstall("C:\\Users\\O'Neil", 'C:\\s', 'win32', 'winget', 'x64').run[2].at(-1), /O''Neil/);
+});
+
+test('bunPathCommand returns the same PowerShell strings as bunInstall on Windows', () => {
+  const b = bunPathCommand("C:\\Users\\O'Neil");
+  assert.equal(b.desc, 'put ~\\.bun\\bin on your user PATH (open a new terminal)');
+  assert.equal(b.tool, 'bun-path');
+  assert.equal(b.run[0][0], 'powershell');
+  assert.match(b.run[0].at(-1), /SetEnvironmentVariable\('Path'/);
+  assert.match(b.run[0].at(-1), /O''Neil/);
+  assert.match(b.undo[0].at(-1), /Environment\]::SetEnvironmentVariable\('Path'/);
+  assert.match(b.skipIfOutput.cmd.at(-1), /-contains '[^']*O''Neil[^']*'\) \{ exit 0 \}/);
+  const win = bunInstall("C:\\Users\\O'Neil", 'C:\\s', 'win32', 'winget', 'x64');
+  assert.ok(win.run[2].at(-1).includes(b.run[0].at(-1))); // bunInstall's run script contains the path-add part
+  assert.equal(win.undo[1].at(-1), b.undo[0].at(-1)); // undo path-remove part is exactly the same
 });
 
 test('verify-sha256: a mismatch deletes the file and exits 1 so the chain stops before extraction', () => {

@@ -165,6 +165,23 @@ export function antigravityPrereqs(pm, platform, home, app = true) {
 // Linux and Windows: the pinned release zip is downloaded to a file, checked against the pinned SHA256 and only then extracted,
 // so no upstream installer script runs. Linux: no shell profile edit (the engine finds ~/.bun/bin itself). Windows: ~\.bun\bin goes on the user PATH.
 const VERIFY = fileURLToPath(new URL('./verify-sha256.mjs', import.meta.url));
+const psQ = (s) => s.replace(/'/g, "''"); // PowerShell single-quote escape for a profile path like O'Neil
+const psRun = (script) => ['powershell', '-NoProfile', '-NonInteractive', '-Command', script];
+const psAddPath = (bin) => `$p = [string][Environment]::GetEnvironmentVariable('Path', 'User'); if (($p -split ';') -notcontains '${psQ(bin)}') { [Environment]::SetEnvironmentVariable('Path', ($p.TrimEnd(';') + ';${psQ(bin)}'), 'User') }`;
+const psRemovePath = (bin) => `$p = [string][Environment]::GetEnvironmentVariable('Path', 'User'); [Environment]::SetEnvironmentVariable('Path', (($p -split ';' | Where-Object { $_ -and $_ -ne '${psQ(bin)}' }) -join ';'), 'User')`;
+
+export function bunPathCommand(home) {
+  const bin = path.join(home, '.bun', 'bin');
+  return {
+    // tool bun-path, not bun: a moved Bun pin must not undo and re-record this PATH entry.
+    tool: 'bun-path', desc: 'put ~\\.bun\\bin on your user PATH (open a new terminal)', optional: true,
+    run: [psRun(psAddPath(bin))],
+    undo: [psRun(psRemovePath(bin))],
+    // Already in the saved user PATH (only this shell is stale): skip, so --uninstall never removes an entry the user made.
+    skipIfOutput: { cmd: psRun(`if (([string][Environment]::GetEnvironmentVariable('Path', 'User') -split ';') -contains '${psQ(bin)}') { exit 0 } else { exit 1 }`) },
+  };
+}
+
 export function bunInstall(home, dir, platform, pm, arch = process.arch) {
   const bunDir = path.join(home, '.bun');
   if (platform === 'darwin') {
@@ -182,12 +199,10 @@ export function bunInstall(home, dir, platform, pm, arch = process.arch) {
   if (platform === 'win32') {
     const bin = path.join(bunDir, 'bin');
     const tmp = path.join(dir, `${name}-${version}`);
-    const q = (s) => s.replace(/'/g, "''"); // PowerShell single-quote escape for a profile path like O'Neil
-    const ps = (script) => ['powershell', '-NoProfile', '-NonInteractive', '-Command', script];
     return {
       tool: 'bun', desc: `install bun ${version}`, optional: true,
-      run: [download, verify, ps(`Expand-Archive -Force -LiteralPath '${q(zip)}' -DestinationPath '${q(tmp)}'; New-Item -ItemType Directory -Force '${q(bin)}' | Out-Null; Move-Item -Force '${q(path.join(tmp, name, 'bun.exe'))}' '${q(path.join(bin, 'bun.exe'))}'; Remove-Item -Recurse -Force '${q(tmp)}'; $p = [string][Environment]::GetEnvironmentVariable('Path', 'User'); if (($p -split ';') -notcontains '${q(bin)}') { [Environment]::SetEnvironmentVariable('Path', ($p.TrimEnd(';') + ';${q(bin)}'), 'User') }`)],
-      undo: [rm, ps(`$p = [string][Environment]::GetEnvironmentVariable('Path', 'User'); [Environment]::SetEnvironmentVariable('Path', (($p -split ';' | Where-Object { $_ -and $_ -ne '${q(bin)}' }) -join ';'), 'User')`)],
+      run: [download, verify, psRun(`Expand-Archive -Force -LiteralPath '${psQ(zip)}' -DestinationPath '${psQ(tmp)}'; New-Item -ItemType Directory -Force '${psQ(bin)}' | Out-Null; Move-Item -Force '${psQ(path.join(tmp, name, 'bun.exe'))}' '${psQ(path.join(bin, 'bun.exe'))}'; Remove-Item -Recurse -Force '${psQ(tmp)}'; ${psAddPath(bin)}`)],
+      undo: [rm, psRun(psRemovePath(bin))],
     };
   }
   return {
