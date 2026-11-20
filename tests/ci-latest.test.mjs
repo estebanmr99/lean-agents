@@ -46,6 +46,20 @@ test('bump fills node from the new version and the PR table flags a raised floor
   assert.match(body, /\| ctx \| 2\.1\.4 \| 2\.1\.7 \| >=24\.15\.0 → >=24\.15\.0 ⚠ above lean floor \|/);
 });
 
+test('script installer pins: ci-latest re-hashes them and the bump PR carries the new sha256 (#245)', async () => {
+  const text = '{\n  "pins": {\n    "moved": { "kind": "download", "url": "https://x/install", "version": "script", "verified": "2026-11-01", "ci": "real-x", "sha256": "aaaaaaaaaaaaaaaa" },\n    "same": { "kind": "download", "url": "https://y/install", "version": "script", "verified": "2026-11-01", "sha256": "bbbbbbbbbbbbbbbb" }\n  }\n}';
+  const hash = async (url) => (url === 'https://x/install' ? 'cccccccccccccccc' : 'bbbbbbbbbbbbbbbb');
+  const pins = JSON.parse(text).pins;
+  assert.deepEqual(await bump(pins, null, hash), [{ key: 'moved', from: 'sha256 aaaaaaaaaaaa', to: 'sha256 cccccccccccc' }]);
+  assert.equal(pins.moved.sha256, 'cccccccccccccccc');
+  const r = await bumpPins({ text, get: null, hash, today: '2026-11-20', log: () => {} });
+  assert.deepEqual(r.changes.map((c) => c.key), ['moved']);
+  assert.match(r.text, /"moved": .*"verified": "2026-11-20".*"sha256": "cccccccccccccccc"/);
+  assert.match(r.text, /"same": .*"verified": "2026-11-01"/);
+  assert.match(render(r.changes), /read the script at that URL before merging/);
+  assert.equal((await bump(JSON.parse(text).pins, null)).length, 0, 'no hash function: script pins are skipped');
+});
+
 test('ciOnly pins stay out of state.json pins and have a CI job', () => {
   const ciOnly = Object.entries(PINS).filter(([, p]) => p.ciOnly).map(([k]) => k);
   assert.deepEqual(ciOnly.sort(), ['claude-code', 'copilot-cli', 'opencode-v1', 'opencode-v2']);
