@@ -544,7 +544,7 @@ function prereqCommands(o, behind = new Set()) {
   }
   if (o.bun && o.tools.includes('context-mode') && process.platform !== 'linux' && !which('bun') && bunPresent(o.home)) {
     if (process.platform === 'win32') out.push(bunPathCommand(o.home));
-    else if (!o.everything) console.log('! Bun is in ~/.bun/bin but not on PATH; Context Mode needs it on PATH here. Add that folder to PATH.');
+    else console.log('! Bun is in ~/.bun/bin but not on PATH; Context Mode needs it on PATH here. Add that folder to PATH.');
   }
   if (o.bun && o.tools.includes('context-mode') && !bunPresent(o.home)) {
     const b = bunInstall(o.home, stateDir(o.home), process.platform, pm);
@@ -799,7 +799,9 @@ async function install(o) {
   const report = [];
   const errors = [];
   if (o.exec) {
+    const noCli = new Set(); // agents whose CLI install failed above: their steps would only fail again
     for (const [i, c] of commands.entries()) {
+      if (noCli.has(c.agent)) { console.log(`  skipped: ${c.desc} (no ${AGENT_CLIS[c.agent]} CLI)`); continue; }
       // gh is on by default, so having no installer for it (no brew or winget) must not fail the run.
       if (c.manual) { console.log(`! ${c.desc}`); if (!c.optional) { failed++; errors.push(c.desc); } continue; }
       const there = (c.skipIfExists && exists(c.skipIfExists)) || (c.skipIfOutput && quiet(c.skipIfOutput.cmd).ok);
@@ -820,8 +822,9 @@ async function install(o) {
         const bin = c.bins.find((b) => fs.existsSync(b));
         // The installer's PATH change reaches new terminals only: put its folder first here so the agent's steps below find it.
         if (bin) process.env.PATH = `${path.dirname(bin)}${path.delimiter}${process.env.PATH ?? ''}`;
-        else { failed++; errors.push(c.desc); }
+        else { failed++; errors.push(c.desc); noCli.add(c.lifecycle); }
         report.push({ desc: c.desc, ok: !!bin, exit: null });
+        if (ui) ui.result(!!bin, c.desc);
         continue;
       }
       // Recorded before it runs, so a command killed midway can still be undone.
