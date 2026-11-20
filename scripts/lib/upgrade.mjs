@@ -148,6 +148,7 @@ export function upgradeInventory(inv, { home, fsx = fs, binary = { path: null, v
 export function formatUpgrade(r) {
   const u = r.upgrade;
   const out = [`--upgrade-agent opencode (dry run: nothing is changed; --yes applies once --backup --yes made a verified backup)`,
+    'OpenCode 2 migrates your sessions the first time it starts: --backup --yes keeps a 1.x copy first, and --undo --yes goes back to it.',
     `OpenCode: ${u.binary.version ?? 'version unknown'} at ${u.binary.path ?? 'not on PATH'} (${u.binary.via ?? 'n/a'}), major ${u.layout.major ?? 'none'}, sessions ${u.layout.sessions ?? 'unknown'}`,
     `${u.counts.managed} managed, ${u.counts['user-translatable']} translatable, ${u.counts['user-manual']} manual`];
   for (const i of r.items.filter((x) => x.upgrade)) out.push(`  ${i.upgrade.class.padEnd(16)} ${i.upgrade.before}${i.upgrade.after ? ` -> ${i.upgrade.after}` : ''}${i.upgrade.class === 'user-manual' ? `  (${i.upgrade.reason})` : ''}${i.file ? `  (${i.file})` : ''}`);
