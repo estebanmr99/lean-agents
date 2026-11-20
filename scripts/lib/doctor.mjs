@@ -218,6 +218,11 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
         const r = q(['npx', '-y', npmSpec('codeburn'), '--version'], 120000);
         add('codeburn runs', r.ok ? 'ok' : 'error', r.ok ? '' : npxFailDetail(r.out, { home, env }));
       }
+      // Code Mode needs Claude Code 2.1.323+; an older CLI ignores the setting (#304).
+      if (o.tools.includes('code-mode') && o.agents.includes('claude')) {
+        const v = /\d+\.\d+\.\d+/.exec(q(['claude', '--version']).out ?? '')?.[0];
+        if (v) add('Claude Code Mode', compare(v, '2.1.323') < 0 ? 'note' : 'ok', compare(v, '2.1.323') < 0 ? `Claude Code ${v} is older than 2.1.323: the setting is on, Code Mode stays off until --update moves the pin` : `Claude Code ${v}`);
+      }
       if (o.tools.includes('autoskills')) {
         const r = q(['npx', '-y', npmSpec('autoskills'), '--help'], 120000);
         add('autoskills runs', r.ok ? 'ok' : 'error', r.ok ? '' : npxFailDetail(r.out, { home, env }));

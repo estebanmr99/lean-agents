@@ -4,6 +4,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Added
+
+- `--add-tools a,b`: adds tools to your saved setup through `--update`, keeping the saved agents, OpenCode profile and other choices. A plain re-run now says when it would change the saved agents or profile, and `code-mode` says (in the plan and in `--doctor`) when Claude Code is older than 2.1.323 (found on a real Windows PC, [#304](https://github.com/estebanmr99/lean-agents/issues/304)).
+
 ### Changed
 
 - Contributor checks from #305: a test fails when install or undo code writes user files outside the `fsops` action kinds; seeded random configs must round-trip install and `--uninstall` byte for byte; the PR template and the coordinate session prompt ask for `behavior-diff.sh` output, the failing-then-passing test, and the checks a PR adds.

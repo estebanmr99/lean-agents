@@ -16,6 +16,7 @@ import { detectTerminals, terminalCommands, gitBashActions, stillNeeded, shellNo
 import { vscodeUserDir } from '../scripts/lib/adapters/vscode-copilot.mjs';
 import { shellEdit } from '../scripts/lib/adapters/opencode-v2.mjs';
 import { npmSpec, PINS } from '../scripts/lib/pins.mjs';
+import { compare as compareVersions } from '../scripts/lib/node-runtime.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ALL = ['--yes', '--no-exec', '--agents', 'claude,opencode-v2', '--all-tools', '--privacy', 'strict', '--lang', 'en', '--profile', 'vertex-gemini', '--adhd-always', '--ponytail-mode', 'lite'];
@@ -1023,6 +1024,26 @@ test('code-mode (#304): opt-in, sets the Claude user env only when absent, warns
   assert.equal(env(mine).CLAUDE_CODE_EXPERIMENTAL_CODE_MODE, '0');
   lean(mine, ['--uninstall', '--yes', '--no-exec']);
   assert.equal(env(mine).CLAUDE_CODE_EXPERIMENTAL_CODE_MODE, '0');
+});
+
+test('re-run (#304): --add-tools keeps the saved agents and profile, a plain re-run says it changes them', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  lean(home, ['--yes', '--no-exec', '--agents', 'claude,opencode-v2', '--tools', 'serena', '--profile', 'vertex-gemini', '--lang', 'en']);
+  const add = lean(home, ['--yes', '--no-exec', '--dry-run', '--add-tools', 'code-mode']);
+  assert.match(add, /plan for claude, opencode-v2\n/);
+  assert.match(add, /tools: rtk, context-mode, serena, code-mode \| .*profile: vertex-gemini/);
+  if (compareVersions(PINS['claude-code'].version, '2.1.323') < 0) assert.match(add, /takes effect once the pin moves/);
+  assert.ok(!add.includes('Note: your saved setup'));
+  const rerun = lean(home, ['--yes', '--no-exec', '--dry-run', '--agents', 'claude', '--tools', 'serena']);
+  assert.match(rerun, /Note: your saved setup is claude, opencode-v2 with profile vertex-gemini; this run changes it/);
+  assert.ok(!lean(home, ['--yes', '--no-exec', '--dry-run', '--agents', 'opencode-v2,claude', '--tools', 'serena', '--profile', 'vertex-gemini']).includes('Note: your saved setup'), 'same agents in another order');
+
+  lean(home, ['--yes', '--no-exec', '--add-tools', 'code-mode']);
+  const { options } = JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'state.json'), 'utf8'));
+  assert.deepEqual([options.agents, options.tools, options.profile], [['claude', 'opencode-v2'], ['rtk', 'context-mode', 'serena', 'code-mode'], 'vertex-gemini']);
+  const run = (h, args) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', h, ...args], { encoding: 'utf8' });
+  assert.match(run(home, ['--yes', '--no-exec', '--dry-run', '--add-tools', 'nope']).stderr, /unknown tools: nope/);
+  assert.match(run(fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-')), ['--yes', '--no-exec', '--dry-run', '--add-tools', 'serena']).stderr, /nothing to update/);
 });
 
 test('bunInstall: pinned zip, SHA256 check before extraction, undo only for what it installs', () => {

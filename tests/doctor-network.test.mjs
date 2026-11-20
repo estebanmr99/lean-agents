@@ -35,3 +35,18 @@ test('strict: no skipped row when no selected agent runs mcp list', () => {
   const { rows } = runDoctor(preset('off'), ['opencode-v2']);
   assert.equal(rows.some((r) => r.status === 'skipped'), false);
 });
+
+test('code-mode (#304): a note while Claude Code is older than 2.1.323, ok from it', () => {
+  const rows = (ver) => {
+    const run = (argv) => ({ ok: true, out: argv[0] === 'claude' && argv[1] === '--version' ? `${ver} (Claude Code)` : '' });
+    const state = { version: '0', commands: [], files: [], options: { agents: ['claude'], tools: ['code-mode'], privacy: 'standard', network: preset('on') } };
+    let out = '';
+    const write = process.stdout.write;
+    process.stdout.write = (s) => { out += s; return true; };
+    try { doctor({ home: '/nonexistent-lean-home', state, exec: true, json: true, run }); } finally { process.stdout.write = write; }
+    return JSON.parse(out).rows.filter((r) => r.item === 'Claude Code Mode');
+  };
+  assert.deepEqual(rows('2.1.316').map((r) => r.status), ['note']);
+  assert.match(rows('2.1.316')[0].detail, /older than 2\.1\.323/);
+  assert.deepEqual(rows('2.1.323').map((r) => r.status), ['ok']);
+});
