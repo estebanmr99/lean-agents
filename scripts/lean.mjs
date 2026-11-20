@@ -558,9 +558,7 @@ function prereqCommands(o, behind = new Set()) {
 // agents.json records them, and --uninstall-agent removes them, like a separate --install-agent run.
 function everythingCliInstalls(o, gitPending) {
   const table = agentTable({ home: o.home, platform: process.platform, dir: stateDir(o.home), realHome: REAL_HOME, gitBash: gitPending ? 'bash.exe' : undefined });
-  const missing = o.agents.filter((a) => AGENT_CLIS[a] && table[a] && !which(AGENT_CLIS[a]));
-  for (const a of missing) if (table[a].manual) console.log(`! ${a}: ${table[a].manual}`);
-  return missing.filter((a) => !table[a].manual).map((a) => ({
+  return o.agents.filter((a) => AGENT_CLIS[a] && table[a] && !table[a].manual && !which(AGENT_CLIS[a])).map((a) => ({
     desc: `install the ${AGENT_CLIS[a]} CLI (${table[a].method}${table[a].version ? ` ${table[a].version}` : ''})`, run: [], undo: [], lifecycle: a, bins: table[a].bins,
   }));
 }
