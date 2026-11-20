@@ -11,6 +11,9 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ### Fixed
 
 - `--dry-run` and `--update --dry-run` mark an install that is already there (the Orca or Warp app, a vendor checkout) as "already there, skipped" instead of listing its install commands; the real run already skipped it (#179).
+- `--doctor` checks Context Mode on the Node lean-agents installed it on, not on PATH (#179 PC run).
+- `--doctor` shows why `codeburn runs` / `autoskills runs` failed, with a hint for a broken npx cache entry (#179 PC run).
+- `--upgrade-agent opencode` no longer copies local plugin file paths from the 1.x `plugin` list into 2.x `plugins[]`; they are listed as manual (#179 PC run).
 - `--install-agent claude` on Windows adds `~\.local\bin` to the user PATH (the upstream installer only prints a note), and `--uninstall-agent claude` removes it (#179 PC run).
 - Claude Code installer pin refreshed after an upstream change to install.sh.
 - `--uninstall` still tries the undo of a command that had failed (`ok: false`), but its failure no longer keeps the record, so a half install can be uninstalled (#179 PC run).

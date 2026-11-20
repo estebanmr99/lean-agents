@@ -4,7 +4,7 @@ import path from 'node:path';
 import { sha } from './fsops.mjs';
 import { PINS, npmSpec, behindPins, nodeRange } from './pins.mjs';
 import { version, quiet, findAgy, antigravityFootprint } from './system.mjs';
-import { satisfies, nodeSkipLine, minVersion } from './node-runtime.mjs';
+import { satisfies, nodeSkipLine, minVersion, findNvm, nodeAt } from './node-runtime.mjs';
 import { mcpLaunches, classify, duplicateSkills, skillDirs } from './inventory.mjs';
 import { stillNeeded, shellNotice } from './terminals.mjs';
 import { adhdSkillFiles } from './adhd.mjs';
@@ -100,6 +100,13 @@ function checkInventory({ home, exec, run, env, platform, fsx }, add) {
   return { nodes, skills };
 }
 
+export function npxFailDetail(out) {
+  const line = out.split('\n').find((l) => /error/i.test(l))?.trim().slice(0, 200);
+  if (!line) return '';
+  if (/_npx/.test(line) && /enoent/i.test(line)) return `${line} (broken npx cache entry: delete that _npx folder, then run again)`;
+  return line;
+}
+
 export function doctor({ home, state, exec, nodeVersion = process.versions.node, json = false, run = quiet, env = process.env, platform = process.platform, fsx = fs, probe = [], collect = null }) {
   const rows = [];
   const add = (item, status, detail = '') => rows.push({ item, status, detail });
@@ -144,6 +151,17 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
       for (const [bin, tool] of [['claude', 'claude'], ['opencode', 'opencode-v1'], ['opencode', 'opencode-v2'], ['copilot', 'copilot-cli'], ['agy', 'antigravity'], ['rtk', 'rtk'], ['context-mode', 'context-mode'], ['uvx', 'serena']]) {
         const needed = o.agents.includes(tool) || o.tools.includes(tool);
         if (!needed) continue;
+        if (bin === 'context-mode' && state.toolNode?.version) {
+          const nvm = findNvm({ env, home, platform, realHome: env.HOME || env.USERPROFILE || home });
+          if (nvm) {
+            const dir = nvm.win ? path.join(nvm.dir, `v${state.toolNode.version}`) : path.join(nvm.dir, 'versions', 'node', `v${state.toolNode.version}`);
+            const n = nodeAt(nvm, dir, state.toolNode.version);
+            const cli = path.join(n.modules, 'context-mode', 'package.json');
+            const found = fsx.existsSync(cli);
+            add(`context-mode on Node ${state.toolNode.version}`, found ? 'ok' : 'error', found ? cli : 'not found');
+            continue;
+          }
+        }
         const at = bin === 'agy' ? findAgy(home, platform, env) ?? bin : bin;
         const v = version(at, undefined, childEnv(network));
         add(at === bin ? `${bin} on PATH` : `${bin} found outside PATH`, v ? 'ok' : 'error', v ?? 'not found');
@@ -165,8 +183,14 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
       if (o.agents.includes('copilot-cli')) checkCopilot(o, add, q, withMcp);
       if (o.agents.includes('antigravity')) checkAntigravity(o, CORE_AGENTS, add, q, withMcp, findAgy(home, platform, env) ?? 'agy');
       // npx may have to download, which takes longer than a local check.
-      if (o.tools.includes('codeburn')) add('codeburn runs', q(['npx', '-y', npmSpec('codeburn'), '--version'], 120000).ok ? 'ok' : 'error');
-      if (o.tools.includes('autoskills')) add('autoskills runs', q(['npx', '-y', npmSpec('autoskills'), '--help'], 120000).ok ? 'ok' : 'error');
+      if (o.tools.includes('codeburn')) {
+        const r = q(['npx', '-y', npmSpec('codeburn'), '--version'], 120000);
+        add('codeburn runs', r.ok ? 'ok' : 'error', r.ok ? '' : npxFailDetail(r.out));
+      }
+      if (o.tools.includes('autoskills')) {
+        const r = q(['npx', '-y', npmSpec('autoskills'), '--help'], 120000);
+        add('autoskills runs', r.ok ? 'ok' : 'error', r.ok ? '' : npxFailDetail(r.out));
+      }
     }
   }
   checkAntigravityIde(home, add, fsx);

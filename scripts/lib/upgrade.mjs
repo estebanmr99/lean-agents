@@ -70,6 +70,10 @@ function classifyItem(it, stopgaps, home, fsx) {
     const t = row(tui ? 'tui-plugin' : 'plugin');
     if (!t.verified) return verifyRow(t, `${tui ? 'tui.json ' : ''}plugin ${it.name}`);
     if (it.source) return manual(`plugin ${it.name}`, localPluginReason(pluginSource(it, home, fsx)));
+
+    const isLocalPath = /^([./~]|file:|[a-zA-Z]:[\\/])/.test(it.name) || (/[\/\\]/.test(it.name) && /\.(js|mjs|cjs|ts)$/.test(it.name));
+    if (isLocalPath) return manual(`plugin ${it.name}`, localPluginReason(null));
+
     return translate(t, it.name, `plugin ${it.name}`);
   }
   const sg = stopgaps.find((s) => s.file === it.file);

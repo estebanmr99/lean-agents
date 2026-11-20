@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { doctor } from '../scripts/lib/doctor.mjs';
+import { doctor, npxFailDetail } from '../scripts/lib/doctor.mjs';
 import { preset } from '../scripts/lib/network.mjs';
 
 const fsx = (files = [], links = {}) => ({ existsSync: (p) => files.includes(p) || p in links, realpathSync: (p) => links[p] ?? p });
@@ -137,4 +137,45 @@ test('no duplicate when each agent reads one folder', () => {
   fs.mkdirSync(path.join(h, '.claude', 'skills', 'x'), { recursive: true });
   fs.writeFileSync(path.join(h, '.claude', 'skills', 'x', 'SKILL.md'), 'x');
   assert.deepEqual(run(h, { fs }).skills, []);
+});
+
+test('context-mode on Node is checked using findNvm, not on PATH', () => {
+  const h = tmp();
+  const dir = path.join(h, '.nvm');
+  const win = process.platform === 'win32';
+  const nodeDir = win ? path.join(dir, `v24.15.0`) : path.join(dir, 'versions', 'node', 'v24.15.0');
+  const mods = win ? path.join(nodeDir, 'node_modules') : path.join(nodeDir, 'lib', 'node_modules');
+  const cli = path.join(mods, 'context-mode', 'package.json');
+
+  fs.mkdirSync(path.dirname(cli), { recursive: true });
+  fs.writeFileSync(cli, '');
+  if (!win) {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'nvm.sh'), '');
+  }
+
+  const env = win ? { NVM_HOME: dir, USERPROFILE: h } : { NVM_DIR: dir, HOME: h };
+
+  const s = { version: '0', commands: [], files: [], toolNode: { version: '24.15.0' }, options: { agents: ['claude'], tools: ['context-mode'], privacy: 'standard', network: preset('on') } };
+
+  let out = '';
+  const write = process.stdout.write;
+  process.stdout.write = (st) => { out += st; return true; };
+  try { doctor({ home: h, state: s, exec: true, json: true, env, platform: process.platform, run: () => ({ ok: false, out: '' }) }); } finally { process.stdout.write = write; }
+
+  const r = JSON.parse(out);
+  const ok = r.rows.find((x) => x.item === 'context-mode on Node 24.15.0');
+  assert.ok(ok, 'found the nvm node check');
+  assert.equal(ok.status, 'ok');
+  assert.equal(ok.detail, cli);
+  assert.equal(r.rows.find((x) => x.item === 'context-mode on PATH'), undefined, 'did not fall back to PATH check');
+});
+
+test('npxFailDetail extracts the first error line and appends a hint for broken cache', () => {
+  assert.equal(npxFailDetail(''), '');
+  assert.equal(npxFailDetail('some stdout\nError: unexpected\nmore lines'), 'Error: unexpected');
+  assert.equal(
+    npxFailDetail('npm error enoent Could not read package.json: ... npm-cache\\_npx\\hash\\package.json'),
+    'npm error enoent Could not read package.json: ... npm-cache\\_npx\\hash\\package.json (broken npx cache entry: delete that _npx folder, then run again)'
+  );
 });
