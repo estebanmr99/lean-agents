@@ -1292,7 +1292,7 @@ test('core/pins.json: every pin has version, date and a CI job that exists; no p
   const ci = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8');
   for (const [key, p] of Object.entries(PINS)) {
     // Installer scripts are pinned by SHA256, not by a version number.
-    if (p.version !== 'script' && key !== 'warp-app') assert.match(p.version, /^(?:jq-)?v?\d+\.\d+\.\d+$/, key);
+    if (p.version !== 'script' && key !== 'warp-app') assert.match(p.version, /^v?\d+\.\d+\.\d+$/, key);
     assert.match(p.verified, /^\d{4}-\d{2}-\d{2}$/, key);
     assert.ok(new RegExp(`^  ${p.ci}:`, 'm').test(ci), `${key}: no CI job ${p.ci}`);
   }

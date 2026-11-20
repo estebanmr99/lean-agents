@@ -6,9 +6,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const LABEL = 'version-watch';
-const STABLE = /^(?:jq-)?v?\d+\.\d+\.\d+$/;
+const STABLE = /^v?\d+\.\d+\.\d+$/;
 const mark = (v) => `<!-- version-watch:${v} -->`;
-const parts = (v) => v.replace(/^(?:jq-)?v/, '').split('.').map(Number);
+const parts = (v) => v.replace(/^v/, '').split('.').map(Number);
 
 // True when `next` is a higher stable x.y.z than `current`.
 export function isNewer(current, next) {
