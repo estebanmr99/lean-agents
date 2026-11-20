@@ -762,7 +762,7 @@ async function install(o) {
   if (every && process.platform === 'darwin' && pendingPrereqs(every.steps).some((s) => s.id === 'homebrew')) process.env.PATH = `/opt/homebrew/bin${path.delimiter}/usr/local/bin${path.delimiter}${process.env.PATH ?? ''}`;
   // Linux: uv and rtk installers put binaries in ~/.local/bin, which only a new shell may have on PATH.
   if (every && process.platform === 'linux' && pendingPrereqs(every.steps).some((s) => s.id === 'uv' || s.id === 'rtk')) process.env.PATH = `${path.join(o.home, '.local', 'bin')}${path.delimiter}${process.env.PATH ?? ''}`;
-  // winget --scope user puts command links (uv, rtk, jq) and Git.Git's git.exe here, and on the saved user PATH, which only new terminals see. VERIFY (nightly)
+  // winget --scope user puts command links (uv, rtk, jq) and Git.Git's git.exe here, and on the saved user PATH, which only new terminals see (nightly fresh-machine, 2026-11-20).
   if (every && process.platform === 'win32' && pendingPrereqs(every.steps).some((s) => s.commands.some((argv) => argv[0] === 'winget'))) {
     // Both: winget resolves the profile folder, which differs from LOCALAPPDATA when USERPROFILE is overridden (CI). An elevated shell gets Git under Program Files.
     const locals = [...new Set([path.join(o.home, 'AppData', 'Local'), process.env.LOCALAPPDATA].filter(Boolean))];

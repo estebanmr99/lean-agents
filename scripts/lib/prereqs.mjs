@@ -19,7 +19,7 @@ const NVM_WIN = {
   url: 'https://github.com/coreybutler/nvm-windows/releases/download/v2.0.1/nvm-2.0.1-x64-setup.exe',
   sha256: '2ba6ab6290fdc7d1e608e76c97577ca6e1df772b2d59ab8ebc01e10788de8e57',
 };
-// The setup just ran, so this process has no nvm on PATH: read NVM_HOME and NVM_SYMLINK from the saved user or machine environment. VERIFY
+// The setup just ran, so this process has no nvm on PATH: read NVM_HOME and NVM_SYMLINK from the saved user or machine environment (nightly fresh-machine, 2026-11-20).
 const NVM_WIN_INSTALL_24 = ['powershell', '-NoProfile', '-NonInteractive', '-Command',
   "foreach ($n in 'NVM_HOME', 'NVM_SYMLINK') { $v = [Environment]::GetEnvironmentVariable($n, 'User'); if (-not $v) { $v = [Environment]::GetEnvironmentVariable($n, 'Machine') }; if ($v) { Set-Item \"env:$n\" $v } }; " +
   "if (-not $env:NVM_HOME) { Write-Error 'NVM_HOME is not set: nvm-windows did not install'; exit 1 }; & (Join-Path $env:NVM_HOME 'nvm.exe') install 24; exit $LASTEXITCODE"];

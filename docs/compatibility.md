@@ -453,7 +453,7 @@ Checked 2026-11-10 for Session 65 (#65, #46), with npm 12.2.1 and Node 26.12.1 i
 | `files` + `bundleDependencies: true` after `npm ci --omit=dev`: the tarball holds `scripts/`, `core/`, `profiles/`, LICENSE, READMEs and the 7 locked runtime packages (about 175 KB, 126 files); `npx ./lean-agents-<v>.tgz` runs `--version`, `--dry-run`, an install, `--doctor` and `--uninstall` with no further npm install | local probe, `package` CI job | 2026-11-10 |
 | npm 12 does not pack `npm-shrinkwrap.json` (even when listed in `files`) and `npm ci` rejects it, so it is not used; the lockfile reaches users through the bundled dependencies | local probe | 2026-11-10 |
 | Provenance: `npm publish --provenance` needs `repository.url` to match the repo (case-sensitive) | [npm docs, generating provenance](https://docs.npmjs.com/generating-provenance-statements) | 2026-11-10 |
-| `--everything` Linux `git` and `unzip` prerequisites via `apt-get` (`sudo` unless root) | local test (**VERIFY** until the fresh-machine nightly passes) | 2026-11-19 |
+| `--everything` Linux `git` and `unzip` prerequisites via `apt-get` (`sudo` unless root) | local test; installs as root in the fresh-machine nightly (2026-11-20) | 2026-11-20 |
 | `release.yml` checks out with `fetch-depth: 0` so `scripts/release.mjs` sees earlier `v*` tags and adds a "Tool versions" table (`git show <prev tag>:core/pins.json` vs the tagged `core/pins.json`, versions only, no network). Offline tests cover the diff; the real tag-push path is **VERIFY** (first release after this PR) | `tests/pins-diff.test.mjs`; the table printed from `git show v0.8.0:core/pins.json` against today's pins in a local clone | 2026-11-18 |
 
 **Trust:** only the release download is checksum-verified. The `SHA256SUMS` file comes from the same release as the tarball, so the check catches corruption, not a tampered or compromised release (`install.sh`, `install.ps1`; #162). Not in place: a signature or attestation the bootstrap checks. Possible fixes, **VERIFY** before use: `gh attestation verify` on a GitHub artifact attestation for the tarball, and npm provenance checked with `npm audit signatures` (0.8.0 has none; see step 2 below). A checkout you run as a file (`bash install.sh` or `install.ps1` next to `scripts/lean.mjs`) is trusted as it is: you chose that folder. In a checkout, `npm ci --omit=dev` reruns when `package-lock.json` changes (hash in `node_modules/.lean-agents-lock`). A git clone in the install folder is replaced only when `git status` is clean.
@@ -679,6 +679,18 @@ Versions of the agent CLIs come from `<bin> --version` run with a scratch HOME (
 **Limit:** this is a PATH trick on a runner image, not a bare machine. `/usr/bin/git` (the Xcode shim) stays on macOS, winget and the Windows system tools stay, and a per-user install on the runner could still be found by absolute path. Corporate proxy and TLS inspection are only provable on the owner's PC.
 
 **VERIFY** (first nightly runs decide): Homebrew's pinned installer unattended on macOS runners (including the Xcode CLT step); nvm-windows without admin on `windows-latest`; `--everything` as root in the Ubuntu container; `actions/download-artifact` inside the container. Not run locally: no real binaries on the owner's machine.
+
+**Proven (2026-11-20):**
+- **Windows, run 44708895051:** the whole fresh-machine leg passes, from install through `--doctor`. It starts from the image without Git (the image's Git is uninstalled first), with winget installed by `Repair-WinGetPackageManager`.
+  - nvm-windows installs and `nvm install 24` runs, with `NVM_HOME` read from the saved environment.
+  - winget `--scope user` installs Git.Git, astral-sh.uv, rtk-ai.rtk and GitHub.cli.
+  - The command links land in `<USERPROFILE>\AppData\Local\Microsoft\WinGet\Links`. That folder follows the profile, not `LOCALAPPDATA`.
+  - On the elevated runner, Git lands in `Program Files\Git`.
+  - OpenCode 2 installs through the Git Bash that this same run installed.
+- **Runner facts the leg works around:**
+  - The image sets `npm_config_prefix=C:\npm\prefix`.
+  - `winget install OpenJS.NodeJS.LTS --scope user` reports "No applicable installer found", so `install.ps1` falls back to the nodejs.org zip.
+- **macOS and Linux:** the install passes, including RTK from the Linux tarball, uv in `~/.local/bin` and git and unzip through apt as root. `--doctor` still fails there: the agent CLIs land in `~/.local/bin` and `~/.opencode/bin`, and lean-agents puts no entry for them in a shell profile.
 
 ## Agent CLI upgrades within a major (#182 PR3, 2026-11-18)
 
