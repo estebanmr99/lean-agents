@@ -282,13 +282,24 @@ check "LEAN_TEST_FAIL_AT without LEAN_AGENTS_TEST=1 is refused" test "$rc" = 1
 check "and the live tree is unchanged" test "$(ltree)" = "$LIVE_STATE"
 
 if [ "$is_win" = 1 ]; then
-  # The 2.x install on Windows is not automated (VERIFY): the apply stops at that step and undoes what it did before.
+  # Windows: the 2.x install runs the pinned installer under Git Bash and puts ~\.opencode\bin first on the user PATH; --undo takes both back.
   for step in backup opencode1; do round "$step"; done
+  hkcu() { powershell.exe -NoProfile -Command "[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment').GetValue('Path', '', 'DoNotExpandEnvironmentNames')" | tr -d '\r'; }
+  path_before="$(hkcu)"
   leanu --yes >"$T/win-apply.out" 2>&1; rc=$?
   tail -n 12 "$T/win-apply.out" | sed 's/^/  /'
-  check "windows apply: stops at install2x (exit 1)" test "$rc" = 1
-  check "windows apply: names the manual 2.x install" grep -q 'not proven yet' "$T/win-apply.out"
-  check "windows apply: rolled back, live tree byte-identical" test "$(jstatus)" = rolled-back -a "$(ltree)" = "$LIVE_STATE" -a "$(dtree)" = "$LIVE_DATA"
+  check "windows apply: exits 0" test "$rc" = 0
+  check "windows apply: journal says applied" test "$(jstatus)" = applied
+  check "windows apply: the 2.x binary reports 2.x" test "$(ver "$ocbin" | cut -d. -f1)" = 2
+  check "windows apply: ~\.opencode\bin is first on the user PATH" test "$(hkcu | cut -d';' -f1 | tr '\\' / | sed 's:/*$::')" = "$HOME/.opencode/bin"
+  check "windows apply: never touched the live data" test "$(dtree)" = "$LIVE_DATA"
+  leanu --undo --yes >"$T/win-undo.out" 2>&1; rc=$?
+  tail -n 12 "$T/win-undo.out" | sed 's/^/  /'
+  check "windows --undo: exits 0" test "$rc" = 0
+  check "windows --undo: journal says undone" test "$(jstatus)" = undone
+  check "windows --undo: no 2.x binary left" test ! -e "$ocbin"
+  check "windows --undo: user PATH restored" test "$(hkcu)" = "$path_before"
+  check "windows --undo: config restored (sha256 = the 1.x snapshot in the backup)" node "$T/h.mjs" same "$CFG" "$bk/config" all
 else
   for step in backup opencode1 install2x config dcp; do round "$step"; done
 
