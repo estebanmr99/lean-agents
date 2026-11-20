@@ -293,9 +293,14 @@ export async function inventory({ home, env = process.env, platform = process.pl
     else if (s.includes('duplicate')) it.action = it.kind === 'skill' || it.kind === 'plugin' || it.kind === 'mcp' ? 'ask' : it.kind === 'npm' ? (tn && it.node !== tn.version ? 'remove' : 'keep') : 'remove';
   }
   const oc = await opencodeInfo(home, env, fsx, { toolNode: tn });
-  const plan = items.filter((i) => i.action !== 'keep').map((i) => `${i.action} ${i.client} ${i.kind} ${i.name} (${i.status.join(', ') || i.owner})`);
+  // Linked skill copies: --yes skips them (it never deletes a link target), so they are not plan steps (#226).
+  const byLink = (i) => i.kind === 'skill' && i.linked && i.status.includes('duplicate');
+  const plan = items.filter((i) => i.action !== 'keep' && !byLink(i)).map((i) => `${i.action} ${i.client} ${i.kind} ${i.name} (${i.status.join(', ') || i.owner})`);
   for (const s of stopgaps) if (s.replaceWith) plan.push(`ask ${s.file}: replace with ${s.replaceWith}`);
-  return { version: 1, os: platform, toolNode, items, opencode: { ...oc, dataDir: rel(oc.dataDir) }, stopgaps, plan, health: pluginHealth(home, { fsx }), ok: !items.some((i) => i.action !== 'keep') };
+  const links = {};
+  for (const i of items.filter(byLink)) for (const c of i.copies) (links[i.name] ??= new Set()).add(c);
+  const byHand = Object.entries(links).map(([n, c]) => `skill ${n}: remove the extra link, keep one folder (${[...c].join(', ')})`);
+  return { version: 1, os: platform, toolNode, items, opencode: { ...oc, dataDir: rel(oc.dataDir) }, stopgaps, plan, byHand, health: pluginHealth(home, { fsx }), ok: !items.some((i) => i.action !== 'keep') };
 }
 
 export async function adopt(o) {
@@ -320,6 +325,7 @@ export async function adopt(o) {
   for (const f of r.health) console.log(`  health    ${f.plugin || 'probe'} [${f.id}] ${f.line}\n            fix: ${f.fix}`);
   for (const s of r.stopgaps) console.log(`  stopgap   ${s.file}${s.replaceWith ? `: replace with ${s.replaceWith}` : `: ${s.note}`}`);
   console.log(r.plan.length ? `Plan (${r.plan.length} steps; add --yes to apply, --confirm-removals to allow the removals):\n${r.plan.map((l) => `  - ${l}`).join('\n')}` : 'Plan: nothing to change.');
+  if (r.byHand.length) console.log(`Fix by hand (--yes leaves these):\n${r.byHand.map((l) => `  - ${l}`).join('\n')}`);
   if (r.apply.length) console.log(`--yes does:\n${r.apply.map((l) => `  - ${l}`).join('\n')}`);
   return true;
 }

@@ -44,10 +44,14 @@ test('work-PC layout as real copies: all three folders are flagged, with clients
 });
 
 test('work-PC layout as links to one folder (the Skills CLI layout) is still flagged', { skip }, async () => {
-  const rows = skillRows(await run(home(['.agents', '.claude', '.cursor'], 'link')));
+  const inv = await run(home(['.agents', '.claude', '.cursor'], 'link'));
+  const rows = skillRows(inv);
   assert.equal(rows.length, 3);
   assert.ok(rows.every((r) => r.status.includes('duplicate') && r.linked === true && r.differs === false));
   assert.match(rows[0].fix, /links/);
+  // --yes skips links, so the plan does not promise steps for them; one fix-by-hand line instead (#226)
+  assert.ok(!inv.plan.some((l) => /skill/.test(l)));
+  assert.equal(inv.byHand.length, 1); assert.match(inv.byHand[0], /remove the extra link/);
 });
 
 test('copies that differ say so, with a different short hash per folder', { skip }, async () => {
