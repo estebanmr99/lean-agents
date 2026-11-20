@@ -533,7 +533,7 @@ function prereqCommands(o, behind = new Set()) {
     }
     const p = prereqFor(t, pm);
     if (!p || (which(p.bin) && !behind.has(t))) continue;
-    if (p.install) out.push({ tool: t, desc: `install ${p.bin}`, run: p.install, undo: [], optional: t === 'gh' });
+    if (p.install) out.push({ tool: t, desc: `install ${p.bin}`, run: p.install, undo: [], optional: t === 'gh', bin: p.bin });
     else out.push({ tool: t, desc: `${p.bin} is missing: install it from ${p.manual}`, run: [], undo: [], manual: true, optional: t === 'gh', bin: p.bin });
   }
   if (o.agents.includes('antigravity')) {
@@ -813,7 +813,7 @@ async function install(o) {
       if (noCli.has(c.agent) && (c.run ?? []).some((argv) => argv[0] === AGENT_CLIS[c.agent])) { console.log(`  skipped: ${c.desc} (no ${AGENT_CLIS[c.agent]} CLI)`); continue; }
       // gh is on by default, so having no installer for it (no brew or winget) must not fail the run.
       // Planned before the prerequisites ran: --everything may have installed it since (macOS: brew's uv brings uvx). Not for --update's behind tools.
-      if (c.manual && c.bin && !behind.has(c.tool) && which(c.bin)) continue;
+      if (c.bin && !behind.has(c.tool) && which(c.bin)) continue;
       if (c.manual) { console.log(`! ${c.desc}`); if (!c.optional) { failed++; errors.push(c.desc); } continue; }
       const there = (c.skipIfExists && exists(c.skipIfExists)) || (c.skipIfOutput && quiet(c.skipIfOutput.cmd).ok);
       if (there) {
