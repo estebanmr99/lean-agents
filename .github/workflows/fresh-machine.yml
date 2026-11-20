@@ -95,6 +95,18 @@ jobs:
           & (Join-Path $env:LEAN_AGENTS_DIST 'install.ps1') -Doctor
           if ($LASTEXITCODE -ne 0) { exit 1 }
           exit 0
+      # Names and log tails only (no env values): why winget's Git failed and where its command links went.
+      - name: Show winget diagnostics
+        if: failure()
+        shell: powershell
+        run: |
+          $links = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links'
+          "Links ($links):"; Get-ChildItem $links -ErrorAction SilentlyContinue | ForEach-Object { "  $($_.Name) $($_.LinkType) -> $($_.Target)" }
+          "User Path entries:"; ([Environment]::GetEnvironmentVariable('Path', 'User') -split ';') | ForEach-Object { "  $_" }
+          $diag = Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\LocalState\DiagOutputDir'
+          Get-ChildItem $diag -Filter 'Git.Git*.log' -ErrorAction SilentlyContinue | ForEach-Object { "== $($_.Name)"; Get-Content $_.FullName -Tail 40 }
+          Get-ChildItem $env:TEMP -Filter 'Setup Log*.txt' -ErrorAction SilentlyContinue | ForEach-Object { "== $($_.Name)"; Get-Content $_.FullName -Tail 40 }
+          "where rtk:"; where.exe rtk 2>&1
 
   linux:
     needs: dist
