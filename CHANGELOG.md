@@ -4,45 +4,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
-### Added
-
-- `--doctor` reports the active Node against the `engines.node` of the project you run it in, and notes that VS Code or Cursor started outside your shell can resolve another Node (#177).
-- `--everything` installs `jq` (Homebrew or winget) when you pick the Warp plugin for Claude Code and jq is missing, since the plugin's hooks need it; `--uninstall` removes it (#179).
-- `--install-agent opencode-v2` and `--upgrade-agent opencode` install OpenCode 2 on Windows through Git Bash with the pinned installer, and put `~\.opencode\bin` first on the user PATH (removed again by `--uninstall-agent`) (#179).
-- Optional install of Warp and Orca terminal apps (`--install-terminal warp|orca|both`, undone by `--uninstall`). Integrations continue to be preselected if the app is already installed.
-
-### Fixed
-
-- DCP on OpenCode: a DCP plugin entry you already have (`@tarquinen/opencode-dcp@latest`, a bare name or your own version pin) is kept as it is ("kept your values for: plugin"); lean-agents no longer appends its pinned entry next to it, which loaded two DCP copies (#212).
-- The `--upgrade-agent opencode` dry run says first that OpenCode 2 migrates your sessions the first time it starts, and how to keep a 1.x copy (`--backup --yes`) and go back (`--undo --yes`).
-- macOS and Linux: `--everything` adds one marked PATH block to your shell rc file (`~/.zshrc`, `~/.bashrc`, `~/.bash_profile` or `~/.profile`) for the folders it installs into that are not on PATH yet, so a new terminal finds claude, opencode, rtk, uvx and context-mode; `--uninstall` removes it (#335).
-- The OpenCode 2 installer is pinned to an upstream commit (`raw.githubusercontent.com/anomalyco/opencode/<sha>/install`) instead of `opencode.ai/v2/install`, whose content changes with every upstream edit and broke the SHA-256 check on 2026-11-20. The pinned file is the same one checked before.
-- `--upgrade-agent opencode` on macOS and Linux no longer breaks your shell: the `opencode1` PATH block in `~/.zshrc` / `~/.bashrc` / `~/.profile` used `<!-- -->` markers, a syntax error in bash and zsh. It now uses `# lean-agents:opencode1:start` / `:end`, and `--uninstall` removes only that block.
-- `--adopt` no longer lists skill copies that are links to one folder as plan steps (`--yes` leaves them alone); it lists them once under "Fix by hand: remove the extra link" (#226).
-- The OpenCode 1.x session backup checks again, just before it finishes, that OpenCode is not running; if OpenCode started during the copy, the backup fails and leaves nothing behind (#253).
-- `--everything` on Linux without Homebrew installs RTK from its pinned release tarball into `~/.local/bin` (SHA-256 checked, undone by `--uninstall`) instead of asking you to install it by hand (#308).
-- `--everything` on Linux finds the uv and uvx it just installed in `~/.local/bin`. `install.ps1` no longer replaces the session PATH when winget fails to install Node.js, which hid winget from the engine (uv and RTK became manual steps) (#308).
-- `--everything` on a fresh machine: a tool it reported missing at plan time (uvx) counts as present once the prerequisites installed it, and is not installed a second time (winget failed on that); after a failed agent CLI install only that CLI's own steps are skipped; on Windows Node 24 installs through the nvm-windows it just set up, and OpenCode 2 installs into the home lean-agents configures, also when the same run installs the Git it needs (#308).
-- `--everything` on Windows: the tools winget just installed (uv, RTK, jq, Git) work in the same run; before, only a new terminal found them (#308). This also covers an overridden USERPROFILE and Git installed under Program Files from an elevated shell.
-- `--everything` on Linux installs git and unzip with apt-get (`sudo -E` unless root, so a proxy still works) when they are missing, and Windows installs Git with winget; `--uninstall` removes them again (#308).
-- The daily `ci-latest` run re-hashes the installer scripts pinned at a fixed URL (Claude Code, Antigravity, the macOS and Linux Cursor script); when one changed, its pin-bump PR carries the new SHA-256, so a Cursor release no longer leaves `real-cursor` red until someone re-pins by hand (#245).
-- `--upgrade-agent opencode --dry-run` reports the verified backup the apply will use, instead of `backup: null` (#297).
-- `--upgrade-agent opencode` with `--home` pointing elsewhere no longer runs the real `opencode --version` (it wrote logs); the report says `not probed (--home)` (#226).
-- `--everything` installs the Claude Code and OpenCode 2 CLIs it configures when they are missing (the same pinned install as `--install-agent`, undone by `--uninstall-agent`), so one command works on a fresh machine (#308, #179).
-- `--uninstall` removes the empty folders lean-agents created; a folder that holds anything else stays (#223).
-- OpenCode 2: lean-agents no longer installs the RTK plugin, which rtk writes for the 1.x plugin API and OpenCode 2 refuses to load (#179). Installs from before keep the step on record, so `--uninstall` still removes the plugin; to drop it now, run `rtk init -g --opencode --uninstall`, then run the lean-agents install again (that command also removes RTK's Claude Code hook).
-- Windows: when Bun is in `~\.bun\bin` but not on PATH, lean-agents now puts that folder on the user PATH (`--uninstall` takes it off again) instead of only warning (#179). An entry with a trailing backslash counts as the same folder.
-- `--uninstall` on Windows waits for the Orca uninstaller to finish (it relaunches itself and returned at once, so the Orca folder could still be there).
-- `--dry-run` and `--update --dry-run` mark an install that is already there (the Orca or Warp app, a vendor checkout) as "already there, skipped" instead of listing its install commands; the real run already skipped it (#179).
-- `--doctor` checks Context Mode on the Node lean-agents installed it on, not on PATH (#179 PC run).
-- `--doctor` shows why `codeburn runs` / `autoskills runs` failed, with a hint for a broken npx cache entry (#179 PC run).
-- `--upgrade-agent opencode` no longer copies local plugin file paths from the 1.x `plugin` list into 2.x `plugins[]`; they are listed as manual (#179 PC run).
-- `--install-agent claude` on Windows adds `~\.local\bin` to the user PATH (the upstream installer only prints a note), and `--uninstall-agent claude` removes it (#179 PC run).
-- Claude Code installer pin refreshed after an upstream change to install.sh.
-- `--uninstall` still tries the undo of a command that had failed (`ok: false`), but its failure no longer keeps the record, so a half install can be uninstalled (#179 PC run).
-- On Windows with Node older than 24.20, a skills install or removal that finished no longer counts as failed when Node crashes on exit (nodejs/node#56645), so `--uninstall` can complete (#179 PC run).
-
-## [1.0.0] - 2026-11-18
+## [1.0.0] - 2026-11-20
 
 First stable release. Highlights since 0.8.0:
 
@@ -88,6 +50,10 @@ First stable release. Highlights since 0.8.0:
 - Antigravity pilot (#216): `--doctor` lists `SSL_CERT_FILE` and `NODE_USE_SYSTEM_CA` as set or not set and reports the IDE folders and the `Google.google-antigravity` extension (read-only); `--adopt` lists them too. README "Antigravity pilot" (EN, ES); `docs/compatibility.md` Antigravity rows refreshed from the upstream docs (2026-11-18).
 - Tests (#229): the round trip seeds Antigravity's real skills folder, compares directories (not only files) and checks every kept backup is a copy of a user file; a unit test covers `antigravityAdapter` with `opts.prior` set and unset; the node-floor tests cover `--usage`, `--feedback-draft` and a faked higher `LEAN_AGENTS_NODE`. README tables (EN, ES) gain a row each for Antigravity skill ownership and the Node floor.
 - `tests/roundtrip.test.mjs`: one table-driven test runs install then `--uninstall` for each of the seven adapters in a temp HOME seeded with user files (a JSONC comment, a user MCP server, an agent and a skill named like managed ones) and asserts every file, path and bytes, equals the pre-install snapshot. Tests only (#164).
+- `--doctor` reports the active Node against the `engines.node` of the project you run it in, and notes that VS Code or Cursor started outside your shell can resolve another Node (#177).
+- `--everything` installs `jq` (Homebrew or winget) when you pick the Warp plugin for Claude Code and jq is missing, since the plugin's hooks need it; `--uninstall` removes it (#179).
+- `--install-agent opencode-v2` and `--upgrade-agent opencode` install OpenCode 2 on Windows through Git Bash with the pinned installer, and put `~\.opencode\bin` first on the user PATH (removed again by `--uninstall-agent`) (#179).
+- Optional install of Warp and Orca terminal apps (`--install-terminal warp|orca|both`, undone by `--uninstall`). Integrations continue to be preselected if the app is already installed.
 
 ### Fixed
 - Preflight warning for a missing agent CLI writes to stderr under `--json` so stdout remains valid JSON (#179 PC run).
@@ -144,6 +110,34 @@ First stable release. Highlights since 0.8.0:
 - `--uninstall` removes only what lean-agents created: the Linux and Windows Bun undo deletes `~/.bun/bin/bun` (`bun.exe`) and then its dirs only if empty, so your Bun cache and global packages stay; the OpenCode vendor undo re-derives the checkout path from your home at undo time and refuses a symlink, an edited `state.json` path or anything outside the home (#157).
 - `--doctor` (text and `--json`) and the install preview print only `set` / `not set` for proxy and CA variables, so internal proxy hosts, ports and CA paths no longer reach stdout; `NO_PROXY` also reports whether the loopback entries are present (#172).
 - The proxy test checks the proxy host and port (`127.0.0.1:3128`) on disk instead of the bare port `3128`, so a temp path or timestamp that contains `3128` no longer fails it (#205).
+- DCP on OpenCode: a DCP plugin entry you already have (`@tarquinen/opencode-dcp@latest`, a bare name or your own version pin) is kept as it is ("kept your values for: plugin"); lean-agents no longer appends its pinned entry next to it, which loaded two DCP copies (#212).
+- The `--upgrade-agent opencode` dry run says first that OpenCode 2 migrates your sessions the first time it starts, and how to keep a 1.x copy (`--backup --yes`) and go back (`--undo --yes`).
+- macOS and Linux: `--everything` adds one marked PATH block to your shell rc file (`~/.zshrc`, `~/.bashrc`, `~/.bash_profile` or `~/.profile`) for the folders it installs into that are not on PATH yet, so a new terminal finds claude, opencode, rtk, uvx and context-mode; `--uninstall` removes it (#335).
+- The OpenCode 2 installer is pinned to an upstream commit (`raw.githubusercontent.com/anomalyco/opencode/<sha>/install`) instead of `opencode.ai/v2/install`, whose content changes with every upstream edit and broke the SHA-256 check on 2026-11-20. The pinned file is the same one checked before.
+- `--upgrade-agent opencode` on macOS and Linux no longer breaks your shell: the `opencode1` PATH block in `~/.zshrc` / `~/.bashrc` / `~/.profile` used `<!-- -->` markers, a syntax error in bash and zsh. It now uses `# lean-agents:opencode1:start` / `:end`, and `--uninstall` removes only that block.
+- `--adopt` no longer lists skill copies that are links to one folder as plan steps (`--yes` leaves them alone); it lists them once under "Fix by hand: remove the extra link" (#226).
+- The OpenCode 1.x session backup checks again, just before it finishes, that OpenCode is not running; if OpenCode started during the copy, the backup fails and leaves nothing behind (#253).
+- `--everything` on Linux without Homebrew installs RTK from its pinned release tarball into `~/.local/bin` (SHA-256 checked, undone by `--uninstall`) instead of asking you to install it by hand (#308).
+- `--everything` on Linux finds the uv and uvx it just installed in `~/.local/bin`. `install.ps1` no longer replaces the session PATH when winget fails to install Node.js, which hid winget from the engine (uv and RTK became manual steps) (#308).
+- `--everything` on a fresh machine: a tool it reported missing at plan time (uvx) counts as present once the prerequisites installed it, and is not installed a second time (winget failed on that); after a failed agent CLI install only that CLI's own steps are skipped; on Windows Node 24 installs through the nvm-windows it just set up, and OpenCode 2 installs into the home lean-agents configures, also when the same run installs the Git it needs (#308).
+- `--everything` on Windows: the tools winget just installed (uv, RTK, jq, Git) work in the same run; before, only a new terminal found them (#308). This also covers an overridden USERPROFILE and Git installed under Program Files from an elevated shell.
+- `--everything` on Linux installs git and unzip with apt-get (`sudo -E` unless root, so a proxy still works) when they are missing, and Windows installs Git with winget; `--uninstall` removes them again (#308).
+- The daily `ci-latest` run re-hashes the installer scripts pinned at a fixed URL (Claude Code, Antigravity, the macOS and Linux Cursor script); when one changed, its pin-bump PR carries the new SHA-256, so a Cursor release no longer leaves `real-cursor` red until someone re-pins by hand (#245).
+- `--upgrade-agent opencode --dry-run` reports the verified backup the apply will use, instead of `backup: null` (#297).
+- `--upgrade-agent opencode` with `--home` pointing elsewhere no longer runs the real `opencode --version` (it wrote logs); the report says `not probed (--home)` (#226).
+- `--everything` installs the Claude Code and OpenCode 2 CLIs it configures when they are missing (the same pinned install as `--install-agent`, undone by `--uninstall-agent`), so one command works on a fresh machine (#308, #179).
+- `--uninstall` removes the empty folders lean-agents created; a folder that holds anything else stays (#223).
+- OpenCode 2: lean-agents no longer installs the RTK plugin, which rtk writes for the 1.x plugin API and OpenCode 2 refuses to load (#179). Installs from before keep the step on record, so `--uninstall` still removes the plugin; to drop it now, run `rtk init -g --opencode --uninstall`, then run the lean-agents install again (that command also removes RTK's Claude Code hook).
+- Windows: when Bun is in `~\.bun\bin` but not on PATH, lean-agents now puts that folder on the user PATH (`--uninstall` takes it off again) instead of only warning (#179). An entry with a trailing backslash counts as the same folder.
+- `--uninstall` on Windows waits for the Orca uninstaller to finish (it relaunches itself and returned at once, so the Orca folder could still be there).
+- `--dry-run` and `--update --dry-run` mark an install that is already there (the Orca or Warp app, a vendor checkout) as "already there, skipped" instead of listing its install commands; the real run already skipped it (#179).
+- `--doctor` checks Context Mode on the Node lean-agents installed it on, not on PATH (#179 PC run).
+- `--doctor` shows why `codeburn runs` / `autoskills runs` failed, with a hint for a broken npx cache entry (#179 PC run).
+- `--upgrade-agent opencode` no longer copies local plugin file paths from the 1.x `plugin` list into 2.x `plugins[]`; they are listed as manual (#179 PC run).
+- `--install-agent claude` on Windows adds `~\.local\bin` to the user PATH (the upstream installer only prints a note), and `--uninstall-agent claude` removes it (#179 PC run).
+- Claude Code installer pin refreshed after an upstream change to install.sh.
+- `--uninstall` still tries the undo of a command that had failed (`ok: false`), but its failure no longer keeps the record, so a half install can be uninstalled (#179 PC run).
+- On Windows with Node older than 24.20, a skills install or removal that finished no longer counts as failed when Node crashes on exit (nodejs/node#56645), so `--uninstall` can complete (#179 PC run).
 
 ### Changed
 
