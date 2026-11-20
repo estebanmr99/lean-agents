@@ -14,12 +14,17 @@ opencode --version
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 
 bash "$repo/install.sh" --yes --no-exec --agents opencode-v2 \
-  --tools serena,playwright,playwright-extension,ponytail --privacy strict --profile anthropic-api
+  --tools serena,playwright,playwright-extension,ponytail,rtk --privacy strict --profile anthropic-api
 
 # Proves the file name the migration guide gives for the old tui.json.
 LC_ALL=C grep -aq 'opencode/cli.json' "$(command -v opencode)"
 
 opencode debug config > "$HOME/resolved.txt" 2>"$HOME/stderr.txt" || { cat "$HOME/resolved.txt" "$HOME/stderr.txt"; exit 1; }
+
+if LC_ALL=C grep -E -i 'LoadError|failed to load plugin' "$HOME/stderr.txt" "$HOME/resolved.txt"; then
+  echo "FAIL: OpenCode logged a plugin load error" >&2
+  exit 1
+fi
 
 opencode debug agents > "$HOME/agents.txt" 2>&1 || true
 node --input-type=module - "$HOME/resolved.txt" "$repo" "$HOME/agents.txt" <<'JS'
