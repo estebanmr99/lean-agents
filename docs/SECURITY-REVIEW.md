@@ -56,7 +56,7 @@ Only after you approve the plan, and never with admin rights. `--dry-run` prints
 
 | Command | Why |
 | --- | --- |
-| `brew install rtk`, `uv`, `git`, `gh` or `winget install --id rtk-ai.rtk`, `astral-sh.uv`, `Git.Git`, `GitHub.cli` (`--scope user`) | missing prerequisites; `gh` only when asked |
+| `brew install jq`, `rtk`, `uv`, `git`, `gh` or `winget install --id jqlang.jq`, `rtk-ai.rtk`, `astral-sh.uv`, `Git.Git`, `GitHub.cli` (`--scope user`) | missing prerequisites; `gh` and `jq` only when asked |
 | `npm install -g context-mode@2.1.4` | Context Mode |
 | `rtk init -g …` (per agent) | RTK hook or plugin |
 | `claude plugin marketplace add …`, `claude plugin install …`, `claude mcp add --scope user …` | Claude Code plugins and MCP servers |
@@ -83,7 +83,7 @@ Separate from the install-time commands above: code the agents download every ti
 | Serena (`uvx --from git+https://github.com/oraios/serena@<commit>`) | `serena` | |
 | Bun zip and the agent installers (claude.ai, opencode.ai, antigravity.google, cursor.com), the Homebrew installer (pinned by commit, run only on a Mac without Homebrew), checked by SHA256. Cursor's installer downloads a tarball that is not checked (#206) | `bun`, `claude-installer`, `claude-installer-win`, `opencode-installer`, `antigravity-installer`, `cursor-installer`, `homebrew-installer` | |
 | Agent CLIs from `--install-agent` (their versions go to the installers); CI-only harness CLIs | `claude-code`, `opencode-v2`, `opencode-v1`, `copilot-cli` | |
-| RTK, `gh` (brew, winget), `uv` | `rtk`, `uv`, `gh` | latest from their source; the pin is a known-good version and a minimum, never forced (#182) |
+| jq, RTK, `gh` (brew, winget), `uv` | `jq`, `rtk`, `uv`, `gh` | latest from their source; the pin is a known-good version and a minimum, never forced (#182) |
 | Antigravity CLI cask (`brew install --cask antigravity-cli`) | `antigravity-cask` | Homebrew cannot pin or hash-check it (#147); the pin records the version checked, reported only |
 
 A green `ci-latest` run opens one pin-bump PR when upstream ships a newer version; pins change only after you merge it (`skills/update-models`, section "Tool versions").

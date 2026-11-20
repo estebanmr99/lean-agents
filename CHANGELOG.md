@@ -6,6 +6,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Added
 
+- `--everything` installs `jq` (Homebrew or winget) when you pick the Warp plugin for Claude Code and jq is missing, since the plugin's hooks need it; `--uninstall` removes it (#179).
 - `--install-agent opencode-v2` and `--upgrade-agent opencode` install OpenCode 2 on Windows through Git Bash with the pinned installer, and put `~\.opencode\bin` first on the user PATH (removed again by `--uninstall-agent`) (#179).
 - Optional install of Warp and Orca terminal apps (`--install-terminal warp|orca|both`, undone by `--uninstall`). Integrations continue to be preselected if the app is already installed.
 
