@@ -764,8 +764,10 @@ async function install(o) {
   if (every && process.platform === 'linux' && pendingPrereqs(every.steps).some((s) => s.id === 'uv' || s.id === 'rtk')) process.env.PATH = `${path.join(o.home, '.local', 'bin')}${path.delimiter}${process.env.PATH ?? ''}`;
   // winget --scope user puts command links (uv, rtk, jq) and Git.Git's git.exe here, and on the saved user PATH, which only new terminals see. VERIFY (nightly)
   if (every && process.platform === 'win32' && pendingPrereqs(every.steps).some((s) => s.commands.some((argv) => argv[0] === 'winget'))) {
-    const local = process.env.LOCALAPPDATA ?? path.join(o.home, 'AppData', 'Local');
-    process.env.PATH = [path.join(local, 'Microsoft', 'WinGet', 'Links'), path.join(local, 'Programs', 'Git', 'cmd'), process.env.PATH ?? ''].join(path.delimiter);
+    // Both: winget resolves the profile folder, which differs from LOCALAPPDATA when USERPROFILE is overridden (CI). An elevated shell gets Git under Program Files.
+    const locals = [...new Set([path.join(o.home, 'AppData', 'Local'), process.env.LOCALAPPDATA].filter(Boolean))];
+    const gitMachine = process.env.ProgramFiles ? [path.join(process.env.ProgramFiles, 'Git', 'cmd')] : [];
+    process.env.PATH = [...locals.flatMap((l) => [path.join(l, 'Microsoft', 'WinGet', 'Links'), path.join(l, 'Programs', 'Git', 'cmd')]), process.env.PATH ?? '', ...gitMachine].join(path.delimiter); // Program Files last: only a fallback
   }
   const ui = q.menus ? await menuProgress() : null;
   Object.assign(process.env, childEnv(o.network));

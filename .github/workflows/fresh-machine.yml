@@ -82,6 +82,9 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
+          # A fresh PC has no Git: remove the image's copy (the VM is thrown away), so winget's Git.Git install is a real first install.
+          $unins = Get-ChildItem "$env:ProgramFiles\Git\unins*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($unins) { Write-Output "Removing the image's Git ($($unins.Name))"; Start-Process $unins.FullName -ArgumentList '/VERYSILENT', '/NORESTART' -Wait } else { Write-Output 'No preinstalled Git found' }
           $env:Path = (($env:Path -split ';') | Where-Object { $_ -and $_ -notmatch '(?i)nodejs|\\Git\\|GitHub CLI|nvm|npm' }) -join ';'
           foreach ($c in 'node', 'npm', 'git', 'gh', 'nvm') {
             if (Get-Command $c -ErrorAction SilentlyContinue) { throw "$c is still visible" }
