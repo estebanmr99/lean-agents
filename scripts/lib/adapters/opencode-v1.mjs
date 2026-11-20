@@ -65,7 +65,7 @@ export function opencodeV1Adapter({ home, core, profile, opts, rulesPath }) {
   actions.push(...orcaShimActions({ dir, terminals: opts.terminals, platform: opts.platform }));
   if (tools.includes('ponytail')) edits.push({ path: ['plugin'], value: npmSpec('ponytail'), mode: 'arrayAdd', legacy: ['@dietrichgebert/ponytail'] });
   if (tools.includes('dcp')) {
-    edits.push({ path: ['plugin'], value: npmSpec('opencode-dcp'), mode: 'arrayAdd' });
+    edits.push({ path: ['plugin'], value: npmSpec('opencode-dcp'), mode: 'arrayAdd', legacy: [] }); // any DCP entry already there is the user's: kept, nothing appended (#212)
     actions.push(dcpConfigAction(dir, profile));
   }
   const net = opts.network;
