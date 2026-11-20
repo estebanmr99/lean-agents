@@ -291,7 +291,8 @@ if [ "$is_win" = 1 ]; then
   check "windows apply: exits 0" test "$rc" = 0
   check "windows apply: journal says applied" test "$(jstatus)" = applied
   check "windows apply: the 2.x binary reports 2.x" test "$(ver "$ocbin" | cut -d. -f1)" = 2
-  check "windows apply: ~\.opencode\bin is first on the user PATH" test "$(hkcu | cut -d';' -f1 | tr '\\' / | sed 's:/*$::')" = "$HOME/.opencode/bin"
+  first="$(powershell.exe -NoProfile -Command "[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment').GetValue('Path', '').Split(';')[0].TrimEnd('\\').Replace('\\', '/')" | tr -d '\r')"
+  check "windows apply: ~/.opencode/bin is first on the user PATH" test "$first" = "$HOME/.opencode/bin"
   check "windows apply: never touched the live data" test "$(dtree)" = "$LIVE_DATA"
   leanu --undo --yes >"$T/win-undo.out" 2>&1; rc=$?
   tail -n 12 "$T/win-undo.out" | sed 's/^/  /'
