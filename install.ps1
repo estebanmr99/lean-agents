@@ -187,8 +187,9 @@ if (-not (Test-Command 'node')) {
       $wingetArgs = @('install', '--id', 'OpenJS.NodeJS.LTS', '-e', '--scope', 'user', '--accept-source-agreements', '--accept-package-agreements')
       if (-not $Yes -and (Read-Host "Node.js is missing. Install it with 'winget $($wingetArgs -join ' ')'? [y/N]") -notmatch '^(y|yes|s|si)$') { throw $nodeHelp }
       & winget @wingetArgs
+      # Add the saved PATH only after a winget success, and keep this session's entries (winget itself can live only here).
       if ($LASTEXITCODE -ne 0) { Write-Warning 'lean-agents: winget could not install Node.js; trying the nodejs.org zip instead.' }
-      $env:Path = @('Machine', 'User' | ForEach-Object { [Environment]::GetEnvironmentVariable('Path', $_) }) -join ';'
+      else { $env:Path = (@($env:Path) + @('Machine', 'User' | ForEach-Object { [Environment]::GetEnvironmentVariable('Path', $_) })) -join ';' }
     }
     if (-not (Test-Command 'node')) {
       if (-not $Yes -and (Read-Host "Node.js is missing. Download the Node.js $NodeMajor zip from nodejs.org into $nodeHome (your user only, no admin)? [y/N]") -notmatch '^(y|yes|s|si)$') { throw $nodeHelp }
