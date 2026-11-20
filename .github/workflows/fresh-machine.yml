@@ -95,6 +95,8 @@ jobs:
           $env:LEAN_AGENTS_DIST = (Resolve-Path dist).Path
           & (Join-Path $env:LEAN_AGENTS_DIST 'install.ps1') -Yes --everything
           if ($LASTEXITCODE -ne 0) { exit 1 }
+          # Like the new terminal the install asks for: add the saved user PATH (not Machine, which would bring the hidden tools back).
+          $env:Path = "$env:Path;$([Environment]::GetEnvironmentVariable('Path', 'User'))"
           & (Join-Path $env:LEAN_AGENTS_DIST 'install.ps1') -Doctor
           if ($LASTEXITCODE -ne 0) { exit 1 }
           exit 0
