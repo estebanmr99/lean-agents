@@ -98,6 +98,7 @@ jobs:
           name: dist
           path: dist
       - name: Install everything on a bare Ubuntu
+        shell: bash
         run: |
           set -euo pipefail
           # The image has no curl: install.sh needs it, and nothing else (no Node.js, git or gh).

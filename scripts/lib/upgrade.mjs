@@ -131,6 +131,7 @@ export function upgradeInventory(inv, { home, fsx = fs, binary = { path: null, v
     ...mine.filter((i) => i.upgrade.class === 'user-translatable').map((i) => `translate ${i.upgrade.before} -> ${i.upgrade.after}`),
     ...mine.filter((i) => i.upgrade.class === 'user-manual').map((i) => `manual ${i.upgrade.before}: ${i.upgrade.reason}`),
   ];
+  const stamp = readBackupStamp(home, fsx); // shown as ~ like the other paths: reports get pasted into issues
   return {
     ...inv,
     items,
@@ -138,7 +139,7 @@ export function upgradeInventory(inv, { home, fsx = fs, binary = { path: null, v
       from: 'opencode-v1', to: 'opencode-v2',
       binary: { path: rel(binary.path), version: binary.version, via: installVia(binary.path) },
       layout: { configDir: rel(ocDir), dataDir: inv.opencode.dataDir, sessions: inv.opencode.sessions, major: inv.opencode.major },
-      backup: null, // PR B: the permanent session backup
+      backup: stamp && { ...stamp, dir: rel(stamp.dir), frozen: rel(stamp.frozen) },
       counts, plan,
     },
   };
