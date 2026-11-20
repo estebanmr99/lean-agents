@@ -65,6 +65,8 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
   // A DISABLE_AUTOUPDATER already in the environment is the user's own choice, so it is respected too.
   const updater = updaterMode(opts);
   if (updater && !(updater === 'setIfAbsent' && (opts.env ?? process.env).DISABLE_AUTOUPDATER !== undefined)) edits.push({ path: ['env', 'DISABLE_AUTOUPDATER'], value: '1', mode: updater });
+  // Opt-in only (#304): experimental, and a session started with it resumes only with it on. User settings only; project settings ignore it.
+  if (tools.includes('code-mode')) edits.push({ path: ['env', 'CLAUDE_CODE_EXPERIMENTAL_CODE_MODE'], value: '1', mode: 'setIfAbsent' });
   if (tools.includes('copilot-usage')) {
     // Only when the user has no statusLine (setIfAbsent); uninstall removes it only while it is still ours. Forward slashes: Claude runs it through bash, also on Windows.
     const script = path.join(dir, 'lean-copilot-usage-statusline.mjs');
