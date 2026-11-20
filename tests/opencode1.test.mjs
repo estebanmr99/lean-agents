@@ -91,6 +91,9 @@ test('install: copies the binary, writes the shim and one rc block; the shim run
   assert.equal(spawnSync(shim, ['--version'], { encoding: 'utf8' }).stdout.trim(), '1.19.0');
   const rc = fs.readFileSync(j(f.home, '.profile'), 'utf8');
   assert.match(rc, new RegExp(`export PATH='${f.L.bin.replace(/[\\/]/g, '.')}':"\\$PATH"`));
+  // The rc file must still parse: HTML markers broke bash and zsh at every shell start.
+  assert.equal(spawnSync('sh', ['-n', j(f.home, '.profile')]).status, 0, rc);
+  assert.equal(spawnSync('sh', ['-c', `. '${j(f.home, '.profile')}' && echo "$PATH"`], { encoding: 'utf8', env: { PATH: '/usr/bin:/bin' } }).stdout.split(':')[0], f.L.bin);
   assert.equal(rec.pathEntry, false);
   assert.deepEqual(files.map((e) => path.basename(e.path)).sort(), ['.profile', 'opencode1']);
 });
@@ -102,7 +105,7 @@ test('undo: removes the shim, the rc block, the copy and the bin dir; keeps the 
   const files = [];
   const rec = doInstall(p, f, { files });
   assert.equal(fs.existsSync(j(f.home, '.profile')), false, 'an existing .bashrc is used instead of creating .profile');
-  assert.match(fs.readFileSync(j(f.home, '.bashrc'), 'utf8'), /^alias a=b\n\n<!-- lean-agents:start -->/);
+  assert.match(fs.readFileSync(j(f.home, '.bashrc'), 'utf8'), /^alias a=b\n\n# lean-agents:opencode1:start\n/);
   fs.mkdirSync(f.L.state, { recursive: true });
   fs.writeFileSync(j(f.L.state, 'kv.json'), '{}');
   const report = [...undo(files, [f.home]), ...removeOpencode1(rec, { home: f.home })];

@@ -217,7 +217,7 @@ sed 's/^/  /' "$T/oc1.out"
 check "opencode1 apply exits 0" test "$rc" = 0
 check "binary copied to opencode1/$v1" test -s "$OC1/$v1/$bin1"
 check "shim written" test -s "$OC1/bin/opencode1"
-if [ "$is_win" = 1 ]; then check "opencode1.cmd written" test -s "$OC1/bin/opencode1.cmd"; else check "PATH block in a shell rc file" grep -rq 'lean-agents:start' "$HOME/.profile" "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.bash_profile" 2>/dev/null; fi
+if [ "$is_win" = 1 ]; then check "opencode1.cmd written" test -s "$OC1/bin/opencode1.cmd"; else check "PATH block in a shell rc file" grep -rq 'lean-agents:opencode1:start' "$HOME/.profile" "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.bash_profile" 2>/dev/null; fi
 binp="$OC1/bin"; if [ "$is_win" = 1 ]; then binp="$(cygpath -u "$binp")"; fi
 check "opencode1 --version = $v1 (shim by path)" test "$("$OC1/bin/opencode1" --version 2>/dev/null | tail -n 1 | tr -d '\r')" = "$v1"
 check "opencode1 --version = $v1 (found on PATH)" test "$(PATH="$binp:$PATH" opencode1 --version 2>/dev/null | tail -n 1 | tr -d '\r')" = "$v1"
@@ -241,7 +241,7 @@ sed 's/^/  /' "$T/oc1-un.out"
 check "uninstall exits 0" test "$rc" = 0
 check "binary copy removed" test ! -e "$OC1/$v1"
 check "shim folder removed" test ! -e "$OC1/bin"
-if [ "$is_win" = 0 ]; then refute "PATH block removed from the rc files" grep -rq 'lean-agents:start' "$HOME/.profile" "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.bash_profile" 2>/dev/null; fi
+if [ "$is_win" = 0 ]; then refute "PATH block removed from the rc files" grep -rq 'lean-agents:opencode1:start' "$HOME/.profile" "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.bash_profile" 2>/dev/null; fi
 check "frozen copy kept (4 sessions)" test "$(count "$frozen")" = 4
 check "backup kept" test -s "$bk/MANIFEST.sha256"
 check "live data hash still unchanged" test "$(node "$T/h.mjs" tree "$LIVE")" = "$live_data_tree"

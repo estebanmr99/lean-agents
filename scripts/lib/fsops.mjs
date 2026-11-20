@@ -3,7 +3,8 @@
 //   file  - a whole file lean-agents owns (rules, agent definitions, loaders)
 //   json  - edits to a JSON/JSONC file the user owns; comments and formatting survive
 //   block - a marked block inside a text file the user owns (CLAUDE.md, AGENTS.md);
-//           toml: true uses # markers and puts the block first, so its keys stay top-level
+//           toml: true uses # markers and puts the block first, so its keys stay top-level;
+//           id: '<name>' uses # markers named by id (shell rc files: several blocks per file, and HTML markers break the shell)
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -166,8 +167,10 @@ export function revertJsonEdits(text, applied) {
   return text;
 }
 
-export function setBlock(original, body, toml = false) {
-  const [open, close] = toml ? [TOML_START, TOML_END] : [BLOCK_START, BLOCK_END];
+const idMarks = (id) => [`# lean-agents:${id}:start`, `# lean-agents:${id}:end`];
+
+export function setBlock(original, body, toml = false, id = undefined) {
+  const [open, close] = id ? idMarks(id) : toml ? [TOML_START, TOML_END] : [BLOCK_START, BLOCK_END];
   const block = `${open}\n${body.trim()}\n${close}`;
   const text = original ?? '';
   const start = text.indexOf(open);
@@ -180,13 +183,16 @@ export function setBlock(original, body, toml = false) {
   return `${text}${sep}${block}\n`;
 }
 
-export function removeBlock(text) {
-  for (const [open, close] of [[BLOCK_START, BLOCK_END], [TOML_START, TOML_END]]) {
+export function removeBlock(text, id = undefined) {
+  for (const [open, close] of id ? [idMarks(id)] : [[BLOCK_START, BLOCK_END], [TOML_START, TOML_END]]) {
     const start = text.indexOf(open);
     const end = text.indexOf(close);
     if (start < 0 || end < start) continue;
-    const rest = text.slice(0, start) + text.slice(end + close.length);
-    return (start === 0 ? rest.replace(/^\n+/, '') : rest).replace(/\n{3,}$/, '\n\n').replace(/^\n+$/, '');
+    const head = text.slice(0, start);
+    const tail = text.slice(end + close.length).replace(/^\n+/, '');
+    // A block between two others leaves one blank line, not the separators of both.
+    const rest = tail ? head.replace(/\n*$/, head ? '\n\n' : '') + tail : head;
+    return rest.replace(/\n{3,}$/, '\n\n').replace(/^\n+$/, '');
   }
   return text;
 }
@@ -228,7 +234,7 @@ export function plan(actions, roots = [], prior = []) {
       keptKeys = r.kept.map((k) => k.path.join('.'));
       if (r.kept.length) note = `kept your values for: ${r.kept.map((k) => k.path.join('.')).join(', ')}`;
     } else if (a.kind === 'block') {
-      after = setBlock(before, a.body, a.toml);
+      after = setBlock(before, a.body, a.toml, a.id);
     }
     const status = before === null ? 'create' : before === after ? 'unchanged' : 'modify';
     // A file lean-agents created and nobody edited since holds nothing of the user's: a rerun needs no backup of it.
@@ -262,7 +268,7 @@ export function apply(planned, backupDir, home, roots = [home], entries = []) {
     const dirs = [];
     for (let d = path.dirname(p.path); !fs.existsSync(d); d = path.dirname(d)) dirs.push(d);
     fs.mkdirSync(path.dirname(p.path), { recursive: true });
-    entries.push({ path: p.path, kind: p.kind, created: p.before === null, backup, hash: sha(p.after), applied: p.applied, noRestore: p.applied?.some((e) => e.upgraded), keepEmpty: p.keepEmpty, ...(dirs.length && { dirs }) });
+    entries.push({ path: p.path, kind: p.kind, created: p.before === null, backup, hash: sha(p.after), applied: p.applied, noRestore: p.applied?.some((e) => e.upgraded), keepEmpty: p.keepEmpty, ...(p.id && { id: p.id }), ...(dirs.length && { dirs }) });
     fs.writeFileSync(p.path, p.after);
   }
   return entries;
@@ -303,7 +309,7 @@ export function undo(entries, roots = []) {
       fs.writeFileSync(e.path, text);
       report.push(['reverted our keys', e.path]);
     } else if (e.kind === 'block') {
-      fs.writeFileSync(e.path, removeBlock(now));
+      fs.writeFileSync(e.path, removeBlock(now, e.id));
       report.push(['removed our block', e.path]);
     } else {
       report.push(['left (you edited it)', e.path]);
