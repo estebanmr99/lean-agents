@@ -58,7 +58,8 @@ jobs:
             if env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin sh -c "command -v $c" | grep -v '^/usr/bin/git$'; then echo "$c is still visible"; exit 1; fi
           done
           lean --yes --everything
-          lean --doctor
+          grep -n lean-agents "$home"/.profile "$home"/.bashrc "$home"/.zshrc 2>/dev/null || true
+          env -i HOME="$home" TERM=dumb PATH=/usr/bin:/bin:/usr/sbin:/sbin LEAN_AGENTS_DIST="$PWD/dist" bash -c 'for f in .profile .bashrc .zshrc; do [ -f "$HOME/$f" ] && . "$HOME/$f"; done; exec bash "$LEAN_AGENTS_DIST/install.sh" --doctor'
 
   windows:
     needs: dist
@@ -142,7 +143,8 @@ jobs:
           home="$(mktemp -d)"
           lean() { env -i HOME="$home" TERM=dumb PATH=/usr/bin:/bin:/usr/sbin:/sbin LEAN_AGENTS_DIST="$PWD/dist" bash "$PWD/dist/install.sh" "$@"; }
           lean --yes --everything
-          lean --doctor
+          grep -n lean-agents "$home"/.profile "$home"/.bashrc "$home"/.zshrc 2>/dev/null || true
+          env -i HOME="$home" TERM=dumb PATH=/usr/bin:/bin:/usr/sbin:/sbin LEAN_AGENTS_DIST="$PWD/dist" bash -c 'for f in .profile .bashrc .zshrc; do [ -f "$HOME/$f" ] && . "$HOME/$f"; done; exec bash "$LEAN_AGENTS_DIST/install.sh" --doctor'
 
   forced:
     if: inputs.force-fail

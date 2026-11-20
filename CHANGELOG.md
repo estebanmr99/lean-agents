@@ -12,6 +12,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- macOS and Linux: `--everything` adds one marked PATH block to your shell rc file (`~/.zshrc`, `~/.bashrc`, `~/.bash_profile` or `~/.profile`) for the folders it installs into that are not on PATH yet, so a new terminal finds claude, opencode, rtk, uvx and context-mode; `--uninstall` removes it (#335).
 - `--upgrade-agent opencode` on macOS and Linux no longer breaks your shell: the `opencode1` PATH block in `~/.zshrc` / `~/.bashrc` / `~/.profile` used `<!-- -->` markers, a syntax error in bash and zsh. It now uses `# lean-agents:opencode1:start` / `:end`, and `--uninstall` removes only that block.
 - `--adopt` no longer lists skill copies that are links to one folder as plan steps (`--yes` leaves them alone); it lists them once under "Fix by hand: remove the extra link" (#226).
 - The OpenCode 1.x session backup checks again, just before it finishes, that OpenCode is not running; if OpenCode started during the copy, the backup fails and leaves nothing behind (#253).

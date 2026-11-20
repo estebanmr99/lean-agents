@@ -30,6 +30,7 @@ import { backupOpencode, backupLayout, listProcesses, opencodeRunning } from './
 import { readBackupStamp } from './lib/backup-stamp.mjs';
 import { isActive, failAt, applyPreflight, verifyBackup, configDrift, createSteps, makeCtx, runApply, runUndo, restoreData } from './lib/opencode-upgrade.mjs';
 import { planOpencode1, installOpencode1, removeOpencode1, layout as opencode1Layout } from './lib/opencode1.mjs';
+import { posixPathBlock } from './lib/shell-path.mjs';
 import { agentLifecycle, agentTable, upgradeCommands, undoPlan, undoUpgrades, agentOf, agentStamps, VSCODE_NOTE, AGENT_CLIS } from './lib/agent-lifecycle.mjs';
 import { copilotUsage } from './lib/copilot-usage.mjs';
 import { draftIssue, addFiledIssue } from './lib/feedback.mjs';
@@ -485,7 +486,7 @@ function migrationPlan(o) {
   return { planned, commands: r.commands, migration: { ...r, rows: finishRows(r.rows, planned, o.exec), base, names } };
 }
 
-function buildPlan(o) {
+function buildPlan(o, every = null) {
   if (o.migrate) return migrationPlan(o);
   if (o.project) {
     const r = projectPlan(ROOT, o.project, o);
@@ -516,6 +517,7 @@ function buildPlan(o) {
   if (o.bun && o.network.telemetry === 'off') {
     actions.push({ kind: 'block', toml: true, path: path.join(o.home, '.bunfig.toml'), body: 'telemetry = false' });
   }
+  actions.push(...posixPathActions(o, every));
   return { planned: plan(actions, writeRoots(o), readState(o.home)?.files), commands };
 }
 
@@ -687,6 +689,19 @@ function updateInfo(o, saved) {
   return { rows, notes: changelogNotes(fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '', saved.version ?? '0.0.0', current) };
 }
 
+// The folders an --everything run installs into, as one marked rc block (#335). Folders already on PATH are left out.
+function posixPathActions(o, every) {
+  if (!every || process.platform === 'win32') return [];
+  const pending = new Set(pendingPrereqs(every.steps).map((s) => s.id));
+  const dirs = [
+    ...(o.agents.includes('claude') || pending.has('uv') || pending.has('rtk') ? ['.local/bin'] : []),
+    ...(o.agents.includes('opencode-v2') ? ['.opencode/bin'] : []),
+  ];
+  const brew = pending.has('homebrew') ? (process.arch === 'arm64' ? '/opt/homebrew' : '/usr/local') : null;
+  const privateNode = process.execPath.startsWith(path.join(o.home, '.config', 'lean-agents', 'node') + path.sep);
+  return posixPathBlock({ home: o.home, platform: process.platform, envPath: process.env.PATH, dirs, brew, privateNode, shell: process.env.SHELL });
+}
+
 async function install(o) {
   if (o.json && !o.yes) throw new Error('--json needs --yes: the menus would write questions to stdout');
   const saved = o.command === 'update' ? readState(o.home) : null;
@@ -697,10 +712,10 @@ async function install(o) {
   }
   if (o.command === 'update' && saved.options.migrateOnly) throw new Error(`nothing to update: only ${saved.adoptOnly ? '--adopt' : '--migrate'} ran here; install first (--everything --yes)`);
   const p = await choose(o, saved?.options);
-  const { planned, commands: agentCommands, migration } = buildPlan(o);
+  const every = o.everything && !o.migrate ? everythingPrereqs(o, readState(o.home)) : null;
+  const { planned, commands: agentCommands, migration } = buildPlan(o, every);
   if (migration && !migration.rows.length) { p.close(); console.log('Nothing to migrate: no rules, agents, skills, prompts, MCP servers or hooks found.'); return o.json && printApplied(o, [], [], []); }
   const behind = new Set((saved ? behindPins(saved) : []).map((b) => pinTool(b.tool)));
-  const every = o.everything && !migration ? everythingPrereqs(o, readState(o.home)) : null;
   // The planner owns these installs; the per-tool ones below would repeat them.
   const owned = new Set(pendingPrereqs(every?.steps ?? []).map((s) => (s.id === 'node-24' ? 'node' : s.id)));
   const update = saved && (o.dryRun || o.exec) ? updateInfo(o, saved) : null;
@@ -871,6 +886,8 @@ async function install(o) {
   console.log('Next: restart your agents, log in to your providers, then run --doctor.');
   const shell = shellNotice();
   if (shell) console.log(shell.text);
+  const rc = files.find((f) => f.id === 'path');
+  if (rc) console.log(`Open a new terminal (or run: . ${rc.path}) so the new PATH takes effect.`);
   const todo = stillNeeded({ home: o.home, terminals: o.terminals, agents: o.agents });
   if (todo.length) console.log(`Still needed from you:\n${todo.map((t) => `  - ${t.text}`).join('\n')}`);
   if (o.tools.includes('playwright-extension')) console.log(`Signed-in browser: ${EXTENSION_NOTE}`);
