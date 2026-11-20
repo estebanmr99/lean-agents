@@ -258,11 +258,19 @@ export function apply(planned, backupDir, home, roots = [home], entries = []) {
       privateDir(path.dirname(backup), path.dirname(backupDir));
       writePrivate(backup, p.before);
     }
+    // The folders this write creates, deepest first: undo removes them again once they are empty (#223).
+    const dirs = [];
+    for (let d = path.dirname(p.path); !fs.existsSync(d); d = path.dirname(d)) dirs.push(d);
     fs.mkdirSync(path.dirname(p.path), { recursive: true });
-    entries.push({ path: p.path, kind: p.kind, created: p.before === null, backup, hash: sha(p.after), applied: p.applied, noRestore: p.applied?.some((e) => e.upgraded), keepEmpty: p.keepEmpty });
+    entries.push({ path: p.path, kind: p.kind, created: p.before === null, backup, hash: sha(p.after), applied: p.applied, noRestore: p.applied?.some((e) => e.upgraded), keepEmpty: p.keepEmpty, ...(dirs.length && { dirs }) });
     fs.writeFileSync(p.path, p.after);
   }
   return entries;
+}
+
+// Only empty folders: a file the user added since keeps its folder.
+function removeEmptyDirs(dirs = []) {
+  for (const d of dirs) try { fs.rmdirSync(d); } catch { return; }
 }
 
 // Undo state entries. If the user edited a file after install, remove only our parts.
@@ -272,11 +280,12 @@ export function undo(entries, roots = []) {
     const blocked = unsafe(e.path, roots);
     if (blocked) { report.push(['left (symlink)', e.path]); continue; }
     const now = read(e.path);
-    if (now === null) continue;
+    if (now === null) { removeEmptyDirs(e.dirs); continue; }
     const untouched = sha(now) === e.hash;
     if (untouched && e.created) {
       fs.rmSync(e.path);
       report.push(['removed', e.path]);
+      removeEmptyDirs(e.dirs);
     } else if (untouched && e.backup && !e.noRestore && fs.existsSync(e.backup)) {
       fs.writeFileSync(e.path, fs.readFileSync(e.backup, 'utf8'));
       report.push(['restored', e.path]);
@@ -286,6 +295,7 @@ export function undo(entries, roots = []) {
       if (e.created && left && typeof left === 'object' && !Object.keys(left).length) {
         fs.rmSync(e.path);
         report.push(['removed', e.path]);
+        removeEmptyDirs(e.dirs);
         continue;
       }
       // A tool that rejects a file without its container key (Copilot: "mcpServers: Required") keeps it empty.

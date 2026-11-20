@@ -140,3 +140,15 @@ test('a rerun fixes the old Context Mode entry, keeps an edited one, and uninsta
   const edited = entry(['-y', 'context-mode@2.0.1', '--my-flag']);
   assert.equal(fs.readFileSync(run(mine, edited), 'utf8'), edited);
 });
+
+test('undo removes the folders apply created only while they are empty (#223)', () => {
+  const home = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'lean-dirs-')));
+  const file = (rel) => plan([{ kind: 'file', path: path.join(home, rel), content: `${OWNED_MARK}\n` }], [home]);
+  const entries = apply(file('a/b/x.md'), path.join(home, 'bk'), home, [home]);
+  apply(file('c/y.md'), path.join(home, 'bk'), home, [home], entries);
+  fs.writeFileSync(path.join(home, 'c', 'mine.txt'), 'user file\n');
+  undo(entries, [home]);
+  assert.ok(!fs.existsSync(path.join(home, 'a')), 'a/b and a are removed');
+  assert.equal(fs.readFileSync(path.join(home, 'c', 'mine.txt'), 'utf8'), 'user file\n');
+  fs.rmSync(home, { recursive: true, force: true });
+});

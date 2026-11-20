@@ -103,7 +103,8 @@ for (const agent of Object.keys(userFiles('/h'))) {
     lean(home, ['--uninstall', '--yes', '--no-exec']);
     const after = snapshot(home);
     assert.deepEqual(withoutBackups(after.files, before.files), before.files);
-    // Every directory the user had survives. Extra empty ones are left by uninstall (#223) and the engine folder stays on purpose.
+    // Every directory the user had survives, and no new one is left (#223) but the engine folder, kept on purpose.
     assert.deepEqual(before.dirs.filter((d) => !after.dirs.includes(d)), []);
+    assert.deepEqual(after.dirs.filter((d) => !before.dirs.includes(d) && !/^\.config(\/lean-agents(\/backups(\/[^/]+.*)?)?)?$/.test(d)), []);
   });
 }
