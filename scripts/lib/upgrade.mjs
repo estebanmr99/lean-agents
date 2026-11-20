@@ -71,7 +71,8 @@ function classifyItem(it, stopgaps, home, fsx) {
     if (!t.verified) return verifyRow(t, `${tui ? 'tui.json ' : ''}plugin ${it.name}`);
     if (it.source) return manual(`plugin ${it.name}`, localPluginReason(pluginSource(it, home, fsx)));
 
-    const isLocalPath = /^([./~]|file:|[a-zA-Z]:[\\/])/.test(it.name) || (/[\/\\]/.test(it.name) && /\.(js|mjs|cjs|ts)$/.test(it.name));
+    // A path or a bare file name is a local plugin; npm names (also @scope/name) are not.
+    const isLocalPath = /^([./~\\]|file:|[a-zA-Z]:[\\/])/.test(it.name) || (!it.name.startsWith('@') && /\.(js|mjs|cjs|ts)$/.test(it.name));
     if (isLocalPath) return manual(`plugin ${it.name}`, localPluginReason(null));
 
     return translate(t, it.name, `plugin ${it.name}`);

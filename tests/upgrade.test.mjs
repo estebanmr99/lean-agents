@@ -39,6 +39,7 @@ test('every class appears and translation rows give the right before/after', { s
   assert.deepEqual(pair('some-npm-plugin@1.0.0', 'plugin'), ['user-translatable', 'plugin some-npm-plugin@1.0.0', 'plugins[]']);
   assert.deepEqual(pair('./x.ts', 'plugin'), ['user-manual', 'plugin ./x.ts', null]);
   assert.deepEqual(pair('plugins/graphify.js', 'plugin'), ['user-manual', 'plugin plugins/graphify.js', null]);
+  assert.deepEqual(pair('my-plugin.mjs', 'plugin'), ['user-manual', 'plugin my-plugin.mjs', null]);
   assert.deepEqual(pair('@warp-dot-dev/opencode-warp@0.1.7', 'plugin'), ['managed', 'plugin @warp-dot-dev/opencode-warp@0.1.7', 'plugins[]']);
   assert.deepEqual(pair('compaction.reserved'), ['user-translatable', 'compaction.reserved', 'compaction.buffer']);
   assert.deepEqual(pair('autoupdate'), ['user-translatable', 'autoupdate: false', 'update: "disable"']);

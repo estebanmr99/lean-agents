@@ -4,6 +4,7 @@ import path from 'node:path';
 import { sha } from './fsops.mjs';
 import { PINS, npmSpec, behindPins, nodeRange } from './pins.mjs';
 import { version, quiet, findAgy, antigravityFootprint } from './system.mjs';
+import { redactText } from './redact.mjs';
 import { satisfies, nodeSkipLine, minVersion, findNvm, nodeAt } from './node-runtime.mjs';
 import { mcpLaunches, classify, duplicateSkills, skillDirs } from './inventory.mjs';
 import { stillNeeded, shellNotice } from './terminals.mjs';
@@ -100,9 +101,11 @@ function checkInventory({ home, exec, run, env, platform, fsx }, add) {
   return { nodes, skills };
 }
 
-export function npxFailDetail(out) {
-  const line = out.split('\n').find((l) => /error/i.test(l))?.trim().slice(0, 200);
-  if (!line) return '';
+// Redacted: npm error lines can carry proxy credentials or tokens, and doctor output gets pasted into issues.
+export function npxFailDetail(out, opts) {
+  const raw = (out ?? '').split('\n').find((l) => /error/i.test(l))?.trim();
+  if (!raw) return '';
+  const line = redactText(raw, opts).slice(0, 200);
   if (/_npx/.test(line) && /enoent/i.test(line)) return `${line} (broken npx cache entry: delete that _npx folder, then run again)`;
   return line;
 }
@@ -158,7 +161,7 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
             const n = nodeAt(nvm, dir, state.toolNode.version);
             const cli = path.join(n.modules, 'context-mode', 'package.json');
             const found = fsx.existsSync(cli);
-            add(`context-mode on Node ${state.toolNode.version}`, found ? 'ok' : 'error', found ? cli : 'not found');
+            add(`context-mode on Node ${state.toolNode.version}`, found ? 'ok' : 'error', found ? cli : `not found: ${cli}`);
             continue;
           }
         }
@@ -185,11 +188,11 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
       // npx may have to download, which takes longer than a local check.
       if (o.tools.includes('codeburn')) {
         const r = q(['npx', '-y', npmSpec('codeburn'), '--version'], 120000);
-        add('codeburn runs', r.ok ? 'ok' : 'error', r.ok ? '' : npxFailDetail(r.out));
+        add('codeburn runs', r.ok ? 'ok' : 'error', r.ok ? '' : npxFailDetail(r.out, { home, env }));
       }
       if (o.tools.includes('autoskills')) {
         const r = q(['npx', '-y', npmSpec('autoskills'), '--help'], 120000);
-        add('autoskills runs', r.ok ? 'ok' : 'error', r.ok ? '' : npxFailDetail(r.out));
+        add('autoskills runs', r.ok ? 'ok' : 'error', r.ok ? '' : npxFailDetail(r.out, { home, env }));
       }
     }
   }
