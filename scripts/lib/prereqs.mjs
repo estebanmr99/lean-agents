@@ -6,7 +6,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PINS } from './pins.mjs';
-import { bunInstall } from './system.mjs';
+import { bunInstall, rtkInstall } from './system.mjs';
 import { satisfies, compare, minVersion, nvmInstallArgv } from './node-runtime.mjs';
 
 const VERIFY_SHA = fileURLToPath(new URL('./verify-sha256.mjs', import.meta.url));
@@ -74,7 +74,7 @@ export function everythingAgents({ platform, detected = {}, project = false }) {
 const WINGET = (id) => ['winget', 'install', '--id', id, '-e', '--scope', 'user', '--accept-source-agreements', '--accept-package-agreements'];
 
 // probe: { platform, arch, home, tmp, execPath, has: { brew, winget, uv, rtk, bun, git, clt, nvm, jq }, nodeActive: '22.20.0' | null,
-//   nvmNodes: ['24.15.0'], nvmDirExisted: true (~/.nvm was there before this run, so its undo is empty), proxyEnv: ['HTTPS_PROXY'] (names only), needsGit: false, done: ['prereq:nvm'] (resume stamps), bunInstall: stub for tests }
+//   nvmNodes: ['24.15.0'], nvmDirExisted: true (~/.nvm was there before this run, so its undo is empty), proxyEnv: ['HTTPS_PROXY'] (names only), needsGit: false, done: ['prereq:nvm'] (resume stamps), bunInstall, rtkInstall: stubs for tests }
 export function planPrereqs(probe) {
   const { platform, arch = 'x64', home, has = {}, nodeActive = null, nvmNodes = [], nvmDirExisted = false, proxyEnv = [], needsGit = false, done = [], terminals = [], agents = [] } = probe;
   const win = platform === 'win32', mac = platform === 'darwin';
@@ -172,9 +172,10 @@ export function planPrereqs(probe) {
   tool('uv', 'uv', 'Runs Serena (uvx).', has.uv,
     !win && !pm ? [fetch(UV_INSTALL_URL, uvScript), ['sh', uvScript]] : route(['brew', 'install', 'uv'], 'astral-sh.uv', 'https://docs.astral.sh/uv/getting-started/installation/'), // direct script unpinned: VERIFY
     pm === 'brew' ? { undo: [['brew', 'uninstall', 'uv']] } : pm === 'winget' ? { undo: [['winget', 'uninstall', '--id', 'astral-sh.uv', '-e']] } : {});
+  const rtk = !win && !pm ? (probe.rtkInstall ?? rtkInstall)(home, tmp, platform, arch) : null;
   tool('rtk', 'RTK', 'Compresses command output for the agents.', has.rtk,
-    route(['brew', 'install', 'rtk'], 'rtk-ai.rtk', 'https://github.com/rtk-ai/rtk#installation'),
-    pm === 'brew' ? { undo: [['brew', 'uninstall', 'rtk']] } : pm === 'winget' ? { undo: [['winget', 'uninstall', '--id', 'rtk-ai.rtk', '-e']] } : {});
+    rtk ? rtk.run : route(['brew', 'install', 'rtk'], 'rtk-ai.rtk', 'https://github.com/rtk-ai/rtk#installation'),
+    rtk ? { undo: rtk.undo } : pm === 'brew' ? { undo: [['brew', 'uninstall', 'rtk']] } : pm === 'winget' ? { undo: [['winget', 'uninstall', '--id', 'rtk-ai.rtk', '-e']] } : {});
 
   if (terminals.includes('warp') && agents.includes('claude')) {
     tool('jq', 'jq', 'The Warp plugin for Claude Code reads hook JSON with jq.', has.jq,
