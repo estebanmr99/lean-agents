@@ -66,6 +66,8 @@ test('Linux with apt: installs git and unzip using apt-get', () => {
   const root = planPrereqs(bare('linux', { has: { apt: true, git: true, bun: true }, needsGit: true, root: true }));
   assert.equal(by(root, 'git').skipIf, 'git is on PATH');
   assert.equal(by(root, 'unzip'), undefined); // step omitted because bun is installed
+  const rootBare = planPrereqs(bare('linux', { has: { apt: true }, needsGit: true, root: true }));
+  assert.deepEqual(by(rootBare, 'unzip').commands[1], ['apt-get', 'install', '-y', '-qq', '--no-install-recommends', 'unzip']); // root: no sudo (the CI container has none)
 });
 
 test('Windows: git only when a tool needs it; nvm-windows setup is hash-checked; winget routes', () => {
