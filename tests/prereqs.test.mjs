@@ -41,13 +41,31 @@ test('Mac without nvm: installer keeps the shell profile alone and undo removes 
   assert.ok(!nvm.undo[0].includes('rm'));
 });
 
-test('Linux: no Xcode or Homebrew, uv by script, rtk manual, bun by pinned zip', () => {
-  const steps = planPrereqs(bare('linux'));
-  assert.deepEqual(ids(steps), ['nvm', 'node-24', 'uv', 'rtk', 'bun']);
+test('Linux: no Xcode or Homebrew, git and unzip manual when no apt, uv by script, rtk manual, bun by pinned zip', () => {
+  const steps = planPrereqs(bare('linux', { needsGit: true }));
+  assert.deepEqual(ids(steps), ['git', 'unzip', 'nvm', 'node-24', 'uv', 'rtk', 'bun']);
+  assert.deepEqual(by(steps, 'git').commands, []);
+  assert.match(by(steps, 'git').manual, /^https:\/\/git-scm\.com\//);
+  assert.deepEqual(by(steps, 'unzip').commands, []);
+  assert.match(by(steps, 'unzip').manual, /^https:\/\/infozip\.sourceforge\.net\//);
   assert.equal(by(steps, 'uv').commands.length, 2);
   assert.deepEqual(by(steps, 'rtk').commands, []);
   assert.match(by(steps, 'rtk').manual, /^https:/);
   assert.equal(by(steps, 'bun').commands.length, 5); // mkdir tmp, download, verify, mkdir, unzip
+});
+
+test('Linux with apt: installs git and unzip using apt-get', () => {
+  // Non-root (adds sudo)
+  const steps = planPrereqs(bare('linux', { has: { apt: true }, needsGit: true }));
+  const git = by(steps, 'git');
+  assert.deepEqual(git.commands[0], ['sudo', 'apt-get', 'update', '-qq']);
+  assert.deepEqual(git.commands[1], ['sudo', 'apt-get', 'install', '-y', '-qq', '--no-install-recommends', 'git']);
+  assert.deepEqual(git.undo[0], ['sudo', 'apt-get', 'remove', '-y', '-qq', 'git']);
+
+  // Root (no sudo), git skipped, bun installed so unzip skipped/omitted
+  const root = planPrereqs(bare('linux', { has: { apt: true, git: true, bun: true }, needsGit: true, root: true }));
+  assert.equal(by(root, 'git').skipIf, 'git is on PATH');
+  assert.equal(by(root, 'unzip'), undefined); // step omitted because bun is installed
 });
 
 test('Windows: git only when a tool needs it; nvm-windows setup is hash-checked; winget routes', () => {

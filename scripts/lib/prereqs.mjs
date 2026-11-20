@@ -108,6 +108,29 @@ export function planPrereqs(probe) {
     });
   }
 
+  if (platform === 'linux') {
+    const sudo = probe.root ? [] : ['sudo'];
+    const apt = (pkg) => has.apt ? {
+      commands: [[...sudo, 'apt-get', 'update', '-qq'], [...sudo, 'apt-get', 'install', '-y', '-qq', '--no-install-recommends', pkg]],
+      undo: [[...sudo, 'apt-get', 'remove', '-y', '-qq', pkg]],
+    } : { commands: [] };
+
+    if (needsGit) {
+      add({
+        id: 'git', label: 'Git', why: "The agents' plugin and skill installs clone with git.",
+        ...apt('git'), manual: has.apt ? undefined : 'https://git-scm.com/downloads',
+        skipIf: has.git ? 'git is on PATH' : null,
+      });
+    }
+    if (!has.bun) {
+      add({
+        id: 'unzip', label: 'unzip', why: 'Unpacks the pinned Bun zip.',
+        ...apt('unzip'), manual: has.apt ? undefined : 'https://infozip.sourceforge.net/UnZip.html',
+        skipIf: has.unzip ? 'unzip is on PATH' : null,
+      });
+    }
+  }
+
   // The brew-based steps below run after the Homebrew step, so a planned brew counts.
   const pm = mac && (has.brew || steps.some((s) => s.id === 'homebrew')) ? 'brew' : win && has.winget ? 'winget' : null;
 
