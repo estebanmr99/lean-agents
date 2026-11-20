@@ -12,7 +12,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
-- OpenCode 2: lean-agents no longer installs the RTK plugin, which rtk writes for the 1.x plugin API and OpenCode 2 refuses to load (#179). Installs from before keep the step on record, so `--uninstall` still removes the plugin; to drop it now, run `rtk init -g --opencode --uninstall`.
+- OpenCode 2: lean-agents no longer installs the RTK plugin, which rtk writes for the 1.x plugin API and OpenCode 2 refuses to load (#179). Installs from before keep the step on record, so `--uninstall` still removes the plugin; to drop it now, run `rtk init -g --opencode --uninstall`, then run the lean-agents install again (that command also removes RTK's Claude Code hook).
 - Windows: when Bun is in `~\.bun\bin` but not on PATH, lean-agents now puts that folder on the user PATH (`--uninstall` takes it off again) instead of only warning (#179).
 - `--uninstall` on Windows waits for the Orca uninstaller to finish (it relaunches itself and returned at once, so the Orca folder could still be there).
 - `--dry-run` and `--update --dry-run` mark an install that is already there (the Orca or Warp app, a vendor checkout) as "already there, skipped" instead of listing its install commands; the real run already skipped it (#179).

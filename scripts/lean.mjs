@@ -1072,6 +1072,11 @@ async function uninstall(o) {
   }
   const p = await prompter(o.yes);
   console.log(`This restores ${state.files.length} files and undoes ${state.commands.length} commands.`);
+  if (o.dryRun) {
+    for (const c of [...state.commands].reverse()) {
+      if (c.undo?.length) console.log(`  - undo: ${c.desc}${c.agent ? ` (${c.agent})` : ''}`);
+    }
+  }
   if (o.dryRun || !yesNo(await p.ask('Uninstall?', o.yes ? 'y' : 'n'))) { p.close(); console.log('Nothing changed.'); return; }
   p.close();
   if (!o.exec && state.commands.length) throw new Error('--no-exec cannot undo the commands this install ran; run --uninstall without it');
@@ -1134,6 +1139,11 @@ function vscodeHooks(o) {
     const files = state.files.filter((f) => mine.has(f.path));
     const commands = state.commands.filter((c) => c.agent === 'vscode-copilot');
     console.log(`This restores ${files.length} files and undoes ${commands.length} commands, all written for vscode-copilot.`);
+    if (o.dryRun) {
+      for (const c of [...commands].reverse()) {
+        if (c.undo?.length) console.log(`  - undo: ${c.desc}${c.agent ? ` (${c.agent})` : ''}`);
+      }
+    }
     const p = await prompter(o.yes);
     const ok = !o.dryRun && yesNo(await p.ask('Remove the vscode-copilot config?', o.yes ? 'y' : 'n'));
     p.close();
