@@ -106,7 +106,9 @@ export function npxFailDetail(out, opts) {
   const raw = (out ?? '').split('\n').find((l) => /error/i.test(l))?.trim();
   if (!raw) return '';
   const line = redactText(raw, opts).slice(0, 200);
-  if (/_npx/.test(line) && /enoent/i.test(line)) return `${line} (broken npx cache entry: delete that _npx folder, then run again)`;
+  // npm prints `code ENOENT` first and the _npx path on a later line, so look at the whole output for the folder.
+  const npx = /enoent/i.test(out) && out.match(/[^\s'"]*_npx[\\/][0-9a-f]+/i)?.[0];
+  if (npx) return `${line} (broken npx cache entry: delete ${redactText(npx, opts)}, then run again)`;
   return line;
 }
 

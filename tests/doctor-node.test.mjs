@@ -174,10 +174,11 @@ test('context-mode on Node is checked using findNvm, not on PATH', () => {
 test('npxFailDetail extracts the first error line and appends a hint for broken cache', () => {
   assert.equal(npxFailDetail(''), '');
   assert.equal(npxFailDetail(undefined), '');
+  assert.match(npxFailDetail('npm error code ENOENT\nnpm error path C:\\c\\npm-cache\\_npx\\a1b2c3\\package.json', { home: '/h', env: {} }), /^npm error code ENOENT \(broken npx cache entry: delete C:\\c\\npm-cache\\_npx\\a1b2c3, then run again\)$/);
   assert.doesNotMatch(npxFailDetail('npm error request to https://user:pw@example.com:3128/x failed', { home: '/h', env: {} }), /:pw@/);
   assert.equal(npxFailDetail('some stdout\nError: unexpected\nmore lines'), 'Error: unexpected');
   assert.equal(
-    npxFailDetail('npm error enoent Could not read package.json: ... npm-cache\\_npx\\hash\\package.json'),
-    'npm error enoent Could not read package.json: ... npm-cache\\_npx\\hash\\package.json (broken npx cache entry: delete that _npx folder, then run again)'
+    npxFailDetail('npm error enoent Could not read package.json: npm-cache\\_npx\\beef\\package.json'),
+    'npm error enoent Could not read package.json: npm-cache\\_npx\\beef\\package.json (broken npx cache entry: delete npm-cache\\_npx\\beef, then run again)'
   );
 });
