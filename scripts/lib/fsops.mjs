@@ -107,8 +107,9 @@ export function applyJsonEdits(original, edits, owned = []) {
         const wrote = (v) => owned.some((o) => o.mode === 'arrayAdd' && JSON.stringify(o.path) === JSON.stringify(e.path) && o.value === v && pkgName(v) === pkgName(e.value));
         const old = list.findIndex((v) => e.legacy.includes(v) || wrote(v));
         if (old >= 0) {
-          // `replaced`: the user's own legacy entry (not an earlier pin of ours), so --uninstall can put it back.
-          const replaced = e.restore && e.legacy.includes(list[old]) && !wrote(list[old]) ? list[old] : undefined;
+          // `replaced`: the user's own legacy entry, so --uninstall can put it back; over an earlier pin of ours (a pin bump) it carries that pin's.
+          const earlier = owned.find((o) => o.mode === 'arrayAdd' && JSON.stringify(o.path) === JSON.stringify(e.path) && o.value === list[old]);
+          const replaced = !e.restore ? undefined : wrote(list[old]) ? earlier?.replaced : e.legacy.includes(list[old]) ? list[old] : undefined;
           text = applyEdits(text, modify(text, [...e.path, old], e.value, FORMAT));
           applied.push(replaced === undefined ? e : { ...e, replaced });
           continue;

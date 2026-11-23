@@ -11,7 +11,7 @@ import { npmSpec } from '../scripts/lib/pins.mjs';
 import { dcpRow } from '../scripts/lib/plugin-health.mjs';
 import { opencodeV2Adapter } from '../scripts/lib/adapters/opencode-v2.mjs';
 import { loadCore } from '../scripts/lib/render.mjs';
-import { plan, apply, undo } from '../scripts/lib/fsops.mjs';
+import { plan, apply, undo, applyJsonEdits, revertJsonEdits } from '../scripts/lib/fsops.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PKG = '@tarquinen/opencode-dcp';
@@ -100,4 +100,17 @@ test('doctor DCP row: @latest is changed; pinned with resolved deps and no probe
   assert.equal(ok.status, 'ok');
   assert.equal(ok.detail, `registered: ${PIN} (TUI: ${PIN}) ; resolved: 3.2.0 ; loads: not probed, run --doctor --probe-plugins`);
   assert.match(dcpRow(h, { probed: true }).detail, /loads: yes \(probe\)/);
+  assert.match(dcpRow(h, { probed: true, probe: [{ id: 'probe-failed', plugin: '' }] }).detail, /loads: unknown \(probe failed\)/);
+  assert.match(dcpRow(h, { probed: true, probe: [{ id: 'command-missing', plugin: 'other' }] }).detail, /loads: yes \(probe\)/);
+  assert.equal(dcpRow(h, { probed: true, probe: [{ id: 'command-missing', plugin: PKG }] }).status, 'error');
+});
+
+test('a pin bump keeps the user entry: uninstall after two installs with different pins restores the bare name', () => {
+  const edit = (v) => ({ path: ['plugin'], value: `${PKG}@${v}`, mode: 'arrayAdd', legacy: [`${PKG}@latest`, PKG], restore: true });
+  const original = `{ "plugin": ["${PKG}"] }`;
+  const one = applyJsonEdits(original, [edit('3.2.0')]);
+  const two = applyJsonEdits(one.text, [edit('3.3.0')], one.applied);
+  assert.deepEqual(parse(two.text).plugin, [`${PKG}@3.3.0`]);
+  // --uninstall reverts state entries newest first.
+  assert.equal(revertJsonEdits(revertJsonEdits(two.text, two.applied), one.applied), original);
 });

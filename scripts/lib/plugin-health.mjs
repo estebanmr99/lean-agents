@@ -126,9 +126,9 @@ export function dcpRow(home, { fsx = fs, probe = [], probed = false } = {}) {
   const versions = [path.join(root, 'node_modules'), ...wrapperDirs(root, name, fsx).map((d) => path.join(d, 'node_modules'))]
     .map((nm) => readJson(path.join(nm, ...name.split('/'), 'package.json'), fsx)?.version).filter(Boolean);
   const broken = checkDepTree(home, name, fsx, specs.map((e) => e.version)).length > 0;
-  const failed = probe.some((f) => f.plugin === name || f.id === 'command-missing');
+  const failed = probe.some((f) => f.plugin === name);
   const spec = (e) => (e ? e.spec : 'none');
-  const loads = failed ? 'no' : probed ? 'yes (probe)' : 'not probed, run --doctor --probe-plugins';
+  const loads = failed ? 'no' : probe.some((f) => f.id === 'probe-failed') ? 'unknown (probe failed)' : probed ? 'yes (probe)' : 'not probed, run --doctor --probe-plugins';
   const floating = specs.some((e) => !e.version || e.version === 'latest');
   const status = broken || failed ? 'error' : floating || reconcileSpecs(specs).length ? 'changed' : 'ok';
   const detail = `registered: ${spec(server)} (TUI: ${spec(tui)}) ; resolved: ${versions[0] ?? 'not in cache'} ; loads: ${loads}${floating ? '. Fix: run lean-agents again to pin it' : ''}`;
