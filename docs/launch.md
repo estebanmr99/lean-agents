@@ -2,7 +2,7 @@
 
 For the owner. Not linked from the README. Every claim below is something the repo shows today. There are no savings numbers on purpose: the repo cannot show a before and after, so no post claims one.
 
-Do not post until the `v1.0.0` release exists, unless you want a preview launch. In that case say "preview".
+Do not post until the `v1.1.0` release exists, unless you want a preview launch. In that case say "preview".
 
 ## What these posts may claim
 
