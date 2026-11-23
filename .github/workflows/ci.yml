@@ -1013,6 +1013,24 @@ jobs:
       - name: Install, ask agy what loaded, doctor, uninstall
         shell: pwsh
         run: ./tests/real-antigravity.ps1
+      # #374: the pinned release zip, not install.ps1. Throwaway --home: agy.exe lands in <home>\.gemini\bin.
+      - name: --install-agent and --uninstall-agent (pinned release zip)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $h = Join-Path $env:RUNNER_TEMP "agy-lifecycle-$([guid]::NewGuid())"
+          New-Item -ItemType Directory -Path $h | Out-Null
+          $agy = "$h\.gemini\bin\agy.exe"
+          node scripts/lean.mjs --home $h --yes --install-agent antigravity
+          if ($LASTEXITCODE -ne 0) { throw 'install-agent failed' }
+          if (-not (Test-Path $agy)) { throw 'agy.exe was not installed' }
+          $v = & $agy --version | Out-String
+          if ($v -notmatch '1\.5\.3') { throw "agy --version: $v" }
+          if (([Environment]::GetEnvironmentVariable('Path', 'User') -split ';') -notcontains "$h\.gemini\bin") { throw 'PATH entry missing' }
+          node scripts/lean.mjs --home $h --yes --uninstall-agent antigravity
+          if ($LASTEXITCODE -ne 0) { throw 'uninstall-agent failed' }
+          if (Test-Path $agy) { throw 'agy.exe was not removed' }
+          if (([Environment]::GetEnvironmentVariable('Path', 'User') -split ';') -contains "$h\.gemini\bin") { throw 'PATH entry was not removed' }
 
   bench-context-mode:
     # Context Mode ctx_execute with Node only, then with Bun (session 11, items 8 and 9). Numbers go to the job summary.

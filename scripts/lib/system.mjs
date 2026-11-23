@@ -137,7 +137,7 @@ export function gitHint(pm, present = which('git')) {
 }
 
 // Antigravity CLI and app, only when the user picked Antigravity. Only ids checked upstream (2026-11-03) run;
-// the rest print the vendor link. Windows CLI: `Google.AntigravityCLI` has no documented scope, so install.ps1 stays manual.
+// the rest print the vendor link. Windows CLI: --install-agent antigravity (pinned release zip, agent-lifecycle.mjs); `Google.AntigravityCLI` has no documented scope.
 // #147: Homebrew installs whatever version the cask has today; it cannot install an older one or a cask from a URL.
 export const BREW_AGY_LIMIT = 'Homebrew cannot pin or verify this cask: you get its current version, unpinned by lean-agents. VERIFY';
 
@@ -155,7 +155,7 @@ export function antigravityPrereqs(pm, platform, home, app = true) {
     : winApp && quiet(['winget', 'list', '--id', 'Google.Antigravity', '-e']).ok;
   if (!appInstalled) {
     if (platform === 'darwin' && pm === 'brew') out.push({ desc: 'install the Antigravity app', run: [['brew', 'install', '--cask', 'antigravity']] });
-    else if (winApp) out.push({ desc: 'install the Antigravity app', run: [['winget', 'install', '--id', 'Google.Antigravity', '-e', '--scope', 'user', '--accept-source-agreements', '--accept-package-agreements']] });
+    else if (winApp) out.push({ desc: 'install the Antigravity app', run: [['winget', 'install', '--id', 'Google.Antigravity', '-e', '--scope', 'user', '--accept-source-agreements', '--accept-package-agreements']], undo: [['winget', 'uninstall', '--id', 'Google.Antigravity', '-e']] });
     else out.push({ desc: 'The Antigravity app is optional: download it from https://antigravity.google/download', note: true });
   }
   return out;

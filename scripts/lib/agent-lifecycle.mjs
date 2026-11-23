@@ -27,11 +27,31 @@ function script(pinKey, dir, args = [], ext = '.sh') {
   return { version: null, download: file, run: [[ext === '.ps1' ? 'curl.exe' : 'curl', '-fsSL', '-o', file, p.url], [process.execPath, VERIFY, file, p.sha256], ext === '.ps1' ? ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', file, ...args] : ['bash', file, ...args]] };
 }
 
+// Antigravity CLI on Windows: the pinned release zip holds antigravity.exe, installed as agy.exe where install.ps1 puts it
+// (%LOCALAPPDATA%\\agy\\bin; under --home a temp folder uses <home>\\.gemini\\bin, #229). install.ps1 itself is not used: it downloads from a Cloud Run manifest.
+function agyWindows({ home, dir, realHome, env, arch }) {
+  const W = path.win32;
+  const p = PINS['antigravity-cli-win'];
+  const key = arch === 'arm64' ? 'arm64' : 'x64';
+  const local = home === realHome && env.LOCALAPPDATA ? W.join(env.LOCALAPPDATA, 'agy') : null;
+  const binDir = local ? W.join(local, 'bin') : W.join(home, '.gemini', 'bin');
+  const zip = W.join(dir, `agy_cli_windows_${key}-${p.version}.zip`);
+  const tmp = W.join(dir, `agy_cli_windows_${key}-${p.version}`);
+  const q = (s) => s.replace(/'/g, "''");
+  const ps = `Expand-Archive -Force -LiteralPath '${q(zip)}' -DestinationPath '${q(tmp)}'; New-Item -ItemType Directory -Force '${q(binDir)}' | Out-Null; Move-Item -Force '${q(W.join(tmp, 'antigravity.exe'))}' '${q(W.join(binDir, 'agy.exe'))}'; Remove-Item -Recurse -Force '${q(tmp)}'`;
+  return {
+    method: 'download', version: p.version, download: zip,
+    run: [['curl.exe', '-fsSL', '-o', zip, `https://github.com/google-antigravity/antigravity-cli/releases/download/${p.version}/agy_cli_windows_${key}.zip`], [process.execPath, VERIFY, zip, p.sha256[key]], ['powershell', '-NoProfile', '-NonInteractive', '-Command', ps]],
+    // agy updates itself: uninstall keeps a changed agy.exe (sha256 mismatch). VERIFY the setting that turns auto-update off.
+    bins: [W.join(binDir, 'agy.exe')], dirs: local ? [binDir, local] : [binDir], pathDir: binDir,
+  };
+}
+
 // One row per agent for this OS: how it is installed, where its binary lands and which dirs the install may write to.
 // `manual` is a reason, not a command: that agent/OS route is not proven yet (VERIFY in docs/compatibility.md).
 // `ver`: version per pin key to install instead of the release pin (the saved previous version, for an undo).
 // gitBash: plan as if Git Bash were there (--everything installs Git first; the run builds the table again with the real path).
-export function agentTable({ home, platform, dir, realHome, ver = {}, env = process.env, gitBash }) {
+export function agentTable({ home, platform, dir, realHome, ver = {}, env = process.env, gitBash, arch = process.arch }) {
   const at = (key) => ver[key] ?? PINS[key].version;
   const posix = platform !== 'win32';
   const cmds = AGENT_CLIS;
@@ -68,7 +88,7 @@ export function agentTable({ home, platform, dir, realHome, ver = {}, env = proc
   } else {
     t.antigravity = posix
       ? { method: 'script', ...script('antigravity-installer', dir), bins: bin('agy'), dirs: [path.join(local, 'bin'), path.join(local, 'share'), path.join(home, '.antigravity'), path.join(home, '.gemini')] }
-      : { manual: 'Antigravity CLI on Windows (Google.AntigravityCLI): no documented scope, install it from https://antigravity.google/docs/getting-started. VERIFY' };
+      : agyWindows({ home, dir, realHome, env, arch });
   }
   for (const [a, row] of Object.entries(t)) row.cmd = cmds[a];
   return t;
