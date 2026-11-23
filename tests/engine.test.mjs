@@ -1366,7 +1366,7 @@ test('Still needed from you: printed after install and by --doctor, Orca hooks f
 
 test('Antigravity app and CLI install only through verified ids, else print the vendor link', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-agy-'));
-  const runs = (pm, platform) => antigravityPrereqs(pm, platform, home).map((c) => c.run[0]?.join(' ') ?? 'manual');
+  const runs = (pm, platform) => antigravityPrereqs(pm, platform, home).map((c) => c.run?.[0]?.join(' ') ?? 'manual');
   assert.ok(runs('brew', 'darwin').includes('brew install --cask antigravity'));
   assert.ok(runs('brew', 'darwin').every((r) => !r.startsWith('winget')));
   // Without a package route the app is only a note; a missing CLI is a manual step.
