@@ -137,11 +137,11 @@ export function gitHint(pm, present = which('git')) {
 }
 
 // Antigravity CLI and app, only when the user picked Antigravity. Only ids checked upstream (2026-11-03) run;
-// the rest print the vendor link. Windows CLI: `Google.AntigravityCLI` has no documented scope, so install.ps1 stays manual.
+// the rest print the vendor link. Windows CLI: --install-agent antigravity (pinned release zip, agent-lifecycle.mjs); `Google.AntigravityCLI` has no documented scope.
 // #147: Homebrew installs whatever version the cask has today; it cannot install an older one or a cask from a URL.
 export const BREW_AGY_LIMIT = 'Homebrew cannot pin or verify this cask: you get its current version, unpinned by lean-agents. VERIFY';
 
-export function antigravityPrereqs(pm, platform, home, app = true) {
+export function antigravityPrereqs(pm, platform, home, app = true, q = quiet) {
   const out = [];
   const winApp = pm === 'winget' && platform === 'win32';
   if (!findAgy(home, platform)) {
@@ -150,12 +150,15 @@ export function antigravityPrereqs(pm, platform, home, app = true) {
       : { desc: `agy is missing: install it from https://antigravity.google/docs/getting-started`, run: [], manual: true });
   }
   if (!app) return out;
+  const listed = winApp ? q(['winget', 'list', '--id', 'Google.Antigravity', '-e']) : null;
+  // winget list that did not finish says nothing: installing then could record an undo for the user's own app.
+  if (listed?.failed) { out.push({ desc: 'could not check for the Antigravity app (winget list did not finish): install it from https://antigravity.google/download', note: true }); return out; }
   const appInstalled = platform === 'darwin'
     ? exists('/Applications/Antigravity.app') || exists(path.join(home, 'Applications', 'Antigravity.app'))
-    : winApp && quiet(['winget', 'list', '--id', 'Google.Antigravity', '-e']).ok;
+    : winApp && listed.ok;
   if (!appInstalled) {
     if (platform === 'darwin' && pm === 'brew') out.push({ desc: 'install the Antigravity app', run: [['brew', 'install', '--cask', 'antigravity']] });
-    else if (winApp) out.push({ desc: 'install the Antigravity app', run: [['winget', 'install', '--id', 'Google.Antigravity', '-e', '--scope', 'user', '--accept-source-agreements', '--accept-package-agreements']] });
+    else if (winApp) out.push({ desc: 'install the Antigravity app', run: [['winget', 'install', '--id', 'Google.Antigravity', '-e', '--scope', 'user', '--accept-source-agreements', '--accept-package-agreements']], undo: [['winget', 'uninstall', '--id', 'Google.Antigravity', '-e']] });
     else out.push({ desc: 'The Antigravity app is optional: download it from https://antigravity.google/download', note: true });
   }
   return out;
