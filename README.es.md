@@ -278,7 +278,7 @@ curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/i
 
 ## Por qué
 
-- **Menos tokens.** Explorar, investigar y revisar lo hacen subagentes baratos. Las salidas grandes no entran al contexto. Los agentes buscan símbolos en vez de leer archivos completos.
+- **Menos tokens.** Explorar, investigar y revisar lo hacen subagentes baratos. Las salidas grandes no entran al contexto. Los agentes buscan símbolos en vez de leer archivos completos. (medido: [Savings benchmark](docs/benchmark.md))
 - **Respuestas más claras.** Un solo set corto de reglas: primero la respuesta, supuestos explícitos, cambios quirúrgicos, verificar antes de decir que terminó.
 - **Igual en todos lados.** Las reglas se escriben una vez en `core/` y se adaptan a cada agente.
 

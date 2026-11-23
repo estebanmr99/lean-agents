@@ -278,7 +278,7 @@ curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/i
 
 ## Why
 
-- **Fewer tokens.** Exploration, research and review go to cheap subagents. Big outputs stay out of the context window. Agents search symbols instead of reading whole files.
+- **Fewer tokens.** Exploration, research and review go to cheap subagents. Big outputs stay out of the context window. Agents search symbols instead of reading whole files. (measured: [Savings benchmark](docs/benchmark.md))
 - **Clearer answers.** One short set of global rules: answer first, state assumptions, surgical changes, verify before saying done.
 - **Same behavior everywhere.** Rules are written once in `core/` and rendered for each agent.
 

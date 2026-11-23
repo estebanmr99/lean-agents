@@ -1,0 +1,42 @@
+name: Savings Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: 'Model to use (e.g. google-vertex/gemini-3.1-pro-preview)'
+        required: true
+        type: string
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          
+      - name: Install OpenCode
+        run: npm install -g @opencode/cli
+        
+      - name: Run Benchmark
+        env:
+          # The provider key secret must be configured in the repository settings.
+          # For example, if using Google Vertex, set GOOGLE_APPLICATION_CREDENTIALS or similar.
+          # If using Anthropic, set ANTHROPIC_API_KEY.
+          PROVIDER_API_KEY: ${{ secrets.PROVIDER_API_KEY }}
+        run: |
+          node tests/bench-savings.mjs \
+            --home "${RUNNER_TEMP}/bench-home" \
+            --run \
+            --model "${{ inputs.model }}" \
+            --out "${RUNNER_TEMP}/bench-out"
+            
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-savings-results
+          path: ${{ runner.temp }}/bench-out/

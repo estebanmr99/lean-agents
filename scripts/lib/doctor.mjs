@@ -167,6 +167,13 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
     // A saved toolNode means Context Mode runs on its own Node, so the active one does not matter.
     const nodeNote = o.tools.includes('context-mode') && !state.toolNode && !satisfies(nodeVersion, nodeRange('context-mode')) ? nodeSkipLine('context-mode', nodeRange('context-mode'), nodeVersion) : '';
     if (nodeNote) o.tools = o.tools.filter((t) => t !== 'context-mode');
+    
+    // #370 Active setup row
+    const rulesFile = state.files.find((f) => /AGENTS\.md|CLAUDE\.md|copilot-instructions\.md|instructions/i.test(f.path) && fsx.existsSync(f.path));
+    const rulesSize = rulesFile ? fsx.statSync(rulesFile.path).size : 0;
+    const subagentsCount = state.files.filter((f) => f.path.replace(/\\/g, '/').includes('/agents/') && f.path.endsWith('.md')).length;
+    add('Active setup', 'ok', `rules ${rulesSize} bytes (~${Math.round(rulesSize / 4)} tokens), tools on: ${o.tools.join(', ') || 'none'}, subagents: ${subagentsCount}`);
+
     add('lean-agents', 'ok', `v${state.version}, agents: ${o.agents.join(', ')}, privacy: ${o.privacy}`);
     const active = (exec && /\d+\.\d+\.\d+/.exec(version('node') ?? '')?.[0]) || nodeVersion;
     const pn = projectNode({ cwd, home, nodeVersion: active, fsx });
