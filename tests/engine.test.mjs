@@ -1061,7 +1061,8 @@ test('bunInstall: pinned zip, SHA256 check before extraction, undo only for what
   const win = bunInstall('/h', '/h/state', 'win32', 'winget', 'x64');
   assert.equal(win.run[0][0], 'curl.exe');
   assert.equal(win.run[1][3], sha256['windows-x64']);
-  assert.match(win.run[2].at(-1), /Expand-Archive.*bun\.exe.*SetEnvironmentVariable/s);
+  assert.match(win.run[2].at(-1), /^\$ErrorActionPreference = 'Stop';.*ZipFile\]::ExtractToDirectory.*bun\.exe.*SetEnvironmentVariable/s);
+  assert.doesNotMatch(win.run[2].at(-1), /Expand-Archive/);
   assert.match(win.undo[1].at(-1), /SetEnvironmentVariable/);
   assert.match(bunInstall("C:\\Users\\O'Neil", 'C:\\s', 'win32', 'winget', 'x64').run[2].at(-1), /O''Neil/);
 });
