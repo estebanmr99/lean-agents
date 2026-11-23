@@ -17,7 +17,16 @@ export XDG_CONFIG_HOME="$HOME/.config"
 unset XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
 "$code_bin" --version
 repo="$(cd "$(dirname "$0")/.." && pwd)"
-if [[ "$(uname)" == Darwin ]]; then user="$HOME/Library/Application Support/Code/User"; else user="$HOME/.config/Code/User"; fi
+if [[ "${RUNNER_OS:-}" == "Windows" ]]; then
+  # Git Bash on Windows: redirect APPDATA to keep the host clean.
+  export APPDATA="$HOME/AppData/Roaming"
+  user="$APPDATA/Code/User"
+  mkdir -p "$user"
+elif [[ "$(uname)" == Darwin ]]; then
+  user="$HOME/Library/Application Support/Code/User"
+else
+  user="$HOME/.config/Code/User"
+fi
 
 bash "$repo/install.sh" --yes --agents vscode-copilot --tools serena,playwright,playwright-extension,caveman \
   --privacy strict --lang en --ponytail-mode off </dev/null 2>&1 | tee "$HOME/install.txt"
