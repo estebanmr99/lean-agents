@@ -12,6 +12,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Changed
 
+- Shorter README first screen and a team rollout page (docs/team-rollout.md) (#372).
 - Contributor checks from #305: a test fails when install or undo code writes user files outside the `fsops` action kinds; seeded random configs must round-trip install and `--uninstall` byte for byte; the PR template and the coordinate session prompt ask for `behavior-diff.sh` output, the failing-then-passing test, and the checks a PR adds.
 
 ### Fixed
