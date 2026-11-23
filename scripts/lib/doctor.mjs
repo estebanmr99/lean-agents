@@ -64,9 +64,21 @@ function checkAntigravity(o, core, add, q, withMcp, agy = 'agy') {
   }
 }
 
+// Skill names lean-agents installed: saved records keep only `undo`, which for skills is `npx -y skills@<v> remove <names> -g -y`.
+export function ownSkills(state) {
+  const names = new Set();
+  if (!state) return names;
+  // A failed install (ok false) does not own the name: the copies may be the user's.
+  for (const argv of (state.commands ?? []).filter((c) => c.ok).flatMap((c) => c.undo ?? [])) {
+    if (!/^skills@/.test(argv[2] ?? '') || argv[3] !== 'remove') continue;
+    for (const a of argv.slice(4)) { if (a.startsWith('-')) break; names.add(a); }
+  }
+  return names;
+}
+
 // Which Node runs each registered MCP command of a pinned tool, and skills that two folders of one agent both hold.
 // Read-only, and it also covers machines lean-agents did not set up (#104 points 4-5, #132).
-function checkInventory({ home, exec, run, env, platform, fsx }, add) {
+function checkInventory({ home, exec, run, env, platform, fsx, state }, add) {
   const rel = (p) => (p && p.startsWith(home) ? `~${p.slice(home.length)}` : p);
   const nodes = mcpLaunches(home, { env, platform, fsx }).map((m) => {
     let nodeVersion = m.launch.nodeVersion;
@@ -93,7 +105,13 @@ function checkInventory({ home, exec, run, env, platform, fsx }, add) {
     }
   }
   const skills = [...bySkill.values()];
+  const own = ownSkills(state);
   for (const s of skills) {
+    if (!s.differs && !s.unreadable && own.has(s.name)) {
+      add(`duplicate skill ${s.name}`, 'ok',
+        `in ${s.dirs.join(' and ')} (read by ${s.agents.join(', ')}); identical copies that lean-agents installed (the Skills CLI writes one per agent folder)`);
+      continue;
+    }
     const orca = ORCA.has(s.name) ? ' Orca installs this skill in both folders on purpose.' : '';
     add(`duplicate skill ${s.name}`, s.differs ? 'changed' : 'note',
       `in ${s.dirs.join(' and ')} (read by ${s.agents.join(', ')}); ${s.unreadable ? 'a copy is unreadable, so they could not be compared' : `the copies ${s.differs ? 'differ' : 'are identical'}`}; winner: ${s.winner}. Keep one folder.${orca}`);
@@ -230,7 +248,7 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
     }
   }
   checkAntigravityIde(home, add, fsx);
-  const { nodes, skills } = checkInventory({ home, exec, run, env, platform, fsx }, add);
+  const { nodes, skills } = checkInventory({ home, exec, run, env, platform, fsx, state }, add);
   // #212: config listing a plugin is not proof it loads. Read-only; `probe` holds findings of the opt-in --probe-plugins server run.
   if (state?.options.agents.some((a) => a.startsWith('opencode'))) {
     for (const f of [...pluginHealth(home, { fsx }), ...probe]) add(`plugin ${f.plugin || 'probe'} ${f.id}`, ['deps-incomplete', 'command-missing'].includes(f.id) ? 'error' : 'changed', `${f.line}. Fix: ${f.fix}`);
