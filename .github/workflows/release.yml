@@ -37,7 +37,7 @@ jobs:
           audit="docs/audit-${GITHUB_REF_NAME#v}.md"
           test -f "$audit" || { echo "::error::$audit is missing"; exit 1; }
           grep -q '^## Summary' "$audit" && grep -q '^## Findings and issues' "$audit" || { echo "::error::$audit lacks the Summary and Findings and issues sections"; exit 1; }
-          issues=$(gh issue list --repo "$GITHUB_REPOSITORY" --label audit --state open --json number,labels \
+          issues=$(gh issue list --repo "$GITHUB_REPOSITORY" --label audit --state open --limit 1000 --json number,labels \
             --jq '.[] | "\(if ([.labels[].name] | index("release-proof")) then "exempt" else "open" end) \(.number)"')
           blocked=""
           while read -r kind number; do
