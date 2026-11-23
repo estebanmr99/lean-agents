@@ -68,14 +68,10 @@ function checkAntigravity(o, core, add, q, withMcp, agy = 'agy') {
 export function ownSkills(state) {
   const names = new Set();
   if (!state) return names;
-  for (const argv of (state.commands ?? []).flatMap((c) => c.undo ?? [])) {
+  // A failed install (ok false) does not own the name: the copies may be the user's.
+  for (const argv of (state.commands ?? []).filter((c) => c.ok).flatMap((c) => c.undo ?? [])) {
     if (!/^skills@/.test(argv[2] ?? '') || argv[3] !== 'remove') continue;
     for (const a of argv.slice(4)) { if (a.startsWith('-')) break; names.add(a); }
-  }
-  for (const f of state.files ?? []) {
-    const p = typeof f === 'string' ? f : f?.path;
-    const m = /[/\\]skills[/\\]([^/\\]+)/i.exec(p ?? '');
-    if (m) names.add(m[1]);
   }
   return names;
 }

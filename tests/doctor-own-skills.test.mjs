@@ -18,12 +18,12 @@ function runDoctor(home, state) {
   return JSON.parse(out);
 }
 
-test('ownSkills: null state gives empty set, lean-update command record derives lean-update', () => {
+test('ownSkills: names come from successful Skills CLI undo records only', () => {
   assert.equal(ownSkills(null).size, 0);
   assert.equal(ownSkills({}).size, 0);
 
   const cmd = leanUpdateCommands(['claude'])[0];
-  const state = { commands: [cmd] };
+  const state = { commands: [{ ...cmd, ok: true }] };
   const own = ownSkills(state);
   assert.ok(own.has('lean-update'));
 
@@ -31,6 +31,7 @@ test('ownSkills: null state gives empty set, lean-update command record derives 
   const saved = ownSkills({ commands: [
     { desc: 'Caveman skills for Claude Code', ok: true, undo: [['npx', '-y', 'skills@1.7.4', 'remove', 'caveman', 'caveman-compress', 'caveman-stats', '-a', 'claude-code', '-g', '-y']] },
     { desc: 'other', ok: true, undo: [['npm', 'remove', '-g', 'my-skills-tool']] },
+    { desc: 'failed', ok: false, undo: [['npx', '-y', 'skills@1.7.4', 'remove', 'lean-migrate', '-g', '-y']] },
   ] });
   assert.deepEqual([...saved].sort(), ['caveman', 'caveman-compress', 'caveman-stats']);
 });
@@ -61,7 +62,8 @@ test('duplicate skills: identical own skill copies are ok, differing copies are 
 
   const state = {
     version: '0',
-    commands: [{ ...leanUpdateCommands(['claude'])[0], ok: true }, diffCmd],
+    // The saved record shape (scripts/lean.mjs): desc, ok, undo only.
+    commands: [leanUpdateCommands(['claude'])[0], diffCmd].map(({ desc, undo }) => ({ desc, ok: true, undo })),
     files: [],
     options: { agents: ['claude'], tools: [], privacy: 'standard', network: preset('on') },
   };
