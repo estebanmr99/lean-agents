@@ -20,6 +20,7 @@ export function buildSummary({ state = null, rows = [], applied = {}, logins = [
       updated: list(updated),
       skipped: list(rows.filter((r) => r.status === 'skipped').map((r) => r.item)),
       errors: list(applied.errors),
+      activeSetup: t(rows.find((r) => r.item === 'Active setup')?.detail ?? ''),
       doctor: {
         ok: !problems.length,
         counts: rows.reduce((n, r) => ({ ...n, [r.status]: (n[r.status] ?? 0) + 1 }), {}),
