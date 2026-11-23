@@ -26,7 +26,19 @@ test('win32 plan: arm64 picks the arm64 sha256; no LOCALAPPDATA uses the #229 fo
 });
 
 test('the winget app install carries its undo', () => {
-  const app = antigravityPrereqs('winget', 'win32', 'C:\\u').find((c) => c.run[0]?.[1] === 'install');
+  const absent = () => ({ ok: false, failed: false, out: '' });
+  const app = antigravityPrereqs('winget', 'win32', 'C:\\u', true, absent).find((c) => c.run?.[0]?.[1] === 'install');
   assert.ok(app);
   assert.deepEqual(app.undo, [['winget', 'uninstall', '--id', 'Google.Antigravity', '-e']]);
+});
+
+test('winget list that did not finish: no app install, so no undo that could remove the user app', () => {
+  const timedOut = () => ({ ok: false, failed: true, out: '' });
+  const rows = antigravityPrereqs('winget', 'win32', 'C:\\u', true, timedOut);
+  assert.ok(!rows.some((c) => c.undo));
+  assert.ok(rows.some((c) => c.note && /could not check/.test(c.desc)));
+});
+
+test('win32 plan: ia32 gets a manual step, not the x64 zip', () => {
+  assert.match(plan('ia32').manual, /no release zip/);
 });

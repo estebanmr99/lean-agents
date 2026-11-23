@@ -32,12 +32,13 @@ function script(pinKey, dir, args = [], ext = '.sh') {
 function agyWindows({ home, dir, realHome, env, arch }) {
   const W = path.win32;
   const p = PINS['antigravity-cli-win'];
-  const key = arch === 'arm64' ? 'arm64' : 'x64';
+  if (arch !== 'x64' && arch !== 'arm64') return { manual: `Antigravity CLI on Windows ${arch}: no release zip; install it from https://antigravity.google/docs/getting-started` };
+  const key = arch;
   const local = home === realHome && env.LOCALAPPDATA ? W.join(env.LOCALAPPDATA, 'agy') : null;
   const binDir = local ? W.join(local, 'bin') : W.join(home, '.gemini', 'bin');
   const zip = W.join(dir, `agy_cli_windows_${key}-${p.version}.zip`);
   const tmp = W.join(dir, `agy_cli_windows_${key}-${p.version}`);
-  const q = (s) => s.replace(/'/g, "''");
+  const q = (s) => s.replace(/['‘’‚‛]/g, (c) => c + c); // PowerShell also ends a '...' string at typographic quotes
   const ps = `Expand-Archive -Force -LiteralPath '${q(zip)}' -DestinationPath '${q(tmp)}'; New-Item -ItemType Directory -Force '${q(binDir)}' | Out-Null; Move-Item -Force '${q(W.join(tmp, 'antigravity.exe'))}' '${q(W.join(binDir, 'agy.exe'))}'; Remove-Item -Recurse -Force '${q(tmp)}'`;
   return {
     method: 'download', version: p.version, download: zip,
