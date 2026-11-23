@@ -19,6 +19,8 @@ unset XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 if [[ "${RUNNER_OS:-}" == "Windows" ]]; then
   # Git Bash on Windows: isolate USERPROFILE and APPDATA to keep the host clean.
+  # winget --scope user links its tools in the runner's real profile, not the redirected one.
+  winget_links="$(cygpath -u "$LOCALAPPDATA")/Microsoft/WinGet/Links"
   USERPROFILE="$(cygpath -w "$HOME")"
   APPDATA="$(cygpath -w "$HOME/AppData/Roaming")"
   LOCALAPPDATA="$(cygpath -w "$HOME/AppData/Local")"
@@ -57,6 +59,7 @@ ext="$HOME/vscode-extensions"
 cat "$HOME/extensions.txt"
 grep -qiE 'already installed|successfully installed' "$HOME/extensions.txt"
 
+if [[ -n "${winget_links:-}" ]]; then PATH="$winget_links:$PATH"; fi
 node "$repo/scripts/lean.mjs" --doctor </dev/null
 
 node "$repo/scripts/lean.mjs" --uninstall --yes </dev/null 2>&1 | tee "$HOME/uninstall.txt"
