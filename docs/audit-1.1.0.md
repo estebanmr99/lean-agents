@@ -1,6 +1,6 @@
 # Audit 1.1.0
 
-Release audit of lean-agents for 1.1.0 (branch `session-rel110-release-prep`, 2026-11-23). content: range v1.0.0..main (66 commits), two read-only reviews 2026-11-23 (security inspector over scripts/, install.sh, install.ps1, core/pins.json, .github/workflows/; product-owner release check).
+Release audit of lean-agents for 1.1.0 (2026-11-23): range v1.0.0..main (66 commits), two read-only reviews (security inspector over `scripts/`, `install.sh`, `install.ps1`, `core/pins.json`, `.github/workflows/`; product-owner release check).
 
 ## Summary
 

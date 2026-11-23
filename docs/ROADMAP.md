@@ -56,6 +56,12 @@ Scope and order from the architecture checkpoint [`docs/checkpoints/0.7.0.md`](c
 
 No 0.9.0 release was cut: its scope (the guided OpenCode 1.x to 2.x upgrade, [#80](https://github.com/estebanmr99/lean-agents/issues/80) part 2, and the 0.8.0 audit fixes) shipped in 1.0.0.
 
+## On hold
+
+| Session | Issues | What changes |
+| --- | --- | --- |
+| 9 — Showcase | — | Logo, one short GIF per use case (dry run, uninstall, all-off preset, team mode), "who it is for" in the README |
+
 ## 1.0.0
 
 Details in `CHANGELOG.md` and [`audit-1.0.0.md`](audit-1.0.0.md). Closed: the 0.8.0 audit issues ([#155](https://github.com/estebanmr99/lean-agents/issues/155) to [#169](https://github.com/estebanmr99/lean-agents/issues/169) except [#160](https://github.com/estebanmr99/lean-agents/issues/160)), [#181](https://github.com/estebanmr99/lean-agents/issues/181) and the review follow-ups. Code and docs are merged for these; they stay open for proof only the owner can give (see the audit, "Owner-only gates"):
