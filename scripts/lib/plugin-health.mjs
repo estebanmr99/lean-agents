@@ -115,6 +115,26 @@ export function pluginHealth(home, { pins = PIN_VERSIONS, fsx = fs } = {}) {
   return [...reconcileSpecs(entries, pins), ...names.flatMap((n) => checkDepTree(home, n, fsx, entries.filter((e) => e.name === n).map((e) => e.version)))];
 }
 
+// One DCP row for --doctor (#212), built from the same findings. null when DCP is in no config. `probe`: findings of the --probe-plugins run, `probed`: it ran.
+export function dcpRow(home, { fsx = fs, probe = [], probed = false } = {}) {
+  const name = '@tarquinen/opencode-dcp';
+  const specs = readSpecs(home, fsx).filter((e) => e.name === name);
+  if (!specs.length) return null;
+  const server = specs.find((e) => e.file !== 'tui.json' && e.file !== 'tui.jsonc');
+  const tui = specs.find((e) => e.file === 'tui.json' || e.file === 'tui.jsonc');
+  const root = cacheDir(home);
+  const versions = [path.join(root, 'node_modules'), ...wrapperDirs(root, name, fsx).map((d) => path.join(d, 'node_modules'))]
+    .map((nm) => readJson(path.join(nm, ...name.split('/'), 'package.json'), fsx)?.version).filter(Boolean);
+  const broken = checkDepTree(home, name, fsx, specs.map((e) => e.version)).length > 0;
+  const failed = probe.some((f) => f.plugin === name || f.id === 'command-missing');
+  const spec = (e) => (e ? e.spec : 'none');
+  const loads = failed ? 'no' : probed ? 'yes (probe)' : 'not probed, run --doctor --probe-plugins';
+  const floating = specs.some((e) => !e.version || e.version === 'latest');
+  const status = broken || failed ? 'error' : floating || reconcileSpecs(specs).length ? 'changed' : 'ok';
+  const detail = `registered: ${spec(server)} (TUI: ${spec(tui)}) ; resolved: ${versions[0] ?? 'not in cache'} ; loads: ${loads}${floating ? '. Fix: run lean-agents again to pin it' : ''}`;
+  return { status, detail };
+}
+
 const freePort = () => new Promise((resolve, reject) => {
   const s = net.createServer().on('error', reject).listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); });
 });

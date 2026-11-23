@@ -1538,7 +1538,7 @@ test('pinned OpenCode plugins: an old unversioned entry is replaced in place, a 
   assert.deepEqual(own.plugins(), ['@dietrichgebert/ponytail@1.2.3']);
 });
 
-test('DCP plugin spec (#212): an existing DCP entry (@latest, bare or a version) is kept and no second one is appended', async () => {
+test('DCP plugin spec (#212): a bare or @latest entry moves to the pin, an exact version is kept, never a second entry', async () => {
   const pkg = PINS['opencode-dcp'].source;
   const dcp = npmSpec('opencode-dcp');
   const { opencodeV2Adapter } = await import('../scripts/lib/adapters/opencode-v2.mjs');
@@ -1563,11 +1563,11 @@ test('DCP plugin spec (#212): an existing DCP entry (@latest, bare or a version)
   lean(kept.home, ['--yes', '--no-exec', '--agents', 'opencode-v1', '--tools', 'dcp', '--lang', 'en', '--profile', 'none']);
   fs.writeFileSync(kept.file, fs.readFileSync(kept.file, 'utf8').replace('{', '{"theme":"x",')); // keeps uninstall on the per-key path
   lean(kept.home, ['--yes', '--no-exec', '--uninstall']);
-  assert.deepEqual(kept.read(), ['mine', `${pkg}@latest`], 'uninstall leaves the kept entry');
+  assert.deepEqual(kept.read(), ['mine', `${pkg}@latest`], 'uninstall restores the entry the user had');
   for (const run of [v1, v2]) {
     assert.deepEqual(run(['mine']), ['mine', dcp], run.name);
-    assert.deepEqual(run(['mine', `${pkg}@latest`]), ['mine', `${pkg}@latest`], run.name);
-    assert.deepEqual(run([pkg]), [pkg], run.name);
+    assert.deepEqual(run(['mine', `${pkg}@latest`]), ['mine', dcp], run.name);
+    assert.deepEqual(run([pkg]), [dcp], run.name);
     assert.deepEqual(run([`${pkg}@3.1.15`]), [`${pkg}@3.1.15`], run.name);
   }
 });

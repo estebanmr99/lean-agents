@@ -14,6 +14,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- DCP is pinned in both the server and the TUI config on OpenCode 1.x and 2.x (an existing `@latest` or bare name is moved to the pin, an exact version you chose is kept), and `--doctor` shows one DCP row: registered, resolved, loads ([#212](https://github.com/estebanmr99/lean-agents/issues/212)).
 - `--doctor` no longer warns about identical skill copies that lean-agents installed itself in more than one agent folder (#368).
 
 ## [1.0.0] - 2026-11-20

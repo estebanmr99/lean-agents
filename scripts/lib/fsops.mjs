@@ -107,8 +107,10 @@ export function applyJsonEdits(original, edits, owned = []) {
         const wrote = (v) => owned.some((o) => o.mode === 'arrayAdd' && JSON.stringify(o.path) === JSON.stringify(e.path) && o.value === v && pkgName(v) === pkgName(e.value));
         const old = list.findIndex((v) => e.legacy.includes(v) || wrote(v));
         if (old >= 0) {
+          // `replaced`: the user's own legacy entry (not an earlier pin of ours), so --uninstall can put it back.
+          const replaced = e.restore && e.legacy.includes(list[old]) && !wrote(list[old]) ? list[old] : undefined;
           text = applyEdits(text, modify(text, [...e.path, old], e.value, FORMAT));
-          applied.push(e);
+          applied.push(replaced === undefined ? e : { ...e, replaced });
           continue;
         }
         const own = list.find((v) => pkgName(v) === pkgName(e.value));
@@ -147,7 +149,7 @@ export function revertJsonEdits(text, applied) {
       const list = getAt(text, e.path);
       if (!Array.isArray(list)) continue;
       const i = list.findIndex((v) => JSON.stringify(v) === JSON.stringify(e.value));
-      if (i >= 0) text = applyEdits(text, modify(text, [...e.path, i], undefined, FORMAT));
+      if (i >= 0) text = applyEdits(text, modify(text, [...e.path, i], e.replaced, FORMAT));
     } else if (e.keepIfChanged && JSON.stringify(getAt(text, e.path)) !== JSON.stringify(e.value)) {
       // The user changed our value after install: it is theirs now.
       continue;
