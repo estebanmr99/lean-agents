@@ -26,6 +26,13 @@ test('ownSkills: null state gives empty set, lean-update command record derives 
   const state = { commands: [cmd] };
   const own = ownSkills(state);
   assert.ok(own.has('lean-update'));
+
+  // Saved records keep only desc/ok/undo; other `remove` commands must not count.
+  const saved = ownSkills({ commands: [
+    { desc: 'Caveman skills for Claude Code', ok: true, undo: [['npx', '-y', 'skills@1.7.4', 'remove', 'caveman', 'caveman-compress', 'caveman-stats', '-a', 'claude-code', '-g', '-y']] },
+    { desc: 'other', ok: true, undo: [['npm', 'remove', '-g', 'my-skills-tool']] },
+  ] });
+  assert.deepEqual([...saved].sort(), ['caveman', 'caveman-compress', 'caveman-stats']);
 });
 
 test('duplicate skills: identical own skill copies are ok, differing copies are changed, unmanaged identical copies are note', () => {

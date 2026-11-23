@@ -64,36 +64,13 @@ function checkAntigravity(o, core, add, q, withMcp, agy = 'agy') {
   }
 }
 
-// Skill names lean-agents installed, derived from state.commands and state.files.
+// Skill names lean-agents installed: saved records keep only `undo`, which for skills is `npx -y skills@<v> remove <names> -g -y`.
 export function ownSkills(state) {
   const names = new Set();
   if (!state) return names;
-  for (const c of state.commands ?? []) {
-    const list = [];
-    for (const entry of [c.run, c.undo]) {
-      if (!entry) continue;
-      if (Array.isArray(entry)) {
-        if (entry.length && Array.isArray(entry[0])) list.push(...entry);
-        else list.push(entry);
-      }
-    }
-    for (const argv of list) {
-      if (!Array.isArray(argv)) continue;
-      const idx = argv.indexOf('--skill');
-      if (idx !== -1) {
-        for (let i = idx + 1; i < argv.length; i++) {
-          if (typeof argv[i] === 'string' && argv[i].startsWith('-')) break;
-          names.add(argv[i]);
-        }
-      }
-      const remIdx = argv.indexOf('remove');
-      if (remIdx !== -1 && argv.some((a) => typeof a === 'string' && a.includes('skills'))) {
-        for (let i = remIdx + 1; i < argv.length; i++) {
-          if (typeof argv[i] === 'string' && argv[i].startsWith('-')) break;
-          names.add(argv[i]);
-        }
-      }
-    }
+  for (const argv of (state.commands ?? []).flatMap((c) => c.undo ?? [])) {
+    if (!/^skills@/.test(argv[2] ?? '') || argv[3] !== 'remove') continue;
+    for (const a of argv.slice(4)) { if (a.startsWith('-')) break; names.add(a); }
   }
   for (const f of state.files ?? []) {
     const p = typeof f === 'string' ? f : f?.path;
