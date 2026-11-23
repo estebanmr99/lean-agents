@@ -25,9 +25,10 @@ Some text
 });
 
 test('bench-savings dry-run prints plan and exits 0', () => {
+  const home = path.join(os.tmpdir(), `bench-dry-run-${Date.now()}`);
   const res = spawnSync(process.execPath, [
     path.join(ROOT, 'tests', 'bench-savings.mjs'),
-    '--home', '/tmp/bench-test-home'
+    '--home', home
   ], { encoding: 'utf8' });
   
   assert.strictEqual(res.status, 0);
@@ -36,9 +37,10 @@ test('bench-savings dry-run prints plan and exits 0', () => {
 });
 
 test('bench-savings --run without --model fails', () => {
+  const home = path.join(os.tmpdir(), `bench-fail-${Date.now()}`);
   const res = spawnSync(process.execPath, [
     path.join(ROOT, 'tests', 'bench-savings.mjs'),
-    '--home', '/tmp/bench-test-home',
+    '--home', home,
     '--run'
   ], { encoding: 'utf8' });
   
@@ -64,7 +66,14 @@ test('doctor Active setup row content and summary line', () => {
   };
 
   const collect = [];
-  doctor({ home, state, collect, fsx: fs, run: () => ({ ok: true, out: '' }) });
+  doctor({
+    home,
+    state,
+    collect,
+    fsx: fs,
+    run: () => ({ ok: true, out: '' }),
+    nodeVersion: '24.15.0' // Use a version that supports context-mode to be host-independent
+  });
   
   const setupRow = collect.find(r => r.item === 'Active setup');
   assert.ok(setupRow, 'Active setup row missing');
