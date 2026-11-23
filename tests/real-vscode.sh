@@ -19,9 +19,10 @@ unset XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 if [[ "${RUNNER_OS:-}" == "Windows" ]]; then
   # Git Bash on Windows: isolate USERPROFILE and APPDATA to keep the host clean.
-  export USERPROFILE="$(cygpath -w "$HOME")"
-  export APPDATA="$(cygpath -w "$HOME/AppData/Roaming")"
-  export LOCALAPPDATA="$(cygpath -w "$HOME/AppData/Local")"
+  USERPROFILE="$(cygpath -w "$HOME")"
+  APPDATA="$(cygpath -w "$HOME/AppData/Roaming")"
+  LOCALAPPDATA="$(cygpath -w "$HOME/AppData/Local")"
+  export USERPROFILE APPDATA LOCALAPPDATA
   mkdir -p "$HOME/AppData/Roaming" "$HOME/AppData/Local"
   user="$HOME/AppData/Roaming/Code/User"
   mkdir -p "$user"
