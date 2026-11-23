@@ -164,6 +164,19 @@ export function antigravityPrereqs(pm, platform, home, app = true, q = quiet) {
   return out;
 }
 
+// The Cursor IDE app, only when the app is missing. Unpinned like the Antigravity app: the package manager's current version (#375).
+// A winget list that did not finish returns a note and no install, so no undo can remove the user's own app. Linux: manual download only.
+export function cursorAppPrereqs(pm, platform, home, q = quiet) {
+  const winApp = pm === 'winget' && platform === 'win32';
+  const listed = winApp ? q(['winget', 'list', '--id', 'Anysphere.Cursor', '-e']) : null;
+  if (listed?.failed) return [{ desc: 'could not check for the Cursor app (winget list did not finish): install it from https://cursor.com/download', note: true }];
+  const installed = platform === 'darwin' ? exists('/Applications/Cursor.app') || exists(path.join(home, 'Applications', 'Cursor.app')) : winApp && listed.ok;
+  if (installed) return [];
+  if (platform === 'darwin' && pm === 'brew') return [{ desc: 'install the Cursor app', run: [['brew', 'install', '--cask', 'cursor']], undo: [['brew', 'uninstall', '--cask', 'cursor']] }];
+  if (winApp) return [{ desc: 'install the Cursor app', run: [['winget', 'install', '--id', 'Anysphere.Cursor', '-e', '--scope', 'user', '--accept-source-agreements', '--accept-package-agreements']], undo: [['winget', 'uninstall', '--id', 'Anysphere.Cursor', '-e']] }];
+  return [{ desc: 'The Cursor app is optional: download it from https://cursor.com/download', note: true }];
+}
+
 // Bun for Context Mode (JS/TS in ctx_execute). One route per OS; the undo is recorded only when this install ran.
 // Linux and Windows: the pinned release zip is downloaded to a file, checked against the pinned SHA256 and only then extracted,
 // so no upstream installer script runs. Linux: no shell profile edit (the engine finds ~/.bun/bin itself). Windows: ~\.bun\bin goes on the user PATH.

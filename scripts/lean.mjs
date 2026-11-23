@@ -20,7 +20,7 @@ import { projectPlan, projectStateDir } from './lib/project.mjs';
 import { gsdPlan } from './lib/gsd.mjs';
 import { MIGRATE_SOURCES, MIGRATE_TARGETS, readSource, detectSources, migratePlan, finishRows, formatTable } from './lib/migrate.mjs';
 import { adhdCommand } from './lib/adhd.mjs';
-import { version as binVersion, versionFull, gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPathCommand, bunPresent, which, run, quiet, exists, isolate, configHome, envDir } from './lib/system.mjs';
+import { version as binVersion, versionFull, gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, cursorAppPrereqs, bunInstall, bunPathCommand, bunPresent, which, run, quiet, exists, isolate, configHome, envDir } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
 import { probePlugins } from './lib/plugin-health.mjs';
 import { adopt, inventory, saveState } from './lib/adopt.mjs';
@@ -194,7 +194,7 @@ const HELP = `Usage: lean-agents [options]
   --no-exec              Run no external command (no installs, no version probes); --uninstall refuses it when commands need undoing
   --probe-plugins        With --doctor or --adopt: start a short-lived opencode serve (throwaway state dir, loopback) and check a plugin's command registers
   --json                 With --dry-run, --doctor or --yes: print one JSON object on stdout (messages go to stderr)
-  --no-app               Do not install the Antigravity app (the CLI is still installed when missing)
+  --no-app               Do not install the Antigravity or Cursor app (the CLI is still installed when missing)
   --bun / --no-bun       Install Bun for Context Mode (default: on; faster JS, TypeScript)
   --project <dir>        Write the shared team files into one repository
                          (AGENTS.md, .github/, .vscode/mcp.json, .cursor/)
@@ -549,6 +549,12 @@ function prereqCommands(o, behind = new Set()) {
     for (const c of antigravityPrereqs(pm, process.platform, o.home, o.app)) {
       if (c.note) console.log(c.desc);
       else out.push({ tool: 'antigravity', undo: [], ...c });
+    }
+  }
+  if (o.agents.includes('cursor') && o.app) {
+    for (const c of cursorAppPrereqs(pm, process.platform, o.home)) {
+      if (c.note) console.log(c.desc);
+      else out.push({ tool: 'cursor-app', ...c });
     }
   }
   if (o.bun && o.tools.includes('context-mode') && process.platform !== 'linux' && !which('bun') && bunPresent(o.home)) {
