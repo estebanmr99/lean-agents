@@ -167,7 +167,7 @@ Empieza siempre con `--dry-run`: muestra cada archivo y comando antes de cambiar
 - `--install-agent a,b` / `--uninstall-agent a,b` (opcional): instala un CLI de agente (`claude`, `opencode-v2`, `copilot-cli`, `cursor`, `antigravity`) desde su instalador fijado (se comprueba el SHA256 antes de ejecutarlo; Linux y macOS, y Copilot CLI, Antigravity CLI y Cursor CLI en Windows) o lo quita. Muestra primero el plan (`--dry-run` se detiene ahí; `--yes` omite la pregunta). La instalación registra los archivos que creó el instalador con su SHA256; la desinstalación borra solo los que siguen iguales, o ejecuta `npm uninstall -g`, nunca el desinstalador del propio agente, y no toca tu configuración ni tus datos. Un agente que instalaste tú se informa como "not installed by lean-agents" y no se toca. OpenCode 1.x nunca se instala ni se quita.
 - En PowerShell las opciones comunes van en PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`. Cualquier otra opción se pasa tal cual, por ejemplo `-DryRun --network off`.
 - Context Mode 2 necesita Node.js 24.15 y GSD Core necesita Node.js 24 (`engines.node` en `core/pins.json`). Con un Node activo más antiguo, lean-agents los ejecuta con un Node 24 de nvm sin cambiar tu Node por defecto (nvm-windows: uno ya instalado) y lo registra con su ruta absoluta; en Claude Code eso significa un servidor MCP en lugar del plugin de Context Mode, así que sus hooks y skills no se instalan. Sin nvm los omite con una línea. Todo lo demás funciona con Node.js 22.20 o superior.
-- Con Context Mode, el instalador también instala Bun por defecto (`ctx_execute` más rápido); añade `--no-bun` (`-NoBun` en PowerShell) para omitirlo. Con Antigravity o Cursor, `--no-app` (`-NoApp`) omite la instalación de la app (la app de Cursor se instala con brew o winget solo si falta, se registra y `--uninstall` la quita; en Linux, descárgala tú). Ver la fila de Bun en [Niveles de instalación](#niveles-de-instalación).
+- Con Context Mode, el instalador también instala Bun por defecto (`ctx_execute` más rápido); añade `--no-bun` (`-NoBun` en PowerShell) para omitirlo. Con Antigravity, `--no-app` (`-NoApp`) omite la instalación de la app. Con Cursor, `--cursor-app` (`-CursorApp`) instala también la app de Cursor con brew o winget si falta; se registra y `--uninstall` la quita (en Linux, descárgala tú). Ver la fila de Bun en [Niveles de instalación](#niveles-de-instalación).
 
 ### Todas las opciones
 
@@ -191,7 +191,8 @@ Cada opción de `--help`. En PowerShell se escriben en PascalCase (`-DryRun`).
 | `--terminal` warp, orca, both o none | Integraciones de agente para una terminal que ya tienes (por defecto: las detectadas) |
 | `--gh` / `--no-gh` | Instala GitHub CLI (`gh`) si falta (por defecto: sí) |
 | `--bun` / `--no-bun` | Instala Bun para Context Mode (por defecto: sí) |
-| `--no-app` | No instala la app de Antigravity o Cursor (el CLI sí, si falta) |
+| `--no-app` | No instala la app de Antigravity (el CLI sí, si falta) |
+| `--cursor-app` | Con Cursor: instala también la app de Cursor si falta (brew o winget; opcional) |
 | `--no-exec` | No ejecuta ningún comando externo (ni instalaciones ni sondeos de versión); `--uninstall` lo rechaza si hay comandos que deshacer |
 | `--probe-plugins` | Con `--doctor` o `--adopt`: arranca un `opencode serve` efímero (directorio de estado desechable, loopback) y comprueba que el comando de un plugin se registra |
 | `--project <dir>` | Escribe los archivos compartidos del equipo en un repositorio |

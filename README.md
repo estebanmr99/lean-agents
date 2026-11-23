@@ -167,7 +167,7 @@ Always start with `--dry-run`: it shows every file and command before anything c
 - `--install-agent a,b` / `--uninstall-agent a,b` (opt-in): install an agent CLI (`claude`, `opencode-v2`, `copilot-cli`, `cursor`, `antigravity`) from its pinned installer (SHA256-checked before it runs; Linux and macOS, plus Copilot CLI, Antigravity CLI and Cursor CLI on Windows) or remove it again. It shows the plan first (`--dry-run` stops there; `--yes` skips the question). Install records the files the installer created with their SHA256; uninstall deletes only those that still match, or runs `npm uninstall -g`, never the agent's own uninstaller, and leaves your config and data alone. An agent you installed yourself is reported as "not installed by lean-agents" and left alone. OpenCode 1.x is never installed or removed.
 - In PowerShell the common flags are PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`. Any other flag is passed as it is, for example `-DryRun --network off`.
 - Context Mode 2 needs Node.js 24.15 and GSD Core needs Node.js 24 (`engines.node` in `core/pins.json`). On an older active Node, lean-agents runs them on an nvm Node 24 without changing your default (nvm-windows: one already installed) and registers it with its absolute path; on Claude Code that means an MCP server instead of the Context Mode plugin, so its hooks and skills are not installed. Without nvm it skips them with one line. Everything else works on Node.js 22.20 or newer.
-- With Context Mode, the installer also sets up Bun by default (faster `ctx_execute`); add `--no-bun` (`-NoBun` in PowerShell) to skip it. With Antigravity or Cursor, `--no-app` (`-NoApp`) skips installing the app (the Cursor app is installed with brew or winget only when missing, recorded and removed by `--uninstall`; Linux: download it yourself). See the Bun row in [Install tiers](#install-tiers).
+- With Context Mode, the installer also sets up Bun by default (faster `ctx_execute`); add `--no-bun` (`-NoBun` in PowerShell) to skip it. With Antigravity, `--no-app` (`-NoApp`) skips installing the app. With Cursor, `--cursor-app` (`-CursorApp`) also installs the Cursor app with brew or winget when missing, recorded and removed by `--uninstall` (Linux: download it yourself). See the Bun row in [Install tiers](#install-tiers).
 
 ### All flags
 
@@ -191,7 +191,8 @@ Every flag from `--help`. In PowerShell the same flags are PascalCase (`-DryRun`
 | `--terminal` warp, orca, both or none | Agent integrations for a terminal you already have (default: the detected ones) |
 | `--gh` / `--no-gh` | Install GitHub CLI (`gh`) if it is missing (default: on) |
 | `--bun` / `--no-bun` | Install Bun for Context Mode (default: on) |
-| `--no-app` | Do not install the Antigravity or Cursor app (the CLI is still installed when missing) |
+| `--no-app` | Do not install the Antigravity app (the CLI is still installed when missing) |
+| `--cursor-app` | With Cursor: also install the Cursor app when missing (brew or winget; opt-in) |
 | `--no-exec` | Run no external command (no installs, no version probes); `--uninstall` refuses it when commands need undoing |
 | `--probe-plugins` | With `--doctor` or `--adopt`: start a short-lived `opencode serve` (throwaway state dir, loopback) and check that a plugin's command registers |
 | `--project <dir>` | Write the shared team files into one repository |
