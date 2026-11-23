@@ -47,13 +47,13 @@ lean-agents funciona con Claude Code, OpenCode 1.x y 2.x, GitHub Copilot CLI, An
 
 | Agente | macOS | Linux | Windows | Reglas | Subagentes | Herramientas MCP | Job de CI con binario real |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Claude Code | VERIFY | ✅ | ✅ | ✅ | ✅ | ✅ | `real-claude` |
-| OpenCode 1.x | VERIFY | ✅ | ✅ | ✅ | ✅ | ✅ | `real-opencode-v1`, `real-windows`, `real-opencode-shell` |
-| OpenCode 2.x | VERIFY | ✅ | ✅ | ✅ | ✅ | ✅ | `real-opencode`, `real-opencode-shell`, `real-windows` |
+| Claude Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `real-claude` |
+| OpenCode 1.x | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `real-opencode-v1`, `real-windows`, `real-opencode-shell` |
+| OpenCode 2.x | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `real-opencode`, `real-opencode-shell`, `real-windows` |
 | Copilot CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `real-copilot`, `real-copilot-windows` |
 | Antigravity CLI | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ | `real-antigravity`, `real-antigravity-windows` |
 | VS Code Copilot | ✅ | ✅ | VERIFY | ⚠️ | ⚠️ | ✅ | `real-vscode` |
-| Cursor | VERIFY | ✅ | ✅ | ➖ (solo con `--project`) | ⚠️ | ✅ | `real-cursor`, `real-cursor-windows` |
+| Cursor | ✅ | ✅ | ✅ | ➖ (solo con `--project`) | ⚠️ | ✅ | `real-cursor`, `real-cursor-windows` |
 
 En Windows, los agentes funcionan mejor con Git Bash instalado (RTK y los comandos estilo bash lo necesitan); el resumen de la instalación y `--doctor` te dicen qué shell se encontró y qué hacer si falta. Para OpenCode, lean-agents también pone su clave `shell` en Git Bash cuando lo encuentra, así la herramienta bash corre ahí por defecto (`--shell default` lo desactiva; un `shell` que ya hayas puesto se conserva).
 

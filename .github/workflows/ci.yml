@@ -18,7 +18,7 @@ permissions:
 
 concurrency:
   # A newer push cancels an older PR run, but every push to main keeps its own run: back-to-back merges used to cancel
-  # each other, so the macOS legs that only run on main almost never finished.
+  # each other, so the scheduled or dispatch runs almost never finished.
   group: ci-${{ inputs.latest && 'latest-' || '' }}${{ github.event_name == 'push' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
@@ -32,7 +32,7 @@ env:
 
 jobs:
   # Docs-only PRs skip the real-binary jobs. lint, test and the Secret scan always run.
-  # macOS real-* legs run only off pull requests: five at once per PR run left some without a runner (#56).
+  # macOS real-* legs run on schedule and workflow_dispatch: five at once per PR run left some without a runner (#56).
   # CI-1: the macOS legs of test and package, and the Windows legs of real-orca-opencode-v1, real-bun, real-tool-node and real-adopt, also run only off pull requests.
   changes:
     runs-on: ubuntu-latest
@@ -291,11 +291,16 @@ jobs:
         run: ./tests/real-bootstrap.ps1 -Dist dist
 
   real-opencode:
+    name: ${{ matrix.os == 'ubuntu-latest' && 'real-opencode' || format('real-opencode ({0})', matrix.os) }}
     # Real OpenCode 2 binary, throwaway HOME: proves the keys we write are accepted.
     needs: changes
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 10
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && '["ubuntu-latest"]' || '["ubuntu-latest","macos-latest"]') }}
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -520,11 +525,16 @@ jobs:
         run: ./tests/real-upgrade-opencode.ps1
 
   real-opencode-v1:
+    name: ${{ matrix.os == 'ubuntu-latest' && 'real-opencode-v1' || format('real-opencode-v1 ({0})', matrix.os) }}
     # Real OpenCode 1.x binary, throwaway HOME: proves the 1.x keys are accepted.
     needs: changes
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 10
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && '["ubuntu-latest"]' || '["ubuntu-latest","macos-latest"]') }}
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -547,7 +557,7 @@ jobs:
     # the isolation proof for `opencode1` (#80 part 2, P1): 1.19 on a frozen copy under XDG_DATA_HOME + XDG_STATE_HOME leaves the
     # live dirs byte-identical (asserted), OPENCODE_DB + OPENCODE_CONFIG_DIR is printed as evidence, plus what a stdio MCP child
     # inherits and whether 2.x migrates the db on --version / debug config. Windows also runs the native PowerShell half.
-    # macOS stays VERIFY (macOS real-* legs run only off pull requests, #56).
+    # macOS stays VERIFY for this job (no macOS leg, #56).
     needs: changes
     if: needs.changes.outputs.code == 'true' && needs.changes.outputs.opencode == 'true'
     timeout-minutes: 25
@@ -661,11 +671,16 @@ jobs:
       - run: bash tests/real-coord-watch.sh
 
   real-claude:
+    name: ${{ matrix.os == 'ubuntu-latest' && 'real-claude' || format('real-claude ({0})', matrix.os) }}
     # Real Claude Code, throwaway HOME, no login: MCP servers go through the claude CLI.
     needs: changes
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 10
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && '["ubuntu-latest"]' || '["ubuntu-latest","macos-latest"]') }}
+    runs-on: ${{ matrix.os }}
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
@@ -683,6 +698,7 @@ jobs:
           npm install -g "$(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('claude-code')))")"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Use the runner's Linuxbrew
+        if: runner.os == 'Linux'
         run: echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
       - name: Install every tool, check them, uninstall
         run: |
@@ -1215,7 +1231,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: ${{ fromJSON(github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && '["ubuntu-latest"]' || '["ubuntu-latest","macos-latest"]') }}
     runs-on: ${{ matrix.os }}
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1
