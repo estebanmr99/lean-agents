@@ -222,9 +222,11 @@ export function bunInstall(home, dir, platform, pm, arch = process.arch) {
   if (platform === 'win32') {
     const bin = path.join(bunDir, 'bin');
     const tmp = path.join(dir, `${name}-${version}`);
+    // .NET ZipFile, not Expand-Archive: powershell 5.1 started from pwsh 7 loads the 7.x Archive module and fails. Stop: any error exits non-zero.
+    const ps = `$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.IO.Compression.FileSystem; if (Test-Path -LiteralPath '${psQ(tmp)}') { Remove-Item -Recurse -Force -LiteralPath '${psQ(tmp)}' }; [System.IO.Compression.ZipFile]::ExtractToDirectory('${psQ(zip)}', '${psQ(tmp)}'); New-Item -ItemType Directory -Force '${psQ(bin)}' | Out-Null; Move-Item -Force '${psQ(path.join(tmp, name, 'bun.exe'))}' '${psQ(path.join(bin, 'bun.exe'))}'; Remove-Item -Recurse -Force '${psQ(tmp)}'; ${psAddPath(bin)}`;
     return {
       tool: 'bun', desc: `install bun ${version}`, optional: true,
-      run: [download, verify, psRun(`Expand-Archive -Force -LiteralPath '${psQ(zip)}' -DestinationPath '${psQ(tmp)}'; New-Item -ItemType Directory -Force '${psQ(bin)}' | Out-Null; Move-Item -Force '${psQ(path.join(tmp, name, 'bun.exe'))}' '${psQ(path.join(bin, 'bun.exe'))}'; Remove-Item -Recurse -Force '${psQ(tmp)}'; ${psAddPath(bin)}`)],
+      run: [download, verify, psRun(ps)],
       undo: [rm, psRun(psRemovePath(bin))],
     };
   }
