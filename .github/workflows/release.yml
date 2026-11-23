@@ -29,6 +29,7 @@ jobs:
           ok=$(gh run list --repo "$GITHUB_REPOSITORY" --commit "$GITHUB_SHA" --workflow ci.yml --json conclusion --jq 'map(select(.conclusion == "success")) | length')
           [ "${ok:-0}" -gt 0 ] || { echo "::error::no successful ci.yml run for $GITHUB_SHA"; exit 1; }
       # Release gate: no publish without this version's audit and with any medium+ finding still open.
+      # An open audit issue labelled release-proof does not block: its proof is the release run itself.
       - name: Audit gate
         env:
           GH_TOKEN: ${{ github.token }}
@@ -36,8 +37,18 @@ jobs:
           audit="docs/audit-${GITHUB_REF_NAME#v}.md"
           test -f "$audit" || { echo "::error::$audit is missing"; exit 1; }
           grep -q '^## Summary' "$audit" && grep -q '^## Findings and issues' "$audit" || { echo "::error::$audit lacks the Summary and Findings and issues sections"; exit 1; }
-          open=$(gh issue list --repo "$GITHUB_REPOSITORY" --label audit --state open --json number --jq 'map("#\(.number)") | join(" ")')
-          [ -z "$open" ] || { echo "::error::open audit issues: $open"; exit 1; }
+          issues=$(gh issue list --repo "$GITHUB_REPOSITORY" --label audit --state open --json number,labels \
+            --jq '.[] | "\(if ([.labels[].name] | index("release-proof")) then "exempt" else "open" end) \(.number)"')
+          blocked=""
+          while read -r kind number; do
+            [ -n "$number" ] || continue
+            if [ "$kind" = exempt ]; then
+              echo "::notice::exempt (release-proof): #$number, the release run is its proof"
+            else
+              blocked="$blocked #$number"
+            fi
+          done <<<"$issues"
+          [ -z "$blocked" ] || { echo "::error::open audit issues:$blocked"; exit 1; }
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22

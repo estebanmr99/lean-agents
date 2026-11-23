@@ -156,7 +156,7 @@ The biggest groups are "Not yet verified" and "Verification log". Items that nee
 2. **Deprecate the placeholder ([#169](https://github.com/estebanmr99/lean-agents/issues/169)):** done. The issue records `0.0.0-stage` as deprecated; re-check with `npm view lean-agents@0.0.0-stage deprecated`.
 3. **Work-PC trial ([#145](https://github.com/estebanmr99/lean-agents/issues/145)):** read-only `--adopt` and `--upgrade-agent opencode --dry-run` on the work PC with OpenCode 1.19.0 (never upgrade without the plan).
 4. **Fresh-machine runs:** `--everything` on a clean Mac and a clean Windows PC ([#179](https://github.com/estebanmr99/lean-agents/issues/179)); `docs/fresh-machine.md` has the steps.
-5. **Release gate inputs:** the audit gate needs no issue labeled `audit` open; the new gate needs the tagged commit on main with a green `ci.yml` run.
+5. **Release gate inputs:** the audit gate needs no issue labeled `audit` open, except one labeled `release-proof` (its proof is the release run itself, so it does not block); the new gate needs the tagged commit on main with a green `ci.yml` run.
 
 ## Bot PRs
 
