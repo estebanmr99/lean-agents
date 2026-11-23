@@ -55,8 +55,34 @@ export function dcpConfigAction(dir, profile) {
       { path: ['$schema'], value: 'https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json', mode: 'setIfAbsent' },
       { path: ['compress', 'minContextLimit'], value: Math.round(contextWindow * 0.5), mode: 'setIfAbsent' },
       { path: ['compress', 'maxContextLimit'], value: Math.round(contextWindow * 0.8), mode: 'setIfAbsent' },
+      // DCP's own updater floats to npm latest and broke loading once (#212); `autoUpdate` is in dcp.schema.json (checked 2026-11-23).
+      { path: ['autoUpdate'], value: false, mode: 'setIfAbsent' },
     ],
   };
+}
+
+// DCP plugin edit for the server (`plugin` on 1.x, `plugins` on 2.x) or tui.json: a bare name or `@latest` moves to the pin
+// in place; an exact version the user chose is not in `legacy`, so it stays and nothing is added (#212).
+export function dcpPluginEdit(key) {
+  const pkg = PINS['opencode-dcp'].source;
+  return { path: [key], value: npmSpec('opencode-dcp'), mode: 'arrayAdd', legacy: [`${pkg}@latest`, pkg], restore: true };
+}
+
+// tui.json(c) edit, only for a file that already exists and already lists DCP (shared by 1.x and 2.x).
+export function dcpTuiActions(dir) {
+  const pkg = PINS['opencode-dcp'].source;
+  const actions = [];
+  for (const file of ['tui.json', 'tui.jsonc']) {
+    const p = path.join(dir, file);
+    if (!fs.existsSync(p)) continue;
+    try {
+      const plugins = parse(fs.readFileSync(p, 'utf8'))?.plugin;
+      if (Array.isArray(plugins) && plugins.some(x => typeof x === 'string' && (x === pkg || x.startsWith(`${pkg}@`)))) actions.push({ kind: 'json', path: p, edits: [dcpPluginEdit('plugin')] });
+    } catch (e) {
+      // unreadable file: leave it alone
+    }
+  }
+  return actions;
 }
 
 // MCP entry edit. `shape` turns a command array into this agent's entry. A server with `legacy` commands in core/mcp.json
@@ -184,23 +210,8 @@ export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
   }
   if (tools.includes('ponytail')) edits.push({ path: ['plugins'], value: npmSpec('ponytail'), mode: 'arrayAdd', legacy: ['@dietrichgebert/ponytail'] });
   if (tools.includes('dcp')) {
-    const pkg = PINS['opencode-dcp'].source;
-    edits.push({ path: ['plugins'], value: npmSpec('opencode-dcp'), mode: 'arrayAdd', legacy: [] }); // any DCP entry already there is the user's: kept, nothing appended (#212)
-    actions.push(dcpConfigAction(dir, profile));
-    for (const file of ['tui.json', 'tui.jsonc']) {
-      const p = path.join(dir, file);
-      if (fs.existsSync(p)) {
-        try {
-          const parsed = parse(fs.readFileSync(p, 'utf8'));
-          const plugins = Array.isArray(parsed?.plugin) ? parsed.plugin : [];
-          if (plugins.some(x => typeof x === 'string' && (x === pkg || x.startsWith(`${pkg}@`)))) {
-            actions.push({ kind: 'json', path: p, edits: [{ path: ['plugin'], value: npmSpec('opencode-dcp'), mode: 'arrayAdd', legacy: [`${pkg}@latest`, pkg] }] });
-          }
-        } catch (e) {
-          // skip
-        }
-      }
-    }
+    edits.push(dcpPluginEdit('plugins'));
+    actions.push(dcpConfigAction(dir, profile), ...dcpTuiActions(dir));
   }
   if (opts.terminals?.includes('warp')) edits.push({ path: ['plugins'], value: npmSpec('warp-opencode'), mode: 'arrayAdd', legacy: ['@warp-dot-dev/opencode-warp'] });
   if (opts.network.outbound === 'off') edits.push({ path: ['share'], value: 'disabled', mode: 'set' });

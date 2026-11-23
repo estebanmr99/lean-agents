@@ -11,7 +11,7 @@ import { stillNeeded, shellNotice } from './terminals.mjs';
 import { adhdSkillFiles } from './adhd.mjs';
 import { proxyReport, childEnv, fromPrivacy } from './network.mjs';
 import { leftovers } from './parallel.mjs';
-import { pluginHealth } from './plugin-health.mjs';
+import { pluginHealth, dcpRow } from './plugin-health.mjs';
 
 const CORE_AGENTS = ['debug', 'explore', 'planner', 'research', 'review'];
 const SECRET_KEY = /(key|token|secret|password|auth)/i;
@@ -153,7 +153,7 @@ export function projectNode({ cwd, home, nodeVersion, fsx = fs }) {
   }
 }
 
-export function doctor({ home, state, exec, nodeVersion = process.versions.node, json = false, run = quiet, env = process.env, platform = process.platform, fsx = fs, cwd = process.cwd(), probe = [], collect = null }) {
+export function doctor({ home, state, exec, nodeVersion = process.versions.node, json = false, run = quiet, env = process.env, platform = process.platform, fsx = fs, cwd = process.cwd(), probe = [], probed = false, collect = null }) {
   const rows = [];
   const add = (item, status, detail = '') => rows.push({ item, status, detail });
   if (!state) {
@@ -251,6 +251,8 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
   const { nodes, skills } = checkInventory({ home, exec, run, env, platform, fsx, state }, add);
   // #212: config listing a plugin is not proof it loads. Read-only; `probe` holds findings of the opt-in --probe-plugins server run.
   if (state?.options.agents.some((a) => a.startsWith('opencode'))) {
+    const dcp = dcpRow(home, { fsx, probe, probed });
+    if (dcp) add('DCP', dcp.status, dcp.detail);
     for (const f of [...pluginHealth(home, { fsx }), ...probe]) add(`plugin ${f.plugin || 'probe'} ${f.id}`, ['deps-incomplete', 'command-missing'].includes(f.id) ? 'error' : 'changed', `${f.line}. Fix: ${f.fix}`);
   }
   const left = leftovers(process.cwd());

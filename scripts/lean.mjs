@@ -1268,7 +1268,7 @@ async function main() {
   if (o.command === 'doctor') {
     const state = readState(o.home);
     const probe = o.probePlugins && state?.options.agents.some((a) => a.startsWith('opencode')) ? await probePlugins(o.home) : [];
-    return process.exit(doctor({ home: o.home, state, exec: o.exec, nodeVersion: NODE_VERSION, json: o.json, probe }) ? 0 : 1);
+    return process.exit(doctor({ home: o.home, state, exec: o.exec, nodeVersion: NODE_VERSION, json: o.json, probe, probed: !!o.probePlugins }) ? 0 : 1);
   }
   if (o.command === 'upgrade-agent' && o.upgradeAgent === 'vscode-copilot') {
     if (o.backup || o.opencode1 || o.undo) throw new Error('--upgrade-agent vscode-copilot takes no other flags');
