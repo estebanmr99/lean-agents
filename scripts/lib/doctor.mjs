@@ -64,9 +64,48 @@ function checkAntigravity(o, core, add, q, withMcp, agy = 'agy') {
   }
 }
 
+// Skill names lean-agents installed, derived from state.commands and state.files.
+export function ownSkills(state) {
+  const names = new Set();
+  if (!state) return names;
+  for (const c of state.commands ?? []) {
+    const list = [];
+    for (const entry of [c.run, c.undo]) {
+      if (!entry) continue;
+      if (Array.isArray(entry)) {
+        if (entry.length && Array.isArray(entry[0])) list.push(...entry);
+        else list.push(entry);
+      }
+    }
+    for (const argv of list) {
+      if (!Array.isArray(argv)) continue;
+      const idx = argv.indexOf('--skill');
+      if (idx !== -1) {
+        for (let i = idx + 1; i < argv.length; i++) {
+          if (typeof argv[i] === 'string' && argv[i].startsWith('-')) break;
+          names.add(argv[i]);
+        }
+      }
+      const remIdx = argv.indexOf('remove');
+      if (remIdx !== -1 && argv.some((a) => typeof a === 'string' && a.includes('skills'))) {
+        for (let i = remIdx + 1; i < argv.length; i++) {
+          if (typeof argv[i] === 'string' && argv[i].startsWith('-')) break;
+          names.add(argv[i]);
+        }
+      }
+    }
+  }
+  for (const f of state.files ?? []) {
+    const p = typeof f === 'string' ? f : f?.path;
+    const m = /[/\\]skills[/\\]([^/\\]+)/i.exec(p ?? '');
+    if (m) names.add(m[1]);
+  }
+  return names;
+}
+
 // Which Node runs each registered MCP command of a pinned tool, and skills that two folders of one agent both hold.
 // Read-only, and it also covers machines lean-agents did not set up (#104 points 4-5, #132).
-function checkInventory({ home, exec, run, env, platform, fsx }, add) {
+function checkInventory({ home, exec, run, env, platform, fsx, state }, add) {
   const rel = (p) => (p && p.startsWith(home) ? `~${p.slice(home.length)}` : p);
   const nodes = mcpLaunches(home, { env, platform, fsx }).map((m) => {
     let nodeVersion = m.launch.nodeVersion;
@@ -93,7 +132,13 @@ function checkInventory({ home, exec, run, env, platform, fsx }, add) {
     }
   }
   const skills = [...bySkill.values()];
+  const own = ownSkills(state);
   for (const s of skills) {
+    if (!s.differs && !s.unreadable && own.has(s.name)) {
+      add(`duplicate skill ${s.name}`, 'ok',
+        `in ${s.dirs.join(' and ')} (read by ${s.agents.join(', ')}); identical copies that lean-agents installed (the Skills CLI writes one per agent folder)`);
+      continue;
+    }
     const orca = ORCA.has(s.name) ? ' Orca installs this skill in both folders on purpose.' : '';
     add(`duplicate skill ${s.name}`, s.differs ? 'changed' : 'note',
       `in ${s.dirs.join(' and ')} (read by ${s.agents.join(', ')}); ${s.unreadable ? 'a copy is unreadable, so they could not be compared' : `the copies ${s.differs ? 'differ' : 'are identical'}`}; winner: ${s.winner}. Keep one folder.${orca}`);
@@ -230,7 +275,7 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
     }
   }
   checkAntigravityIde(home, add, fsx);
-  const { nodes, skills } = checkInventory({ home, exec, run, env, platform, fsx }, add);
+  const { nodes, skills } = checkInventory({ home, exec, run, env, platform, fsx, state }, add);
   // #212: config listing a plugin is not proof it loads. Read-only; `probe` holds findings of the opt-in --probe-plugins server run.
   if (state?.options.agents.some((a) => a.startsWith('opencode'))) {
     for (const f of [...pluginHealth(home, { fsx }), ...probe]) add(`plugin ${f.plugin || 'probe'} ${f.id}`, ['deps-incomplete', 'command-missing'].includes(f.id) ? 'error' : 'changed', `${f.line}. Fix: ${f.fix}`);

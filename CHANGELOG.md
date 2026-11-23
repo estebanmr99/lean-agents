@@ -12,6 +12,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 - Contributor checks from #305: a test fails when install or undo code writes user files outside the `fsops` action kinds; seeded random configs must round-trip install and `--uninstall` byte for byte; the PR template and the coordinate session prompt ask for `behavior-diff.sh` output, the failing-then-passing test, and the checks a PR adds.
 
+### Fixed
+
+- `--doctor` no longer warns about identical skill copies that lean-agents installed itself in more than one agent folder (#368).
+
 ## [1.0.0] - 2026-11-20
 
 First stable release. Highlights since 0.8.0:
