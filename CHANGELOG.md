@@ -15,6 +15,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 - Shorter README first screen and a team rollout page (docs/team-rollout.md) (#372).
 - Claude Code, OpenCode 1.x and 2.x, and Cursor are now proven on macOS by scheduled CI with the real binaries (#371).
+- VS Code Copilot is now proven on Windows by scheduled CI with a pinned VS Code download (#371).
 - Contributor checks from #305: a test fails when install or undo code writes user files outside the `fsops` action kinds; seeded random configs must round-trip install and `--uninstall` byte for byte; the PR template and the coordinate session prompt ask for `behavior-diff.sh` output, the failing-then-passing test, and the checks a PR adds.
 
 ### Fixed

@@ -17,7 +17,20 @@ export XDG_CONFIG_HOME="$HOME/.config"
 unset XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
 "$code_bin" --version
 repo="$(cd "$(dirname "$0")/.." && pwd)"
-if [[ "$(uname)" == Darwin ]]; then user="$HOME/Library/Application Support/Code/User"; else user="$HOME/.config/Code/User"; fi
+if [[ "${RUNNER_OS:-}" == "Windows" ]]; then
+  # Git Bash on Windows: isolate USERPROFILE and APPDATA to keep the host clean.
+  USERPROFILE="$(cygpath -w "$HOME")"
+  APPDATA="$(cygpath -w "$HOME/AppData/Roaming")"
+  LOCALAPPDATA="$(cygpath -w "$HOME/AppData/Local")"
+  export USERPROFILE APPDATA LOCALAPPDATA
+  mkdir -p "$HOME/AppData/Roaming" "$HOME/AppData/Local"
+  user="$HOME/AppData/Roaming/Code/User"
+  mkdir -p "$user"
+elif [[ "$(uname)" == Darwin ]]; then
+  user="$HOME/Library/Application Support/Code/User"
+else
+  user="$HOME/.config/Code/User"
+fi
 
 bash "$repo/install.sh" --yes --agents vscode-copilot --tools serena,playwright,playwright-extension,caveman \
   --privacy strict --lang en --ponytail-mode off </dev/null 2>&1 | tee "$HOME/install.txt"
@@ -44,6 +57,11 @@ ext="$HOME/vscode-extensions"
 cat "$HOME/extensions.txt"
 grep -qiE 'already installed|successfully installed' "$HOME/extensions.txt"
 
+# winget adds its tools to the saved user PATH; this shell started before that, so reload it.
+if [[ "${RUNNER_OS:-}" == "Windows" ]]; then
+  user_path="$(powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('Path', 'User')" | tr -d '\r')"
+  PATH="$(cygpath -p "$user_path"):$PATH"
+fi
 node "$repo/scripts/lean.mjs" --doctor </dev/null
 
 node "$repo/scripts/lean.mjs" --uninstall --yes </dev/null 2>&1 | tee "$HOME/uninstall.txt"

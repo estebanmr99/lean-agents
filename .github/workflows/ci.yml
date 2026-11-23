@@ -1320,13 +1320,14 @@ jobs:
 
   real-vscode:
     # Real VS Code CLI and real tools, throwaway HOME, no login and no TTY.
+    name: ${{ matrix.os == 'ubuntu-latest' && 'real-vscode' || format('real-vscode ({0})', matrix.os) }}
     needs: changes
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && '["ubuntu-latest"]' || '["ubuntu-latest","macos-latest"]') }}
+        os: ${{ fromJSON(github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && '["ubuntu-latest"]' || '["ubuntu-latest","macos-latest","windows-latest"]') }}
     runs-on: ${{ matrix.os }}
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1
@@ -1350,6 +1351,13 @@ jobs:
       - name: Install VS Code (macOS)
         if: runner.os == 'macOS'
         run: brew install --cask visual-studio-code
+      - name: Install VS Code (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          bash scripts/ci-download.sh vscode-win32-x64 "$RUNNER_TEMP/code.zip"
+          unzip -q "$RUNNER_TEMP/code.zip" -d "$RUNNER_TEMP/vscode"
+          echo "$RUNNER_TEMP/vscode/bin" >> "$GITHUB_PATH"
       - name: Install, let code write the same files, project mode, doctor, uninstall
         run: bash tests/real-vscode.sh
 

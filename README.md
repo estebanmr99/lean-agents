@@ -52,7 +52,7 @@ lean-agents works with Claude Code, OpenCode 1.x and 2.x, GitHub Copilot CLI, An
 | OpenCode 2.x | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `real-opencode`, `real-opencode-shell`, `real-windows` |
 | Copilot CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `real-copilot`, `real-copilot-windows` |
 | Antigravity CLI | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ | `real-antigravity`, `real-antigravity-windows` |
-| VS Code Copilot | ✅ | ✅ | VERIFY | ⚠️ | ⚠️ | ✅ | `real-vscode` |
+| VS Code Copilot | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | `real-vscode` |
 | Cursor | ✅ | ✅ | ✅ | ➖ (`--project` only) | ⚠️ | ✅ | `real-cursor`, `real-cursor-windows` |
 
 On Windows, agents work best with Git Bash installed (RTK and bash-style commands need it); the install summary and `--doctor` tell you which shell is found and what to do if not. For OpenCode, lean-agents also sets its `shell` key to Git Bash when found, so the bash tool runs there by default (`--shell default` opts out; a `shell` you already set is kept).
