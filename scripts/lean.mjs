@@ -20,7 +20,7 @@ import { projectPlan, projectStateDir } from './lib/project.mjs';
 import { gsdPlan } from './lib/gsd.mjs';
 import { MIGRATE_SOURCES, MIGRATE_TARGETS, readSource, detectSources, migratePlan, finishRows, formatTable } from './lib/migrate.mjs';
 import { adhdCommand } from './lib/adhd.mjs';
-import { version as binVersion, versionFull, gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, bunInstall, bunPathCommand, bunPresent, which, run, quiet, exists, isolate, configHome, envDir } from './lib/system.mjs';
+import { version as binVersion, versionFull, gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, cursorAppPrereqs, bunInstall, bunPathCommand, bunPresent, which, run, quiet, exists, isolate, configHome, envDir } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
 import { probePlugins } from './lib/plugin-health.mjs';
 import { adopt, inventory, saveState } from './lib/adopt.mjs';
@@ -85,7 +85,7 @@ function parseArgs(argv) {
   const o = {
     command: 'install', dryRun: false, yes: false, agents: null, tools: null, privacy: null, profile: null,
     lang: null, home: os.homedir(), exec: true, adhdAlways: null, ponytailMode: null, shell: null,
-    networkPreset: null, networkFlags: {}, gh: null, bun: null, terminals: null, app: true, core: true,
+    networkPreset: null, networkFlags: {}, gh: null, bun: null, terminals: null, app: true, cursorApp: false, core: true,
   };
   const list = (v) => v.split(',').map((s) => s.trim()).filter(Boolean);
   for (let i = 0; i < argv.length; i++) {
@@ -105,6 +105,7 @@ function parseArgs(argv) {
       case '--bun': o.bun = true; break;
       case '--no-bun': o.bun = false; break;
       case '--no-app': o.app = false; break;
+      case '--cursor-app': o.cursorApp = true; break;
       case '--privacy': o.privacy = next(); fromPrivacy(o.privacy); break;
       case '--gh': o.gh = true; break;
       case '--no-gh': o.gh = false; break;
@@ -195,6 +196,7 @@ const HELP = `Usage: lean-agents [options]
   --probe-plugins        With --doctor or --adopt: start a short-lived opencode serve (throwaway state dir, loopback) and check a plugin's command registers
   --json                 With --dry-run, --doctor or --yes: print one JSON object on stdout (messages go to stderr)
   --no-app               Do not install the Antigravity app (the CLI is still installed when missing)
+  --cursor-app           With Cursor: also install the Cursor app when missing (brew or winget; opt-in)
   --bun / --no-bun       Install Bun for Context Mode (default: on; faster JS, TypeScript)
   --project <dir>        Write the shared team files into one repository
                          (AGENTS.md, .github/, .vscode/mcp.json, .cursor/)
@@ -549,6 +551,12 @@ function prereqCommands(o, behind = new Set()) {
     for (const c of antigravityPrereqs(pm, process.platform, o.home, o.app)) {
       if (c.note) console.log(c.desc);
       else out.push({ tool: 'antigravity', undo: [], ...c });
+    }
+  }
+  if (o.agents.includes('cursor') && o.cursorApp) {
+    for (const c of cursorAppPrereqs(pm, process.platform, o.home)) {
+      if (c.note) console.log(c.desc);
+      else out.push({ tool: 'cursor-app', ...c });
     }
   }
   if (o.bun && o.tools.includes('context-mode') && process.platform !== 'linux' && !which('bun') && bunPresent(o.home)) {

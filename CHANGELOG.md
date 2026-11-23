@@ -7,6 +7,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ### Added
 
 - `--install-agent antigravity` installs the Antigravity CLI on Windows from a sha256-pinned GitHub release, recorded and removed by `--uninstall`; the Antigravity app install is recorded with an undo ([#374](https://github.com/estebanmr99/lean-agents/issues/374)).
+- `--install-agent cursor` installs the Cursor CLI on Windows from the sha256-pinned cursor.com script, recorded and removed by `--uninstall`; the Cursor app is installed with brew (macOS) or winget (Windows, user scope) only with the opt-in `--cursor-app` (`-CursorApp`) and only when missing, with a recorded undo ([#375](https://github.com/estebanmr99/lean-agents/issues/375)).
 - `--add-tools a,b`: adds tools to your saved setup through `--update`, keeping the saved agents, OpenCode profile and other choices. A plain re-run now says when it would change the saved agents or profile, and `code-mode` says (in the plan and in `--doctor`) when Claude Code is older than 2.1.323 (found on a real Windows PC, [#304](https://github.com/estebanmr99/lean-agents/issues/304)).
 
 ### Changed

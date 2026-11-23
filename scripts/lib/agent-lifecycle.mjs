@@ -49,6 +49,21 @@ function agyWindows({ home, dir, realHome, env, arch }) {
   };
 }
 
+// Cursor CLI on Windows: the pinned cursor.com script (it fixes the CLI version, downloads a 267 MB zip and installs to %LOCALAPPDATA%\\cursor-agent
+// with agent.cmd shims and a user PATH entry), so it runs as is. It ignores --home: only a real home or a LOCALAPPDATA inside --home (CI) is planned.
+// It deletes an existing cursor-agent folder first; --install-agent runs only when `agent` is missing.
+function cursorWindows({ home, dir, realHome, env }) {
+  const W = path.win32;
+  const la = env.LOCALAPPDATA;
+  const rel = la && W.relative(home, la);
+  // LOCALAPPDATA must sit inside home (also for the real one): --uninstall-agent only removes files under home.
+  if (!la || rel === '..' || rel.startsWith('..\\') || W.isAbsolute(rel)) return { manual: 'Cursor CLI on Windows: install it from https://cursor.com/docs/cli/installation (the installer ignores --home)' };
+  const root = W.join(la, 'cursor-agent');
+  const sc = script('cursor-installer-win', dir, [], '.ps1');
+  sc.run[2].splice(2, 0, '-NonInteractive');
+  return { method: 'script', ...sc, bins: [W.join(root, 'agent.cmd')], dirs: [root], pathDir: root };
+}
+
 // One row per agent for this OS: how it is installed, where its binary lands and which dirs the install may write to.
 // `manual` is a reason, not a command: that agent/OS route is not proven yet (VERIFY in docs/compatibility.md).
 // `ver`: version per pin key to install instead of the release pin (the saved previous version, for an undo).
@@ -82,7 +97,7 @@ export function agentTable({ home, platform, dir, realHome, ver = {}, env = proc
   };
   t.cursor = posix
     ? { method: 'script', ...script('cursor-installer', dir), bins: bin('agent', 'cursor-agent'), dirs: [path.join(local, 'bin'), path.join(local, 'share', 'cursor-agent'), path.join(home, '.cursor')] }
-    : { manual: 'Cursor CLI on Windows (cursor.com/install): not proven yet. VERIFY' };
+    : cursorWindows({ home, dir, realHome, env });
   if (platform === 'darwin' && packageManager() === 'brew') {
     // The engine's own Antigravity install (antigravityPrereqs); brew removes what it installed.
     const c = antigravityPrereqs('brew', platform, home, false).find((x) => x.run.length);

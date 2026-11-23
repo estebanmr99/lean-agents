@@ -22,6 +22,7 @@ param(
   [switch]$NoCore,
   [switch]$NoBun,
   [switch]$NoApp,
+  [switch]$CursorApp,
   [switch]$NoGh,
   [string]$Privacy,
   # $Profile is a PowerShell automatic variable, so -Profile binds through an alias.
@@ -327,7 +328,7 @@ if (-not $DryRun -and (Test-Path (Join-Path $rtkDir 'rtk.exe'))) {
 # -Everything (#179 PR2) is not wired yet. When the engine has its --everything preset, add the switch to param()
 # and `Everything = '--everything'` to $switches below; until then `--everything` passes through $Rest.
 $engineArgs = @()
-$switches = [ordered]@{ DryRun = '--dry-run'; Yes = '--yes'; AllTools = '--all-tools'; NoTools = '--no-tools'; NoCore = '--no-core'; NoBun = '--no-bun'; NoApp = '--no-app'; NoGh = '--no-gh'; Update = '--update'; Uninstall = '--uninstall'; Doctor = '--doctor' }
+$switches = [ordered]@{ DryRun = '--dry-run'; Yes = '--yes'; AllTools = '--all-tools'; NoTools = '--no-tools'; NoCore = '--no-core'; NoBun = '--no-bun'; NoApp = '--no-app'; CursorApp = '--cursor-app'; NoGh = '--no-gh'; Update = '--update'; Uninstall = '--uninstall'; Doctor = '--doctor' }
 foreach ($name in $switches.Keys) { if ($PSBoundParameters[$name]) { $engineArgs += $switches[$name] } }
 $lists = [ordered]@{ Agents = '--agents'; Tools = '--tools' }
 foreach ($name in $lists.Keys) { if ($PSBoundParameters[$name]) { $engineArgs += $lists[$name], ($PSBoundParameters[$name] -join ',') } }
