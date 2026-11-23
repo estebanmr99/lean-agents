@@ -1,7 +1,7 @@
 // OpenCode 1.x adapter (>=1.18.29). Keys checked against the 1.19.0 config schema; files
 // and commands are shared with the 2.x adapter, only config keys differ.
 import path from 'node:path';
-import { configPath, dcpConfigAction, localServer, opencodeShared, profileEdits, shellEdit } from './opencode-v2.mjs';
+import { configPath, dcpConfigAction, dcpPluginEdit, dcpTuiActions, localServer, opencodeShared, profileEdits, shellEdit } from './opencode-v2.mjs';
 import { OWNED_MARK } from '../fsops.mjs';
 import { configHome } from '../system.mjs';
 import { npmSpec } from '../pins.mjs';
@@ -65,8 +65,8 @@ export function opencodeV1Adapter({ home, core, profile, opts, rulesPath }) {
   actions.push(...orcaShimActions({ dir, terminals: opts.terminals, platform: opts.platform }));
   if (tools.includes('ponytail')) edits.push({ path: ['plugin'], value: npmSpec('ponytail'), mode: 'arrayAdd', legacy: ['@dietrichgebert/ponytail'] });
   if (tools.includes('dcp')) {
-    edits.push({ path: ['plugin'], value: npmSpec('opencode-dcp'), mode: 'arrayAdd', legacy: [] }); // any DCP entry already there is the user's: kept, nothing appended (#212)
-    actions.push(dcpConfigAction(dir, profile));
+    edits.push(dcpPluginEdit('plugin'));
+    actions.push(dcpConfigAction(dir, profile), ...dcpTuiActions(dir));
   }
   const net = opts.network;
   if (net.outbound === 'off') edits.push({ path: ['share'], value: 'disabled', mode: 'set' });
