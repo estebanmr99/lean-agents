@@ -15,6 +15,7 @@ What lean-agents configures per agent, how, and when each command or key was las
 | Caveman | `npx skills add … -a claude-code -g` | `npx skills add … -a opencode -g` | `npx skills add … -a opencode -g` | `npx skills add … -a github-copilot -g` | `npx skills add … -a antigravity-cli -g` (partial) |
 | Compaction | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=80` | `compaction.auto` + `compaction.buffer` | `compaction.auto` + `compaction.reserved`, optional DCP | planned | planned |
 | Strict privacy | env flags (below) | `share`, `update`, `policies` | `share`, `autoupdate`, `experimental.openTelemetry`, `disabled_providers` | `autoUpdate: false`; telemetry only through the `--disable-client-telemetry` flag | account setting only, printed as a reminder |
+| Token usage reporting | ➖ | `opencode run --format json` (stream event `type: "usage"`, **VERIFY**) | ➖ | ➖ | ➖ |
 
 ### VS Code Copilot and Cursor
 

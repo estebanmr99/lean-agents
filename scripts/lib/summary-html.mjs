@@ -94,6 +94,7 @@ export function renderSummary({ model, filed = [], network, home, env } = {}) {
     return items.length > MAX_ITEMS ? `${shown} ${x.more(items.length - MAX_ITEMS)}` : shown;
   };
   const rows = [`<li>${esc(x.installed(summary.installed.length))}</li>`];
+  if (summary.activeSetup) rows.push(`<li><strong>Active setup:</strong> ${esc(summary.activeSetup)}</li>`);
   for (const k of ['kept', 'updated', 'skipped']) rows.push(`<li>${esc(x[k])}: ${list(summary[k])}</li>`);
   if (summary.errors.length) rows.push(`<li>${esc(x.errors)}: ${list(summary.errors)}</li>`);
   const d = summary.doctor;
