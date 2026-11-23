@@ -12,6 +12,53 @@
 
 </div>
 
+A cross-agent, token-efficient AI coding setup: one command installs shared rules, cheap-by-default subagents, and token-saving MCP tools into Claude Code, OpenCode (1.x and 2.x), GitHub Copilot CLI, Antigravity CLI, VS Code Copilot, and Cursor on macOS, Linux, and Windows.
+
+**Who it's for:** solo developers · teams ([rollout guide](docs/team-rollout.md), `--project`) · work PCs behind a proxy ([details](#on-a-work-pc-proxy-network-and-security-review)).
+
+Needs Node.js 22.20+ and git. `--dry-run` lists every file and command; nothing changes:
+
+```bash
+npx lean-agents@latest --dry-run
+```
+
+PowerShell takes the same command. New machine? See [Fresh Mac or Windows PC](#fresh-mac-or-windows-pc---everything). No Node.js yet? See [Fallback: bootstraps](#fallback-bootstraps). Flags and pinning: [Quick start](#quick-start).
+
+**What it changes on your machine:** rules (`AGENTS.md`), subagents, RTK and MCP tools (Context Mode, plus optional Serena and Playwright). Every change is tracked in state and undone cleanly by `npx lean-agents@latest --uninstall`.
+
+[Full reference](#details)
+
+<!-- details -->
+## Details
+
+lean-agents works with Claude Code, OpenCode 1.x and 2.x, GitHub Copilot CLI, Antigravity CLI, VS Code Copilot and Cursor on macOS, Linux and Windows.
+
+**Contents**
+
+- [Supported agents](#supported-agents) · [Demo: OpenCode with GitHub Copilot models](#demo-opencode-with-github-copilot-models)
+- [Quick start](#quick-start)
+- [Why](#why) · [What you get](#what-you-get)
+- [Warp and Orca](#warp-and-orca) · [Signed-in browser](#signed-in-browser-opt-in) · [VS Code Copilot and Cursor](#vs-code-copilot-and-cursor)
+- [Team mode](#team-mode---project) ([rollout guide](docs/team-rollout.md)) · [Migrate](#migrate-from-another-tool---migrate) · [Parallel agent sessions](#parallel-agent-sessions) · [Claude through GitHub Copilot](#claude-through-github-copilot)
+- [Install tiers](#install-tiers) · [On a work PC](#on-a-work-pc-proxy-network-and-security-review) · [Models that stay current](#models-that-stay-current)
+- [Safety](#safety) · [Credits](#credits) · [Roadmap](#roadmap) · [Contributing](#contributing) · [License](#license)
+
+## Supported agents
+
+| Agent | macOS | Linux | Windows | Rules | Subagents | MCP tools | Real-binary CI job |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Claude Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `real-claude` |
+| OpenCode 1.x | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `real-opencode-v1`, `real-windows`, `real-opencode-shell` |
+| OpenCode 2.x | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `real-opencode`, `real-opencode-shell`, `real-windows` |
+| Copilot CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `real-copilot`, `real-copilot-windows` |
+| Antigravity CLI | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ | `real-antigravity`, `real-antigravity-windows` |
+| VS Code Copilot | ✅ | ✅ | VERIFY | ⚠️ | ⚠️ | ✅ | `real-vscode` |
+| Cursor | ✅ | ✅ | ✅ | ➖ (`--project` only) | ⚠️ | ✅ | `real-cursor`, `real-cursor-windows` |
+
+On Windows, agents work best with Git Bash installed (RTK and bash-style commands need it); the install summary and `--doctor` tell you which shell is found and what to do if not. For OpenCode, lean-agents also sets its `shell` key to Git Bash when found, so the bash tool runs there by default (`--shell default` opts out; a `shell` you already set is kept).
+
+✅ a CI job runs the real binary on that OS (OS columns) or lean-agents writes it (feature columns) · ⚠️ written, load unproven · ➖ not available · VERIFY not proven yet. Per-agent files and verification dates: [docs/compatibility.md](docs/compatibility.md).
+
 What your agent writes is only as good as what you give it: your prompt, and the setup around it. Rules. Cheap subagents for the boring work. Tools that save tokens. Privacy you chose.
 
 You should not have to perfect every prompt. lean-agents sets the rest up for you, once, on top of the agents you already use.
@@ -54,39 +101,6 @@ Never read, print or store my API keys or tokens.
 <img src="docs/assets/demo.gif" alt="install.sh --dry-run listing every file and command it would change" width="720">
 
 </div>
-
-## Supported agents
-
-| Agent | macOS | Linux | Windows | Rules | Subagents | MCP tools | Real-binary CI job |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Claude Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `real-claude` |
-| OpenCode 1.x | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `real-opencode-v1`, `real-windows`, `real-opencode-shell` |
-| OpenCode 2.x | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `real-opencode`, `real-opencode-shell`, `real-windows` |
-| Copilot CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `real-copilot`, `real-copilot-windows` |
-| Antigravity CLI | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ | `real-antigravity`, `real-antigravity-windows` |
-| VS Code Copilot | ✅ | ✅ | VERIFY | ⚠️ | ⚠️ | ✅ | `real-vscode` |
-| Cursor | ✅ | ✅ | ✅ | ➖ (`--project` only) | ⚠️ | ✅ | `real-cursor`, `real-cursor-windows` |
-
-On Windows, agents work best with Git Bash installed (RTK and bash-style commands need it); the install summary and `--doctor` tell you which shell is found and what to do if not. For OpenCode, lean-agents also sets its `shell` key to Git Bash when found, so the bash tool runs there by default (`--shell default` opts out; a `shell` you already set is kept).
-
-✅ a CI job runs the real binary on that OS (OS columns) or lean-agents writes it (feature columns) · ⚠️ written, load unproven · ➖ not available · VERIFY not proven yet. Per-agent files and verification dates: [docs/compatibility.md](docs/compatibility.md).
-
-**Who it's for:** solo developers · teams (`--project` writes the setup into the repo) · work PCs behind a proxy ([details](#on-a-work-pc-proxy-network-and-security-review)).
-
-<!-- details -->
-## Details
-
-lean-agents works with Claude Code, OpenCode 1.x and 2.x, GitHub Copilot CLI, Antigravity CLI, VS Code Copilot and Cursor on macOS, Linux and Windows.
-
-**Contents**
-
-- [Demo: OpenCode with GitHub Copilot models](#demo-opencode-with-github-copilot-models)
-- [Quick start](#quick-start)
-- [Why](#why) · [What you get](#what-you-get)
-- [Warp and Orca](#warp-and-orca) · [Signed-in browser](#signed-in-browser-opt-in) · [VS Code Copilot and Cursor](#vs-code-copilot-and-cursor)
-- [Team mode](#team-mode---project) · [Migrate](#migrate-from-another-tool---migrate) · [Parallel agent sessions](#parallel-agent-sessions) · [Claude through GitHub Copilot](#claude-through-github-copilot)
-- [Install tiers](#install-tiers) · [On a work PC](#on-a-work-pc-proxy-network-and-security-review) · [Models that stay current](#models-that-stay-current)
-- [Safety](#safety) · [Credits](#credits) · [Roadmap](#roadmap) · [Contributing](#contributing) · [License](#license)
 
 ## At a glance
 
@@ -361,7 +375,7 @@ Drop `--dry-run` (`-DryRun`) to apply. `--uninstall` removes it all again.
 <details>
 <summary>Files written and commands</summary>
 
-Puts the shared setup into one repository, so everyone on the team gets it with `git pull`:
+Puts the shared setup into one repository, so everyone on the team gets it with `git pull`. Rolling out across a team? See the [Team rollout guide](docs/team-rollout.md) for version pinning, onboarding with `--doctor`, and updates:
 
 | File | What it does |
 | --- | --- |
