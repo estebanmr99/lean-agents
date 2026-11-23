@@ -18,9 +18,12 @@ unset XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
 "$code_bin" --version
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 if [[ "${RUNNER_OS:-}" == "Windows" ]]; then
-  # Git Bash on Windows: redirect APPDATA to keep the host clean.
-  export APPDATA="$HOME/AppData/Roaming"
-  user="$APPDATA/Code/User"
+  # Git Bash on Windows: isolate USERPROFILE and APPDATA to keep the host clean.
+  export USERPROFILE="$(cygpath -w "$HOME")"
+  export APPDATA="$(cygpath -w "$HOME/AppData/Roaming")"
+  export LOCALAPPDATA="$(cygpath -w "$HOME/AppData/Local")"
+  mkdir -p "$HOME/AppData/Roaming" "$HOME/AppData/Local"
+  user="$HOME/AppData/Roaming/Code/User"
   mkdir -p "$user"
 elif [[ "$(uname)" == Darwin ]]; then
   user="$HOME/Library/Application Support/Code/User"
