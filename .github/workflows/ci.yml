@@ -557,7 +557,7 @@ jobs:
     # the isolation proof for `opencode1` (#80 part 2, P1): 1.19 on a frozen copy under XDG_DATA_HOME + XDG_STATE_HOME leaves the
     # live dirs byte-identical (asserted), OPENCODE_DB + OPENCODE_CONFIG_DIR is printed as evidence, plus what a stdio MCP child
     # inherits and whether 2.x migrates the db on --version / debug config. Windows also runs the native PowerShell half.
-    # macOS stays VERIFY (the 4 jobs real-claude, real-opencode, real-opencode-v1 and real-cursor are proven on macOS on schedule, #371).
+    # macOS stays VERIFY for this job (no macOS leg, #56).
     needs: changes
     if: needs.changes.outputs.code == 'true' && needs.changes.outputs.opencode == 'true'
     timeout-minutes: 25
