@@ -18,6 +18,8 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 
+- Release audit gate: an open audit issue labelled `release-proof` (its proof is the release run itself) no longer blocks the release; the gate prints it.
+- Bun on Windows: unzip with .NET instead of Expand-Archive, which fails in Windows PowerShell started from PowerShell 7 (follow-up of #379).
 - DCP is pinned in both the server and the TUI config on OpenCode 1.x and 2.x (an existing `@latest` or bare name is moved to the pin, an exact version you chose is kept), and `--doctor` shows one DCP row: registered, resolved, loads ([#212](https://github.com/estebanmr99/lean-agents/issues/212)).
 - `--doctor` no longer warns about identical skill copies that lean-agents installed itself in more than one agent folder (#368).
 
