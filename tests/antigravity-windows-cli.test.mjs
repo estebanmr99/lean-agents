@@ -26,7 +26,7 @@ test('win32 plan: arm64 picks the arm64 sha256; no LOCALAPPDATA uses the #229 fo
 });
 
 test('the winget app install carries its undo', () => {
-  const absent = () => ({ ok: false, failed: false, out: '' });
+  const absent = () => ({ ok: false, failed: false, status: 0x8A150014, out: '' }); // winget: no applications found
   const app = antigravityPrereqs('winget', 'win32', 'C:\\u', true, absent).find((c) => c.run?.[0]?.[1] === 'install');
   assert.ok(app);
   assert.deepEqual(app.undo, [['winget', 'uninstall', '--id', 'Google.Antigravity', '-e']]);

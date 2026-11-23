@@ -141,6 +141,11 @@ export function gitHint(pm, present = which('git')) {
 // #147: Homebrew installs whatever version the cask has today; it cannot install an older one or a cask from a URL.
 export const BREW_AGY_LIMIT = 'Homebrew cannot pin or verify this cask: you get its current version, unpinned by lean-agents. VERIFY';
 
+// winget list: exit 0 = installed; only APPINSTALLER_CLI_ERROR_NO_APPLICATIONS_FOUND (0x8A150014, signed or not) = not installed.
+// Anything else (timeout, source error) is no answer: installing then could record an undo for the user's own app.
+const WINGET_NONE = [0x8A150014, 0x8A150014 - 2 ** 32];
+const wingetAnswer = (r) => (r.ok ? 'present' : !r.failed && WINGET_NONE.includes(r.status) ? 'absent' : 'unknown');
+
 export function antigravityPrereqs(pm, platform, home, app = true, q = quiet) {
   const out = [];
   const winApp = pm === 'winget' && platform === 'win32';
@@ -150,12 +155,11 @@ export function antigravityPrereqs(pm, platform, home, app = true, q = quiet) {
       : { desc: `agy is missing: install it from https://antigravity.google/docs/getting-started`, run: [], manual: true });
   }
   if (!app) return out;
-  const listed = winApp ? q(['winget', 'list', '--id', 'Google.Antigravity', '-e']) : null;
-  // winget list that did not finish says nothing: installing then could record an undo for the user's own app.
-  if (listed?.failed) { out.push({ desc: 'could not check for the Antigravity app (winget list did not finish): install it from https://antigravity.google/download', note: true }); return out; }
+  const listed = winApp ? wingetAnswer(q(['winget', 'list', '--id', 'Google.Antigravity', '-e'])) : null;
+  if (listed === 'unknown') { out.push({ desc: 'could not check for the Antigravity app (winget list gave no answer): install it from https://antigravity.google/download', note: true }); return out; }
   const appInstalled = platform === 'darwin'
     ? exists('/Applications/Antigravity.app') || exists(path.join(home, 'Applications', 'Antigravity.app'))
-    : winApp && listed.ok;
+    : listed === 'present';
   if (!appInstalled) {
     if (platform === 'darwin' && pm === 'brew') out.push({ desc: 'install the Antigravity app', run: [['brew', 'install', '--cask', 'antigravity']] });
     else if (winApp) out.push({ desc: 'install the Antigravity app', run: [['winget', 'install', '--id', 'Google.Antigravity', '-e', '--scope', 'user', '--accept-source-agreements', '--accept-package-agreements']], undo: [['winget', 'uninstall', '--id', 'Google.Antigravity', '-e']] });
@@ -165,16 +169,19 @@ export function antigravityPrereqs(pm, platform, home, app = true, q = quiet) {
 }
 
 // The Cursor IDE app, only when the app is missing. Unpinned like the Antigravity app: the package manager's current version (#375).
-// A winget list that did not finish returns a note and no install, so no undo can remove the user's own app. Linux: manual download only.
-export function cursorAppPrereqs(pm, platform, home, q = quiet) {
+// A winget list with no clear answer returns a note and no install, so no undo can remove the user's own app; brew checks its own
+// cask list too (a custom --appdir). Linux: manual download only.
+export function cursorAppPrereqs(pm, platform, home, q = quiet, ex = exists) {
   const winApp = pm === 'winget' && platform === 'win32';
-  const listed = winApp ? q(['winget', 'list', '--id', 'Anysphere.Cursor', '-e']) : null;
-  if (listed?.failed) return [{ desc: 'could not check for the Cursor app (winget list did not finish): install it from https://cursor.com/download', note: true }];
-  const installed = platform === 'darwin' ? exists('/Applications/Cursor.app') || exists(path.join(home, 'Applications', 'Cursor.app')) : winApp && listed.ok;
+  const listed = winApp ? wingetAnswer(q(['winget', 'list', '--id', 'Anysphere.Cursor', '-e'])) : null;
+  if (listed === 'unknown') return [{ desc: 'could not check for the Cursor app (winget list gave no answer): install it from https://cursor.com/download', note: true }];
+  const installed = platform === 'darwin'
+    ? ex(['/Applications/Cursor.app', path.join(home, 'Applications', 'Cursor.app')]) || (pm === 'brew' && q(['brew', 'list', '--cask', 'cursor']).ok)
+    : listed === 'present';
   if (installed) return [];
   if (platform === 'darwin' && pm === 'brew') return [{ desc: 'install the Cursor app', run: [['brew', 'install', '--cask', 'cursor']], undo: [['brew', 'uninstall', '--cask', 'cursor']] }];
   if (winApp) return [{ desc: 'install the Cursor app', run: [['winget', 'install', '--id', 'Anysphere.Cursor', '-e', '--scope', 'user', '--accept-source-agreements', '--accept-package-agreements']], undo: [['winget', 'uninstall', '--id', 'Anysphere.Cursor', '-e']] }];
-  return [{ desc: 'The Cursor app is optional: download it from https://cursor.com/download', note: true }];
+  return [{ desc: 'Cursor app: no brew or winget here, download it from https://cursor.com/download', note: true }];
 }
 
 // Bun for Context Mode (JS/TS in ctx_execute). One route per OS; the undo is recorded only when this install ran.
@@ -278,7 +285,7 @@ export function run(argv, { dryRun, log, env, json, codes }) {
 export function quiet(argv, timeout = 30000, env = {}) {
   const r = spawnSync(argv[0], argv.slice(1), { encoding: 'utf8', shell: useShell(argv[0]), timeout, env: { ...allowedEnv(), ...env } });
   // `failed`: the command did not finish (timeout, signal, not runnable), so a non-zero status says nothing about its answer.
-  return { ok: r.status === 0, failed: Boolean(r.error || r.signal), out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
+  return { ok: r.status === 0, failed: Boolean(r.error || r.signal), status: r.status, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
 }
 
 export const exists = (p) => Array.isArray(p) ? p.some(x => fs.existsSync(x)) : fs.existsSync(p);

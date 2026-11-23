@@ -56,7 +56,8 @@ function cursorWindows({ home, dir, realHome, env }) {
   const W = path.win32;
   const la = env.LOCALAPPDATA;
   const rel = la && W.relative(home, la);
-  if (!la || (home !== realHome && (rel.startsWith('..') || W.isAbsolute(rel)))) return { manual: 'Cursor CLI on Windows: install it from https://cursor.com/docs/cli/installation (the installer ignores --home)' };
+  // LOCALAPPDATA must sit inside home (also for the real one): --uninstall-agent only removes files under home.
+  if (!la || rel === '..' || rel.startsWith('..\\') || W.isAbsolute(rel)) return { manual: 'Cursor CLI on Windows: install it from https://cursor.com/docs/cli/installation (the installer ignores --home)' };
   const root = W.join(la, 'cursor-agent');
   const sc = script('cursor-installer-win', dir, [], '.ps1');
   sc.run[2].splice(2, 0, '-NonInteractive');
