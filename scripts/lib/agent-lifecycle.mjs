@@ -39,7 +39,8 @@ function agyWindows({ home, dir, realHome, env, arch }) {
   const zip = W.join(dir, `agy_cli_windows_${key}-${p.version}.zip`);
   const tmp = W.join(dir, `agy_cli_windows_${key}-${p.version}`);
   const q = (s) => s.replace(/['‘’‚‛]/g, (c) => c + c); // PowerShell also ends a '...' string at typographic quotes
-  const ps = `Expand-Archive -Force -LiteralPath '${q(zip)}' -DestinationPath '${q(tmp)}'; New-Item -ItemType Directory -Force '${q(binDir)}' | Out-Null; Move-Item -Force '${q(W.join(tmp, 'antigravity.exe'))}' '${q(W.join(binDir, 'agy.exe'))}'; Remove-Item -Recurse -Force '${q(tmp)}'`;
+  // .NET ZipFile, not Expand-Archive: powershell 5.1 started from pwsh 7 loads the 7.x Archive module and fails. Stop: any error exits non-zero.
+  const ps = `$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.IO.Compression.FileSystem; if (Test-Path -LiteralPath '${q(tmp)}') { Remove-Item -Recurse -Force -LiteralPath '${q(tmp)}' }; [System.IO.Compression.ZipFile]::ExtractToDirectory('${q(zip)}', '${q(tmp)}'); New-Item -ItemType Directory -Force '${q(binDir)}' | Out-Null; Move-Item -Force '${q(W.join(tmp, 'antigravity.exe'))}' '${q(W.join(binDir, 'agy.exe'))}'; Remove-Item -Recurse -Force '${q(tmp)}'`;
   return {
     method: 'download', version: p.version, download: zip,
     run: [['curl.exe', '-fsSL', '-o', zip, `https://github.com/google-antigravity/antigravity-cli/releases/download/${p.version}/agy_cli_windows_${key}.zip`], [process.execPath, VERIFY, zip, p.sha256[key]], ['powershell', '-NoProfile', '-NonInteractive', '-Command', ps]],

@@ -14,7 +14,7 @@ test('win32 plan: pinned zip, sha256 check, agy.exe extract, PATH folder', () =>
   assert.equal(x64.run[0][0], 'curl.exe');
   assert.match(x64.run[0].at(-1), new RegExp(`/download/${p.version}/agy_cli_windows_x64\\.zip$`));
   assert.equal(x64.run[1].at(-1), p.sha256.x64);
-  assert.match(x64.run[2].at(-1), /Expand-Archive.*antigravity\.exe.*agy\.exe/s);
+  assert.match(x64.run[2].at(-1), /^\$ErrorActionPreference = 'Stop';.*ZipFile\]::ExtractToDirectory.*antigravity\.exe.*agy\.exe/s);
   assert.deepEqual(x64.bins, ['C:\\u\\AppData\\Local\\agy\\bin\\agy.exe']);
   assert.equal(x64.pathDir, 'C:\\u\\AppData\\Local\\agy\\bin');
 });
