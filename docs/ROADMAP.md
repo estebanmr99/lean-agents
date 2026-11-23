@@ -2,7 +2,7 @@
 
 What comes next, in order. Each step is one build session in `docs/SPEC.md` section 14 and one PR. A step is done when its CI job with real binaries is green and its issues are closed.
 
-Latest release: [`v1.0.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v1.0.0) (2026-11-20; the owner tags it). Earlier: [`v0.8.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.8.0) (2026-11-12), [`v0.7.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.7.0) and [`v0.6.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.6.0) (2026-11-06, which raised the minimum Node to 22.20), and [`v0.5.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.5.0) (2026-11-04).
+Latest release: [`v1.1.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v1.1.0) (2026-11-23; the owner tags it). Earlier: [`v1.0.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v1.0.0) (2026-11-20), [`v0.8.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.8.0) (2026-11-12), [`v0.7.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.7.0) and [`v0.6.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.6.0) (2026-11-06, which raised the minimum Node to 22.20), and [`v0.5.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.5.0) (2026-11-04).
 
 ## Done in 0.6.0: fixes from real installs (planned as 0.5.1)
 
@@ -56,13 +56,7 @@ Scope and order from the architecture checkpoint [`docs/checkpoints/0.7.0.md`](c
 
 No 0.9.0 release was cut: its scope (the guided OpenCode 1.x to 2.x upgrade, [#80](https://github.com/estebanmr99/lean-agents/issues/80) part 2, and the 0.8.0 audit fixes) shipped in 1.0.0.
 
-## On hold
-
-| Session | Issues | What changes |
-| --- | --- | --- |
-| 9 — Showcase | — | Logo, one short GIF per use case (dry run, uninstall, all-off preset, team mode), "who it is for" in the README |
-
-## 1.0.0 (current)
+## 1.0.0
 
 Details in `CHANGELOG.md` and [`audit-1.0.0.md`](audit-1.0.0.md). Closed: the 0.8.0 audit issues ([#155](https://github.com/estebanmr99/lean-agents/issues/155) to [#169](https://github.com/estebanmr99/lean-agents/issues/169) except [#160](https://github.com/estebanmr99/lean-agents/issues/160)), [#181](https://github.com/estebanmr99/lean-agents/issues/181) and the review follow-ups. Code and docs are merged for these; they stay open for proof only the owner can give (see the audit, "Owner-only gates"):
 
@@ -72,6 +66,10 @@ Details in `CHANGELOG.md` and [`audit-1.0.0.md`](audit-1.0.0.md). Closed: the 0.
 - [#182](https://github.com/estebanmr99/lean-agents/issues/182): release train: update plan, agent CLI upgrades inside a major, `--update --undo`, self-updaters off.
 - [#160](https://github.com/estebanmr99/lean-agents/issues/160): npm publish through trusted publishing only. Open until the tag run proves it.
 - Launch: run `docs/launch.md` after the tag.
+
+## 1.1.0 (current)
+
+Details in `CHANGELOG.md` and [`audit-1.1.0.md`](audit-1.1.0.md).
 
 ## After 1.0.0
 

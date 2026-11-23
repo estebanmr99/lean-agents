@@ -4,6 +4,8 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-23
+
 ### Added
 
 - A reproducible savings benchmark harness for the owner to run later (`tests/bench-savings.mjs`), plus an "Active setup" line in `--doctor` and the summary page showing rules size, tools on, and subagents count ([#370](https://github.com/estebanmr99/lean-agents/issues/370)).
@@ -24,6 +26,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - Bun on Windows: unzip with .NET instead of Expand-Archive, which fails in Windows PowerShell started from PowerShell 7 (follow-up of #379).
 - DCP is pinned in both the server and the TUI config on OpenCode 1.x and 2.x (an existing `@latest` or bare name is moved to the pin, an exact version you chose is kept), and `--doctor` shows one DCP row: registered, resolved, loads ([#212](https://github.com/estebanmr99/lean-agents/issues/212)).
 - `--doctor` no longer warns about identical skill copies that lean-agents installed itself in more than one agent folder (#368).
+
+### Security
+
+- The manual savings benchmark workflow pins OpenCode, passes the model input through an env variable and runs with a read-only token on main only (#389).
 
 ## [1.0.0] - 2026-11-20
 

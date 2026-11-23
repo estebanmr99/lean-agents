@@ -8,7 +8,8 @@ Please report vulnerabilities privately through GitHub's "Report a vulnerability
 
 | Version | Supported |
 | --- | --- |
-| 1.0.x (current) | Yes |
+| 1.1.x (current) | Yes |
+| 1.0.x | Security fixes only |
 | Older than 1.0.0 | No |
 
 Only the latest minor line gets security fixes. When a new minor is tagged, this table moves with it.

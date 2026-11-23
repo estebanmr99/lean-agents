@@ -8,8 +8,12 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: read
+
 jobs:
   bench:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -22,7 +26,7 @@ jobs:
           node-version: '22'
           
       - name: Install OpenCode
-        run: npm install -g @opencode/cli
+        run: npm install -g @opencode/cli@2.2.5
         
       - name: Run Benchmark
         env:
@@ -30,11 +34,12 @@ jobs:
           # For example, if using Google Vertex, set GOOGLE_APPLICATION_CREDENTIALS or similar.
           # If using Anthropic, set ANTHROPIC_API_KEY.
           PROVIDER_API_KEY: ${{ secrets.PROVIDER_API_KEY }}
+          MODEL: ${{ inputs.model }}
         run: |
           node tests/bench-savings.mjs \
             --home "${RUNNER_TEMP}/bench-home" \
             --run \
-            --model "${{ inputs.model }}" \
+            --model "$MODEL" \
             --out "${RUNNER_TEMP}/bench-out"
             
       - name: Upload Results
