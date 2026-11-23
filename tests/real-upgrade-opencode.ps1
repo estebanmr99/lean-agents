@@ -272,7 +272,7 @@ try {
   Assert-That '--undo: no 2.x binary' (-not (Test-Path "$live\.opencode\bin\opencode.exe"))
   Assert-That '--undo: user PATH as before' ((Get-UserPathRaw).TrimEnd(';') -eq $pathBefore.TrimEnd(';'))
   Assert-That '--undo: live data is the frozen copy again (4 sessions)' ((Get-SessionCount $data) -eq 4)
-  Assert-That 'a 1.x opencode still runs' ((Invoke-OpenCode --version | Select-Object -Last 1) -match '^1\.19\.0')
+  Assert-That 'a 1.x opencode still runs' (((Invoke-OpenCode --version | Select-Object -Last 1) -replace '\s', '') -eq $v1)
 } finally {
   Restore-Env
   Set-Location $repo
