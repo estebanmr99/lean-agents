@@ -12,6 +12,53 @@
 
 </div>
 
+Una configuración de código asistido por IA entre agentes y eficiente en tokens: un comando instala reglas compartidas, subagentes económicos por defecto y herramientas MCP para ahorrar tokens en Claude Code, OpenCode (1.x y 2.x), GitHub Copilot CLI, Antigravity CLI, VS Code Copilot y Cursor en macOS, Linux y Windows.
+
+**Para quién es:** desarrolladores solos · equipos ([guía de despliegue](docs/team-rollout.es.md), `--project`) · PCs de trabajo detrás de un proxy ([detalles](#en-una-pc-de-trabajo-proxy-red-y-revisión-de-seguridad)).
+
+Necesitas Node.js 22.20+ y git. `--dry-run` lista cada archivo y comando; nada cambia:
+
+```bash
+npx lean-agents@latest --dry-run
+```
+
+PowerShell usa el mismo comando. ¿Máquina nueva? Ve [Mac o PC con Windows nuevos](#mac-o-pc-con-windows-nuevos---everything). ¿Aún no tienes Node.js? Ve [Alternativa: bootstraps](#alternativa-bootstraps). Opciones y fijar una versión: [Inicio rápido](#inicio-rápido).
+
+**Qué cambia en tu máquina:** reglas (`AGENTS.md`), subagentes y herramientas MCP (RTK, Context Mode, Serena, Playwright). Cada cambio queda registrado y se revierte limpiamente con `npx lean-agents@latest --uninstall`.
+
+[Referencia completa](#detalles)
+
+<!-- details -->
+## Detalles
+
+lean-agents funciona con Claude Code, OpenCode 1.x y 2.x, GitHub Copilot CLI, Antigravity CLI, VS Code Copilot y Cursor en macOS, Linux y Windows.
+
+**Contenido**
+
+- [Agentes compatibles](#agentes-compatibles) · [Demo: OpenCode con modelos de GitHub Copilot](#demo-opencode-con-modelos-de-github-copilot)
+- [Inicio rápido](#inicio-rápido)
+- [Por qué](#por-qué) · [Qué incluye](#qué-incluye)
+- [Warp y Orca](#warp-y-orca) · [Navegador con tu sesión](#navegador-con-tu-sesión-opcional) · [VS Code Copilot y Cursor](#vs-code-copilot-y-cursor)
+- [Modo equipo](#modo-equipo---project) ([guía de despliegue](docs/team-rollout.es.md)) · [Migrar](#migrar-desde-otra-herramienta---migrate) · [Sesiones de agentes en paralelo](#sesiones-de-agentes-en-paralelo) · [Claude a través de GitHub Copilot](#claude-a-través-de-github-copilot)
+- [Niveles de instalación](#niveles-de-instalación) · [En una PC de trabajo](#en-una-pc-de-trabajo-proxy-red-y-revisión-de-seguridad) · [Modelos siempre al día](#modelos-siempre-al-día)
+- [Seguridad](#seguridad) · [Créditos](#créditos) · [Hoja de ruta](#hoja-de-ruta) · [Contribuir](#contribuir) · [Licencia](#licencia)
+
+## Agentes compatibles
+
+| Agente | macOS | Linux | Windows | Reglas | Subagentes | Herramientas MCP | Job de CI con binario real |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Claude Code | VERIFY | ✅ | ✅ | ✅ | ✅ | ✅ | `real-claude` |
+| OpenCode 1.x | VERIFY | ✅ | ✅ | ✅ | ✅ | ✅ | `real-opencode-v1`, `real-windows`, `real-opencode-shell` |
+| OpenCode 2.x | VERIFY | ✅ | ✅ | ✅ | ✅ | ✅ | `real-opencode`, `real-opencode-shell`, `real-windows` |
+| Copilot CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `real-copilot`, `real-copilot-windows` |
+| Antigravity CLI | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ | `real-antigravity`, `real-antigravity-windows` |
+| VS Code Copilot | ✅ | ✅ | VERIFY | ⚠️ | ⚠️ | ✅ | `real-vscode` |
+| Cursor | VERIFY | ✅ | ✅ | ➖ (solo con `--project`) | ⚠️ | ✅ | `real-cursor`, `real-cursor-windows` |
+
+En Windows, los agentes funcionan mejor con Git Bash instalado (RTK y los comandos estilo bash lo necesitan); el resumen de la instalación y `--doctor` te dicen qué shell se encontró y qué hacer si falta. Para OpenCode, lean-agents también pone su clave `shell` en Git Bash cuando lo encuentra, así la herramienta bash corre ahí por defecto (`--shell default` lo desactiva; un `shell` que ya hayas puesto se conserva).
+
+✅ un job de CI ejecuta el binario real en ese sistema (columnas de sistema) o lean-agents lo escribe (columnas de función) · ⚠️ escrito, carga sin comprobar · ➖ no disponible · VERIFY aún sin comprobar. Archivos por agente y fechas de verificación: [docs/compatibility.md](docs/compatibility.md).
+
 Lo que escribe tu agente depende de lo que le das: tu prompt y la configuración que lo rodea. Reglas. Subagentes baratos para lo aburrido. Herramientas que ahorran tokens. La privacidad que tú elegiste.
 
 No tendrías que perfeccionar cada prompt. lean-agents deja el resto listo, una sola vez, sobre los agentes que ya usas.
@@ -54,39 +101,6 @@ Nunca leas, muestres ni guardes mis claves o tokens.
 <img src="docs/assets/demo.gif" alt="install.sh --dry-run lista cada archivo y comando que cambiaría" width="720">
 
 </div>
-
-## Agentes compatibles
-
-| Agente | macOS | Linux | Windows | Reglas | Subagentes | Herramientas MCP | Job de CI con binario real |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Claude Code | VERIFY | ✅ | ✅ | ✅ | ✅ | ✅ | `real-claude` |
-| OpenCode 1.x | VERIFY | ✅ | ✅ | ✅ | ✅ | ✅ | `real-opencode-v1`, `real-windows`, `real-opencode-shell` |
-| OpenCode 2.x | VERIFY | ✅ | ✅ | ✅ | ✅ | ✅ | `real-opencode`, `real-opencode-shell`, `real-windows` |
-| Copilot CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `real-copilot`, `real-copilot-windows` |
-| Antigravity CLI | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ | `real-antigravity`, `real-antigravity-windows` |
-| VS Code Copilot | ✅ | ✅ | VERIFY | ⚠️ | ⚠️ | ✅ | `real-vscode` |
-| Cursor | VERIFY | ✅ | ✅ | ➖ (solo con `--project`) | ⚠️ | ✅ | `real-cursor`, `real-cursor-windows` |
-
-En Windows, los agentes funcionan mejor con Git Bash instalado (RTK y los comandos estilo bash lo necesitan); el resumen de la instalación y `--doctor` te dicen qué shell se encontró y qué hacer si falta. Para OpenCode, lean-agents también pone su clave `shell` en Git Bash cuando lo encuentra, así la herramienta bash corre ahí por defecto (`--shell default` lo desactiva; un `shell` que ya hayas puesto se conserva).
-
-✅ un job de CI ejecuta el binario real en ese sistema (columnas de sistema) o lean-agents lo escribe (columnas de función) · ⚠️ escrito, carga sin comprobar · ➖ no disponible · VERIFY aún sin comprobar. Archivos por agente y fechas de verificación: [docs/compatibility.md](docs/compatibility.md).
-
-**Para quién es:** desarrolladores solos · equipos (`--project` escribe la configuración en el repo) · PCs de trabajo detrás de un proxy ([detalles](#en-una-pc-de-trabajo-proxy-red-y-revisión-de-seguridad)).
-
-<!-- details -->
-## Detalles
-
-lean-agents funciona con Claude Code, OpenCode 1.x y 2.x, GitHub Copilot CLI, Antigravity CLI, VS Code Copilot y Cursor en macOS, Linux y Windows.
-
-**Contenido**
-
-- [Demo: OpenCode con modelos de GitHub Copilot](#demo-opencode-con-modelos-de-github-copilot)
-- [Inicio rápido](#inicio-rápido)
-- [Por qué](#por-qué) · [Qué incluye](#qué-incluye)
-- [Warp y Orca](#warp-y-orca) · [Navegador con tu sesión](#navegador-con-tu-sesión-opcional) · [VS Code Copilot y Cursor](#vs-code-copilot-y-cursor)
-- [Modo equipo](#modo-equipo---project) · [Migrar](#migrar-desde-otra-herramienta---migrate) · [Sesiones de agentes en paralelo](#sesiones-de-agentes-en-paralelo) · [Claude a través de GitHub Copilot](#claude-a-través-de-github-copilot)
-- [Niveles de instalación](#niveles-de-instalación) · [En una PC de trabajo](#en-una-pc-de-trabajo-proxy-red-y-revisión-de-seguridad) · [Modelos siempre al día](#modelos-siempre-al-día)
-- [Seguridad](#seguridad) · [Créditos](#créditos) · [Hoja de ruta](#hoja-de-ruta) · [Contribuir](#contribuir) · [Licencia](#licencia)
 
 ## De un vistazo
 
@@ -361,7 +375,7 @@ Quita `--dry-run` (`-DryRun`) para aplicar. `--uninstall` lo quita todo otra vez
 <details>
 <summary>Archivos que escribe y comandos</summary>
 
-Pone la configuración compartida en un repositorio, así todo el equipo la recibe con `git pull`:
+Pone la configuración compartida en un repositorio, así todo el equipo la recibe con `git pull`. ¿Despliegue en todo el equipo? Consulta la [guía de despliegue en equipo](docs/team-rollout.es.md) para fijar versiones, incorporación con `--doctor` y actualizaciones:
 
 | Archivo | Qué hace |
 | --- | --- |
