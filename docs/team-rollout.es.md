@@ -33,7 +33,7 @@ Ejecutar con `--project <dir>` escribe la configuración compartida directamente
 | `.github/agents/*.agent.md` | Definiciones de subagentes por niveles para VS Code Copilot (`explore`, `research`, `review`, `debug`, `planner`). |
 | `.cursor/rules/lean-agents.mdc` | Regla para Cursor que apunta a `AGENTS.md`. |
 | `.cursor/agents/*.md` | Definiciones de subagentes por niveles para Cursor (`explore`, `research`, `review`, `debug`, `planner`). |
-| `.vscode/mcp.json` | Definiciones compartidas de servidores MCP para VS Code (Context Mode, Serena, Playwright). |
+| `.vscode/mcp.json` | Definiciones compartidas de servidores MCP para VS Code (Context Mode, más Serena y Playwright si los eliges con `--tools`). |
 | `.cursor/mcp.json` | Definiciones compartidas de servidores MCP para Cursor. |
 
 Confírmalos en el repositorio:
@@ -71,8 +71,10 @@ npx lean-agents@1.0.0 --doctor
 | Estado | Significado | Acción necesaria |
 | --- | --- | --- |
 | `ok` | El componente, binario o versión fijada está comprobado, saludable y coincide con la configuración esperada. | Ninguna. Todo funciona correctamente. |
+| `note` | Solo información (por ejemplo, guía sobre la shell, avisos de Node del proyecto o ajustes manuales). | Ninguna (solo información, nada que corregir). |
 | `changed` | Un archivo, versión o ajuste difiere del estado instalado (por ejemplo, un archivo de reglas editado localmente tras la instalación, o una desviación de versión que indica una actualización disponible). | Revisa el cambio. Las modificaciones locales son válidas si son intencionadas; de lo contrario, ejecuta `--update`. |
-| `error` | Una herramienta requerida, binario, registro MCP o comando falló o no se encuentra. | Revisa el detalle del error reportado y reinstala o corrige el requisito que falte. |
+| `error` | Una herramienta requerida, binario, registro MCP o comando falló o no se encuentra, o falta un archivo gestionado. | Revisa el detalle del error reportado y reinstala o corrige el requisito que falte. |
+| `missing` | lean-agents no está instalado en esta máquina (`not installed (run the installer)`). | Ejecuta la instalación (`npx lean-agents@1.0.0`). |
 
 También puedes pasar `--json` a `--doctor` para obtener una salida estructurada en scripts o comprobaciones automáticas.
 

@@ -24,7 +24,7 @@ npx lean-agents@latest --dry-run
 
 PowerShell usa el mismo comando. ¿Máquina nueva? Ve [Mac o PC con Windows nuevos](#mac-o-pc-con-windows-nuevos---everything). ¿Aún no tienes Node.js? Ve [Alternativa: bootstraps](#alternativa-bootstraps). Opciones y fijar una versión: [Inicio rápido](#inicio-rápido).
 
-**Qué cambia en tu máquina:** reglas (`AGENTS.md`), subagentes y herramientas MCP (RTK, Context Mode, Serena, Playwright). Cada cambio queda registrado y se revierte limpiamente con `npx lean-agents@latest --uninstall`.
+**Qué cambia en tu máquina:** reglas (`AGENTS.md`), subagentes, RTK y herramientas MCP (Context Mode, más Serena y Playwright opcionales). Cada cambio queda registrado y se revierte limpiamente con `npx lean-agents@latest --uninstall`.
 
 [Referencia completa](#detalles)
 

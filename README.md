@@ -24,7 +24,7 @@ npx lean-agents@latest --dry-run
 
 PowerShell takes the same command. New machine? See [Fresh Mac or Windows PC](#fresh-mac-or-windows-pc---everything). No Node.js yet? See [Fallback: bootstraps](#fallback-bootstraps). Flags and pinning: [Quick start](#quick-start).
 
-**What it changes on your machine:** rules (`AGENTS.md`), subagents, and MCP tools (RTK, Context Mode, Serena, Playwright). Every change is tracked in state and undone cleanly by `npx lean-agents@latest --uninstall`.
+**What it changes on your machine:** rules (`AGENTS.md`), subagents, RTK and MCP tools (Context Mode, plus optional Serena and Playwright). Every change is tracked in state and undone cleanly by `npx lean-agents@latest --uninstall`.
 
 [Full reference](#details)
 

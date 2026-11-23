@@ -33,7 +33,7 @@ Running with `--project <dir>` writes shared configuration directly into the rep
 | `.github/agents/*.agent.md` | Tiered subagent definitions for VS Code Copilot (`explore`, `research`, `review`, `debug`, `planner`). |
 | `.cursor/rules/lean-agents.mdc` | Cursor rule definition pointing to `AGENTS.md`. |
 | `.cursor/agents/*.md` | Tiered subagent definitions for Cursor (`explore`, `research`, `review`, `debug`, `planner`). |
-| `.vscode/mcp.json` | Shared MCP server definitions for VS Code (Context Mode, Serena, Playwright). |
+| `.vscode/mcp.json` | Shared MCP server definitions for VS Code (Context Mode, plus Serena and Playwright if you pick them with `--tools`). |
 | `.cursor/mcp.json` | Shared MCP server definitions for Cursor. |
 
 Commit them to the repository:
@@ -71,8 +71,10 @@ npx lean-agents@1.0.0 --doctor
 | Status | Meaning | Action needed |
 | --- | --- | --- |
 | `ok` | The component, binary, or pin is verified, healthy, and matches the expected configuration. | None. Everything is working. |
+| `note` | Information only (for example, shell guidance, project Node notices, or manual settings). | None (information only, nothing to fix). |
 | `changed` | A file, pin, or setting differs from the installed state (for example, a rule file edited locally since install, or a pin drift indicating an update is available). | Review the change. Local edits are fine if intentional; otherwise run `--update`. |
-| `error` | A required tool, binary, MCP registration, or install command failed or is missing. | Check the reported error detail and reinstall or fix the missing requirement. |
+| `error` | A required tool, binary, MCP registration, or install command failed or is missing, or a managed file is missing. | Check the reported error detail and reinstall or fix the missing requirement. |
+| `missing` | lean-agents is not installed on this machine (`not installed (run the installer)`). | Run the install (`npx lean-agents@1.0.0`). |
 
 You can also pass `--json` to `--doctor` for machine-readable output in scripts or verification checks.
 
