@@ -15,13 +15,15 @@ const arg = (name) => {
   return null;
 };
 
-// The key is shared and has no OpenRouter credit limit, so the budget stop reads the key's own spend, not model-reported cost (#103).
-// GET https://openrouter.ai/api/v1/key -> data.usage (USD, all time); source: openrouter.ai/docs/api/reference/limits, 2026-11-23.
+// The budget stop reads the key's own spend, not model-reported cost (#103). With BYOK the model cost is billed to the
+// provider account and reported as byok_usage (credits stay ~0), so both count.
+// GET https://openrouter.ai/api/v1/key -> data.usage + data.byok_usage (USD, all time); source: openrouter.ai/docs/api/reference/limits, 2026-11-23.
+// VERIFY: byok_usage is the provider's list-price cost (logs show $0.00 cost for BYOK rows).
 export async function keySpend(key, fetchFn = fetch) {
   const res = await fetchFn('https://openrouter.ai/api/v1/key', { headers: { Authorization: `Bearer ${key}` } });
-  const usage = res.ok ? (await res.json())?.data?.usage : undefined;
-  if (typeof usage !== 'number') throw new Error(`key usage unavailable (HTTP ${res.status})`);
-  return usage;
+  const d = res.ok ? (await res.json())?.data : undefined;
+  if (typeof d?.usage !== 'number' || typeof d?.byok_usage !== 'number') throw new Error(`key usage unavailable (HTTP ${res.status})`);
+  return d.usage + d.byok_usage;
 }
 
 // Raw logs are uploaded as artifacts; the model runs shell with the key in its env, so strip it.
@@ -57,6 +59,15 @@ export function getStats(arr) {
 }
 
 // Exported for tests
+// Only the assistant's own text: the raw stream also holds tool output (the files it read), which would pass answer checks for free.
+export function finalText(out) {
+  const parts = [];
+  for (const line of out.split('\n')) {
+    try { const ev = JSON.parse(line); if (ev.type === 'text') parts.push(String((ev.part || ev).text || '')); } catch {}
+  }
+  return parts.join('\n');
+}
+
 export function parseTokenUsage(out) {
   let inputTokens = 0;
   let outputTokens = 0;
@@ -335,7 +346,7 @@ async function main() {
         console.log(`  Events: ${types.join(', ') || 'none'}; exit ${res.status}`);
         totalCost = Math.max(totalCost + usage.cost, await spentSoFar(startSpend));
         console.log(`  Spent so far (key usage): $${totalCost.toFixed(4)}`);
-        const pass = task.check(workdir, res.stdout || '');
+        const pass = task.check(workdir, finalText(res.stdout || ''));
 
         console.log(`  Pass: ${pass}, In: ${usage.inputTokens}, Out: ${usage.outputTokens}, Cache: ${usage.cacheTokens}, Cost: $${usage.cost.toFixed(4)}, Time: ${wallTime}ms`);
         
@@ -455,7 +466,7 @@ export function generateChart(res, info) {
 
   let svg = `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif" font-size="12" fill="currentColor">`;
   svg += `<rect width="100%" height="100%" fill="none" />`;
-  svg += `<style>text { fill: currentColor; } .baseline { fill: #1f6feb; } .lean { fill: #238636; }</style>`;
+  svg += `<style>text { fill: #1f2328; } line { stroke: #1f2328; } .baseline { fill: #1f6feb; } .lean { fill: #238636; } @media (prefers-color-scheme: dark) { text { fill: #e6edf3; } line { stroke: #e6edf3; } }</style>`;
   svg += `<text x="${width / 2}" y="30" text-anchor="middle" font-size="16" font-weight="bold">Input Tokens (Median &amp; IQR): Lean vs Baseline</text>`;
 
   tasks.forEach((taskId, i) => {
@@ -470,7 +481,7 @@ export function generateChart(res, info) {
       svg += `<rect class="baseline" x="${margin.left}" y="${yBase}" width="${w}" height="${barHeight}" />`;
       const x25 = margin.left + scale(base.in.p25);
       const x75 = margin.left + scale(base.in.p75);
-      svg += `<line x1="${x25}" y1="${yBase + barHeight/2}" x2="${x75}" y2="${yBase + barHeight/2}" stroke="currentColor" stroke-width="1.5" />`;
+      svg += `<line x1="${x25}" y1="${yBase + barHeight/2}" x2="${x75}" y2="${yBase + barHeight/2}" stroke-width="1.5" />`;
       svg += `<text x="${margin.left + w + 5}" y="${yBase + barHeight - 5}">${Math.round(base.in.median)}</text>`;
     }
 
@@ -479,7 +490,7 @@ export function generateChart(res, info) {
       svg += `<rect class="lean" x="${margin.left}" y="${yBase + barHeight}" width="${w}" height="${barHeight}" />`;
       const x25 = margin.left + scale(lean.in.p25);
       const x75 = margin.left + scale(lean.in.p75);
-      svg += `<line x1="${x25}" y1="${yBase + barHeight * 1.5}" x2="${x75}" y2="${yBase + barHeight * 1.5}" stroke="currentColor" stroke-width="1.5" />`;
+      svg += `<line x1="${x25}" y1="${yBase + barHeight * 1.5}" x2="${x75}" y2="${yBase + barHeight * 1.5}" stroke-width="1.5" />`;
       svg += `<text x="${margin.left + w + 5}" y="${yBase + barHeight * 2 - 5}">${Math.round(lean.in.median)}${lean.stable ? ' ★' : ''}</text>`;
     }
   });

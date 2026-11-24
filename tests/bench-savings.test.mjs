@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseTokenUsage, keySpend, redactKey, checkQuotaError, getStats, generateChart } from './bench-savings.mjs';
+import { parseTokenUsage, finalText, keySpend, redactKey, checkQuotaError, getStats, generateChart } from './bench-savings.mjs';
 import { doctor } from '../scripts/lib/doctor.mjs';
 import { buildSummary } from '../scripts/lib/summary-data.mjs';
 import { renderSummary } from '../scripts/lib/summary-html.mjs';
@@ -164,9 +164,11 @@ test('doctor Active setup row content and summary line', () => {
   fs.rmSync(home, { recursive: true, force: true });
 });
 
-test('keySpend reads data.usage and fails closed', async () => {
-  const ok = async () => ({ ok: true, status: 200, json: async () => ({ data: { usage: 1.25 } }) });
-  assert.strictEqual(await keySpend('k', ok), 1.25);
+test('keySpend adds credit and BYOK usage and fails closed', async () => {
+  const ok = async () => ({ ok: true, status: 200, json: async () => ({ data: { usage: 1.25, byok_usage: 0.5 } }) });
+  assert.strictEqual(await keySpend('k', ok), 1.75);
+  const noByok = async () => ({ ok: true, status: 200, json: async () => ({ data: { usage: 1.25 } }) });
+  await assert.rejects(keySpend('k', noByok));
   const bad = async () => ({ ok: false, status: 401, json: async () => ({}) });
   await assert.rejects(keySpend('k', bad), /HTTP 401/);
   const noField = async () => ({ ok: true, status: 200, json: async () => ({ data: {} }) });
@@ -181,4 +183,12 @@ test('redactKey removes every copy of the key', () => {
 test('parseTokenUsage reads step_finish with a nested part and cache object', () => {
   const ev = { type: 'step_finish', part: { type: 'step-finish', tokens: { input: 100, output: 20, reasoning: 5, cache: { read: 7, write: 3 } }, cost: 0.002 } };
   assert.deepStrictEqual(parseTokenUsage(JSON.stringify(ev)), { inputTokens: 100, outputTokens: 25, cacheTokens: 10, cost: 0.002 });
+});
+
+test('finalText keeps assistant text and drops tool output', () => {
+  const out = [
+    JSON.stringify({ type: 'tool_use', part: { state: { output: 'at buggyFunction (app.js:123:45)' } } }),
+    JSON.stringify({ type: 'text', part: { text: 'It was parseConfig.' } }),
+  ].join('\n');
+  assert.strictEqual(finalText(out), 'It was parseConfig.');
 });
