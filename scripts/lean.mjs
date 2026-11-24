@@ -53,7 +53,7 @@ const FIXED_PROFILE = { claude: 'claude-subscription', 'copilot-cli': 'github-co
 Object.assign(ADAPTERS, { 'vscode-copilot': vscodeCopilotAdapter, cursor: cursorAdapter });
 FIXED_PROFILE['vscode-copilot'] = 'github-copilot';
 // Extensions cannot be installed silently without admin policy, so the user installs it.
-const CODE_MODE_NOTE = 'Claude Code Code Mode is experimental (Claude Code 2.1.323 or newer, interactive terminal only, a direct Anthropic subscription or Console login; not Vertex, Bedrock or a gateway). A session started with it resumes only with it on; --uninstall turns it off';
+const CODE_MODE_NOTE = 'Claude Code Code Mode is experimental (Claude Code 2.1.323 or newer, interactive terminal only, a direct Anthropic subscription or Console login; not Vertex, Bedrock or a gateway). Remote Control, Claude in Chrome, computer use and the VS Code panel do not work while it is on; RTK and Context Mode do. A session started with it resumes only with it on; --uninstall turns it off';
 // Code Mode needs Claude Code 2.1.323+; lean-agents installs the pinned version, so say when the pin is older.
 const codeModeNote = () => `${CODE_MODE_NOTE}${compare(PINS['claude-code'].version, '2.1.323') < 0 ? `. The pinned Claude Code ${PINS['claude-code'].version} is older than 2.1.323: the setting is written now and takes effect once the pin moves` : ''}`;
 const EXTENSION_NOTE = 'install the Playwright Extension yourself from https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm . Each session asks you to approve the connection; optional auto-approve: docs/browser-extension.md';
