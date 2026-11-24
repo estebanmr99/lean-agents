@@ -1,0 +1,52 @@
+name: Spike Code Mode Deps
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  spike:
+    name: Check Dependencies and Sandbox
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: |
+          cd spikes/code-mode-deps
+          npm ci --ignore-scripts
+
+      - name: Audit Signatures
+        continue-on-error: true
+        run: |
+          cd spikes/code-mode-deps
+          npm audit signatures >> $GITHUB_STEP_SUMMARY
+
+      - name: Audit Security
+        continue-on-error: true
+        run: |
+          cd spikes/code-mode-deps
+          npm audit --omit=dev --audit-level=high >> $GITHUB_STEP_SUMMARY
+
+      - name: Run Probe
+        run: |
+          cd spikes/code-mode-deps
+          node probe.mjs
+          cat SUMMARY.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload result
+        uses: actions/upload-artifact@4cedc54fd52bf27d61163152277d33d9f379ea61 # v4.6.1
+        with:
+          name: result
+          path: spikes/code-mode-deps/result.json
+          retention-days: 7

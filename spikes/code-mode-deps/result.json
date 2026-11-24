@@ -1,0 +1,84 @@
+{
+  "depTreeSize": 166,
+  "sdkTopLevelDeps": [
+    "@hono/node-server",
+    "ajv",
+    "ajv-formats",
+    "content-type",
+    "cors",
+    "cross-spawn",
+    "eventsource",
+    "eventsource-parser",
+    "express",
+    "express-rate-limit",
+    "hono",
+    "jose",
+    "json-schema-typed",
+    "pkce-challenge",
+    "raw-body",
+    "zod",
+    "zod-to-json-schema"
+  ],
+  "mcp2Split": {
+    "exists": true,
+    "versions": [
+      "2.4.0",
+      "2.3.1",
+      "2.3.0",
+      "2.2.0",
+      "2.1.0"
+    ],
+    "latestDeps": [
+      {
+        "zod": "^4.2.0",
+        "@modelcontextprotocol/core": "2.4.0"
+      }
+    ]
+  },
+  "sandboxProbes": [
+    {
+      "name": "async callTool x3",
+      "status": "PASS",
+      "error": "Lifetime not alive"
+    },
+    {
+      "name": "process",
+      "status": "PASS",
+      "error": "'process' is not defined"
+    },
+    {
+      "name": "require",
+      "status": "PASS",
+      "error": "'require' is not defined"
+    },
+    {
+      "name": "fetch",
+      "status": "PASS",
+      "error": "'fetch' is not defined"
+    },
+    {
+      "name": "dynamic import",
+      "status": "PASS",
+      "error": "Lifetime not alive"
+    },
+    {
+      "name": "globalThis keys",
+      "status": "PASS",
+      "value": []
+    },
+    {
+      "name": "infinite loop",
+      "status": "PASS",
+      "error": "interrupted"
+    },
+    {
+      "name": "memory limit (100MB)",
+      "status": "PASS",
+      "error": "out of memory"
+    }
+  ],
+  "verifications": {
+    "fixedAdvisories": true,
+    "allSigsValid": true
+  }
+}
