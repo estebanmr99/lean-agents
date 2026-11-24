@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseTokenUsage, finalText, keySpend, redactKey, checkQuotaError, getStats, generateChart } from './bench-savings.mjs';
+import { parseTokenUsage, finalText, keySpend, redactKey, checkQuotaError, getStats, generateChart, stripTool, renderResultsMarkdown } from './bench-savings.mjs';
 import { doctor } from '../scripts/lib/doctor.mjs';
 import { buildSummary } from '../scripts/lib/summary-data.mjs';
 import { renderSummary } from '../scripts/lib/summary-html.mjs';
@@ -74,11 +74,11 @@ test('bench-savings budget guards', async (t) => {
       '--home', home,
       '--run',
       '--model', 'mock/model',
-      '--repeats', '10', // 8 tasks * 2 modes * 10 = 160 runs
+      '--repeats', '10', // 9 tasks * 2 modes * 10 = 180 runs
       '--max-runs', '50'
     ], { encoding: 'utf8' });
     assert.strictEqual(res.status, 2);
-    assert.match(res.stderr, /Estimated runs \(160\) exceed --max-runs \(50\)/);
+    assert.match(res.stderr, /Estimated runs \(180\) exceed --max-runs \(50\)/);
   });
 
   fs.rmSync(home, { recursive: true, force: true });
@@ -191,4 +191,75 @@ test('finalText keeps assistant text and drops tool output', () => {
     JSON.stringify({ type: 'text', part: { text: 'It was parseConfig.' } }),
   ].join('\n');
   assert.strictEqual(finalText(out), 'It was parseConfig.');
+});
+
+test('stripTool context-mode removes entry from opencode.jsonc', () => {
+  const home = path.join(os.tmpdir(), `bench-strip-ctx-${Date.now()}`);
+  const ocDir = path.join(home, '.config', 'opencode');
+  fs.mkdirSync(ocDir, { recursive: true });
+  const cfgPath = path.join(ocDir, 'opencode.jsonc');
+  fs.writeFileSync(cfgPath, JSON.stringify({ mcp: { servers: { 'context-mode': { type: 'local' }, other: {} } } }));
+
+  stripTool(home, 'context-mode');
+  const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+  assert.ok(!cfg.mcp.servers['context-mode']);
+  assert.ok(cfg.mcp.servers.other);
+
+  assert.throws(() => stripTool(home, 'context-mode'), /entry not found/);
+  fs.rmSync(home, { recursive: true, force: true });
+});
+
+test('stripTool rtk removes mention from AGENTS.md', () => {
+  const home = path.join(os.tmpdir(), `bench-strip-rtk-${Date.now()}`);
+  const laDir = path.join(home, '.config', 'lean-agents');
+  fs.mkdirSync(laDir, { recursive: true });
+  const rulesPath = path.join(laDir, 'AGENTS.md');
+  const target = ' RTK compression does not replace this.';
+  fs.writeFileSync(rulesPath, `Rule 1.${target}\nRule 2.`);
+
+  stripTool(home, 'rtk');
+  const content = fs.readFileSync(rulesPath, 'utf8');
+  assert.ok(!content.includes(target));
+  assert.match(content, /Rule 1\.\nRule 2\./);
+
+  assert.throws(() => stripTool(home, 'rtk'), /rtk mention not found/);
+  fs.rmSync(home, { recursive: true, force: true });
+});
+
+test('bench-savings variant and task parsing', () => {
+  const home = path.join(os.tmpdir(), `bench-parse-${Date.now()}`);
+  fs.mkdirSync(home, { recursive: true });
+
+  const res = spawnSync(process.execPath, [
+    path.join(ROOT, 'tests', 'bench-savings.mjs'),
+    '--home', home,
+    '--variants', 'invalid'
+  ], { encoding: 'utf8' });
+  assert.strictEqual(res.status, 2);
+  assert.match(res.stderr, /Unknown variant: invalid/);
+
+  const res2 = spawnSync(process.execPath, [
+    path.join(ROOT, 'tests', 'bench-savings.mjs'),
+    '--home', home,
+    '--tasks', 'invalid'
+  ], { encoding: 'utf8' });
+  assert.strictEqual(res2.status, 2);
+  assert.match(res2.stderr, /Unknown task: invalid/);
+
+  fs.rmSync(home, { recursive: true, force: true });
+});
+
+test('renderResultsMarkdown variants table and overhead', () => {
+  const summary = [
+    { task: 'task0', mode: 'baseline', in: { median: 100, p25: 100, p75: 100 }, out: { median: 5 }, time: { median: 500 }, passRate: 1, totalCost: 0 },
+    { task: 'task0', mode: 'lean', in: { median: 150, p25: 150, p75: 150 }, out: { median: 5 }, time: { median: 500 }, passRate: 1, totalCost: 0 },
+    { task: 'task1', mode: 'baseline', in: { median: 1000, p25: 1000, p75: 1000 }, out: { median: 50 }, time: { median: 2000 }, passRate: 1, totalCost: 0 },
+    { task: 'task1', mode: 'lean', in: { median: 800, p25: 800, p75: 800 }, out: { median: 50 }, time: { median: 2000 }, passRate: 0.9, totalCost: 0 }
+  ];
+  const md = renderResultsMarkdown(summary, ['baseline', 'lean'], 0.01);
+  assert.match(md, /### Variants Comparison/);
+  assert.match(md, /\| task0 \| 100 \| 150 \|/);
+  assert.match(md, /\| task1 \| 1000 \| 800 \(90%\) \|/);
+  assert.match(md, /\| \*\*Fixed overhead vs baseline \(task0\)\*\* \| 0 \| 50 \|/);
+  assert.match(md, /Total cost: \$0.0100/);
 });

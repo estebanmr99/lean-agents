@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { parse, applyEdits, modify } from 'jsonc-parser';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURES = path.join(ROOT, 'tests', 'fixtures', 'bench-savings');
@@ -59,6 +60,27 @@ export function getStats(arr) {
 }
 
 // Exported for tests
+export function stripTool(runHome, tool) {
+  if (tool === 'context-mode') {
+    const configPath = path.join(runHome, '.config', 'opencode', 'opencode.jsonc');
+    if (!fs.existsSync(configPath)) throw new Error(`config not found: ${configPath}`);
+    const content = fs.readFileSync(configPath, 'utf8');
+    const root = parse(content);
+    if (!root?.mcp?.servers?.['context-mode']) throw new Error('context-mode entry not found in config');
+    const edits = modify(content, ['mcp', 'servers', 'context-mode'], undefined, { formattingOptions: { insertSpaces: true, tabSize: 2 } });
+    fs.writeFileSync(configPath, applyEdits(content, edits));
+  } else if (tool === 'rtk') {
+    const rulesPath = path.join(runHome, '.config', 'lean-agents', 'AGENTS.md');
+    if (!fs.existsSync(rulesPath)) throw new Error(`rules not found: ${rulesPath}`);
+    const content = fs.readFileSync(rulesPath, 'utf8');
+    const target = ' RTK compression does not replace this.';
+    if (!content.includes(target)) throw new Error('rtk mention not found in rules');
+    fs.writeFileSync(rulesPath, content.replace(target, ''));
+  } else {
+    throw new Error(`unknown tool to strip: ${tool}`);
+  }
+}
+
 // Only the assistant's own text: the raw stream also holds tool output (the files it read), which would pass answer checks for free.
 export function finalText(out) {
   const parts = [];
@@ -97,6 +119,11 @@ export function parseTokenUsage(out) {
 }
 
 const TASKS = [
+  {
+    id: 'task0',
+    prompt: 'Reply with the single word OK and nothing else.',
+    check: (_dir, stdout) => (stdout || '').trim().toUpperCase() === 'OK',
+  },
   {
     id: 'task1',
     prompt: 'Rename the variable "data" to "state" in index.mjs',
@@ -211,6 +238,60 @@ test('failing test', () => { assert.strictEqual(val, 2); });
   },
 ];
 
+// Exported for tests
+export function renderResultsMarkdown(summary, variants, totalCost = 0) {
+  let md = '| Task | Mode | Pass Rate | Median In | IQR In | Median Out | Median Time | Cost |\n';
+  md += '|---|---|---|---|---|---|---|---|\n';
+  for (const s of summary) {
+    const iqrIn = `${s.in.p25.toFixed(0)}-${s.in.p75.toFixed(0)}`;
+    const stableMark = s.stable ? ' ★' : '';
+    md += `| ${s.task} | ${s.mode} | ${(s.passRate * 100).toFixed(0)}% | ${s.in.median.toFixed(0)}${stableMark} | ${iqrIn} | ${s.out.median.toFixed(0)} | ${s.time.median.toFixed(0)}ms | $${s.totalCost.toFixed(4)} |\n`;
+  }
+
+  // Variants table
+  md += '\n### Variants Comparison (Input Tokens)\n\n';
+  md += `| Task | ${variants.join(' | ')} |\n`;
+  md += `|---|${variants.map(() => '---|').join('')}\n`;
+  const tasks = [...new Set(summary.map(s => s.task))];
+  for (const taskId of tasks) {
+    const row = [taskId];
+    for (const v of variants) {
+      const s = summary.find(sm => sm.task === taskId && sm.mode === v);
+      if (!s) { row.push('-'); continue; }
+      let cell = s.in.median.toFixed(0);
+      if (s.passRate < 1) cell += ` (${(s.passRate * 100).toFixed(0)}%)`;
+      row.push(cell);
+    }
+    md += `| ${row.join(' | ')} |\n`;
+  }
+  const overheadRow = ['**Fixed overhead vs baseline (task0)**'];
+  const baseTask0 = summary.find(s => s.task === 'task0' && s.mode === 'baseline')?.in.median ?? 0;
+  for (const v of variants) {
+    if (v === 'baseline') { overheadRow.push('0'); continue; }
+    const vTask0 = summary.find(s => s.task === 'task0' && s.mode === v)?.in.median;
+    overheadRow.push(vTask0 !== undefined ? (vTask0 - baseTask0).toFixed(0) : '-');
+  }
+  md += `| ${overheadRow.join(' | ')} |\n`;
+
+  const leanMedians = summary.filter(s => s.mode === 'lean');
+  const baselineMedians = summary.filter(s => s.mode === 'baseline');
+  if (variants.includes('lean') && variants.includes('baseline')) {
+    let totalPctSaved = 0;
+    let taskCount = 0;
+    for (const lm of leanMedians) {
+      const bm = baselineMedians.find(b => b.task === lm.task);
+      if (bm && bm.in.median > 0) {
+        totalPctSaved += (bm.in.median - lm.in.median) / bm.in.median;
+        taskCount++;
+      }
+    }
+    const avgPctSaved = taskCount > 0 ? (totalPctSaved / taskCount) * 100 : 0;
+    md += `\nlean vs baseline: input tokens ${avgPctSaved >= 0 ? '-' : '+'}${Math.abs(avgPctSaved).toFixed(1)}% (median over tasks)\n`;
+  }
+  md += `\nTotal cost: $${totalCost.toFixed(4)}\n`;
+  return md;
+}
+
 async function main() {
   const HOME = arg('home');
   const MODEL = arg('model');
@@ -219,6 +300,22 @@ async function main() {
   const REPEATS = parseInt(arg('repeats') || '10', 10);
   const MAX_RUNS = parseInt(arg('max-runs') || '200', 10);
   const MAX_USD = Math.min(4.5, parseFloat(arg('max-usd') || '4.5') || 4.5);
+  const VARIANTS = (arg('variants') || process.env.VARIANTS || 'baseline,lean').split(',');
+  const TASKS_TO_RUN = (arg('tasks') || process.env.TASKS || '') ? (arg('tasks') || process.env.TASKS).split(',') : TASKS.map(t => t.id);
+
+  const ALLOWED_VARIANTS = ['baseline', 'rules', 'rtk', 'context-mode', 'lean'];
+  for (const v of VARIANTS) {
+    if (!ALLOWED_VARIANTS.includes(v)) {
+      console.error(`Unknown variant: ${v}. Allowed: ${ALLOWED_VARIANTS.join(', ')}`);
+      process.exit(2);
+    }
+  }
+  for (const tid of TASKS_TO_RUN) {
+    if (!TASKS.find(t => t.id === tid)) {
+      console.error(`Unknown task: ${tid}`);
+      process.exit(2);
+    }
+  }
 
   if (!HOME || path.resolve(HOME) === path.resolve(os.homedir())) {
     console.error('--home <throwaway dir> is required and must not be the real HOME');
@@ -233,13 +330,14 @@ async function main() {
   fs.mkdirSync(HOME, { recursive: true });
   if (OUT) fs.mkdirSync(OUT, { recursive: true });
 
-  const totalEstimatedRuns = TASKS.length * 2 * REPEATS;
+  const totalEstimatedRuns = TASKS_TO_RUN.length * VARIANTS.length * REPEATS;
   console.log(`Plan:`);
   console.log(`  HOME:           ${HOME}`);
   console.log(`  MODEL:          ${MODEL || '(none)'}`);
   console.log(`  OUT:            ${OUT}`);
   console.log(`  REPEATS:        ${REPEATS}`);
-  console.log(`  TASKS:          ${TASKS.length}`);
+  console.log(`  VARIANTS:       ${VARIANTS.join(',')}`);
+  console.log(`  TASKS:          ${TASKS_TO_RUN.length} (${TASKS_TO_RUN.join(',')})`);
   console.log(`  ESTIMATED RUNS: ${totalEstimatedRuns}`);
   console.log(`  MAX RUNS:       ${MAX_RUNS}`);
   console.log(`  MAX USD:        ${MAX_USD}`);
@@ -269,8 +367,9 @@ async function main() {
   const RAW_DIR = path.join(ROOT, 'raw');
   fs.mkdirSync(RAW_DIR, { recursive: true });
 
-  for (const task of TASKS) {
-    for (const mode of ['baseline', 'lean']) {
+  for (const taskId of TASKS_TO_RUN) {
+    const task = TASKS.find(t => t.id === taskId);
+    for (const mode of VARIANTS) {
       for (let n = 1; n <= REPEATS; n++) {
         if (totalCost >= MAX_USD) {
           console.warn(`Budget reached ($${totalCost.toFixed(4)} >= $${MAX_USD}). Stopping.`);
@@ -295,8 +394,10 @@ async function main() {
           childEnv.OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
         }
 
-        if (mode === 'lean') {
-          const leanArgs = ['scripts/lean.mjs', '--home', runHome, '--yes', '--agents', 'opencode-v2', '--tools', 'rtk,context-mode'];
+        if (mode !== 'baseline') {
+          const leanTools = mode === 'rules' ? '--no-tools' : '--tools';
+          const leanToolsVal = mode === 'rules' ? [] : ['rtk,context-mode'];
+          const leanArgs = ['scripts/lean.mjs', '--home', runHome, '--yes', '--agents', 'opencode-v2', leanTools, ...leanToolsVal];
           console.log(`  Setup: node ${leanArgs.join(' ')}`);
           // Setup needs no model key.
           const { OPENROUTER_API_KEY: _k, ...setupEnv } = childEnv;
@@ -305,6 +406,8 @@ async function main() {
             console.error(`  Lean setup failed with exit code ${leanRes.status}:\n${(() => { const lines = redactKey(`${leanRes.stdout || ''}\n${leanRes.stderr || ''}`, KEY).split('\n'); return [...lines.filter((l) => /^\s*! /.test(l)), '...', ...lines.slice(-40)].join('\n'); })()}`);
             process.exit(1);
           }
+          if (mode === 'rtk') stripTool(runHome, 'context-mode');
+          if (mode === 'context-mode') stripTool(runHome, 'rtk');
         }
 
         // --standalone: each run gets a private server; the shared background service keeps its port across temp HOMEs.
@@ -375,14 +478,13 @@ async function main() {
 
     // Aggregates
     const summary = [];
-    const modes = ['baseline', 'lean'];
-    for (const task of TASKS) {
-      for (const mode of modes) {
-        const taskResults = results.filter(r => r.task === task.id && r.mode === mode);
+    for (const taskId of TASKS_TO_RUN) {
+      for (const mode of VARIANTS) {
+        const taskResults = results.filter(r => r.task === taskId && r.mode === mode);
         if (taskResults.length === 0) continue;
 
         summary.push({
-          task: task.id,
+          task: taskId,
           mode,
           passRate: taskResults.filter(r => r.pass).length / taskResults.length,
           in: getStats(taskResults.map(r => r.inputTokens)),
@@ -394,9 +496,9 @@ async function main() {
       }
     }
 
-    for (const task of TASKS) {
-      const lean = summary.find(s => s.task === task.id && s.mode === 'lean');
-      const base = summary.find(s => s.task === task.id && s.mode === 'baseline');
+    for (const taskId of TASKS_TO_RUN) {
+      const lean = summary.find(s => s.task === taskId && s.mode === 'lean');
+      const base = summary.find(s => s.task === taskId && s.mode === 'baseline');
       if (lean && base) {
         const stable = lean.passRate === base.passRate && (lean.in.p75 < base.in.p25 || base.in.p75 < lean.in.p25);
         lean.stable = stable;
@@ -413,40 +515,21 @@ async function main() {
       leanCommit,
       runUrl,
       repeats: REPEATS,
+      variants: VARIANTS,
       totalInput,
       tasks: summary,
       raw: results
     };
     fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(resultsJson, null, 2));
     
-    let md = '| Task | Mode | Pass Rate | Median In | IQR In | Median Out | Median Time | Cost |\n';
-    md += '|---|---|---|---|---|---|---|---|\n';
-    for (const s of summary) {
-      const iqrIn = `${s.in.p25.toFixed(0)}-${s.in.p75.toFixed(0)}`;
-      const stableMark = s.stable ? ' ★' : '';
-      md += `| ${s.task} | ${s.mode} | ${(s.passRate * 100).toFixed(0)}% | ${s.in.median.toFixed(0)}${stableMark} | ${iqrIn} | ${s.out.median.toFixed(0)} | ${s.time.median.toFixed(0)}ms | $${s.totalCost.toFixed(4)} |\n`;
-    }
-
-    const leanMedians = summary.filter(s => s.mode === 'lean');
-    const baselineMedians = summary.filter(s => s.mode === 'baseline');
-    let totalPctSaved = 0;
-    let taskCount = 0;
-    for (const lm of leanMedians) {
-      const bm = baselineMedians.find(b => b.task === lm.task);
-      if (bm && bm.in.median > 0) {
-        totalPctSaved += (bm.in.median - lm.in.median) / bm.in.median;
-        taskCount++;
-      }
-    }
-    const avgPctSaved = taskCount > 0 ? (totalPctSaved / taskCount) * 100 : 0;
-    md += `\nlean vs baseline: input tokens ${avgPctSaved >= 0 ? '-' : '+'}${Math.abs(avgPctSaved).toFixed(1)}% (median over tasks)\n`;
-    md += `\nTotal cost: $${totalCost.toFixed(4)}\n`;
-
+    const md = renderResultsMarkdown(summary, VARIANTS, totalCost);
     fs.writeFileSync(path.join(OUT, 'results.md'), md);
 
-    // SVG Chart
-    const chartSvg = generateChart(summary, resultsJson);
-    fs.writeFileSync(path.join(OUT, 'chart.svg'), chartSvg);
+    // SVG Chart only if baseline and lean are present
+    if (VARIANTS.includes('baseline') && VARIANTS.includes('lean')) {
+      const chartSvg = generateChart(summary, resultsJson);
+      fs.writeFileSync(path.join(OUT, 'chart.svg'), chartSvg);
+    }
 
     console.log(`\nWrote results to ${OUT}`);
     console.log(md);
