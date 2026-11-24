@@ -51,7 +51,7 @@ function agyWindows({ home, dir, realHome, env, arch }) {
 
 // Cursor CLI on Windows: the pinned cursor.com script (it fixes the CLI version, downloads a 267 MB zip and installs to %LOCALAPPDATA%\\cursor-agent
 // with agent.cmd shims and a user PATH entry), so it runs as is. It ignores --home: only a real home or a LOCALAPPDATA inside --home (CI) is planned.
-// It deletes an existing cursor-agent folder first; --install-agent runs only when `agent` is missing.
+// The Cursor installer deletes an existing folder first, so lean-agents stops if it exists; --install-agent runs only when `agent` is missing.
 function cursorWindows({ home, dir, realHome, env }) {
   const W = path.win32;
   const la = env.LOCALAPPDATA;
@@ -59,6 +59,7 @@ function cursorWindows({ home, dir, realHome, env }) {
   // LOCALAPPDATA must sit inside home (also for the real one): --uninstall-agent only removes files under home.
   if (!la || rel === '..' || rel.startsWith('..\\') || W.isAbsolute(rel)) return { manual: 'Cursor CLI on Windows: install it from https://cursor.com/docs/cli/installation (the installer ignores --home)' };
   const root = W.join(la, 'cursor-agent');
+  if (fs.existsSync(root)) return { manual: `Cursor CLI on Windows: ${root} already exists and the Cursor installer deletes it first; install it from https://cursor.com/docs/cli/installation` };
   const sc = script('cursor-installer-win', dir, [], '.ps1');
   sc.run[2].splice(2, 0, '-NonInteractive');
   return { method: 'script', ...sc, bins: [W.join(root, 'agent.cmd')], dirs: [root], pathDir: root };

@@ -1,6 +1,9 @@
 // #375: Cursor CLI on Windows from the pinned cursor.com script, and the opt-in Cursor app. Pure plan checks, no downloads, no real HOME.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { agentTable } from '../scripts/lib/agent-lifecycle.mjs';
 import { PINS } from '../scripts/lib/pins.mjs';
 import { cursorAppPrereqs } from '../scripts/lib/system.mjs';
@@ -28,6 +31,13 @@ test('win32 plan: no LOCALAPPDATA, or one outside a temp --home, is a manual ste
   assert.match(plan({ LOCALAPPDATA: 'D:\\Local' }).manual, /ignores --home/, 'a relocated LOCALAPPDATA outside the real home too');
   assert.equal(plan({ LOCALAPPDATA: 'C:\\u\\..foo' }).manual, undefined, 'a folder named ..foo is inside home');
   assert.equal(plan({ LOCALAPPDATA: 'C:\\tmp\\h\\AppData\\Local' }, 'C:\\tmp\\h').manual, undefined);
+});
+
+test('win32 plan: if the cursor-agent folder exists, it is a manual step', (t) => {
+  t.mock.method(fs, 'existsSync', (p) => p.endsWith('cursor-agent'));
+  const x = plan({ LOCALAPPDATA: 'C:\\u\\AppData\\Local' });
+  assert.match(x.manual, /already exists/);
+  assert.ok(x.manual.includes('C:\\u\\AppData\\Local\\cursor-agent'));
 });
 
 test('winget Cursor app: missing -> install with its undo; installed -> nothing', () => {

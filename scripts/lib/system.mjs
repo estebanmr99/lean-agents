@@ -188,7 +188,7 @@ export function cursorAppPrereqs(pm, platform, home, q = quiet, ex = exists) {
 // Linux and Windows: the pinned release zip is downloaded to a file, checked against the pinned SHA256 and only then extracted,
 // so no upstream installer script runs. Linux: no shell profile edit (the engine finds ~/.bun/bin itself). Windows: ~\.bun\bin goes on the user PATH.
 const VERIFY = fileURLToPath(new URL('./verify-sha256.mjs', import.meta.url));
-const psQ = (s) => s.replace(/'/g, "''"); // PowerShell single-quote escape for a profile path like O'Neil
+const psQ = (s) => s.replace(/['‘’‚‛]/g, (c) => c + c); // PowerShell single-quote escape for O'Neil and typographic quotes
 const psRun = (script) => ['powershell', '-NoProfile', '-NonInteractive', '-Command', script];
 const psAddPath = (bin) => `$p = [string][Environment]::GetEnvironmentVariable('Path', 'User'); if (($p -split ';').TrimEnd('\\') -notcontains '${psQ(bin)}'.TrimEnd('\\')) { [Environment]::SetEnvironmentVariable('Path', ($p.TrimEnd(';') + ';${psQ(bin)}'), 'User') }`;
 const psRemovePath = (bin) => `$p = [string][Environment]::GetEnvironmentVariable('Path', 'User'); [Environment]::SetEnvironmentVariable('Path', (($p -split ';' | Where-Object { $_ -and $_.TrimEnd('\\') -ne '${psQ(bin)}'.TrimEnd('\\') }) -join ';'), 'User')`;
