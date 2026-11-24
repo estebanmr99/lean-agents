@@ -197,7 +197,7 @@ async function main() {
           const { OPENROUTER_API_KEY: _k, ...setupEnv } = childEnv;
           const leanRes = spawnSync(process.execPath, [path.join(ROOT, leanArgs[0]), ...leanArgs.slice(1)], { env: setupEnv, encoding: 'utf8' });
           if (leanRes.status !== 0) {
-            console.error(`  Lean setup failed with exit code ${leanRes.status}:\n${redactKey(`${leanRes.stdout || ''}\n${leanRes.stderr || ''}`, KEY).split('\n').slice(-40).join('\n')}`);
+            console.error(`  Lean setup failed with exit code ${leanRes.status}:\n${(() => { const lines = redactKey(`${leanRes.stdout || ''}\n${leanRes.stderr || ''}`, KEY).split('\n'); return [...lines.filter((l) => /^\s*! /.test(l)), '...', ...lines.slice(-40)].join('\n'); })()}`);
             process.exit(1);
           }
         }
