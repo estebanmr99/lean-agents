@@ -4,6 +4,9 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Changed
+- The Copilot usage meter in the OpenCode sidebar and the `/copilot-usage` toast now show one decimal for the percent left, truncated so it never rounds up past the real value ([#190](https://github.com/estebanmr99/lean-agents/issues/190)).
+
 ### Fixed
 - The DCP row in `--doctor` now shows for unmanaged machines if they have an OpenCode config listing it ([#391](https://github.com/estebanmr99/lean-agents/issues/391)).
 - Node version check now names a fit nvm Node to switch to, or the install command, and `--doctor` adds a "node for lean-agents" row ([#392](https://github.com/estebanmr99/lean-agents/issues/392)).

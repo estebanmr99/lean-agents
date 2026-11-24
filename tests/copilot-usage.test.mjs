@@ -129,7 +129,7 @@ test('tui.js: limited credits paint into the mounted nodes after data arrives; n
     assert.ok(texts(box).includes('loading...'));
     await until(() => !texts(box).includes('loading...'));
     const t = texts(box).join('|');
-    assert.match(t, /61% left/);
+    assert.match(t, /61\.7% left/);
     assert.ok(t.includes('15,441'));
     assert.ok(calls.render >= 1);
     assert.equal(calls.command[0][0].slash.name, 'copilot-usage');
@@ -208,17 +208,17 @@ test('tui.js on 2.x: a finished turn refreshes the meter only after 5 minutes; c
     const cleanup = await plugin.setup(context);
     const box = slots[0].render({ sessionID: 's' });
     await until(() => !texts(box).includes('loading...'));
-    assert.match(texts(box).join('|'), /61% left/);
+    assert.match(texts(box).join('|'), /61\.7% left/);
     // The quota drops to 20% left; the turn-finished signal is the only trigger.
     fs.writeFileSync(data, JSON.stringify({ ...LIMITED, quota_snapshots: { premium_interactions: { unlimited: false, entitlement: 25000, remaining: 5000, percent_remaining: 20 } } }));
     handlers['session.execution.succeeded']();
     await new Promise((r) => setTimeout(r, 1500));
-    assert.match(texts(box).join('|'), /61% left/); // under 5 minutes: no new gh call
+    assert.match(texts(box).join('|'), /61\.7% left/); // under 5 minutes: no new gh call
     const start = realNow();
     Date.now = () => start + 5 * 60 * 1000 + 1000;
     handlers['session.execution.succeeded']();
-    await until(() => /20% left/.test(texts(box).join('|')));
-    assert.match(texts(box).join('|'), /20% left/);
+    await until(() => /20\.0% left/.test(texts(box).join('|')));
+    assert.match(texts(box).join('|'), /20\.0% left/);
     cleanup();
     assert.equal(unsubscribed, 1);
   } finally { Date.now = realNow; process.env.PATH = old; }
@@ -259,7 +259,7 @@ test('tui.js: unusable numbers show unavailable, an out-of-range percent is clam
   const quota = (p) => ({ quota_reset_date: '2026-12-01', quota_snapshots: { premium_interactions: { unlimited: false, entitlement: 100, remaining: 50, ...p } } });
   try {
     const plugin = await loadPlugin();
-    for (const [data, want] of [[quota({ percent_remaining: 'x' }), /unavailable/], [quota({ percent_remaining: 250 }), /100% left/]]) {
+    for (const [data, want] of [[quota({ percent_remaining: 'x' }), /unavailable/], [quota({ percent_remaining: 250 }), /100\.0% left/]]) {
       process.env.PATH = fakeGh(data);
       const { api, calls } = fakeApi();
       await plugin.tui(api);
@@ -267,6 +267,31 @@ test('tui.js: unusable numbers show unavailable, an out-of-range percent is clam
       await until(() => !texts(box).includes('loading...'));
       assert.match(texts(box).join('|'), want);
     }
+  } finally { process.env.PATH = old; }
+});
+
+test('tui.js: percent left shows exactly one decimal and never rounds up (#190)', async () => {
+  const old = process.env.PATH;
+  const quota = (pct) => ({ quota_reset_date: '2026-12-01', quota_snapshots: { premium_interactions: { unlimited: false, entitlement: 100, remaining: 50, percent_remaining: pct } } });
+  try {
+    const plugin = await loadPlugin();
+    for (const [pct, want] of [[42.37, /42\.3% left/], [100, /100\.0% left/]]) {
+      process.env.PATH = fakeGh(quota(pct));
+      const { api, calls } = fakeApi();
+      await plugin.tui(api);
+      const box = calls.slots[0].slots.sidebar_content();
+      await until(() => !texts(box).includes('loading...'));
+      assert.match(texts(box).join('|'), want);
+    }
+    // 9.95 truncates to 9.9 and still counts as below 10 for the error level (startup toast).
+    process.env.PATH = fakeGh(quota(9.95));
+    const { api, calls } = fakeApi();
+    await plugin.tui(api);
+    const box = calls.slots[0].slots.sidebar_content();
+    await until(() => !texts(box).includes('loading...'));
+    await until(() => calls.toast.length > 0);
+    assert.match(texts(box).join('|'), /9\.9% left/);
+    assert.equal(calls.toast[0].variant, 'error');
   } finally { process.env.PATH = old; }
 });
 
