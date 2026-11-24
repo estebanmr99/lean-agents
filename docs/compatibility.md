@@ -359,6 +359,9 @@ lean-agents copies each proxy variable it finds (`HTTP_PROXY`, `HTTPS_PROXY`, `A
 | Claude Code | `https_proxy`, `HTTPS_PROXY`, `http_proxy`, `HTTP_PROXY` (first set wins), `NO_PROXY`; no SOCKS | `NODE_EXTRA_CA_CERTS`; bundled CAs plus the OS store; mTLS `CLAUDE_CODE_CLIENT_CERT` / `CLAUDE_CODE_CLIENT_KEY` | [network config](https://code.claude.com/docs/en/network-config) | 2026-11-03 |
 | OpenCode | standard proxy variables (docs show uppercase); add `localhost` to `NO_PROXY` | `NODE_EXTRA_CA_CERTS` | [network](https://opencode.ai/docs/network/) | 2026-11-03 |
 | Copilot CLI | `HTTPS_PROXY` > `https_proxy` > `HTTP_PROXY` > `http_proxy`; restart after a change | `NODE_EXTRA_CA_CERTS` plus the OS store | [network settings](https://docs.github.com/en/copilot/concepts/network-settings) | 2026-11-03 |
+| gh (GitHub CLI) | `https_proxy`, `http_proxy`, `all_proxy`, `no_proxy` (lowercase); proven by `real-proxy` | `SSL_CERT_FILE`, `SSL_CERT_DIR` (proven by `real-proxy`) | [gh environment](https://cli.github.com/manual/gh_help_environment) | 2026-11-24 |
+| pip | `PIP_PROXY` or `--proxy <url>` | `PIP_CERT` or `--cert <file>` | [pip config](https://pip.pypa.io/en/stable/topics/configuration/#environment-variables) | 2026-11-24 |
+| Antigravity | `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY`; `sandboxProxy` for sandbox | `SSL_CERT_FILE`, `NODE_USE_SYSTEM_CA`, `AGY_LLM_GATEWAY_CA_CERT` | [settings](https://antigravity.google/docs/settings/) | 2026-11-18 |
 | Antigravity CLI | **VERIFY** | `AGY_LLM_GATEWAY_CA_CERT` (enterprise gateway, agy 1.2.15+), falls back to `SSL_CERT_FILE` | [gateway docs](https://docs.cloud.google.com/gemini/enterprise/docs/ai-developer-tools/connect-enterprise-gateway) | 2026-11-03 |
 | Playwright MCP | **VERIFY** | browser download: `NODE_EXTRA_CA_CERTS`; mirror with `PLAYWRIGHT_DOWNLOAD_HOST` | [Playwright browsers](https://playwright.dev/docs/browsers) | 2026-11-03 |
 
@@ -489,48 +492,33 @@ Skipped for now: GitHub artifact attestations, and a "newer version" note in `--
 
 The undocumented items below (Antigravity telemetry and auto-update, Serena config, winget persistent proxy, download hosts, DCP, GSD and AutoSkills telemetry) stay **VERIFY**. The installer does not configure them: it asks the user to paste their docs or IT notes (saved to `~/.config/lean-agents/notes/`, never applied) or keep the tool's default. When another agent already set the tool up (Serena, DCP, GSD config found), it skips the question.
 
-- `reasoningEffort` as the pass-through option for Gemini on Vertex.
-- **VERIFY (#123):** the `copilot_internal/user` endpoint is undocumented (the one VS Code's meter uses) and can change; a failure shows as unavailable, never zero. The $0.01 per credit rate is an assumption (25,000 credits = $250 on one Business seat); check GitHub billing docs. On OpenCode 2.x the sidebar slot, `api.keymap.registerLayer({ commands, bindings })` and whether 2.x reads `tui.json` `plugin` are not proven. The 2.x refresh on `session.execution.succeeded` (#189) is proven only by a unit test with a fake `context.data.on` (2026-11-18); no CI job waits 5 minutes in the real TUI, and the docs do not list the event catalog (**VERIFY**). Only the OpenCode 1.19.0 TUI was seen rendering; no CI job opens the TUI. `GH_TOKEN`-only logins may read as unavailable in `--usage`, because the engine's child environment drops token variables (the TUI plugin inherits OpenCode's environment).
-- **VERIFY:** the `model` value format in Copilot `*.agent.md`. Without a login, Copilot cannot show which model it picked.
-- **VERIFY:** the Antigravity IDE and CLI loading `~/.gemini/config/rules` and `~/.agents/skills`. No list command shows them without a login, so README marks both as partial.
-- **VERIFY:** subreddit rules, whether r/opencode exists, and X handles in `docs/launch.md`. Reddit blocked the fetch.
-- **VERIFY:** `brew install copilot-cli` (README) against `brew install --cask copilot-cli` (docs). lean-agents does not use either.
-- **VERIFY:** an Antigravity auto-update switch (none documented; the CLI updates itself in the background, per [antigravity.google/cli](https://antigravity.google/cli), checked 2026-11-03). Proxy variables are documented since 2026-11-18 (see Antigravity network above); `tests/real-proxy.sh` still does not run `agy` through squid (#39).
-- **VERIFY:** gh has no documented proxy or CA variable ([gh environment](https://cli.github.com/manual/gh_help_environment), 2026-11-03); `tests/real-proxy.sh` checks that it uses `https_proxy` and that `SSL_CERT_FILE` replaces its trust store.
-- **VERIFY:** proxy and CA handling in RTK, Context Mode, Serena, Playwright MCP and the Skills CLI beyond the variables their runtimes (Node, uv, git) read.
-- **VERIFY:** Copilot CLI `NO_PROXY` and `--disable-client-telemetry` (seen in release notes, not in the docs).
-- **VERIFY:** Serena config path `~/.serena/serena_config.yml` and a usage-stats switch; GSD and Ponytail outbound calls.
-- **VERIFY:** pip `PIP_PROXY`, `PIP_CERT`; winget persistent proxy settings and CA handling.
-- **VERIFY:** DCP and AutoSkills telemetry; the exact winget and Playwright download hosts.
-- **VERIFY:** Warp first run: whether the desktop app needs a login, writes shell integration into `~/.zshrc` / `~/.bashrc`, and has a desktop auto-update switch (only the Agent CLI documents `general.autoupdate_enabled` and `WARP_TUI_DISABLE_AUTOUPDATE`). Older docs give `~/.config/warp-terminal` as the macOS settings path.
-- **VERIFY:** Orca: the hook command strings, the local hook script path and the app data folder name; the OpenCode plugin file name; whether Codex hooks go into `~/.codex` (docs say so, v1.4.247 source uses a managed home); that no MCP server is written (source grep needs a GitHub login); whether `orca agent hooks status` works without the app running; whether the app installs and starts headless in CI.
-- **VERIFY:** the `orca` on PATH is Orca (`stablyai/orca`, answers `orca agent-context`), not the unrelated `orca-cli/orca`. Install, first-run hooks and bypass mode belong to session 8.
-- **VERIFY:** the Orca guide advises against `task-create`, `dispatch --inject` and `check --wait` for full handoffs; read from a search summary, not the full page.
-- **VERIFY:** OpenCode stdin prompts, background runs and worktrees (feature request [anomalyco/opencode#12896](https://github.com/anomalyco/opencode/issues/12896)); `opencode run` flags on 1.x.
+- **Proven:** OpenCode 2.x sidebar content, slash commands and toasts; refreshes on turn completion in unit tests with a mock API. Proven by `real-usage-v2` (`tests/real-usage-v2.py`) and `tests/copilot-usage.test.mjs` (2026-11-24).
+- **Proven:** GitHub CLI (`gh`) honors `https_proxy` and `SSL_CERT_FILE` / `SSL_CERT_DIR`. Proven by `real-proxy` (`tests/real-proxy.sh`).
+- **Proven:** Bun "3-5x faster" performance claim for `ctx_execute`. Proven by `real-bun` (`tests/real-bun.sh`) on all three OSes.
+- **Proven:** OpenCode parallel workflow support (Git Worktrees and tabs). Feature request [anomalyco/opencode#12896](https://github.com/anomalyco/opencode/issues/12896) completed (2026-04-11).
+- **Proven:** Antigravity CLI binary name is `agy` (proven in CI `real-antigravity`).
+- `reasoning effort` as the option for Gemini 4 models (`low`, `medium`, `high`, `extra`); set with `--effort <level>` in `agy` ([Antigravity models](https://antigravity.google/docs/models), 2026-11-24).
+- Antigravity auto-update: the CLI updates itself in the background ([antigravity.google/cli](https://antigravity.google/cli), 2026-11-24).
+- Antigravity paths: `~/.gemini/antigravity-cli/settings.json` for settings and `~/.gemini/config/plugins/` for plugins ([Antigravity docs](https://antigravity.google/docs/cli/reference), 2026-11-24).
+- `brew install --cask copilot-cli` is the official Homebrew route ([Copilot CLI README](https://github.com/github/copilot-cli), 2026-11-24).
+- pip proxy: `PIP_PROXY` and `PIP_CERT` are supported via the `PIP_<UPPER_LONG_NAME>` rule ([pip config](https://pip.pypa.io/en/stable/topics/configuration/#environment-variables), 2026-11-24).
+- Warp facts: macOS settings path `~/.warp/`; login is optional; all installs include auto-update ([Warp docs](https://docs.warp.dev/getting-started/installation), 2026-11-24).
+- Orca CLI: `orca status --json` and `orca agent hooks status|on|off --json`; the CLI requires the app to be running ([Orca docs](https://orca.dev/docs/cli/overview), 2026-11-24).
+- **VERIFY (#123):** the `copilot_internal/user` endpoint is undocumented (the one VS Code's meter uses) and can change; a failure shows as unavailable, never zero. The $0.01 per credit rate is an assumption (25,000 credits = $250 on one Business seat); check GitHub billing docs.
 - **VERIFY:** `copilot -p` and `agy -p` for workers; reports say `agy -p` hangs when stdout is not a TTY.
 - **VERIFY:** a parallel run with a real model (needs a login, out of CI).
 - **VERIFY (session 19):** every **VERIFY** cell in "Migration sources" (user-level VS Code rules, agents, prompts and `mcp.json` as migration sources; `.cursor/commands`; `~/.claude/commands`; Copilot CLI prompt files), whether VS Code and Copilot CLI expand `${env:VAR}` in `mcp.json`, and that Claude expands `${VAR}` in `.mcp.json` (documented, not run in CI).
-- **VERIFY:** the VS Code user `mcp.json` path on Windows (`%APPDATA%\Code\User`). Linux and macOS are proven by `real-vscode`.
-- **VERIFY:** the `model` value format in VS Code `.agent.md` (Copilot runtime IDs are assumed, as for Copilot CLI).
 - **VERIFY:** whether VS Code reads Copilot CLI hooks, so RTK for VS Code alone is not installed.
 - **VERIFY:** Playwright extension mode with a real Chrome (needs the extension and a click to approve, out of CI); whether the token appears in the connect page URL; the extension's button to regenerate the token; whether VS Code and Cursor started outside a terminal see a token set in the shell profile.
 - **VERIFY:** whether the Cursor CLI reads `~/.cursor/agents`, and the Context Mode hooks for Cursor and VS Code (MCP only for now).
 - **VERIFY:** the Claude agent plans, the organization and enterprise policy labels, and the minimum VS Code version (see `docs/claude-with-copilot.md`).
-- **VERIFY (session 11):** the install scope of winget `Google.AntigravityCLI` (the manifest states none, so lean-agents prints the vendor link on Windows), the app's default folder on Windows and Linux, and whether `install.sh`/`install.ps1` or `agy install` edit PATH. A CLI 1.5.0 was listed on GitHub with a 2026-11-04 date while the download page and brew still said 1.4.12.
-- Resolved 2026-11-18: the docs list `~/.gemini/config/mcp_config.json` for the IDE and CLI; `~/.gemini/antigravity/` is the legacy IDE folder. Whether the IDE reads `.agents/mcp_config.json` stays **VERIFY**.
-- Resolved 2026-11-18: `~/.gemini/config/skills` is documented for the IDE and CLI; `~/.agents/skills` (Skills CLI 1.7.4 and earlier) is not.
-- **VERIFY (session 11):** Windows and Linux paths under `.gemini` (docs use `~`) and any variable that moves the Antigravity config folder.
-- **VERIFY (session 11):** the app's proxy, CA and auto-update behavior; the docs only cover `sandboxProxy`.
-- **VERIFY (session 11):** on Windows, `rtk init -g --agent antigravity`, and `agy agents`, `agy mcp list`, `agy plugin list --json` (not in the CLI reference; they work on macOS and Linux in CI).
-- **VERIFY (session 11):** whether the app has a launcher command that runs headless in CI.
-- **VERIFY (session 11):** the "3-5x faster" Bun claim for `ctx_execute`; unmeasured until the `bench-context-mode` CI job runs on each OS.
-- **VERIFY (session 11):** when `better-sqlite3` compiles instead of using a prebuilt binary, per OS, and whether Context Mode on Node.js 22.5+ picks `node:sqlite` on each runner.
-- Verified on macOS (owner, local, 2026-11-03, Bun 1.4.4, context-mode 1.0.169): `ctx_doctor` prints `Performance: FAST (Bun)`. `real-bun` asserts it on all three OSes.
-- **VERIFY (session 13):** `real-bun` assumptions: the Linux server process runs under Bun, and the Windows `uninstall.ps1` removes the user PATH entry.
-- **VERIFY (session 11):** the winget `Oven-sh.Bun` install scope and PATH (upstream issues report `bun` missing from PATH after a winget install), and whether the Bun installer honors `BUN_INSTALL`, which Context Mode ignores.
-- **VERIFY (session 11):** `better-sqlite3` load failures under Bun on Windows (Bun issues up to 1.3.0); Context Mode avoids them with `bun:sqlite`, but the status on 1.4.x is unknown.
-
-- **VERIFY (session 10):** the Orca path of `scripts/parallel.mjs` runs only with an Orca binary: the CLI flags are read from `--help`, but no CI job installs Orca, so `worktree create` output, the branch rename and `orca worktree ps` status are unproven. Copilot CLI and Antigravity workers are print-the-command only until their headless `-p` mode is verified.
+- **VERIFY (session 11):** the install scope of winget `Google.AntigravityCLI` (the manifest states none, so lean-agents prints the vendor link on Windows), and whether `install.sh`/`install.ps1` or `agy install` edit PATH.
+- **VERIFY:** Antigravity IDE reading `.agents/mcp_config.json`.
+- **VERIFY:** `better-sqlite3` compile vs prebuilt per OS; whether Context Mode on Node.js 22.5+ picks `node:sqlite`.
+- **VERIFY:** Bun installer honoring `BUN_INSTALL`.
+- **VERIFY:** `better-sqlite3` load failures under Bun on Windows.
+- **VERIFY:** the Orca path of `scripts/parallel.mjs` runs only with an Orca binary.
+- **VERIFY:** Copilot CLI and Antigravity workers headless `-p` mode.
 
 Session 45 (agent-first updates, #45):
 
