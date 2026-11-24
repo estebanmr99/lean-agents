@@ -254,14 +254,14 @@ test('doctor: with exec false and a cwd at a temp project includes a project Nod
   assert.equal(projIdx, leanIdx + 2);
 });
 
-test('nodeFloorFix: returns nvm use <major> for highest fit, else install line', () => {
+test('nodeFloorFix: returns nvm use <version> for highest fit, else install line', () => {
   const floor = '>=22.20.0';
   const nvm = { win: false, dir: '/h/.nvm' };
   const nodes = [
     nodeAt(nvm, '/h/.nvm/versions/node/v22.12.0', '22.12.0'),
     nodeAt(nvm, '/h/.nvm/versions/node/v24.11.0', '24.11.0'),
   ];
-  assert.equal(nodeFloorFix(floor, nodes), 'nvm use 24');
+  assert.equal(nodeFloorFix(floor, nodes), 'nvm use 24.11.0');
   assert.equal(nodeFloorFix(floor, [nodes[0]]), 'nvm install 22 && nvm use 22');
   assert.equal(nodeFloorFix(floor, []), 'nvm install 22 && nvm use 22');
 });
