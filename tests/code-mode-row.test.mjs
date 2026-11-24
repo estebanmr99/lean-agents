@@ -41,11 +41,14 @@ test('codeModeRow: one server codemode false (2.x shape) -> changed', () => {
   assert.match(row.detail, /Fix: remove that setting/);
 });
 
-test('codeModeRow: one server codemode false (1.x shape) -> changed', () => {
+test('codeModeRow: 1.x shape (no mcp.servers) -> null, 1.x has no Code Mode', () => {
   const h = setup({ mcp: { s1: { command: ['c1'], codemode: false } } });
-  const row = codeModeRow(h);
-  assert.equal(row.status, 'changed');
-  assert.match(row.detail, /off for s1 \(codemode: false\)/);
+  assert.equal(codeModeRow(h), null);
+});
+
+test('codeModeRow: execute allow wins over * deny -> ok', () => {
+  const h = setup({ mcp: { servers: { s1: { command: ['c1'] } } }, permission: { '*': 'deny', execute: 'allow' } });
+  assert.equal(codeModeRow(h).status, 'ok');
 });
 
 test('codeModeRow: permission execute deny -> changed', () => {

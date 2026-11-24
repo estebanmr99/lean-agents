@@ -136,18 +136,19 @@ export function dcpRow(home, { fsx = fs, probe = [], probed = false } = {}) {
   return { status, detail };
 }
 
-// One read-only --doctor row that warns when OpenCode Code Mode is turned off (#304).
+// One read-only --doctor row that warns when OpenCode 2 Code Mode is turned off (#304). Only the 2.x `mcp.servers` shape: 1.x has no Code Mode.
 export function codeModeRow(home, { fsx = fs } = {}) {
   const dir = path.join(configHome(home), 'opencode');
   const file = configPath(dir);
   const cfg = readJson(file, fsx);
   if (!cfg) return null;
-  const servers = cfg.mcp?.servers ?? cfg.mcp ?? {};
-  const names = Object.keys(servers).filter((n) => n !== 'servers');
+  const servers = cfg.mcp?.servers && typeof cfg.mcp.servers === 'object' ? cfg.mcp.servers : {};
+  const names = Object.keys(servers);
   if (!names.length) return null;
   const offNames = names.filter((n) => servers[n]?.codemode === false);
   const isDeny = (v) => v === 'deny' || (v && typeof v === 'object' && v['*'] === 'deny');
-  const permDeny = isDeny(cfg.permission?.execute) || isDeny(cfg.permission?.['*']);
+  // A rule for execute wins over the catch-all.
+  const permDeny = isDeny(cfg.permission?.execute ?? cfg.permission?.['*']);
   if (!offNames.length && !permDeny) return { status: 'ok', detail: `on for ${names.length} MCP servers` };
   const parts = [];
   if (offNames.length) parts.push(`off for ${offNames.join(', ')} (codemode: false)`);
