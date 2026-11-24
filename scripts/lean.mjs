@@ -319,7 +319,8 @@ async function chooseMigration(o, p) {
 
 async function choose(o, saved) {
   // --everything answers every question with its default; install() asks the one plan question.
-  const p = await prompter(o.yes || o.everything);
+  // A dry run without a terminal writes nothing, so it previews the defaults instead of failing (#393).
+  const p = await prompter(o.yes || o.everything || (o.dryRun && !process.stdin.isTTY));
   if (o.migrate) return chooseMigration(o, p);
   if (!o.agents && o.everything) {
     const team = everythingAgents({ platform: process.platform, project: !!o.project, detected: process.platform === 'win32' ? detectAgents() : {} }); // detection only matters for the Windows team preset

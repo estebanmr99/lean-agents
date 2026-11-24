@@ -130,8 +130,9 @@ export function dcpRow(home, { fsx = fs, probe = [], probed = false } = {}) {
   const spec = (e) => (e ? e.spec : 'none');
   const loads = failed ? 'no' : probe.some((f) => f.id === 'probe-failed') ? 'unknown (probe failed)' : probed ? 'yes (probe)' : 'not probed, run --doctor --probe-plugins';
   const floating = specs.some((e) => !e.version || e.version === 'latest');
-  const status = broken || failed ? 'error' : floating || reconcileSpecs(specs).length ? 'changed' : 'ok';
-  const detail = `registered: ${spec(server)} (TUI: ${spec(tui)}) ; resolved: ${versions[0] ?? 'not in cache'} ; loads: ${loads}${floating ? '. Fix: run lean-agents again to pin it' : ''}`;
+  const changed = floating || reconcileSpecs(specs).length || (versions.length > 0 && versions.every((v) => !specs.some((e) => e.version === v)));
+  const status = broken || failed ? 'error' : changed ? 'changed' : 'ok';
+  const detail = `registered: ${spec(server)} (TUI: ${spec(tui)}) ; resolved: ${versions[0] ?? 'not in cache'} ; loads: ${loads}${floating ? '. Fix: run lean-agents again to pin it' : changed && status !== 'error' ? '. Fix: start OpenCode once so it fetches the pinned version, then run --doctor again' : ''}`;
   return { status, detail };
 }
 

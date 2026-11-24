@@ -100,6 +100,14 @@ test('doctor DCP row: @latest is changed; pinned with resolved deps and no probe
   const ok = dcpRow(h);
   assert.equal(ok.status, 'ok');
   assert.equal(ok.detail, `registered: ${PIN} (TUI: ${PIN}) ; resolved: 3.2.0 ; loads: not probed, run --doctor --probe-plugins`);
+
+  const changed = dcpRow(h);
+  // simulate a version mismatch
+  fs.writeFileSync(path.join(nm, 'package.json'), JSON.stringify({ name: PKG, version: '3.1.14' }));
+  const res = dcpRow(h);
+  assert.equal(res.status, 'changed');
+  assert.match(res.detail, /Fix: start OpenCode once so it fetches the pinned version/);
+
   assert.match(dcpRow(h, { probed: true }).detail, /loads: yes \(probe\)/);
   assert.match(dcpRow(h, { probed: true, probe: [{ id: 'probe-failed', plugin: '' }] }).detail, /loads: unknown \(probe failed\)/);
   assert.match(dcpRow(h, { probed: true, probe: [{ id: 'command-missing', plugin: 'other' }] }).detail, /loads: yes \(probe\)/);
