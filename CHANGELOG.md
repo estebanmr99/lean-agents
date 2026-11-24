@@ -11,6 +11,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - The Claude Code `code-mode` note and the README rows now say that Remote Control, Claude in Chrome, computer use and the VS Code panel do not work while Code Mode is on, and that RTK and Context Mode do ([#304](https://github.com/estebanmr99/lean-agents/issues/304)).
 
 ### Added
+- Savings benchmark can compare lean-agents rules alone with the full setup, run chosen tasks only, and measures fixed overhead per request with a one-word task (#404).
 - One read-only `--doctor` row that warns when OpenCode Code Mode is turned off ([#304](https://github.com/estebanmr99/lean-agents/issues/304)).
 
 ### Fixed
