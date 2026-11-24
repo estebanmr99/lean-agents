@@ -93,7 +93,7 @@ try:
     send(b"sidebar", 1.0)
     pump(1.5)
     send(b"\r")
-    for needle in ("Copilot credits", "61% left", "Spent", "9,559", "Left", "15,441", "Resets", "Dec 1"):
+    for needle in ("Copilot credits", "61.7% left", "Spent", "9,559", "Left", "15,441", "Resets", "Dec 1"):
         wait_for(needle, 15, f"the sidebar text {needle!r}")
     print("2.x sidebar box with credits: ok")
     print(re.findall(r"Copilot credits.{0,160}", text())[-1])
