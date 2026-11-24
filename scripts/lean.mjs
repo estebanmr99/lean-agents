@@ -20,7 +20,7 @@ import { projectPlan, projectStateDir } from './lib/project.mjs';
 import { gsdPlan } from './lib/gsd.mjs';
 import { MIGRATE_SOURCES, MIGRATE_TARGETS, readSource, detectSources, migratePlan, finishRows, formatTable } from './lib/migrate.mjs';
 import { adhdCommand } from './lib/adhd.mjs';
-import { version as binVersion, versionFull, gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, cursorAppPrereqs, bunInstall, bunPathCommand, bunPresent, which, run, quiet, exists, isolate, configHome, envDir } from './lib/system.mjs';
+import { version as binVersion, versionFull, gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, cursorAppPrereqs, bunInstall, bunPathCommand, bunPresent, rtkInstall, which, run, quiet, exists, isolate, configHome, envDir } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
 import { probePlugins } from './lib/plugin-health.mjs';
 import { adopt, inventory, saveState } from './lib/adopt.mjs';
@@ -545,6 +545,10 @@ function prereqCommands(o, behind = new Set()) {
     }
     const p = prereqFor(t, pm);
     if (!p || (which(p.bin) && !behind.has(t))) continue;
+    if (t === 'rtk' && !p.install && process.platform === 'linux') {
+      const r = rtkInstall(o.home, stateDir(o.home), process.platform, process.arch);
+      if (r) { out.push({ ...r, bin: 'rtk' }); continue; }
+    }
     if (p.install) out.push({ tool: t, desc: `install ${p.bin}`, run: p.install, undo: [], optional: t === 'gh', bin: p.bin });
     else out.push({ tool: t, desc: `${p.bin} is missing: install it from ${p.manual}`, run: [], undo: [], manual: true, optional: t === 'gh', bin: p.bin });
   }
@@ -708,9 +712,12 @@ function updateInfo(o, saved) {
 
 // The folders an --everything run installs into, as one marked rc block (#335). Folders already on PATH are left out.
 function posixPathActions(o, every) {
-  if (!every || process.platform === 'win32') return [];
-  const pending = new Set(pendingPrereqs(every.steps).map((s) => s.id));
-  const dirs = [
+  if (process.platform === 'win32') return [];
+  // A plain --tools rtk run on Linux installs into ~/.local/bin too (#411).
+  const localRtk = !every && process.platform === 'linux' && o.tools.includes('rtk') && !packageManager() && !which('rtk') && Boolean(rtkInstall(o.home, stateDir(o.home), process.platform, process.arch));
+  if (!every && !localRtk) return [];
+  const pending = new Set(pendingPrereqs(every?.steps ?? []).map((s) => s.id));
+  const dirs = localRtk ? ['.local/bin'] : [
     ...(o.agents.includes('claude') || pending.has('uv') || pending.has('rtk') ? ['.local/bin'] : []),
     ...(o.agents.includes('opencode-v2') ? ['.opencode/bin'] : []),
   ];
@@ -800,7 +807,8 @@ async function install(o) {
   // A Homebrew that this run installs is not on this process's PATH yet.
   if (every && process.platform === 'darwin' && pendingPrereqs(every.steps).some((s) => s.id === 'homebrew')) process.env.PATH = `/opt/homebrew/bin${path.delimiter}/usr/local/bin${path.delimiter}${process.env.PATH ?? ''}`;
   // Linux: uv and rtk installers put binaries in ~/.local/bin, which only a new shell may have on PATH.
-  if (every && process.platform === 'linux' && pendingPrereqs(every.steps).some((s) => s.id === 'uv' || s.id === 'rtk')) process.env.PATH = `${path.join(o.home, '.local', 'bin')}${path.delimiter}${process.env.PATH ?? ''}`;
+  const localRtk = !every && process.platform === 'linux' && o.tools.includes('rtk') && !packageManager() && !which('rtk');
+  if (process.platform === 'linux' && (localRtk || (every && pendingPrereqs(every.steps).some((s) => s.id === 'uv' || s.id === 'rtk')))) process.env.PATH = `${path.join(o.home, '.local', 'bin')}${path.delimiter}${process.env.PATH ?? ''}`;
   // winget --scope user puts command links (uv, rtk, jq) and Git.Git's git.exe here, and on the saved user PATH, which only new terminals see (nightly fresh-machine, 2026-11-20).
   if (every && process.platform === 'win32' && pendingPrereqs(every.steps).some((s) => s.commands.some((argv) => argv[0] === 'winget'))) {
     // Both: winget resolves the profile folder, which differs from LOCALAPPDATA when USERPROFILE is overridden (CI). An elevated shell gets Git under Program Files.
