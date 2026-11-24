@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseTokenUsage } from './bench-savings.mjs';
+import { parseTokenUsage, keySpend, redactKey } from './bench-savings.mjs';
 import { doctor } from '../scripts/lib/doctor.mjs';
 import { buildSummary } from '../scripts/lib/summary-data.mjs';
 import { renderSummary } from '../scripts/lib/summary-html.mjs';
@@ -124,4 +124,18 @@ test('doctor Active setup row content and summary line', () => {
   assert.match(html, /<li><strong>Active setup:<\/strong> rules 23 bytes/);
   
   fs.rmSync(home, { recursive: true, force: true });
+});
+
+test('keySpend reads data.usage and fails closed', async () => {
+  const ok = async () => ({ ok: true, status: 200, json: async () => ({ data: { usage: 1.25 } }) });
+  assert.strictEqual(await keySpend('k', ok), 1.25);
+  const bad = async () => ({ ok: false, status: 401, json: async () => ({}) });
+  await assert.rejects(keySpend('k', bad), /HTTP 401/);
+  const noField = async () => ({ ok: true, status: 200, json: async () => ({ data: {} }) });
+  await assert.rejects(keySpend('k', noField));
+});
+
+test('redactKey removes every copy of the key', () => {
+  assert.strictEqual(redactKey('a sk-or-x b sk-or-x', 'sk-or-x'), 'a [REDACTED] b [REDACTED]');
+  assert.strictEqual(redactKey('plain', undefined), 'plain');
 });

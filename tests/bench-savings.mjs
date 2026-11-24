@@ -15,6 +15,18 @@ const arg = (name) => {
   return null;
 };
 
+// The key is shared and has no OpenRouter credit limit, so the budget stop reads the key's own spend, not model-reported cost (#103).
+// GET https://openrouter.ai/api/v1/key -> data.usage (USD, all time); source: openrouter.ai/docs/api/reference/limits, 2026-11-23.
+export async function keySpend(key, fetchFn = fetch) {
+  const res = await fetchFn('https://openrouter.ai/api/v1/key', { headers: { Authorization: `Bearer ${key}` } });
+  const usage = res.ok ? (await res.json())?.data?.usage : undefined;
+  if (typeof usage !== 'number') throw new Error(`key usage unavailable (HTTP ${res.status})`);
+  return usage;
+}
+
+// Raw logs are uploaded as artifacts; the model runs shell with the key in its env, so strip it.
+export const redactKey = (text, key) => (key ? text.split(key).join('[REDACTED]') : text);
+
 // Exported for tests
 export function parseTokenUsage(out) {
   let inputTokens = 0;
@@ -136,6 +148,15 @@ async function main() {
     process.exit(0);
   }
 
+  const KEY = process.env.OPENROUTER_API_KEY;
+  if (!KEY) {
+    console.error('--run needs OPENROUTER_API_KEY');
+    process.exit(2);
+  }
+  // Fail closed: no spend reading, no run.
+  const spentSoFar = async (start) => { try { return (await keySpend(KEY)) - start; } catch (e) { console.error(`Budget check failed: ${e.message}. Stopping.`); return Infinity; } };
+  let startSpend;
+  try { startSpend = await keySpend(KEY); } catch (e) { console.error(`Budget check failed: ${e.message}`); process.exit(2); }
   const results = [];
   let totalCost = 0;
   const RAW_DIR = path.join(ROOT, 'raw');
@@ -189,10 +210,10 @@ async function main() {
         const wallTime = Date.now() - start;
 
         const rawLogPath = path.join(RAW_DIR, `${task.id}-${mode}-${n}.jsonl`);
-        fs.writeFileSync(rawLogPath, res.stdout || '');
+        fs.writeFileSync(rawLogPath, redactKey(res.stdout || '', KEY));
 
         const usage = parseTokenUsage(res.stdout || '');
-        totalCost += usage.cost;
+        totalCost = Math.max(totalCost + usage.cost, await spentSoFar(startSpend));
         const pass = task.check(workdir, res.stdout || '');
 
         console.log(`  Pass: ${pass}, In: ${usage.inputTokens}, Out: ${usage.outputTokens}, Cache: ${usage.cacheTokens}, Cost: $${usage.cost.toFixed(4)}, Time: ${wallTime}ms`);

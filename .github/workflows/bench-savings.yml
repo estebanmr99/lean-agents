@@ -46,12 +46,15 @@ jobs:
             --run \
             --model "$MODEL" \
             --repeats "$REPEATS" \
+            --max-runs 30 \
+            --max-usd 4.5 \
             --out "${RUNNER_TEMP}/bench-out"
             
       - name: Upload Results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: bench-savings-results
+          retention-days: 3
           path: |
             ${{ runner.temp }}/bench-out/
             raw/
