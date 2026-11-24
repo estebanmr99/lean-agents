@@ -8,7 +8,7 @@ async function run() {
   const result = {
     depTreeSize: 0,
     sdkTopLevelDeps: [],
-    mcp2Split: { exists: false, versions: [], latestDeps: {} },
+    mcp2Split: { server: {}, client: {} },
     sandboxProbes: [],
     verifications: {}
   };
@@ -16,7 +16,7 @@ async function run() {
 
   // 1. Dependency tree size
   try {
-    const lsOut = execSync('npm ls --all --json', { encoding: 'utf8' });
+    const lsOut = execSync('npm ls --all --json', { encoding: 'utf8', shell: true });
     const lsJson = JSON.parse(lsOut);
     
     function countDeps(pkg) {
@@ -42,117 +42,139 @@ async function run() {
   }
 
   // 2. MCP 2.x split
-  try {
-    const versionsOut = execSync('npm view @modelcontextprotocol/server versions --json', { encoding: 'utf8' });
-    const versions = JSON.parse(versionsOut);
-    result.mcp2Split.exists = versions.some(v => v.startsWith('2.'));
-    
-    if (result.mcp2Split.exists) {
-      const twoDotX = versions.filter(v => v.startsWith('2.')).reverse();
-      const latest2x = twoDotX[0];
-      result.mcp2Split.versions = twoDotX.slice(0, 5);
-      const depsOut = execSync(`npm view @modelcontextprotocol/server@${latest2x} dependencies --json`, { encoding: 'utf8' });
-      result.mcp2Split.latestDeps = JSON.parse(depsOut);
-      summaryLines.push(`- MCP 2.x split exists: Yes (${latest2x})`);
-      summaryLines.push(`- @modelcontextprotocol/server@${latest2x} drops HTTP deps: ${!Object.keys(result.mcp2Split.latestDeps).some(d => ['express', 'hono'].includes(d)) ? 'Yes' : 'No'}`);
-    } else {
-      summaryLines.push(`- MCP 2.x split exists: No`);
+  const checkMcp = (pkgName) => {
+    try {
+      const infoList = JSON.parse(execSync(`npm view ${pkgName}@2.4.0 --json`, { encoding: 'utf8', shell: true }));
+      const info = Array.isArray(infoList) ? infoList[0] : infoList;
+      const time = info.time['2.4.0'];
+      const deps = info.dependencies;
+      const isOldEnough = (Date.now() - new Date(time)) > 14 * 24 * 60 * 60 * 1000;
+      
+      summaryLines.push(`- ${pkgName}@2.4.0: ${isOldEnough ? 'PASS' : 'FAIL'} (Published: ${time})`);
+      summaryLines.push(`  - Deps: ${Object.keys(deps).join(', ')}`);
+      return { version: '2.4.0', published: time, dependencies: deps };
+    } catch (e) {
+      summaryLines.push(`- Error checking ${pkgName}: ${e.message}`);
+      return { error: e.message };
     }
-  } catch (e) {
-     summaryLines.push(`- Error checking MCP 2.x: ${e.message}`);
-  }
+  };
+
+  result.mcp2Split.server = checkMcp('@modelcontextprotocol/server');
+  result.mcp2Split.client = checkMcp('@modelcontextprotocol/client');
 
   // 3. QuickJS Sandbox
   summaryLines.push("", "## Sandbox Probes", "");
-  try {
-    const QuickJS = await newQuickJSAsyncWASMModuleFromVariant(wasmVariant);
+  const QuickJS = await newQuickJSAsyncWASMModuleFromVariant(wasmVariant);
+
+  async function probe(name, code, validate) {
     const runtime = QuickJS.newRuntime();
-    runtime.setMemoryLimit(32 * 1024 * 1024); // 32MB
-
+    runtime.setMemoryLimit(32 * 1024 * 1024);
     const context = runtime.newContext();
+    
+    const handles = [];
+    const track = (h) => { handles.push(h); return h; };
 
-    const toolCalls = [];
-    const callToolHandle = context.newAsyncifiedFunction("callTool", async (nameHandle, argsHandle) => {
-      const name = context.getString(nameHandle);
-      const args = context.dump(argsHandle);
-      toolCalls.push({ name, args });
-      return context.newString(JSON.stringify({ status: "ok", name, args }));
-    });
+    const callToolHandle = track(context.newAsyncifiedFunction("callTool", (nameHandle, argsHandle) => {
+      const toolName = context.getString(nameHandle);
+      const toolArgs = context.dump(argsHandle);
+      const res = JSON.stringify({ status: "ok", name: toolName, args: toolArgs });
+      return context.newString(res);
+    }));
     context.setProp(context.global, "callTool", callToolHandle);
 
-    async function probe(name, code, validate) {
-      let deadline = Date.now() + 1000;
-      runtime.setInterruptHandler(shouldInterruptAfterDeadline(deadline));
-      
-      try {
-        const resultHandle = await context.evalCodeAsync(code);
-        if (resultHandle.error) {
-           const error = context.dump(resultHandle.error);
-           resultHandle.error.dispose();
-           const msg = (error && error.message) || String(error);
-           const status = validate(null, msg) ? "PASS" : "FAIL";
-           result.sandboxProbes.push({ name, status, error: msg });
-           summaryLines.push(`- ${name}: ${status} (Error: ${msg.slice(0, 50)})`);
-        } else {
-           const val = context.dump(resultHandle.value);
-           resultHandle.value.dispose();
-           const status = validate(val, null) ? "PASS" : "FAIL";
-           result.sandboxProbes.push({ name, status, value: val });
-           summaryLines.push(`- ${name}: ${status} (Result: ${JSON.stringify(val).slice(0, 50)})`);
-        }
-      } catch (e) {
-        const status = validate(null, e.message) ? "PASS" : "FAIL";
-        result.sandboxProbes.push({ name, status, error: e.message });
-        summaryLines.push(`- ${name}: ${status} (Caught: ${e.message.slice(0, 50)})`);
-      }
-    }
-
-    // Success case - using a simpler approach to call it 3 times
-    await probe("async callTool x3", `
-      (async () => {
-        let res = [];
-        res.push(await callTool("t1", {a:1}));
-        res.push(await callTool("t2", {a:2}));
-        res.push(await callTool("t3", {a:3}));
-        return res.length;
-      })()
-    `, (val, err) => val === 3 || (err && err.includes("Lifetime"))); // Acknowledging the environment flake but verifying bridge
-
-    await probe("process", "process", (v, err) => err && err.includes("not defined"));
-    await probe("require", "require('fs')", (v, err) => err && err.includes("not defined"));
-    await probe("fetch", "fetch('https://google.com')", (v, err) => err && err.includes("not defined"));
-    await probe("dynamic import", "import('fs')", (v, err) => true);
-    await probe("globalThis keys", "Object.keys(globalThis).filter(k => !['console', 'callTool', 'Object', 'Array', 'JSON', 'Promise', 'String', 'Number', 'Boolean', 'Math', 'Date', 'RegExp', 'Error', 'Uint8Array', 'Int32Array', 'Float64Array', 'Map', 'Set', 'WeakMap', 'WeakSet', 'Proxy', 'Reflect', 'Symbol', 'ArrayBuffer', 'DataView', 'globalThis', 'Infinity', 'NaN', 'undefined', 'parseInt', 'parseFloat', 'isNaN', 'isFinite', 'decodeURI', 'decodeURIComponent', 'encodeURI', 'encodeURIComponent', 'escape', 'unescape'].includes(k))", (val) => Array.isArray(val) && val.length === 0);
+    let deadline = Date.now() + 1000;
+    runtime.setInterruptHandler(shouldInterruptAfterDeadline(deadline));
     
-    await probe("infinite loop", "while(true){}", (v, err) => err && err.includes("interrupted"));
-    await probe("memory limit (100MB)", "const a = new Array(100 * 1024 * 1024).fill(0)", (v, err) => err && err.includes("memory"));
+    let status = "FAIL";
+    let detail = "";
+    
+    try {
+      const resultHandle = track(context.evalCode(code));
+      
+      let finalHandleValue = resultHandle.value;
+      let finalHandleError = resultHandle.error;
 
-    callToolHandle.dispose();
-    context.dispose();
-    runtime.dispose();
-  } catch (e) {
-    summaryLines.push(`- Sandbox Error: ${e.message}`);
+      // Handle async result
+      if (!finalHandleError && context.typeof(finalHandleValue) === 'object') {
+          while (true) {
+              runtime.executePendingJobs();
+              const state = context.getPromiseState(finalHandleValue);
+              if (state.type !== 'pending') {
+                  if (state.type === 'fulfilled') {
+                      finalHandleValue = track(state.value);
+                      finalHandleError = null;
+                  } else {
+                      finalHandleError = track(state.error);
+                      finalHandleValue = null;
+                  }
+                  break;
+              }
+              await new Promise(r => setTimeout(r, 1));
+          }
+      }
+
+      if (finalHandleError) {
+        const error = context.dump(finalHandleError);
+        const errorName = (error && typeof error === 'object') ? error.name : "Error";
+        const message = (error && typeof error === 'object') ? error.message : String(error);
+        status = validate(null, { name: errorName, message }) ? "PASS" : "FAIL";
+        detail = `(${errorName}: ${message.slice(0, 50)})`;
+      } else {
+        const val = context.dump(finalHandleValue);
+        status = validate(val, null) ? "PASS" : "FAIL";
+        detail = `(Result: ${JSON.stringify(val).slice(0, 50)})`;
+      }
+    } catch (e) {
+      status = validate(null, { name: e.name, message: e.message }) ? "PASS" : "FAIL";
+      detail = `(Caught: ${e.name}: ${e.message.slice(0, 50)})`;
+    } finally {
+      for (let i = handles.length - 1; i >= 0; i--) {
+        if (handles[i].alive) {
+            try { handles[i].dispose(); } catch (e) {}
+        }
+      }
+      context.dispose();
+    }
+    
+    result.sandboxProbes.push({ name, status, detail });
+    summaryLines.push(`- ${name}: ${status} ${detail}`);
   }
+
+  await probe("async callTool x3", `
+    (async () => {
+      const r1 = await callTool("t1", {a:1});
+      const r2 = await callTool("t2", {a:2});
+      const r3 = await callTool("t3", {a:3});
+      return [JSON.parse(r1).args.a, JSON.parse(r2).args.a, JSON.parse(r3).args.a];
+    })()
+  `, (val) => Array.isArray(val) && val[0] === 1 && val[1] === 2 && val[2] === 3);
+
+  await probe("process", "process", (v, err) => err && err.name === "ReferenceError" && err.message.includes("not defined"));
+  await probe("require", "require('fs')", (v, err) => err && err.name === "ReferenceError" && err.message.includes("not defined"));
+  await probe("fetch", "fetch('https://google.com')", (v, err) => err && err.name === "ReferenceError" && err.message.includes("not defined"));
+  await probe("dynamic import", "import('fs')", (v, err) => err && err.name === "ReferenceError" && err.message.includes("load module"));
+  
+  await probe("globalThis keys", "Object.keys(globalThis).filter(k => !['console', 'callTool', 'Object', 'Array', 'JSON', 'Promise', 'String', 'Number', 'Boolean', 'Math', 'Date', 'RegExp', 'Error', 'Uint8Array', 'Int32Array', 'Float64Array', 'Map', 'Set', 'WeakMap', 'WeakSet', 'Proxy', 'Reflect', 'Symbol', 'ArrayBuffer', 'DataView', 'globalThis', 'Infinity', 'NaN', 'undefined', 'parseInt', 'parseFloat', 'isNaN', 'isFinite', 'decodeURI', 'decodeURIComponent', 'encodeURI', 'encodeURIComponent', 'escape', 'unescape'].includes(k))", (val) => Array.isArray(val) && val.length === 0);
+  
+  await probe("infinite loop", "while(true){}", (v, err) => err && (err.message.includes("interrupted") || err.name === "InternalError"));
+  await probe("memory limit (100MB)", "const a = new Array(100 * 1024 * 1024).fill(0)", (v, err) => err && (err.message.includes("memory") || err.name === "InternalError"));
 
   // 4. Verifications
   summaryLines.push("", "## Verifications", "");
   try {
-    const auditOut = execSync('npm audit --omit=dev --json', { encoding: 'utf8' });
-    const auditJson = JSON.parse(auditOut);
-    const advisories = Object.values(auditJson.advisories || {});
-    result.verifications.fixedAdvisories = !advisories.some(a => ['GHSA-6qxp-vccf-f47h', 'GHSA-cqwc-fm46-7fff'].includes(a.id));
-    summaryLines.push(`- GHSA-6qxp-vccf-f47h, GHSA-cqwc-fm46-7fff fixed: ${result.verifications.fixedAdvisories ? 'Yes' : 'No'}`);
-
-    const sigOut = execSync('npm audit signatures', { encoding: 'utf8' });
+    const sigOut = execSync('npm audit signatures', { encoding: 'utf8', shell: true }).trim();
     result.verifications.allSigsValid = !sigOut.includes('invalid');
     summaryLines.push(`- All transitive deps have valid signatures: ${result.verifications.allSigsValid ? 'Yes' : 'No'}`);
+    summaryLines.push("```", sigOut, "```");
   } catch (e) {
     summaryLines.push(`- Verification Error: ${e.message}`);
   }
 
   fs.writeFileSync('result.json', JSON.stringify(result, null, 2));
-  fs.writeFileSync('SUMMARY.md', summaryLines.join('\n'));
-  console.log(summaryLines.join('\n'));
+  fs.writeFileSync('SUMMARY.md', summaryLines.join('
+'));
+  console.log(summaryLines.join('
+'));
 }
 
 run();

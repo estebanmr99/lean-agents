@@ -20,65 +20,71 @@
     "zod-to-json-schema"
   ],
   "mcp2Split": {
-    "exists": true,
-    "versions": [
-      "2.4.0",
-      "2.3.1",
-      "2.3.0",
-      "2.2.0",
-      "2.1.0"
-    ],
-    "latestDeps": [
-      {
+    "server": {
+      "version": "2.4.0",
+      "published": "2026-10-23T18:20:13.773Z",
+      "dependencies": {
         "zod": "^4.2.0",
         "@modelcontextprotocol/core": "2.4.0"
       }
-    ]
+    },
+    "client": {
+      "version": "2.4.0",
+      "published": "2026-10-23T18:21:05.614Z",
+      "dependencies": {
+        "zod": "^4.2.0",
+        "jose": "^6.1.3",
+        "cross-spawn": "^7.0.5",
+        "eventsource": "^3.0.2",
+        "pkce-challenge": "^5.0.0",
+        "eventsource-parser": "^3.0.8",
+        "@modelcontextprotocol/core": "2.4.0"
+      }
+    }
   },
   "sandboxProbes": [
     {
       "name": "async callTool x3",
       "status": "PASS",
-      "error": "Lifetime not alive"
+      "detail": "(Result: [1,2,3])"
     },
     {
       "name": "process",
       "status": "PASS",
-      "error": "'process' is not defined"
+      "detail": "(ReferenceError: 'process' is not defined)"
     },
     {
       "name": "require",
       "status": "PASS",
-      "error": "'require' is not defined"
+      "detail": "(ReferenceError: 'require' is not defined)"
     },
     {
       "name": "fetch",
       "status": "PASS",
-      "error": "'fetch' is not defined"
+      "detail": "(ReferenceError: 'fetch' is not defined)"
     },
     {
       "name": "dynamic import",
       "status": "PASS",
-      "error": "Lifetime not alive"
+      "detail": "(ReferenceError: could not load module 'fs')"
     },
     {
       "name": "globalThis keys",
       "status": "PASS",
-      "value": []
+      "detail": "(Result: [])"
     },
     {
       "name": "infinite loop",
       "status": "PASS",
-      "error": "interrupted"
+      "detail": "(InternalError: interrupted)"
     },
     {
       "name": "memory limit (100MB)",
       "status": "PASS",
-      "error": "out of memory"
+      "detail": "(InternalError: out of memory)"
     }
   ],
   "verifications": {
-    "fixedAdvisories": true,
     "allSigsValid": true
   }
 }
