@@ -8,6 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'jsonc-parser';
 import { npmSpec } from '../scripts/lib/pins.mjs';
+import { doctor } from '../scripts/lib/doctor.mjs';
 import { dcpRow } from '../scripts/lib/plugin-health.mjs';
 import { opencodeV2Adapter } from '../scripts/lib/adapters/opencode-v2.mjs';
 import { loadCore } from '../scripts/lib/render.mjs';
@@ -113,4 +114,19 @@ test('a pin bump keeps the user entry: uninstall after two installs with differe
   assert.deepEqual(parse(two.text).plugin, [`${PKG}@3.3.0`]);
   // --uninstall reverts state entries newest first.
   assert.equal(revertJsonEdits(revertJsonEdits(two.text, two.applied), one.applied), original);
+});
+
+test('doctor DCP row on unmanaged machines', () => {
+  const h = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-dcp-unmanaged-'));
+  const dir = path.join(h, '.config', 'opencode');
+  fs.mkdirSync(dir, { recursive: true });
+
+  let rows = [];
+  doctor({ home: h, state: null, exec: false, collect: rows });
+  assert.ok(!rows.some(r => r.item === 'DCP'));
+
+  fs.writeFileSync(path.join(dir, 'opencode.jsonc'), JSON.stringify({ plugin: [`${PKG}@3.2.0`] }));
+  rows = [];
+  doctor({ home: h, state: null, exec: false, collect: rows });
+  assert.ok(rows.some(r => r.item === 'DCP'));
 });
