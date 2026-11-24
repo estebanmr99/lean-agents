@@ -1,0 +1,9 @@
+{
+  "name": "spike-code-mode-proxy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@utcp/code-mode-mcp": "1.2.1"
+  }
+}
