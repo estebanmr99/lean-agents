@@ -8,6 +8,11 @@ on:
         default: 'openrouter/deepseek/deepseek-v4.1-flash-1017'
         required: true
         type: string
+      max_usd:
+        description: 'Stop when the key has spent this much in this run (USD, at most 4.5)'
+        default: '4.5'
+        required: true
+        type: string
       repeats:
         description: 'Number of repeats per task'
         default: '3'
@@ -40,6 +45,7 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           MODEL: ${{ inputs.model }}
           REPEATS: ${{ inputs.repeats }}
+          MAX_USD: ${{ inputs.max_usd }}
         run: |
           node tests/bench-savings.mjs \
             --home "${RUNNER_TEMP}/bench-home" \
@@ -47,10 +53,11 @@ jobs:
             --model "$MODEL" \
             --repeats "$REPEATS" \
             --max-runs 30 \
-            --max-usd 4.5 \
+            --max-usd "$MAX_USD" \
             --out "${RUNNER_TEMP}/bench-out"
             
       - name: Upload Results
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: bench-savings-results

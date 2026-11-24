@@ -38,16 +38,18 @@ export function parseTokenUsage(out) {
     if (!trimmed.startsWith('{')) continue;
     try {
       const ev = JSON.parse(trimmed);
-      // OpenCode 2 JSON event format for token reporting.
-      // Source: opencode.ai/docs/cli/ and opencode repo (via task #103 hint). Date: 2026-11-23.
+      // VERIFY: the first CI run (2026-11-23) parsed 0 tokens from `type: "step-finish"` with top-level `tokens`.
+      // Accept the step-finish part nested as `part` or flat, `_` or `-` in the type, and `cache` as a number or {read, write}.
       if (ev.type === 'usage') {
         inputTokens += (ev.inputTokens || 0);
         outputTokens += (ev.outputTokens || 0);
-      } else if (ev.type === 'step-finish' && ev.tokens) {
-        inputTokens += (ev.tokens.input || 0);
-        outputTokens += (ev.tokens.output || 0);
-        cacheTokens += (ev.tokens.cache || 0);
-        if (typeof ev.cost === 'number') cost += ev.cost;
+      } else if (/^step[-_]finish$/.test(ev.type)) {
+        const part = ev.part && ev.part.tokens ? ev.part : ev;
+        const t = part.tokens || {};
+        inputTokens += (t.input || 0);
+        outputTokens += (t.output || 0) + (t.reasoning || 0);
+        cacheTokens += typeof t.cache === 'number' ? t.cache : ((t.cache?.read || 0) + (t.cache?.write || 0));
+        if (typeof part.cost === 'number') cost += part.cost;
       }
     } catch {}
   }
@@ -112,7 +114,7 @@ async function main() {
   const OUT = arg('out') || (HOME ? path.join(HOME, 'bench-out') : null);
   const REPEATS = parseInt(arg('repeats') || '1', 10);
   const MAX_RUNS = parseInt(arg('max-runs') || '50', 10);
-  const MAX_USD = parseFloat(arg('max-usd') || '5');
+  const MAX_USD = Math.min(4.5, parseFloat(arg('max-usd') || '4.5') || 4.5);
 
   if (!HOME || path.resolve(HOME) === path.resolve(os.homedir())) {
     console.error('--home <throwaway dir> is required and must not be the real HOME');
@@ -191,9 +193,11 @@ async function main() {
         if (mode === 'lean') {
           const leanArgs = ['scripts/lean.mjs', '--home', runHome, '--yes', '--agents', 'opencode-v2', '--tools', 'rtk,context-mode'];
           console.log(`  Setup: node ${leanArgs.join(' ')}`);
-          const leanRes = spawnSync(process.execPath, [path.join(ROOT, leanArgs[0]), ...leanArgs.slice(1)], { env: childEnv });
+          // Setup needs no model key.
+          const { OPENROUTER_API_KEY: _k, ...setupEnv } = childEnv;
+          const leanRes = spawnSync(process.execPath, [path.join(ROOT, leanArgs[0]), ...leanArgs.slice(1)], { env: setupEnv, encoding: 'utf8' });
           if (leanRes.status !== 0) {
-            console.error(`  Lean setup failed with exit code ${leanRes.status}`);
+            console.error(`  Lean setup failed with exit code ${leanRes.status}:\n${redactKey(`${leanRes.stdout || ''}\n${leanRes.stderr || ''}`, KEY).split('\n').slice(-40).join('\n')}`);
             process.exit(1);
           }
         }
@@ -213,7 +217,11 @@ async function main() {
         fs.writeFileSync(rawLogPath, redactKey(res.stdout || '', KEY));
 
         const usage = parseTokenUsage(res.stdout || '');
+        // Event types only (no content), so a wrong parser shows up in the log.
+        const types = [...new Set((res.stdout || '').split('\n').map((l) => { try { return JSON.parse(l).type; } catch { return null; } }).filter(Boolean))];
+        console.log(`  Events: ${types.join(', ') || 'none'}; exit ${res.status}`);
         totalCost = Math.max(totalCost + usage.cost, await spentSoFar(startSpend));
+        console.log(`  Spent so far (key usage): $${totalCost.toFixed(4)}`);
         const pass = task.check(workdir, res.stdout || '');
 
         console.log(`  Pass: ${pass}, In: ${usage.inputTokens}, Out: ${usage.outputTokens}, Cache: ${usage.cacheTokens}, Cost: $${usage.cost.toFixed(4)}, Time: ${wallTime}ms`);

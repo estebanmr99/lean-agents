@@ -139,3 +139,8 @@ test('redactKey removes every copy of the key', () => {
   assert.strictEqual(redactKey('a sk-or-x b sk-or-x', 'sk-or-x'), 'a [REDACTED] b [REDACTED]');
   assert.strictEqual(redactKey('plain', undefined), 'plain');
 });
+
+test('parseTokenUsage reads step_finish with a nested part and cache object', () => {
+  const ev = { type: 'step_finish', part: { type: 'step-finish', tokens: { input: 100, output: 20, reasoning: 5, cache: { read: 7, write: 3 } }, cost: 0.002 } };
+  assert.deepStrictEqual(parseTokenUsage(JSON.stringify(ev)), { inputTokens: 100, outputTokens: 25, cacheTokens: 10, cost: 0.002 });
+});
