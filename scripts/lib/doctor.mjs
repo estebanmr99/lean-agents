@@ -12,7 +12,7 @@ import { stillNeeded, shellNotice } from './terminals.mjs';
 import { adhdSkillFiles } from './adhd.mjs';
 import { proxyReport, childEnv, fromPrivacy } from './network.mjs';
 import { leftovers } from './parallel.mjs';
-import { pluginHealth, dcpRow } from './plugin-health.mjs';
+import { pluginHealth, dcpRow, codeModeRow } from './plugin-health.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const CORE_AGENTS = ['debug', 'explore', 'planner', 'research', 'review'];
@@ -273,6 +273,8 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
   // #212: config listing a plugin is not proof it loads. Read-only; `probe` holds findings of the opt-in --probe-plugins server run.
   const dcp = dcpRow(home, { fsx, probe, probed });
   if (dcp) add('DCP', dcp.status, dcp.detail);
+  const cm = codeModeRow(home, { fsx });
+  if (cm) add('OpenCode Code Mode', cm.status, cm.detail);
   if (state?.options.agents.some((a) => a.startsWith('opencode'))) {
     for (const f of [...pluginHealth(home, { fsx }), ...probe]) add(`plugin ${f.plugin || 'probe'} ${f.id}`, ['deps-incomplete', 'command-missing'].includes(f.id) ? 'error' : 'changed', `${f.line}. Fix: ${f.fix}`);
   }
