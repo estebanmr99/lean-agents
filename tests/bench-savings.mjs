@@ -202,7 +202,8 @@ async function main() {
           }
         }
 
-        const args = ['run', '--format', 'json', '--model', MODEL, task.prompt];
+        // --standalone: each run gets a private server; the shared background service keeps its port across temp HOMEs.
+        const args = ['run', '--standalone', '--format', 'json', '--model', MODEL, task.prompt];
         console.log(`  Exec: opencode ${args.join(' ')}`);
 
         const start = Date.now();
