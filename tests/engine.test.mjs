@@ -1065,6 +1065,7 @@ test('bunInstall: pinned zip, SHA256 check before extraction, undo only for what
   assert.doesNotMatch(win.run[2].at(-1), /Expand-Archive/);
   assert.match(win.undo[1].at(-1), /SetEnvironmentVariable/);
   assert.match(bunInstall("C:\\Users\\O'Neil", 'C:\\s', 'win32', 'winget', 'x64').run[2].at(-1), /O''Neil/);
+  assert.match(bunInstall("C:\\Users\\O’Neil", 'C:\\s', 'win32', 'winget', 'x64').run[2].at(-1), /O’’Neil/, 'typographic quote is doubled');
 });
 
 test('bunPathCommand returns the same PowerShell strings as bunInstall on Windows', () => {
