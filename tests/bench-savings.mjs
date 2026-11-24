@@ -203,7 +203,8 @@ async function main() {
         }
 
         // --standalone: each run gets a private server; the shared background service keeps its port across temp HOMEs.
-        const args = ['run', '--standalone', '--format', 'json', '--model', MODEL, task.prompt];
+        // --agent build in both modes: lean sets default_agent to plan, which stops headless runs at the plan.
+        const args = ['run', '--standalone', '--agent', 'build', '--format', 'json', '--model', MODEL, task.prompt];
         console.log(`  Exec: opencode ${args.join(' ')}`);
 
         const start = Date.now();
