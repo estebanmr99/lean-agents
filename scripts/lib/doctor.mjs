@@ -37,9 +37,9 @@ export function resolvedOpenCodeConfig(text) {
 }
 
 function checkCopilot(o, add, q, withMcp) {
-  const mcp = withMcp ? q(['copilot', 'mcp', 'list', '--json']) : { ok: false, out: '' };
+  const mcp = withMcp ? q(['copilot', 'mcp', 'list', '--json'], 90000) : { ok: false, out: '' };
   for (const s of ['serena', 'playwright', 'playwright-extension', 'context-mode'].filter((t) => withMcp && o.tools.includes(t))) {
-    add(`copilot mcp ${s}`, mcp.ok && mcp.out.includes(`"${s}"`) ? 'ok' : 'error', mcp.ok ? '' : 'copilot mcp list failed');
+    add(`copilot mcp ${s}`, mcp.ok && mcp.out.includes(`"${s}"`) ? 'ok' : 'error', mcp.ok ? '' : (mcp.failed ? 'copilot mcp list timed out or did not run (90 s limit)' : `copilot mcp list exited ${mcp.status}`));
   }
   const rules = q(['copilot', 'instruction', 'list']);
   add('copilot rules loaded', rules.ok && rules.out.includes('copilot-instructions.md') ? 'ok' : 'error');
@@ -49,16 +49,16 @@ function checkCursor(o, add, q) {
   // `mcp list` starts every server, and Serena through uvx can take longer than 30s.
   const mcp = q(['cursor-agent', 'mcp', 'list'], 120000);
   for (const s of ['serena', 'playwright', 'playwright-extension', 'context-mode'].filter((t) => o.tools.includes(t))) {
-    add(`cursor mcp ${s}`, mcp.ok && mcp.out.includes(s) ? 'ok' : 'error', mcp.ok ? '' : 'cursor-agent mcp list failed');
+    add(`cursor mcp ${s}`, mcp.ok && mcp.out.includes(s) ? 'ok' : 'error', mcp.ok ? '' : (mcp.failed ? 'cursor-agent mcp list timed out or did not run (120 s limit)' : `cursor-agent mcp list exited ${mcp.status}`));
   }
 }
 
 function checkAntigravity(o, core, add, q, withMcp, agy = 'agy') {
   const agents = q([agy, 'agents']).out;
   add('agy subagents loaded', core.every((a) => agents.includes(a)) ? 'ok' : 'error');
-  const mcp = withMcp ? q([agy, 'mcp', 'list']) : { ok: false, out: '' };
+  const mcp = withMcp ? q([agy, 'mcp', 'list'], 90000) : { ok: false, out: '' };
   for (const s of ['serena', 'playwright'].filter((t) => withMcp && o.tools.includes(t))) {
-    add(`agy mcp ${s}`, mcp.ok && mcp.out.includes(s) ? 'ok' : 'error', mcp.ok ? '' : 'agy mcp list failed');
+    add(`agy mcp ${s}`, mcp.ok && mcp.out.includes(s) ? 'ok' : 'error', mcp.ok ? '' : (mcp.failed ? `${agy} mcp list timed out or did not run (90 s limit)` : `${agy} mcp list exited ${mcp.status}`));
   }
   const plugins = q([agy, 'plugin', 'list', '--json']).out;
   for (const t of ['rtk'].filter((p) => o.tools.includes(p))) {
@@ -125,7 +125,8 @@ function checkInventory({ home, exec, run, env, platform, fsx, state }, add) {
 export function npxFailDetail(out, opts) {
   const raw = (out ?? '').split('\n').find((l) => /error/i.test(l))?.trim();
   if (!raw) return '';
-  const line = redactText(raw, opts).slice(0, 200);
+  let line = redactText(raw, opts).slice(0, 200);
+  if (/ECOMPROMISED|EINTEGRITY/.test(out)) line += '. Fix: run npm cache verify, then --doctor again';
   // npm prints `code ENOENT` first and the _npx path on a later line, so look at the whole output for the folder.
   const npx = /enoent/i.test(out) && out.match(/[^\s'"]*_npx[\\/][0-9a-f]+/i)?.[0];
   if (npx) return `${line} (broken npx cache entry: delete ${redactText(npx, opts)}, then run again)`;
@@ -202,7 +203,7 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
     const latest = [...new Map(state.files.map((f) => [f.path, f])).values()];
     for (const f of latest) {
       const rel = f.path.startsWith(home) ? `~${f.path.slice(home.length)}` : f.path;
-      if (!fs.existsSync(f.path)) { add(rel, 'error', 'missing'); continue; }
+      if (!fs.existsSync(f.path)) { add(rel, 'error', 'missing. Fix: run lean-agents again to restore it'); continue; }
       const same = sha(fs.readFileSync(f.path, 'utf8')) === f.hash;
       add(rel, same ? 'ok' : 'changed', same ? '' : 'edited since install (fine if on purpose)');
     }
@@ -243,9 +244,9 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
       if (!withMcp && ['claude', 'cursor', 'copilot-cli', 'antigravity'].some((a) => o.agents.includes(a))) add('mcp servers', 'skipped', 'network off (outbound off): `mcp list` not run');
       if (o.agents.includes('cursor') && withMcp) checkCursor(o, add, q);
       if (o.agents.includes('claude') && withMcp) {
-        const mcp = q(['claude', 'mcp', 'list']);
+        const mcp = q(['claude', 'mcp', 'list'], 90000);
         for (const s of ['serena', 'playwright'].filter((t) => o.tools.includes(t))) {
-          add(`claude mcp ${s}`, mcp.ok && mcp.out.includes(s) ? 'ok' : 'error', mcp.ok ? '' : 'claude mcp list failed');
+          add(`claude mcp ${s}`, mcp.ok && mcp.out.includes(s) ? 'ok' : 'error', mcp.ok ? '' : (mcp.failed ? 'claude mcp list timed out or did not run (90 s limit)' : `claude mcp list exited ${mcp.status}`));
         }
       }
       if (o.agents.some((a) => a.startsWith('opencode'))) checkOpenCode(o, add, q);
