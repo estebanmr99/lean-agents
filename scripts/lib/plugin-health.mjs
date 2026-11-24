@@ -136,6 +136,26 @@ export function dcpRow(home, { fsx = fs, probe = [], probed = false } = {}) {
   return { status, detail };
 }
 
+// One read-only --doctor row that warns when OpenCode 2 Code Mode is turned off (#304). Only the 2.x `mcp.servers` shape: 1.x has no Code Mode.
+export function codeModeRow(home, { fsx = fs } = {}) {
+  const dir = path.join(configHome(home), 'opencode');
+  const file = configPath(dir);
+  const cfg = readJson(file, fsx);
+  if (!cfg) return null;
+  const servers = cfg.mcp?.servers && typeof cfg.mcp.servers === 'object' ? cfg.mcp.servers : {};
+  const names = Object.keys(servers);
+  if (!names.length) return null;
+  const offNames = names.filter((n) => servers[n]?.codemode === false);
+  const isDeny = (v) => v === 'deny' || (v && typeof v === 'object' && v['*'] === 'deny');
+  // A rule for execute wins over the catch-all.
+  const permDeny = isDeny(cfg.permission?.execute ?? cfg.permission?.['*']);
+  if (!offNames.length && !permDeny) return { status: 'ok', detail: `on for ${names.length} MCP servers` };
+  const parts = [];
+  if (offNames.length) parts.push(`off for ${offNames.join(', ')} (codemode: false)`);
+  if (permDeny) parts.push('off: permission denies execute');
+  return { status: 'changed', detail: `${parts.join(' and ')}. Fix: remove that setting so MCP tools run through one script and only its summary enters context` };
+}
+
 const freePort = () => new Promise((resolve, reject) => {
   const s = net.createServer().on('error', reject).listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); });
 });
