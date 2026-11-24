@@ -39,7 +39,7 @@ import { loginRows } from './lib/logins.mjs';
 import { renderSummary, canOffer, openArgv } from './lib/summary-html.mjs';
 import { planUpdate, changelogNotes, formatUpdatePlan } from './lib/update-plan.mjs';
 import { PINS, pinVersions, behindPins, pinTool, nodeRange, npmSpec } from './lib/pins.mjs';
-import { findNvm, installedNodes, resolveToolNodes, nvmLatest, nvmInstallArgv, nvmEnv, toolEnv, satisfies, compare } from './lib/node-runtime.mjs';
+import { findNvm, installedNodes, nodeFloorFix, resolveToolNodes, nvmLatest, nvmInstallArgv, nvmEnv, toolEnv, satisfies, compare } from './lib/node-runtime.mjs';
 import { leanUpdateCommands, coordinateCommands, leanMigrateCommands } from './lib/lean-update.mjs';
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
 import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
@@ -1257,7 +1257,10 @@ function checkNodeFloor(o) {
   if (!running) return;
   const readOnly = ['help', 'version', 'doctor', 'usage', 'feedback'].includes(o.command) || (o.command === 'upgrade-agent' && !o.yes) || o.dryRun || (o.command === 'adopt' && !o.yes && !o.undo);
   const allow = process.env.LEAN_AGENTS_ALLOW_OLD_NODE === '1';
-  console.error(`lean-agents: Node ${running} is older than ${floor.replace(/^>=/, '')}, which lean-agents needs. Fix: nvm install 22 && nvm use 22, or run install.sh.${readOnly || allow ? '' : ' Set LEAN_AGENTS_ALLOW_OLD_NODE=1 to run anyway.'}`);
+  const nvm = findNvm({ env: process.env, home: os.homedir(), platform: process.platform, realHome: REAL_HOME });
+  const nodes = nvm ? installedNodes(nvm) : [];
+  const fix = nodeFloorFix(floor, nodes);
+  console.error(`lean-agents: Node ${running} is older than ${floor.replace(/^>=/, '')}, which lean-agents needs. Fix: ${fix}, or run install.sh.${readOnly || allow ? '' : ' Set LEAN_AGENTS_ALLOW_OLD_NODE=1 to run anyway.'}`);
   if (!readOnly && !allow) process.exit(1);
 }
 

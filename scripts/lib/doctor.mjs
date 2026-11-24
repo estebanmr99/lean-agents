@@ -1,11 +1,12 @@
 // Doctor: compares what lean-agents installed with what is on disk and what the agents load.
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { sha } from './fsops.mjs';
 import { PINS, npmSpec, behindPins, nodeRange } from './pins.mjs';
 import { version, quiet, findAgy, antigravityFootprint } from './system.mjs';
 import { redactText } from './redact.mjs';
-import { satisfies, compare, nodeSkipLine, minVersion, findNvm, nodeAt } from './node-runtime.mjs';
+import { satisfies, compare, nodeSkipLine, minVersion, findNvm, nodeAt, installedNodes, nodeFloorFix } from './node-runtime.mjs';
 import { mcpLaunches, classify, duplicateSkills, skillDirs } from './inventory.mjs';
 import { stillNeeded, shellNotice } from './terminals.mjs';
 import { adhdSkillFiles } from './adhd.mjs';
@@ -13,6 +14,7 @@ import { proxyReport, childEnv, fromPrivacy } from './network.mjs';
 import { leftovers } from './parallel.mjs';
 import { pluginHealth, dcpRow } from './plugin-health.mjs';
 
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const CORE_AGENTS = ['debug', 'explore', 'planner', 'research', 'review'];
 const SECRET_KEY = /(key|token|secret|password|auth)/i;
 
@@ -156,8 +158,19 @@ export function projectNode({ cwd, home, nodeVersion, fsx = fs }) {
 export function doctor({ home, state, exec, nodeVersion = process.versions.node, json = false, run = quiet, env = process.env, platform = process.platform, fsx = fs, cwd = process.cwd(), probe = [], probed = false, collect = null }) {
   const rows = [];
   const add = (item, status, detail = '') => rows.push({ item, status, detail });
+
+  const active = (exec && /\d+\.\d+\.\d+/.exec(version('node') ?? '')?.[0]) || nodeVersion;
+  const floor = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).engines.node;
+  const nodeRow = satisfies(active, floor)
+    ? { status: 'ok', detail: `Node ${active}` }
+    : (() => {
+      const nvm = findNvm({ env, home, platform, realHome: env.HOME || env.USERPROFILE || home });
+      return { status: 'error', detail: `Node ${active} is older than ${floor.replace(/^>=/, '')}, which lean-agents needs. Fix: ${nodeFloorFix(floor, nvm ? installedNodes(nvm) : [])}` };
+    })();
+
   if (!state) {
     add('lean-agents', 'missing', 'not installed (run the installer)');
+    add('node for lean-agents', nodeRow.status, nodeRow.detail);
   } else {
     const o = { ...state.options };
     const network = o.network ?? fromPrivacy(o.privacy) ?? {};
@@ -175,7 +188,7 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
     add('Active setup', 'ok', `rules ${rulesSize} bytes (~${Math.round(rulesSize / 4)} tokens), tools on: ${o.tools.join(', ') || 'none'}, subagents: ${subagentsCount}`);
 
     add('lean-agents', 'ok', `v${state.version}, agents: ${o.agents.join(', ')}, privacy: ${o.privacy}`);
-    const active = (exec && /\d+\.\d+\.\d+/.exec(version('node') ?? '')?.[0]) || nodeVersion;
+    add('node for lean-agents', nodeRow.status, nodeRow.detail);
     const pn = projectNode({ cwd, home, nodeVersion: active, fsx });
     if (pn) add(pn.item, pn.status, pn.detail);
     if (nodeNote) add('context-mode', 'note', nodeNote);
@@ -257,9 +270,9 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
   checkAntigravityIde(home, add, fsx);
   const { nodes, skills } = checkInventory({ home, exec, run, env, platform, fsx, state }, add);
   // #212: config listing a plugin is not proof it loads. Read-only; `probe` holds findings of the opt-in --probe-plugins server run.
+  const dcp = dcpRow(home, { fsx, probe, probed });
+  if (dcp) add('DCP', dcp.status, dcp.detail);
   if (state?.options.agents.some((a) => a.startsWith('opencode'))) {
-    const dcp = dcpRow(home, { fsx, probe, probed });
-    if (dcp) add('DCP', dcp.status, dcp.detail);
     for (const f of [...pluginHealth(home, { fsx }), ...probe]) add(`plugin ${f.plugin || 'probe'} ${f.id}`, ['deps-incomplete', 'command-missing'].includes(f.id) ? 'error' : 'changed', `${f.line}. Fix: ${f.fix}`);
   }
   const left = leftovers(process.cwd());

@@ -47,6 +47,13 @@ export function nodeAt(nvm, dir, version) {
 
 export const nodeSkipLine = (tool, range, found) => `${tool} needs Node ${range}, found ${found}: skipped. Install nvm or Node ${minVersion(range).slice(0, 2).join('.')}+, then run --update.`;
 
+// Fix command for an old Node: nvm use if a fit is installed, else install the major (#392). Full version: nvm-windows needs it.
+export function nodeFloorFix(floor, nodes) {
+  const fit = [...nodes].reverse().find((n) => satisfies(n.version, floor));
+  if (fit) return `nvm use ${fit.version}`;
+  return `nvm install ${minVersion(floor)[0]} && nvm use ${minVersion(floor)[0]}`;
+}
+
 // Pins in use whose range the active Node fails -> { toolNode, skipped }. `pins`: { key: { node } } already filtered to the
 // ones in use. `toolNode` is null when none fails or nothing can run them. All failing pins share one Node, the one for the highest floor.
 // A Node that is not installed yet gets `install` (the major) and the version `latest(major)` reports, so configs can name its path.

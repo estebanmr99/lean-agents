@@ -4,9 +4,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { doctor, npxFailDetail, projectNode } from '../scripts/lib/doctor.mjs';
+import { nodeFloorFix, nodeAt } from '../scripts/lib/node-runtime.mjs';
 import { preset } from '../scripts/lib/network.mjs';
 
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fsx = (files = [], links = {}) => ({ existsSync: (p) => files.includes(p) || p in links, realpathSync: (p) => links[p] ?? p });
 const state = { version: '0', commands: [], files: [], options: { agents: ['claude'], tools: [], privacy: 'standard', network: preset('on') } };
 
@@ -99,7 +102,7 @@ test('linux: a symlink that points at Node 24 is ok but marked as able to change
   claudeServers(h, { 'context-mode': OS.linux.symlink24 });
   const r = run(h, OS.linux);
   assert.equal(r.nodes[0].status, 'ok');
-  assert.match(r.rows.find((x) => x.item.startsWith('node for')).detail, /can change/);
+  assert.match(r.rows.find((x) => x.item.startsWith('node for claude mcp')).detail, /can change/);
 });
 
 test('JSON: nodes and skills are always arrays; the home is shown as ~', () => {
@@ -248,5 +251,37 @@ test('doctor: with exec false and a cwd at a temp project includes a project Nod
   assert.equal(row.detail, 'Node 24.1.0 fits engines.node >=22 in ~/my-app/package.json; VS Code or Cursor started outside this shell can resolve another Node');
   const leanIdx = rows.findIndex((r) => r.item === 'lean-agents');
   const projIdx = rows.findIndex((r) => r.item === 'project Node');
-  assert.equal(projIdx, leanIdx + 1);
+  assert.equal(projIdx, leanIdx + 2);
+});
+
+test('nodeFloorFix: returns nvm use <version> for highest fit, else install line', () => {
+  const floor = '>=22.20.0';
+  const nvm = { win: false, dir: '/h/.nvm' };
+  const nodes = [
+    nodeAt(nvm, '/h/.nvm/versions/node/v22.12.0', '22.12.0'),
+    nodeAt(nvm, '/h/.nvm/versions/node/v24.11.0', '24.11.0'),
+  ];
+  assert.equal(nodeFloorFix(floor, nodes), 'nvm use 24.11.0');
+  assert.equal(nodeFloorFix(floor, [nodes[0]]), 'nvm install 22 && nvm use 22');
+  assert.equal(nodeFloorFix(floor, []), 'nvm install 22 && nvm use 22');
+});
+
+test('doctor: node for lean-agents row added for managed and unmanaged', () => {
+  const h = tmp();
+  let rows = [];
+  doctor({ home: h, state: null, exec: false, nodeVersion: '24.0.0', collect: rows });
+  let row = rows.find(r => r.item === 'node for lean-agents');
+  assert.equal(row.status, 'ok');
+  assert.equal(row.detail, 'Node 24.0.0');
+
+  rows = [];
+  doctor({ home: h, state: null, exec: false, nodeVersion: '22.12.0', collect: rows });
+  row = rows.find(r => r.item === 'node for lean-agents');
+  assert.equal(row.status, 'error');
+  assert.match(row.detail, /Node 22\.12\.0 is older than/);
+
+  rows = [];
+  doctor({ home: h, state, exec: false, nodeVersion: '24.0.0', collect: rows });
+  row = rows.find(r => r.item === 'node for lean-agents');
+  assert.equal(row.status, 'ok');
 });

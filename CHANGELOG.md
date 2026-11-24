@@ -4,6 +4,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Fixed
+- The DCP row in `--doctor` now shows for unmanaged machines if they have an OpenCode config listing it ([#391](https://github.com/estebanmr99/lean-agents/issues/391)).
+- Node version check now names a fit nvm Node to switch to, or the install command, and `--doctor` adds a "node for lean-agents" row ([#392](https://github.com/estebanmr99/lean-agents/issues/392)).
+
 ## [1.1.0] - 2026-11-23
 
 ### Added
