@@ -31,7 +31,8 @@ function summarize(user) {
   if (p.unlimited) return { unlimited: true, level: "success" };
   if (![p.entitlement, p.remaining, p.percent_remaining].every(Number.isFinite)) return null;
   const spent = p.entitlement - p.remaining;
-  const pct = Math.min(100, Math.max(0, Math.floor(p.percent_remaining)));
+  // One decimal, truncated (9.95 shows 9.9), so the meter never rounds up past the real value.
+  const pct = Math.min(100, Math.max(0, Math.floor(p.percent_remaining * 10) / 10));
   const reset = new Date(`${user.quota_reset_date}T00:00:00Z`);
   const days = Math.max(0, Math.ceil((reset.getTime() - Date.now()) / 86400000));
   return {
@@ -46,7 +47,7 @@ function summarize(user) {
 
 function toastMessage(s) {
   if (s.unlimited) return "Unlimited premium requests";
-  return `Spent ${credits(s.spent)} (${dollars(s.spent)}) · Left ${credits(s.left)} (${dollars(s.left)}) · ${s.pct}% left · resets ${s.resetLabel} (in ${s.days} days)`;
+  return `Spent ${credits(s.spent)} (${dollars(s.spent)}) · Left ${credits(s.left)} (${dollars(s.left)}) · ${s.pct.toFixed(1)}% left · resets ${s.resetLabel} (in ${s.days} days)`;
 }
 
 // Rows of [color, text] segments for the sidebar box.
@@ -58,7 +59,7 @@ function rowsFor(state, theme) {
   const color = theme[s.level] ?? theme.text;
   const filled = Math.round((s.pct / 100) * BAR_WIDTH);
   return [
-    [[color, "█".repeat(filled)], [theme.borderSubtle ?? muted, "░".repeat(BAR_WIDTH - filled)], [color, `  ${s.pct}% left`]],
+    [[color, "█".repeat(filled)], [theme.borderSubtle ?? muted, "░".repeat(BAR_WIDTH - filled)], [color, `  ${s.pct.toFixed(1)}% left`]],
     [[muted, "Spent".padEnd(8)], [theme.text, credits(s.spent).padEnd(8)], [muted, dollars(s.spent)]],
     [[muted, "Left".padEnd(8)], [theme.text, credits(s.left).padEnd(8)], [muted, dollars(s.left)]],
     [[muted, "Resets".padEnd(8)], [theme.text, s.resetLabel], [muted, ` · in ${s.days} days`]],
