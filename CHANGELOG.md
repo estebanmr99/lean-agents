@@ -14,6 +14,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 - Dynamic job names in CI correctly report SKIPPED on docs-only PRs, so they no longer block the merge (#371 follow-up).
+- `--tools rtk` on Linux without Homebrew now installs the pinned, sha256-checked rtk release into `~/.local/bin` instead of stopping with a manual link ([#411](https://github.com/estebanmr99/lean-agents/issues/411)).
 - The DCP row in `--doctor` now shows for unmanaged machines if they have an OpenCode config listing it ([#391](https://github.com/estebanmr99/lean-agents/issues/391)).
 - Node version check now names a fit nvm Node to switch to, or the install command, and `--doctor` adds a "node for lean-agents" row ([#392](https://github.com/estebanmr99/lean-agents/issues/392)).
 - PowerShell quoting covers typographic quotes; Cursor Windows never installs over an existing folder ([#395](https://github.com/estebanmr99/lean-agents/issues/395)).
