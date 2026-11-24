@@ -74,11 +74,18 @@ async function run() {
     const handles = [];
     const track = (h) => { handles.push(h); return h; };
 
-    const callToolHandle = track(context.newAsyncifiedFunction("callTool", (nameHandle, argsHandle) => {
+    // A real MCP call answers later (stdio reply), so the host resolves a guest promise on a later tick.
+    const callToolHandle = track(context.newFunction("callTool", (nameHandle, argsHandle) => {
       const toolName = context.getString(nameHandle);
       const toolArgs = context.dump(argsHandle);
-      const res = JSON.stringify({ status: "ok", name: toolName, args: toolArgs });
-      return context.newString(res);
+      const deferred = track(context.newPromise());
+      setTimeout(() => {
+        const s = context.newString(JSON.stringify({ status: "ok", name: toolName, args: toolArgs }));
+        deferred.resolve(s);
+        s.dispose();
+        runtime.executePendingJobs();
+      }, 20);
+      return deferred.handle;
     }));
     context.setProp(context.global, "callTool", callToolHandle);
 
@@ -171,10 +178,8 @@ async function run() {
   }
 
   fs.writeFileSync('result.json', JSON.stringify(result, null, 2));
-  fs.writeFileSync('SUMMARY.md', summaryLines.join('
-'));
-  console.log(summaryLines.join('
-'));
+  fs.writeFileSync('SUMMARY.md', summaryLines.join('\n'));
+  console.log(summaryLines.join('\n'));
 }
 
 run();

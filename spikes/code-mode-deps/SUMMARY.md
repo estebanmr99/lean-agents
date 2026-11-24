@@ -22,7 +22,7 @@
 
 - All transitive deps have valid signatures: Yes
 ```
-audited 98 packages in 0s
+audited 98 packages in 1s
 
 98 packages have verified registry signatures
 
