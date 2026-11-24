@@ -189,7 +189,7 @@ Every flag from `--help`. In PowerShell the same flags are PascalCase (`-DryRun`
 
 | Flag | What it does |
 | --- | --- |
-| `--dry-run` | Show every file change and command; change nothing |
+| `--dry-run` | Show every file change and command; change nothing. Without a terminal it uses saved choices or defaults and never asks |
 | `--yes` | Accept defaults without asking |
 | `--agents a,b` | Agents to set up: claude, opencode-v1, opencode-v2, copilot-cli, antigravity, vscode-copilot, cursor (default: the ones installed) |
 | `--tools a,b` | Optional tools on top of RTK and Context Mode: serena, playwright, ponytail, caveman, i-have-adhd, dcp, codeburn, copilot-usage, gsd, autoskills, playwright-extension, coordinate, lean-migrate, code-mode |
@@ -221,7 +221,7 @@ Every flag from `--help`. In PowerShell the same flags are PascalCase (`-DryRun`
 | `--update` | Re-apply with your saved choices; the plan lists `tool: installed -> release pin`, what stays held (OpenCode 1.x, agent CLIs across a major, tools you installed yourself) and the release notes since your version (`--dry-run [--json]` shows it without changing anything). After the one confirm it also moves the Claude Code, OpenCode 2 and Copilot CLI that lean-agents installed to the release pin, inside the same major (Cursor and Antigravity have no pin, so they stay); each step saves the previous version in `state.json`, and a failed step is reported while the rest continue |
 | `--add-tools a,b` | `--update` that also adds these tools to your saved ones: agents, profile and the rest stay as saved. A plain re-run starts fresh and says when it would change your saved agents or profile |
 | `--update --undo [--yes]` | Put each agent CLI that `--update` upgraded back on the version it had before its first upgrade (the oldest saved `from` per agent, never OpenCode 1.x or across a major): plan first, then a confirm (or `--yes`); a failed step is reported, the rest continue, and the records of restored agents are dropped from `state.json`. `--uninstall` leaves upgraded agent CLIs alone (`--uninstall-agent` removes the ones lean-agents installed) |
-| `--doctor` | Check the install |
+| `--doctor` | Check the install; it also shows which Node runs lean-agents and, when it is too old, the nvm command that fixes it |
 | `--summary` | Write the summary page (`summary.html` in `~/.config/lean-agents/`; `--uninstall` removes it): log-in checklist, the verify prompt with a copy button, what was installed, next steps. The install writes it too and asks once before opening it (never under CI, `--yes`, `--json` or `--no-open`). `--filed-issue "item=issue url"` records an issue the verify prompt filed |
 | `--uninstall` | Undo everything lean-agents changed |
 | `--adopt` | List what a hand-built machine already has and what each item is; with `--yes` it applies the plan |
