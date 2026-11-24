@@ -291,16 +291,37 @@ jobs:
         run: ./tests/real-bootstrap.ps1 -Dist dist
 
   real-opencode:
-    name: ${{ matrix.os == 'ubuntu-latest' && 'real-opencode' || format('real-opencode ({0})', matrix.os) }}
+    name: real-opencode
     # Real OpenCode 2 binary, throwaway HOME: proves the keys we write are accepted.
     needs: changes
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ${{ fromJSON(github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && '["ubuntu-latest"]' || '["ubuntu-latest","macos-latest"]') }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
+      - run: npm ci
+      - name: Install OpenCode 2
+        run: |
+          bash scripts/ci-install-opencode-v2.sh
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+      - name: Install lean-agents and check what OpenCode resolved
+        run: bash tests/real-opencode.sh
+      - name: --install-agent and --uninstall-agent (installer script)
+        run: node tests/real-agent-lifecycle.mjs opencode-v2
+
+  real-opencode-macos:
+    name: real-opencode (macos-latest)
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    timeout-minutes: 10
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -525,16 +546,35 @@ jobs:
         run: ./tests/real-upgrade-opencode.ps1
 
   real-opencode-v1:
-    name: ${{ matrix.os == 'ubuntu-latest' && 'real-opencode-v1' || format('real-opencode-v1 ({0})', matrix.os) }}
+    name: real-opencode-v1
     # Real OpenCode 1.x binary, throwaway HOME: proves the 1.x keys are accepted.
     needs: changes
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ${{ fromJSON(github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && '["ubuntu-latest"]' || '["ubuntu-latest","macos-latest"]') }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
+      - run: npm ci
+      - name: Install OpenCode 1.19
+        run: |
+          npm install -g "$(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('opencode-v1')))")"
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+      - name: Install lean-agents and check what OpenCode resolved
+        run: bash tests/real-opencode-v1.sh
+
+  real-opencode-v1-macos:
+    name: real-opencode-v1 (macos-latest)
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    timeout-minutes: 10
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -671,16 +711,76 @@ jobs:
       - run: bash tests/real-coord-watch.sh
 
   real-claude:
-    name: ${{ matrix.os == 'ubuntu-latest' && 'real-claude' || format('real-claude ({0})', matrix.os) }}
+    name: real-claude
     # Real Claude Code, throwaway HOME, no login: MCP servers go through the claude CLI.
     needs: changes
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ${{ fromJSON(github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && '["ubuntu-latest"]' || '["ubuntu-latest","macos-latest"]') }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
+      - run: npm ci
+      - name: Install Claude Code
+        run: |
+          npm install -g "$(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('claude-code')))")"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Use the runner's Linuxbrew
+        if: runner.os == 'Linux'
+        run: echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
+      - name: Install every tool, check them, uninstall
+        run: |
+          export HOME="$(mktemp -d)"
+          claude --version
+          mkdir -p "$HOME/.gemini/antigravity-cli"
+          bash install.sh --yes --agents claude --all-tools --privacy standard --lang en --ponytail-mode lite > "$HOME/install.txt"
+          cat "$HOME/install.txt"
+          if grep -qE '^ *! ' "$HOME/install.txt"; then exit 1; fi
+          claude mcp list > "$HOME/mcp.txt"
+          cat "$HOME/mcp.txt"
+          grep -q serena "$HOME/mcp.txt"
+          grep -q playwright "$HOME/mcp.txt"
+          if ! grep -q 'context-mode needs Node >=24.15.0' "$HOME/install.txt"; then grep -q 'plugin:context-mode' "$HOME/mcp.txt"; fi
+          grep -q 'rtk hook' "$HOME/.claude/settings.json"
+          # Claude status line (#123): written because the fresh HOME had none; run its command with a fake gh.
+          mkdir -p "$HOME/fakegh"
+          printf '%s\n' '#!/bin/sh' "echo '{\"quota_reset_date\":\"2026-12-01\",\"quota_snapshots\":{\"premium_interactions\":{\"unlimited\":false,\"entitlement\":25000,\"remaining\":15441,\"percent_remaining\":61.7}}}'" > "$HOME/fakegh/gh"
+          chmod +x "$HOME/fakegh/gh"
+          cmd="$(node -p 'JSON.parse(require("fs").readFileSync(process.env.HOME + "/.claude/settings.json", "utf8")).statusLine.command')"
+          line="$(echo '{}' | PATH="$HOME/fakegh:$PATH" TMPDIR="$(mktemp -d)" bash -c "$cmd")"
+          echo "status line: $line"
+          test "$line" = 'Copilot: 15441 of 25000 credits left (61%), about $154.41 of $250.00, resets 2026-12-01'
+          test -f "$HOME/.claude/skills/caveman/SKILL.md"
+          grep -q '^disable-model-invocation: false$' "$HOME"/.claude/plugins/cache/i-have-adhd/i-have-adhd/*/skills/i-have-adhd/SKILL.md
+          node -e 'JSON.parse(require("fs").readFileSync(process.env.HOME + "/.claude/settings.json", "utf8"))'
+          node scripts/lean.mjs --uninstall --yes > "$HOME/uninstall.txt"
+          cat "$HOME/uninstall.txt"
+          if grep -qE '^ *! ' "$HOME/uninstall.txt"; then exit 1; fi
+          claude mcp list > "$HOME/mcp-after.txt"
+          cat "$HOME/mcp-after.txt"
+          if grep -qE 'serena|playwright|context-mode' "$HOME/mcp-after.txt"; then exit 1; fi
+          if grep -q 'rtk hook' "$HOME/.claude/settings.json"; then exit 1; fi
+          if grep -q statusLine "$HOME/.claude/settings.json"; then exit 1; fi
+          test ! -e "$HOME/.claude/lean-copilot-usage-statusline.mjs"
+          test ! -e "$HOME/.claude/skills/caveman"
+      # Last: the native installer may replace the npm-installed claude the steps above use.
+      - name: --install-agent and --uninstall-agent (installer script)
+        run: node tests/real-agent-lifecycle.mjs claude
+
+  real-claude-macos:
+    name: real-claude (macos-latest)
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    timeout-minutes: 10
+    runs-on: macos-latest
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
@@ -1320,14 +1420,52 @@ jobs:
 
   real-vscode:
     # Real VS Code CLI and real tools, throwaway HOME, no login and no TTY.
-    name: ${{ matrix.os == 'ubuntu-latest' && 'real-vscode' || format('real-vscode ({0})', matrix.os) }}
+    name: real-vscode
     needs: changes
     if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
+      - run: npm ci
+      - name: Install VS Code (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          bash scripts/ci-download.sh vscode-linux-x64 "$RUNNER_TEMP/code.tar.gz"
+          tar -xzf "$RUNNER_TEMP/code.tar.gz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/VSCode-linux-x64/bin" >> "$GITHUB_PATH"
+          echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
+      - name: Install VS Code (macOS)
+        if: runner.os == 'macOS'
+        run: brew install --cask visual-studio-code
+      - name: Install VS Code (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          bash scripts/ci-download.sh vscode-win32-x64 "$RUNNER_TEMP/code.zip"
+          unzip -q "$RUNNER_TEMP/code.zip" -d "$RUNNER_TEMP/vscode"
+          echo "$RUNNER_TEMP/vscode/bin" >> "$GITHUB_PATH"
+      - name: Install, let code write the same files, project mode, doctor, uninstall
+        run: bash tests/real-vscode.sh
+
+  real-vscode-others:
+    name: real-vscode (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && '["ubuntu-latest"]' || '["ubuntu-latest","macos-latest","windows-latest"]') }}
+        os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1

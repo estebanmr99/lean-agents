@@ -511,6 +511,7 @@ Mark each `[x]` when merged.
 - [x] **0.8.0 audit fixes** (1.0.0). Issues #155 to #168 (except #160 and #169 as owner steps; #169 done), PRs #183 to #188, #191, #192, #217, #222, #224, #225, #230. `docs/audit-1.0.0.md` lists each issue with its PR.
 - [x] **Reviews 1 to 9** (1.0.0). Issues #213, #219, #229, #235, #238, #253, #268, #278, #282, #284; fixes in #221, #231, #237, #240, #255, #272, #281, #283, #285. Open follow-ups are in the audit.
 - [x] **Issue #181 — Summary page** (1.0.0). Issue #181, PRs #275, #276, #286.
+- [x] **Required checks on docs-only PRs** (#371 follow-up). Fix dynamic job names so SKIPPED reports correctly. PR #406.
 - [ ] **Release 1.0.0 gates** (the owner). Issues #160 (OIDC proof), #145 (work-PC trial), #179 (fresh Mac and PC runs), #180 (logged-in VS Code agent run); the sessions for #80 part 2, #179, #180 and #182 are merged in code and docs, so the issues stay open for that proof. Tag and publish are the owner's; mark `[x]` when the tag run is green.
 
 ### Session 9 — Showcase

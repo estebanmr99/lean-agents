@@ -5,6 +5,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ## [Unreleased]
 
 ### Changed
+- Savings benchmark: supports OpenRouter DeepSeek, multiple repeats, raw log uploads, and budget guards for runs and cost (#103).
 - The Copilot usage meter in the OpenCode sidebar and the `/copilot-usage` toast now show one decimal for the percent left, truncated so it never rounds up past the real value ([#190](https://github.com/estebanmr99/lean-agents/issues/190)).
 - The Claude Code `code-mode` note and the README rows now say that Remote Control, Claude in Chrome, computer use and the VS Code panel do not work while Code Mode is on, and that RTK and Context Mode do ([#304](https://github.com/estebanmr99/lean-agents/issues/304)).
 
@@ -12,6 +13,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - One read-only `--doctor` row that warns when OpenCode Code Mode is turned off ([#304](https://github.com/estebanmr99/lean-agents/issues/304)).
 
 ### Fixed
+- Dynamic job names in CI correctly report SKIPPED on docs-only PRs, so they no longer block the merge (#371 follow-up).
 - The DCP row in `--doctor` now shows for unmanaged machines if they have an OpenCode config listing it ([#391](https://github.com/estebanmr99/lean-agents/issues/391)).
 - Node version check now names a fit nvm Node to switch to, or the install command, and `--doctor` adds a "node for lean-agents" row ([#392](https://github.com/estebanmr99/lean-agents/issues/392)).
 - PowerShell quoting covers typographic quotes; Cursor Windows never installs over an existing folder ([#395](https://github.com/estebanmr99/lean-agents/issues/395)).
