@@ -2,11 +2,16 @@ import { readFileSync } from 'node:fs';
 
 const TOOLS = Array.from({ length: 20 }, (_, i) => ({
   name: `fake_read_${i}`,
-  description: `Fake tool ${i} that returns fixed text`,
+  // Sized like a typical real MCP tool (several described parameters), so tools/list bytes are realistic.
+  description: `Fake tool ${i}: reads a resource by path and returns its text. Use it when you need the contents of a file, page or record; supports ranges, encodings and a size cap.`,
   inputSchema: {
     type: "object",
     properties: {
-      path: { type: "string" }
+      path: { type: "string", description: "Path or identifier of the resource to read" },
+      offset: { type: "integer", description: "Line or byte offset to start reading from", minimum: 0 },
+      limit: { type: "integer", description: "Maximum number of lines or bytes to return", minimum: 1 },
+      encoding: { type: "string", enum: ["utf8", "base64", "latin1"], description: "Encoding of the returned text" },
+      follow_links: { type: "boolean", description: "Follow symbolic links when resolving the path" }
     },
     required: ["path"]
   }
@@ -57,6 +62,7 @@ process.stdin.on("data", async (data) => {
     if (!line.trim()) continue;
     try {
       const request = JSON.parse(line);
+      if (request.id === undefined) continue; // notifications get no reply
       const result = await handleRequest(request);
       process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: request.id, result }) + "\n");
     } catch (e) {

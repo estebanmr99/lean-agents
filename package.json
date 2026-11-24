@@ -18,8 +18,7 @@
     "scripts/",
     "core/",
     "profiles/",
-    "CHANGELOG.md",
-    "!spikes/"
+    "CHANGELOG.md"
   ],
   "bundleDependencies": true,
   "scripts": {

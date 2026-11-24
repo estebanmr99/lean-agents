@@ -6,12 +6,17 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   spike:
     name: Spike (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     
@@ -53,16 +58,17 @@ jobs:
       - name: Run Measurements
         env:
           HOME: ${{ runner.temp }}/h
-          PATH: ${{ env.PATH }}
         run: |
           cd spikes/code-mode-proxy
           node measure.mjs
+          cat SUMMARY.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Artifacts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: spike-results-${{ matrix.os }}
+          retention-days: 7
           path: |
             spikes/code-mode-proxy/npm-audit-signatures.txt
             spikes/code-mode-proxy/npm-audit.json
