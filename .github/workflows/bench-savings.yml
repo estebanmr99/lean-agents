@@ -15,7 +15,7 @@ on:
         type: string
       repeats:
         description: 'Number of repeats per task'
-        default: '3'
+        default: '10'
         required: true
         type: string
 
@@ -58,7 +58,7 @@ jobs:
             --run \
             --model "$MODEL" \
             --repeats "$REPEATS" \
-            --max-runs 30 \
+            --max-runs 200 \
             --max-usd "$MAX_USD" \
             --out "${RUNNER_TEMP}/bench-out"
             

@@ -5,12 +5,50 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseTokenUsage, keySpend, redactKey } from './bench-savings.mjs';
+import { parseTokenUsage, finalText, keySpend, redactKey, checkQuotaError, getStats, generateChart } from './bench-savings.mjs';
 import { doctor } from '../scripts/lib/doctor.mjs';
 import { buildSummary } from '../scripts/lib/summary-data.mjs';
 import { renderSummary } from '../scripts/lib/summary-html.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+test('generateChart contains bar pairs and footer', () => {
+  const summary = [
+    { task: 'task1', mode: 'baseline', in: { median: 100, p25: 80, p75: 120 }, stable: true },
+    { task: 'task1', mode: 'lean', in: { median: 50, p25: 40, p75: 60 }, stable: true }
+  ];
+  const info = { model: 'm1', opencodeVersion: 'v1', date: '2026-11-23' };
+  const svg = generateChart(summary, info);
+  assert.match(svg, /<rect class="baseline"/);
+  assert.match(svg, /<rect class="lean"/);
+  assert.match(svg, /task1/);
+  assert.match(svg, /m1 · OpenCode v1 · 2026-11-23/);
+  assert.match(svg, /★/); // stable mark
+});
+
+test('checkQuotaError detects 402 and provider.quota', () => {
+  const out1 = '{"type":"error","error":{"type":"provider.quota","status":429}}\n';
+  assert.deepStrictEqual(checkQuotaError(out1), { type: 'provider.quota', status: 429 });
+  const out2 = '{"status":402,"error":{"message":"payment required"}}\n';
+  assert.deepStrictEqual(checkQuotaError(out2), { type: undefined, status: 402 });
+  assert.strictEqual(checkQuotaError('{"type":"message"}'), null);
+});
+
+test('getStats on known arrays', () => {
+  const arr = [10, 20, 30, 40, 50];
+  const s = getStats(arr);
+  // pos = (5-1)*0.5 = 2. index 2 is 30.
+  // pos = (5-1)*0.25 = 1. index 1 is 20.
+  // pos = (5-1)*0.75 = 3. index 3 is 40.
+  assert.strictEqual(s.median, 30);
+  assert.strictEqual(s.p25, 20);
+  assert.strictEqual(s.p75, 40);
+
+  const arr2 = [10, 20];
+  const s2 = getStats(arr2);
+  // pos = (2-1)*0.5 = 0.5. 10 + 0.5*(20-10) = 15.
+  assert.strictEqual(s2.median, 15);
+});
 
 test('parseTokenUsage extracts tokens from OpenCode 2 JSON format', () => {
   const out = `
@@ -36,11 +74,11 @@ test('bench-savings budget guards', async (t) => {
       '--home', home,
       '--run',
       '--model', 'mock/model',
-      '--repeats', '10', // 5 tasks * 2 modes * 10 = 100 runs
+      '--repeats', '10', // 8 tasks * 2 modes * 10 = 160 runs
       '--max-runs', '50'
     ], { encoding: 'utf8' });
     assert.strictEqual(res.status, 2);
-    assert.match(res.stderr, /Estimated runs \(100\) exceed --max-runs \(50\)/);
+    assert.match(res.stderr, /Estimated runs \(160\) exceed --max-runs \(50\)/);
   });
 
   fs.rmSync(home, { recursive: true, force: true });
@@ -126,9 +164,11 @@ test('doctor Active setup row content and summary line', () => {
   fs.rmSync(home, { recursive: true, force: true });
 });
 
-test('keySpend reads data.usage and fails closed', async () => {
-  const ok = async () => ({ ok: true, status: 200, json: async () => ({ data: { usage: 1.25 } }) });
-  assert.strictEqual(await keySpend('k', ok), 1.25);
+test('keySpend adds credit and BYOK usage and fails closed', async () => {
+  const ok = async () => ({ ok: true, status: 200, json: async () => ({ data: { usage: 1.25, byok_usage: 0.5 } }) });
+  assert.strictEqual(await keySpend('k', ok), 1.75);
+  const noByok = async () => ({ ok: true, status: 200, json: async () => ({ data: { usage: 1.25 } }) });
+  await assert.rejects(keySpend('k', noByok));
   const bad = async () => ({ ok: false, status: 401, json: async () => ({}) });
   await assert.rejects(keySpend('k', bad), /HTTP 401/);
   const noField = async () => ({ ok: true, status: 200, json: async () => ({ data: {} }) });
@@ -143,4 +183,12 @@ test('redactKey removes every copy of the key', () => {
 test('parseTokenUsage reads step_finish with a nested part and cache object', () => {
   const ev = { type: 'step_finish', part: { type: 'step-finish', tokens: { input: 100, output: 20, reasoning: 5, cache: { read: 7, write: 3 } }, cost: 0.002 } };
   assert.deepStrictEqual(parseTokenUsage(JSON.stringify(ev)), { inputTokens: 100, outputTokens: 25, cacheTokens: 10, cost: 0.002 });
+});
+
+test('finalText keeps assistant text and drops tool output', () => {
+  const out = [
+    JSON.stringify({ type: 'tool_use', part: { state: { output: 'at buggyFunction (app.js:123:45)' } } }),
+    JSON.stringify({ type: 'text', part: { text: 'It was parseConfig.' } }),
+  ].join('\n');
+  assert.strictEqual(finalText(out), 'It was parseConfig.');
 });
