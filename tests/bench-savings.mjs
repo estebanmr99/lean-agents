@@ -6,7 +6,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { parse, applyEdits, modify } from 'jsonc-parser';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURES = path.join(ROOT, 'tests', 'fixtures', 'bench-savings');
@@ -57,28 +56,6 @@ export function getStats(arr) {
     return sorted[base + 1] !== undefined ? sorted[base] + rest * (sorted[base + 1] - sorted[base]) : sorted[base];
   };
   return { median: getP(0.5), p25: getP(0.25), p75: getP(0.75) };
-}
-
-// Exported for tests
-export function stripTool(runHome, tool) {
-  if (tool === 'context-mode') {
-    const configPath = path.join(runHome, '.config', 'opencode', 'opencode.jsonc');
-    if (!fs.existsSync(configPath)) throw new Error(`config not found: ${configPath}`);
-    const content = fs.readFileSync(configPath, 'utf8');
-    const root = parse(content);
-    if (!root?.mcp?.servers?.['context-mode']) throw new Error('context-mode entry not found in config');
-    const edits = modify(content, ['mcp', 'servers', 'context-mode'], undefined, { formattingOptions: { insertSpaces: true, tabSize: 2 } });
-    fs.writeFileSync(configPath, applyEdits(content, edits));
-  } else if (tool === 'rtk') {
-    const rulesPath = path.join(runHome, '.config', 'lean-agents', 'AGENTS.md');
-    if (!fs.existsSync(rulesPath)) throw new Error(`rules not found: ${rulesPath}`);
-    const content = fs.readFileSync(rulesPath, 'utf8');
-    const target = ' RTK compression does not replace this.';
-    if (!content.includes(target)) throw new Error('rtk mention not found in rules');
-    fs.writeFileSync(rulesPath, content.replace(target, ''));
-  } else {
-    throw new Error(`unknown tool to strip: ${tool}`);
-  }
 }
 
 // Only the assistant's own text: the raw stream also holds tool output (the files it read), which would pass answer checks for free.
@@ -303,7 +280,8 @@ async function main() {
   const VARIANTS = (arg('variants') || process.env.VARIANTS || 'baseline,lean').split(',');
   const TASKS_TO_RUN = (arg('tasks') || process.env.TASKS || '') ? (arg('tasks') || process.env.TASKS).split(',') : TASKS.map(t => t.id);
 
-  const ALLOWED_VARIANTS = ['baseline', 'rules', 'rtk', 'context-mode', 'lean'];
+  // No rtk-only or context-mode-only variant: on OpenCode 2 lean installs nothing for rtk (#179), so those equal rules and lean.
+  const ALLOWED_VARIANTS = ['baseline', 'rules', 'lean'];
   for (const v of VARIANTS) {
     if (!ALLOWED_VARIANTS.includes(v)) {
       console.error(`Unknown variant: ${v}. Allowed: ${ALLOWED_VARIANTS.join(', ')}`);
@@ -406,8 +384,6 @@ async function main() {
             console.error(`  Lean setup failed with exit code ${leanRes.status}:\n${(() => { const lines = redactKey(`${leanRes.stdout || ''}\n${leanRes.stderr || ''}`, KEY).split('\n'); return [...lines.filter((l) => /^\s*! /.test(l)), '...', ...lines.slice(-40)].join('\n'); })()}`);
             process.exit(1);
           }
-          if (mode === 'rtk') stripTool(runHome, 'context-mode');
-          if (mode === 'context-mode') stripTool(runHome, 'rtk');
         }
 
         // --standalone: each run gets a private server; the shared background service keeps its port across temp HOMEs.

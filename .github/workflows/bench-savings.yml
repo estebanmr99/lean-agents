@@ -19,7 +19,7 @@ on:
         required: true
         type: string
       variants:
-        description: 'Variants to run (comma-separated: baseline,rules,rtk,context-mode,lean)'
+        description: 'Variants to run (comma-separated: baseline,rules,lean)'
         default: 'baseline,lean'
         required: true
         type: string

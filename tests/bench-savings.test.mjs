@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseTokenUsage, finalText, keySpend, redactKey, checkQuotaError, getStats, generateChart, stripTool, renderResultsMarkdown } from './bench-savings.mjs';
+import { parseTokenUsage, finalText, keySpend, redactKey, checkQuotaError, getStats, generateChart, renderResultsMarkdown } from './bench-savings.mjs';
 import { doctor } from '../scripts/lib/doctor.mjs';
 import { buildSummary } from '../scripts/lib/summary-data.mjs';
 import { renderSummary } from '../scripts/lib/summary-html.mjs';
@@ -191,39 +191,6 @@ test('finalText keeps assistant text and drops tool output', () => {
     JSON.stringify({ type: 'text', part: { text: 'It was parseConfig.' } }),
   ].join('\n');
   assert.strictEqual(finalText(out), 'It was parseConfig.');
-});
-
-test('stripTool context-mode removes entry from opencode.jsonc', () => {
-  const home = path.join(os.tmpdir(), `bench-strip-ctx-${Date.now()}`);
-  const ocDir = path.join(home, '.config', 'opencode');
-  fs.mkdirSync(ocDir, { recursive: true });
-  const cfgPath = path.join(ocDir, 'opencode.jsonc');
-  fs.writeFileSync(cfgPath, JSON.stringify({ mcp: { servers: { 'context-mode': { type: 'local' }, other: {} } } }));
-
-  stripTool(home, 'context-mode');
-  const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
-  assert.ok(!cfg.mcp.servers['context-mode']);
-  assert.ok(cfg.mcp.servers.other);
-
-  assert.throws(() => stripTool(home, 'context-mode'), /entry not found/);
-  fs.rmSync(home, { recursive: true, force: true });
-});
-
-test('stripTool rtk removes mention from AGENTS.md', () => {
-  const home = path.join(os.tmpdir(), `bench-strip-rtk-${Date.now()}`);
-  const laDir = path.join(home, '.config', 'lean-agents');
-  fs.mkdirSync(laDir, { recursive: true });
-  const rulesPath = path.join(laDir, 'AGENTS.md');
-  const target = ' RTK compression does not replace this.';
-  fs.writeFileSync(rulesPath, `Rule 1.${target}\nRule 2.`);
-
-  stripTool(home, 'rtk');
-  const content = fs.readFileSync(rulesPath, 'utf8');
-  assert.ok(!content.includes(target));
-  assert.match(content, /Rule 1\.\nRule 2\./);
-
-  assert.throws(() => stripTool(home, 'rtk'), /rtk mention not found/);
-  fs.rmSync(home, { recursive: true, force: true });
 });
 
 test('bench-savings variant and task parsing', () => {
