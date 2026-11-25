@@ -402,6 +402,7 @@ lean-agents copies each proxy variable it finds (`HTTP_PROXY`, `HTTPS_PROXY`, `A
 | git | `http_proxy`, `https_proxy`, `all_proxy` (lowercase); `http.proxy` wins | `http.sslCAInfo`, `GIT_SSL_CAINFO` | [git-config](https://git-scm.com/docs/git-config) | 2026-11-03 |
 | uv, uvx (Serena) | `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` (uppercase) | `SSL_CERT_FILE`, `SSL_CERT_DIR`, `UV_SYSTEM_CERTS=true` (`UV_NATIVE_TLS` is deprecated) | [uv env vars](https://docs.astral.sh/uv/reference/environment/) | 2026-11-03 |
 | Homebrew | `http_proxy`, `https_proxy`, `all_proxy`, `no_proxy` (lowercase, through curl and git) | no variable documented | [brew manpage](https://docs.brew.sh/Manpage) | 2026-11-03 |
+| gh | no gh variable; Go's standard `HTTPS_PROXY`/`HTTP_PROXY`/`NO_PROXY` (`tests/real-proxy.sh` proves `https_proxy`) | no gh variable; `SSL_CERT_FILE` replaces the trust store on Linux (`tests/real-proxy.sh`) | `gh help environment` on gh 2.103.0 has no proxy, cert, SSL or TLS entry; in cli/cli, `HTTPS_PROXY` and `SSL_CERT_FILE` appear only under `script/` (test mocks), not in the CLI code (#441) | 2026-11-25 |
 | winget | `--proxy <url>`, `--no-proxy` per run; not used by lean-agents | not documented | [winget settings](https://learn.microsoft.com/en-us/windows/package-manager/winget/settings) | 2026-11-03 |
 | Claude Code | `https_proxy`, `HTTPS_PROXY`, `http_proxy`, `HTTP_PROXY` (first set wins), `NO_PROXY`; no SOCKS | `NODE_EXTRA_CA_CERTS`; bundled CAs plus the OS store; mTLS `CLAUDE_CODE_CLIENT_CERT` / `CLAUDE_CODE_CLIENT_KEY` | [network config](https://code.claude.com/docs/en/network-config) | 2026-11-03 |
 | OpenCode | standard proxy variables (docs show uppercase); add `localhost` to `NO_PROXY` | `NODE_EXTRA_CA_CERTS` | [network](https://opencode.ai/docs/network/) | 2026-11-03 |
@@ -543,7 +544,6 @@ The undocumented items below (Antigravity telemetry and auto-update, Serena conf
 - **VERIFY:** subreddit rules, whether r/opencode exists, and X handles in `docs/launch.md`. Reddit blocked the fetch.
 - **VERIFY:** `brew install copilot-cli` (README) against `brew install --cask copilot-cli` (docs). lean-agents does not use either.
 - **VERIFY:** an Antigravity auto-update switch (none documented; the CLI updates itself in the background, per [antigravity.google/cli](https://antigravity.google/cli), checked 2026-11-03). Proxy variables are documented since 2026-11-18 (see Antigravity network above); `tests/real-proxy.sh` still does not run `agy` through squid (#39).
-- **VERIFY:** gh has no documented proxy or CA variable ([gh environment](https://cli.github.com/manual/gh_help_environment), 2026-11-03); `tests/real-proxy.sh` checks that it uses `https_proxy` and that `SSL_CERT_FILE` replaces its trust store.
 - **VERIFY:** proxy and CA handling in RTK, Context Mode, Serena, Playwright MCP and the Skills CLI beyond the variables their runtimes (Node, uv, git) read.
 - **VERIFY:** Copilot CLI `NO_PROXY` and `--disable-client-telemetry` (seen in release notes, not in the docs).
 - **VERIFY:** Serena config path `~/.serena/serena_config.yml` and a usage-stats switch; GSD and Ponytail outbound calls.
