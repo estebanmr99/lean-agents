@@ -482,9 +482,9 @@ Mark each `[x]` when merged.
 - [x] **Session 22 — Repo audit, issue forms, labeled backlog** (0.7.0). `docs/audit-2026-11.md`, forms in `.github/ISSUE_TEMPLATE` (bug, feature, update-finding, agent-support, config), `scripts/labels.sh`, the backlog as labeled issues, "Before each release" checklist. Audit findings are filed as issues, not fixed here.
 - [x] **Session 45 — Agent-first updates** (0.7.0). Issue #45. `lean-update` skill, read-only detection table in `docs/manual-install.md`, one temp backup removed after `--doctor`, `--update` prints old -> new, `--doctor --json` lists `behind`, daily green `ci-latest` opens a pin-bump PR.
 - [x] **Session 58 — 1-minute README** (0.7.0). Issue #58, PR #81. Short README EN and ES with a support matrix, "what you get" and "who it is for"; `scripts/check-readme.mjs` enforces the 1-minute rule in CI.
-- [x] **Session 59 — Architecture checkpoint** (0.7.0). Issue #59. [`docs/checkpoints/0.7.0.md`](checkpoints/0.7.0.md): one keep / change / spike per question, and the 0.7.0 sessions below.
+- [x] **Session 59 — Architecture checkpoint** (0.7.0). Issue #59. [`docs/checkpoints/0.7.0.md`](archive/checkpoints/0.7.0.md): one keep / change / spike per question, and the 0.7.0 sessions below.
 
-0.7.0 sessions from the checkpoint, accepted by the owner on 2026-11-06 (order and parallel groups in [`docs/checkpoints/0.7.0.md`](checkpoints/0.7.0.md) section 5):
+0.7.0 sessions from the checkpoint, accepted by the owner on 2026-11-06 (order and parallel groups in [`docs/checkpoints/0.7.0.md`](archive/checkpoints/0.7.0.md) section 5):
 
 - [x] **Session 69 — CI trust** (0.7.0). Issues #69, #70, #56. #69 done (PR #83); #70 and #56 done (PR #95). Actions pinned by SHA plus Dependabot, least-privilege tokens, macOS jobs fixed or trimmed, one update channel (pin-bump PR, no per-tool issues), `ci-latest` green. One update channel and green ci-latest finished in Session 108 (#108). Sonnet.
 - [x] **Session 68 — File safety and redaction** (0.7.0). Issues #68, #67, #74, #72. (PR #94; #72 in PR #89). Opus plans the env allowlist, Sonnet builds.
@@ -502,7 +502,7 @@ Mark each `[x]` when merged.
 - [x] **Session 50 — Pin bumps** (0.7.0, after 64). Issues #50, #51, #52. Merge the ci-latest pin-bump PR instead of hand bumps; keep opencode-v1 at 1.19.0 (work PC version); also closes #97 to #102. Haiku.
 - [x] **Session 44 — Context Mode on Node < 24.15** (0.7.0, after 64). Issues #44 and #104 points 1 to 3 (engines check, `node` field per pin, matching nvm Node with absolute registration). Opus plans, Sonnet builds. #104 points 4 and 5 and #106 go to 0.8.0; #103 later.
 - [x] **Session 65 — How you get it: release tag default, npm package** (0.7.0, after #58, 69 and 44). Issues #65, #46. Opus plans, Sonnet builds.
-- [x] **Archive done sessions** (0.7.0, last, alone). Checkpoint Q3: 18 finished session blocks moved to [`docs/sessions-done.md`](sessions-done.md); one line each stays here. Session 9 stays open. Haiku.
+- [x] **Archive done sessions** (0.7.0, last, alone). Checkpoint Q3: 18 finished session blocks moved to [`docs/sessions-done.md`](archive/sessions-done.md); one line each stays here. Session 9 stays open. Haiku.
 - [x] **Issue #123 follow-up — Copilot credits on OpenCode 2.x, status lines** (0.8.0). PR #137. Claude `statusLine` only when none is set.
 - [x] **Issue #130 — Code navigation: Serena vs codebase-memory-mcp** (0.8.0). PR #134. Serena stays the default.
 - [x] **Session 106 — Adopt a hand-built machine** (0.8.0). Issues #106, #104 points 4 and 5, #132. PRs #135 (doctor Node per tool), #138 (`--adopt` dry run, `--json`), #140 (apply, undo, backup, `real-adopt`).
@@ -537,7 +537,7 @@ Done when: the `assets` workflow renders every image and GIF, and the owner has 
 
 - README EN and ES in sync with the code and the CHANGELOG (flags, tables, Node version, pins). `node scripts/check-readme.mjs` is enforced by CI (the `lint` job and the release workflow); a person still re-reads the first screen.
 - README still fits the 1-minute rule: hero within the line budget before Details, support matrix matches the CI jobs in `ci.yml` (cells without a real-binary job say VERIFY), alt text on every image.
-- Audit rerun before tagging: write `docs/audit-<version>.md` (format of [`audit-0.8.0.md`](audit-0.8.0.md)); every medium or higher finding is an issue labeled `audit`, and all of them are closed (fixed) before the tag. Enforced: the `Audit gate` step in `release.yml` fails the release, before any publish, when the file is missing or an `audit` issue is open; an open audit issue labeled `release-proof` (its proof is the release run itself) is exempt and printed, not a blocker.
+- Audit rerun before tagging: write `docs/audit-<version>.md` (format of [`audit-0.8.0.md`](archive/audit-0.8.0.md)); every medium or higher finding is an issue labeled `audit`, and all of them are closed (fixed) before the tag. Enforced: the `Audit gate` step in `release.yml` fails the release, before any publish, when the file is missing or an `audit` issue is open; an open audit issue labeled `release-proof` (its proof is the release run itself) is exempt and printed, not a blocker.
 - Labels triaged: no open issue without a `type:` and a `priority:` label (`bash scripts/labels.sh` first if labels are missing); p0 issues are closed or consciously deferred.
-- Architecture checkpoint (#59): write `docs/checkpoints/<version>.md`, one keep / change / spike per question. Latest: [`docs/checkpoints/0.7.0.md`](checkpoints/0.7.0.md).
+- Architecture checkpoint (#59): write `docs/checkpoints/<version>.md`, one keep / change / spike per question. Latest: [`docs/checkpoints/0.7.0.md`](archive/checkpoints/0.7.0.md).
 - `docs/ROADMAP.md` and `CHANGELOG.md` match what is merged.
