@@ -29,6 +29,10 @@ export async function keySpend(key, fetchFn = fetch) {
 // Raw logs are uploaded as artifacts; the model runs shell with the key in its env, so strip it.
 export const redactKey = (text, key) => (key ? text.split(key).join('[REDACTED]') : text);
 
+export function checkEnv(dir) {
+  return { PATH: process.env.PATH || "", HOME: dir, NODE_OPTIONS: "" };
+}
+
 // Exported for tests
 export function checkQuotaError(out) {
   for (const line of out.split('\n')) {
@@ -118,7 +122,210 @@ export function priceUsage(usage, prices) {
   );
 }
 
-const TASKS = [
+export const HARNESS_STATE = new Map(); // dir -> { testFiles: Map<filename, content>, expectedTests: number }
+
+export function generateTask9(dir) {
+  const state = { testFiles: new Map(), expectedTests: 0 };
+  fs.mkdirSync(path.join(dir, 'src', 'a'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'src', 'b'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'src', 'c'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'tests'), { recursive: true });
+
+  for (const layer of ['c', 'b', 'a']) {
+    for (let i = 0; i < 12; i++) {
+      let content = '';
+      if (layer === 'a') content += `import { calc_modb${i}_0 } from '../b/modb${i}.mjs';\n`;
+      else if (layer === 'b') content += `import { calc_modc${i}_0 } from '../c/modc${i}.mjs';\n`;
+      for (let j = 0; j < 5; j++) {
+        content += `\nexport function calc_mod${layer}${i}_${j}(x) {\n  let res = x;\n`;
+        for (let k = 0; k < 15; k++) content += `  res += ${k};\n`;
+        if (layer === 'c' && i === 2 && j === 1) content += `  return res - 1; // bug\n`; 
+        else if (layer === 'b' && i === 5 && j === 2) content += `  return res - 1; // bug\n`;
+        else if (layer === 'a' && i === 8 && j === 3) content += `  return res - 1; // bug\n`;
+        else content += `  return res;\n`;
+        content += `}\n`;
+      }
+      fs.writeFileSync(path.join(dir, 'src', layer, `mod${layer}${i}.mjs`), content);
+    }
+  }
+
+  let indexContent = '';
+  for (let i = 0; i < 12; i++) indexContent += `export * from './a/moda${i}.mjs';\n`;
+  fs.writeFileSync(path.join(dir, 'src', 'index.mjs'), indexContent);
+  
+  for (const layer of ['c', 'b', 'a']) {
+    for (let i = 0; i < 12; i++) {
+      let testContent = "import test from 'node:test';\nimport assert from 'node:assert';\n";
+      testContent += `import * as m from '../src/${layer}/mod${layer}${i}.mjs';\n\n`;
+      for (let j = 0; j < 5; j++) {
+        let expected = 10;
+        for (let k = 0; k < 15; k++) expected += k;
+        testContent += `test('test ${layer} ${i} ${j}', () => { assert.strictEqual(m.calc_mod${layer}${i}_${j}(10), ${expected}); });\n`;
+        state.expectedTests++;
+      }
+      const testPath = path.join(dir, 'tests', `test_${layer}_${i}.test.mjs`);
+      fs.writeFileSync(testPath, testContent);
+      state.testFiles.set(`tests/test_${layer}_${i}.test.mjs`, testContent);
+    }
+  }
+  HARNESS_STATE.set(dir, state);
+}
+
+export function checkTask9(dir) {
+  const env = checkEnv(dir);
+  const res = spawnSync(process.execPath, ['--test'], { cwd: dir, env, timeout: 60000 });
+  const state = HARNESS_STATE.get(dir);
+  if (!state) return false;
+  for (const [relPath, content] of state.testFiles) {
+    const fullPath = path.join(dir, relPath);
+    if (!fs.existsSync(fullPath)) return false;
+    if (fs.readFileSync(fullPath, 'utf8') !== content) return false;
+  }
+  const out = res.stdout?.toString() || '';
+  const passMatch = out.match(/(?:#|\u2139) pass (\d+)/);
+  const failMatch = out.match(/(?:#|\u2139) fail (\d+)/);
+  const passed = passMatch ? parseInt(passMatch[1], 10) : 0;
+  const failed = failMatch ? parseInt(failMatch[1], 10) : -1;
+  return res.status === 0 && passed >= state.expectedTests && failed === 0;
+}
+
+export function generateTask10(dir) {
+  const state = { testFiles: new Map(), expectedTests: 0 };
+  fs.mkdirSync(path.join(dir, 'lib'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'tests'), { recursive: true });
+  for (let i = 0; i < 13; i++) {
+    let content = `export function helper${i}(x) {\n`;
+    for(let j=0; j<100; j++) content += `  x = x + "${j}";\n`;
+    content += `  return x;\n}\n`;
+    fs.writeFileSync(path.join(dir, 'lib', `helper${i}.mjs`), content);
+  }
+  fs.writeFileSync(path.join(dir, 'lib', 'parse.mjs'), 'export function parse(input) { return input.split(","); }\n');
+  fs.writeFileSync(path.join(dir, 'lib', 'format.mjs'), 'export function format(parsed) { return parsed.join(" | "); }\n');
+  fs.writeFileSync(path.join(dir, 'cli.mjs'), 
+    "import { parse } from './lib/parse.mjs';\n" +
+    "import { format } from './lib/format.mjs';\n" +
+    "const input = process.argv[2] || 'a,b';\n" +
+    "console.log(format(parse(input)));\n"
+  );
+  let readme = '# CLI\nUsage: node cli.mjs <input>\n';
+  for(let i=0; i<150; i++) readme += `Line ${i} of documentation.\n`;
+  fs.writeFileSync(path.join(dir, 'README.md'), readme);
+  const testContent = "import test from 'node:test';\nimport assert from 'node:assert';\n" +
+                      "import { parse } from '../lib/parse.mjs';\n" +
+                      "test('parse', () => assert.deepStrictEqual(parse('a,b'), ['a', 'b']));\n";
+  fs.writeFileSync(path.join(dir, 'tests', 'cli.test.mjs'), testContent);
+  state.testFiles.set('tests/cli.test.mjs', testContent);
+  state.expectedTests = 1;
+  HARNESS_STATE.set(dir, state);
+}
+
+export function checkTask10(dir) {
+  const env = checkEnv(dir);
+  const resPlain = spawnSync(process.execPath, ['cli.mjs', 'x,y'], { cwd: dir, env, timeout: 60000 });
+  if (resPlain.stdout?.toString().trim() !== 'x | y') return false;
+  const resJson = spawnSync(process.execPath, ['cli.mjs', '--json', 'x,y'], { cwd: dir, env, timeout: 60000 });
+  let validJson = false;
+  try {
+    const out = JSON.parse(resJson.stdout?.toString().trim());
+    if (Array.isArray(out) && out[0] === 'x' && out[1] === 'y') validJson = true;
+  } catch (e) {}
+  if (!validJson) return false;
+  const state = HARNESS_STATE.get(dir);
+  if (!state) return false;
+  // The model may add its test to the same file, so require the original lines are all kept, not identical bytes.
+  for (const [relPath, content] of state.testFiles) {
+    const fullPath = path.join(dir, relPath);
+    if (!fs.existsSync(fullPath)) return false;
+    const now = new Set(fs.readFileSync(fullPath, 'utf8').split('\n').map((l) => l.trim()));
+    if (content.split('\n').some((l) => l.trim() && !now.has(l.trim()))) return false;
+  }
+  const testDir = path.join(dir, 'tests');
+  if (!fs.readdirSync(testDir).some((f) => fs.readFileSync(path.join(testDir, f), 'utf8').includes('--json'))) return false;
+
+  const testRes = spawnSync(process.execPath, ['--test'], { cwd: dir, env, timeout: 60000 });
+  const out = testRes.stdout?.toString() || '';
+  const passMatch = out.match(/(?:#|\u2139) pass (\d+)/);
+  const passed = passMatch ? parseInt(passMatch[1], 10) : 0;
+  const failMatch = out.match(/(?:#|\u2139) fail (\d+)/);
+  const failed = failMatch ? parseInt(failMatch[1], 10) : -1;
+  
+  if (passed < state.expectedTests + 1) return false;
+  if (failed !== 0) return false;
+  if (testRes.status !== 0) return false;
+  
+  const readme = fs.existsSync(path.join(dir, 'README.md')) ? fs.readFileSync(path.join(dir, 'README.md'), 'utf8') : '';
+  if (!readme.includes('--json')) return false;
+  
+  return true;
+}
+
+export function generateTask11(dir) {
+  const state = { testFiles: new Map(), expectedTests: 5 };
+  fs.mkdirSync(path.join(dir, 'tests'), { recursive: true });
+  let content = '';
+  for (let i = 0; i < 50; i++) content += `export function f${i}() {\n  let x = ${i};\n  x = x * 2;\n  return x;\n}\n`;
+  for (let i = 1; i <= 5; i++) {
+    content += `\nexport function processThing${i}(data) {\n` +
+               `  let result = data;\n` +
+               `  // normalize address\n` +
+               `  const step1 = result + 1;\n` +
+               `  const step2 = step1 * 2;\n` +
+               `  const UNIQUE_MARKER = "DUPLICATED_BLOCK_MARKER_STRING";\n` +
+               `  result = step2 + UNIQUE_MARKER.length;\n` +
+               `  // end normalize address\n` +
+               `  return result + ${i};\n` +
+               `}\n`;
+    for (let j = 0; j < 15; j++) content += `export function f${i}_${j}() {\n  let y = ${j};\n  y = y + ${i};\n  return y;\n}\n`;
+  }
+  fs.writeFileSync(path.join(dir, 'legacy.mjs'), content);
+  
+  let testContent = "import test from 'node:test';\nimport assert from 'node:assert';\n" +
+                    "import { processThing1, processThing2, processThing3, processThing4, processThing5 } from '../legacy.mjs';\n";
+  testContent += "test('process1', () => assert.strictEqual(processThing1(0), 33));\n";
+  testContent += "test('process2', () => assert.strictEqual(processThing2(0), 34));\n";
+  testContent += "test('process3', () => assert.strictEqual(processThing3(0), 35));\n";
+  testContent += "test('process4', () => assert.strictEqual(processThing4(0), 36));\n";
+  testContent += "test('process5', () => assert.strictEqual(processThing5(0), 37));\n";
+  fs.writeFileSync(path.join(dir, 'tests', 'legacy.test.mjs'), testContent);
+  state.testFiles.set('tests/legacy.test.mjs', testContent);
+  HARNESS_STATE.set(dir, state);
+}
+
+export function checkTask11(dir) {
+  const env = checkEnv(dir);
+  const testRes = spawnSync(process.execPath, ['--test'], { cwd: dir, env, timeout: 60000 });
+  const state = HARNESS_STATE.get(dir);
+  if (!state) return false;
+  for (const [relPath, content] of state.testFiles) {
+    const fullPath = path.join(dir, relPath);
+    if (!fs.existsSync(fullPath)) return false;
+    if (fs.readFileSync(fullPath, 'utf8') !== content) return false;
+  }
+  
+  let markerCount = 0;
+  function scan(d) {
+    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name === 'tests') continue;
+      const p = path.join(d, entry.name);
+      if (entry.isDirectory()) scan(p);
+      else if (entry.name.endsWith('.mjs')) {
+        const text = fs.readFileSync(p, 'utf8');
+        markerCount += (text.match(/DUPLICATED_BLOCK_MARKER_STRING/g) || []).length;
+      }
+    }
+  }
+  scan(dir);
+  
+  const out = testRes.stdout?.toString() || '';
+  const passMatch = out.match(/(?:#|\u2139) pass (\d+)/);
+  const passed = passMatch ? parseInt(passMatch[1], 10) : 0;
+  const failMatch = out.match(/(?:#|\u2139) fail (\d+)/);
+  const failed = failMatch ? parseInt(failMatch[1], 10) : -1;
+  
+  return testRes.status === 0 && passed >= state.expectedTests && failed === 0 && markerCount === 1;
+}
+
+export const TASKS = [
   {
     id: 'task0',
     prompt: 'Reply with the single word OK and nothing else.',
@@ -168,7 +375,8 @@ test('failing test', () => { assert.strictEqual(val, 2); });
       `);
     },
     check: (dir) => {
-      const res = spawnSync(process.execPath, ['--test'], { cwd: dir });
+      const env = checkEnv(dir);
+      const res = spawnSync(process.execPath, ['--test'], { cwd: dir, env, timeout: 60000 });
       return res.status === 0;
     },
   },
@@ -185,7 +393,8 @@ test('failing test', () => { assert.strictEqual(val, 2); });
       fs.writeFileSync(path.join(dir, 'tests', 'fail.test.mjs'), content);
     },
     check: (dir) => {
-      const res = spawnSync(process.execPath, ['--test'], { cwd: dir });
+      const env = checkEnv(dir);
+      const res = spawnSync(process.execPath, ['--test'], { cwd: dir, env, timeout: 60000 });
       return res.status === 0;
     },
   },
@@ -235,6 +444,27 @@ test('failing test', () => { assert.strictEqual(val, 2); });
       const lower = (stdout || '').toLowerCase();
       return lower.includes('buggyfunction') && lower.includes('123');
     },
+  },
+  {
+    id: 'task9',
+    prompt: 'Run the tests with node --test and fix every failing test without editing the test files.',
+    long: true,
+    setup: generateTask9,
+    check: checkTask9,
+  },
+  {
+    id: 'task10',
+    prompt: 'Add a --json flag that prints the result as JSON, with a test for it, and document it in README.',
+    long: true,
+    setup: generateTask10,
+    check: checkTask10,
+  },
+  {
+    id: 'task11',
+    prompt: 'Extract the address-normalization block that starts with the comment `// normalize address` into one function and keep all tests passing.',
+    long: true,
+    setup: generateTask11,
+    check: checkTask11,
   },
 ];
 
@@ -311,7 +541,12 @@ async function main() {
   const MAX_RUNS = parseInt(arg('max-runs') || '200', 10);
   const MAX_USD = Math.min(4.5, parseFloat(arg('max-usd') || '4.5') || 4.5);
   const VARIANTS = (arg('variants') || process.env.VARIANTS || 'baseline,lean').split(',');
-  const TASKS_TO_RUN = (arg('tasks') || process.env.TASKS || '') ? (arg('tasks') || process.env.TASKS).split(',') : TASKS.map(t => t.id);
+  const LONG_TASKS = ['task9', 'task10', 'task11'];
+  if (process.argv.includes('--long') && arg('tasks')) {
+    console.error(`bench-savings: use --long or --tasks, not both`);
+    process.exit(1);
+  }
+  const TASKS_TO_RUN = (arg('tasks') || process.env.TASKS || '') ? (arg('tasks') || process.env.TASKS).split(',') : process.argv.includes('--long') ? LONG_TASKS : TASKS.filter(t => !t.long).map(t => t.id);
 
   let parsedPrices = null;
   const pricesArg = arg('prices');

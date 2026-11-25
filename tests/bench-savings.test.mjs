@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseTokenUsage, finalText, keySpend, redactKey, checkQuotaError, getStats, generateChart, renderResultsMarkdown, priceUsage } from './bench-savings.mjs';
+import { parseTokenUsage, finalText, keySpend, redactKey, checkQuotaError, getStats, generateChart, renderResultsMarkdown, priceUsage, TASKS, checkEnv } from './bench-savings.mjs';
 import { doctor } from '../scripts/lib/doctor.mjs';
 import { buildSummary } from '../scripts/lib/summary-data.mjs';
 import { renderSummary } from '../scripts/lib/summary-html.mjs';
@@ -266,4 +266,188 @@ test('renderResultsMarkdown variants table and overhead, and prices', () => {
   assert.match(mdPrices, /Priced Cost uses 1,0,0,1 USD per 1M tokens/);
   assert.match(mdPrices, /\| Task \| Mode \| Pass Rate \| Median In \| IQR In \| Median Out \| Median Turns \| Median Time \| Cost \| Priced Cost \|/);
   assert.match(mdPrices, /\| task0 \| baseline \| 100% \| 100 \| 100-100 \| 5 \| 1 \| 500ms \| \$0.0000 \| \$0.0010 \|/);
+});
+
+test('bench-savings --long and --tasks conflict', () => {
+  const home = path.join(os.tmpdir(), `bench-long-conflict-${Date.now()}`);
+  fs.mkdirSync(home, { recursive: true });
+
+  const res = spawnSync(process.execPath, [
+    path.join(ROOT, 'tests', 'bench-savings.mjs'),
+    '--home', home,
+    '--long',
+    '--tasks', 'task9'
+  ], { encoding: 'utf8' });
+  
+  assert.strictEqual(res.status, 1);
+  assert.match(res.stderr, /bench-savings: use --long or --tasks, not both/);
+  
+  fs.rmSync(home, { recursive: true, force: true });
+});
+
+test('bench-savings task9 check function', () => {
+  const task = TASKS.find(t => t.id === 'task9');
+  const dir = path.join(os.tmpdir(), `bench-task9-${Date.now()}`);
+  fs.mkdirSync(dir, { recursive: true });
+  task.setup(dir);
+  
+  // untouched should fail
+  assert.strictEqual(task.check(dir), false);
+  
+  // apply fix
+  for (const layer of ['c', 'b', 'a']) {
+    for (let i = 0; i < 12; i++) {
+      const p = path.join(dir, 'src', layer, `mod${layer}${i}.mjs`);
+      let content = fs.readFileSync(p, 'utf8');
+      content = content.replace(/  return res - 1; \/\/ bug/g, '  return res;');
+      fs.writeFileSync(p, content);
+    }
+  }
+  
+  // now it should pass
+  assert.strictEqual(task.check(dir), true);
+
+  // gaming 1: test file edited
+  const testP = path.join(dir, 'tests', 'test_a_0.test.mjs');
+  const oldTest = fs.readFileSync(testP, 'utf8');
+  fs.writeFileSync(testP, oldTest + '\n// comment');
+  assert.strictEqual(task.check(dir), false);
+  fs.writeFileSync(testP, oldTest);
+  
+  // gaming 2: test file deleted
+  fs.unlinkSync(testP);
+  assert.strictEqual(task.check(dir), false);
+  
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('bench-savings task10 check function', () => {
+  const task = TASKS.find(t => t.id === 'task10');
+  const dir = path.join(os.tmpdir(), `bench-task10-${Date.now()}`);
+  fs.mkdirSync(dir, { recursive: true });
+  task.setup(dir);
+  
+  assert.strictEqual(task.check(dir), false);
+  
+  fs.writeFileSync(path.join(dir, 'cli.mjs'), "import { parse } from './lib/parse.mjs';\n" +
+                                              "import { format } from './lib/format.mjs';\n" +
+                                              "const input = process.argv[process.argv.indexOf('--json') > -1 ? 3 : 2] || 'a,b';\n" +
+                                              "const parsed = parse(input);\n" +
+                                              "if (process.argv.includes('--json')) {\n" +
+                                              "  console.log(JSON.stringify(parsed));\n" +
+                                              "} else {\n" +
+                                              "  console.log(format(parsed));\n" +
+                                              "}\n");
+  fs.writeFileSync(path.join(dir, 'tests', 'json.test.mjs'), "import test from 'node:test';\nimport assert from 'node:assert';\ntest('--json prints JSON', () => { assert.strictEqual(1, 1); });\n");
+  const readmeContent = fs.readFileSync(path.join(dir, 'README.md'), 'utf8');
+  fs.writeFileSync(path.join(dir, 'README.md'), readmeContent + '\nSupports --json flag\n');
+  
+  assert.strictEqual(task.check(dir), true);
+
+  // gaming: original tests replaced by trivial ones
+  const cliTest = path.join(dir, 'tests', 'cli.test.mjs');
+  const origCliTest = fs.readFileSync(cliTest, 'utf8');
+  fs.writeFileSync(cliTest, "import test from 'node:test';\n" + "test('a', () => {});\n".repeat(20));
+  assert.strictEqual(task.check(dir), false);
+  fs.writeFileSync(cliTest, origCliTest);
+  assert.strictEqual(task.check(dir), true);
+
+  // gaming: always-JSON cli
+  fs.writeFileSync(path.join(dir, 'cli.mjs'), "import { parse } from './lib/parse.mjs';\n" +
+                                              "import { format } from './lib/format.mjs';\n" +
+                                              "const input = process.argv[3] || 'a,b';\n" +
+                                              "console.log(JSON.stringify(parse(input)));\n");
+  assert.strictEqual(task.check(dir), false);
+  
+  // gaming: tests deleted
+  fs.unlinkSync(path.join(dir, 'tests', 'cli.test.mjs'));
+  assert.strictEqual(task.check(dir), false);
+  
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('bench-savings task11 check function', () => {
+  const task = TASKS.find(t => t.id === 'task11');
+  const dir = path.join(os.tmpdir(), `bench-task11-${Date.now()}`);
+  fs.mkdirSync(dir, { recursive: true });
+  task.setup(dir);
+  
+  assert.strictEqual(task.check(dir), false);
+  
+  let content = fs.readFileSync(path.join(dir, 'legacy.mjs'), 'utf8');
+  content = `export function shared(result) {
+  const step1 = result + 1;
+  const step2 = step1 * 2;
+  const UNIQUE_MARKER = "DUPLICATED_BLOCK_MARKER_STRING";
+  return step2 + UNIQUE_MARKER.length;
+}\n` + content;
+
+  for (let i = 1; i <= 5; i++) {
+    content = content.replace(
+      `  // normalize address\n` +
+      `  const step1 = result + 1;\n` +
+      `  const step2 = step1 * 2;\n` +
+      `  const UNIQUE_MARKER = "DUPLICATED_BLOCK_MARKER_STRING";\n` +
+      `  result = step2 + UNIQUE_MARKER.length;\n` +
+      `  // end normalize address`,
+      `  result = shared(result);`
+    );
+  }
+  fs.writeFileSync(path.join(dir, 'legacy.mjs'), content);
+  
+  assert.strictEqual(task.check(dir), true);
+  
+  // gaming: processThing function deleted
+  content = content.replace(/export function processThing1\(data\) \{[\s\S]*?\n\}/, '');
+  fs.writeFileSync(path.join(dir, 'legacy.mjs'), content);
+  // Tests should fail because processThing1 doesn't exist
+  assert.strictEqual(task.check(dir), false);
+  
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('bench-savings checkEnv has no OPENROUTER_API_KEY even when it is set', () => {
+  process.env.OPENROUTER_API_KEY = 'secret';
+  const env = checkEnv('/tmp');
+  assert.strictEqual(env.OPENROUTER_API_KEY, undefined);
+  assert.strictEqual(env.HOME, '/tmp');
+  assert.strictEqual(env.NODE_OPTIONS, '');
+  assert.ok(env.PATH !== undefined);
+});
+
+test('bench-savings fixture generation is deterministic and task9 is large', () => {
+  const task = TASKS.find(t => t.id === 'task9');
+  
+  const dir1 = path.join(os.tmpdir(), `bench-task9-det1-${Date.now()}`);
+  const dir2 = path.join(os.tmpdir(), `bench-task9-det2-${Date.now()}`);
+  fs.mkdirSync(dir1, { recursive: true });
+  fs.mkdirSync(dir2, { recursive: true });
+  
+  task.setup(dir1);
+  task.setup(dir2);
+  
+  let totalLines = 0;
+  function scan(d1, d2) {
+    const f1 = fs.readdirSync(d1);
+    const f2 = fs.readdirSync(d2);
+    assert.deepStrictEqual(f1.sort(), f2.sort());
+    for (const name of f1) {
+      const p1 = path.join(d1, name);
+      const p2 = path.join(d2, name);
+      const stat = fs.statSync(p1);
+      if (stat.isDirectory()) scan(p1, p2);
+      else {
+        const text1 = fs.readFileSync(p1, 'utf8');
+        const text2 = fs.readFileSync(p2, 'utf8');
+        assert.strictEqual(text1, text2);
+        totalLines += text1.split('\n').length;
+      }
+    }
+  }
+  scan(dir1, dir2);
+  
+  assert.ok(totalLines >= 2500, `fixture should be at least 2500 lines, was ${totalLines}`);
+  
+  fs.rmSync(dir1, { recursive: true, force: true });
+  fs.rmSync(dir2, { recursive: true, force: true });
 });
