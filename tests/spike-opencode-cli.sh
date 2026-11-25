@@ -13,13 +13,22 @@ export HOME
 mkdir -p "$HOME" "$T/proj"
 export OPENCODE_DISABLE_AUTOUPDATE=1
 fail=0
+MOCK_PID="" DENY_PID=""
+# The OpenCode service is found by port, not by HOME, so only CI stops it (a local run could stop the owner's own service).
+# shellcheck disable=SC2329 # called through the trap
+cleanup() {
+  kill "$MOCK_PID" "$DENY_PID" 2>/dev/null
+  if [ -n "${GITHUB_ACTIONS:-}" ]; then opencode service stop >/dev/null 2>&1; fi
+  rm -rf "$T"
+}
+trap cleanup EXIT
 
 run_to() {
   local secs=$1; shift
   "$@" & local pid=$!
   local i=0
   while kill -0 "$pid" 2>/dev/null && [ "$i" -lt "$secs" ]; do sleep 1; i=$((i + 1)); done
-  if kill -0 "$pid" 2>/dev/null; then kill "$pid" 2>/dev/null; return 124; fi
+  if kill -0 "$pid" 2>/dev/null; then kill "$pid" 2>/dev/null; sleep 2; kill -9 "$pid" 2>/dev/null; return 124; fi
   wait "$pid"
 }
 # types <file>: distinct JSON event types, in first-seen order, comma separated.
@@ -61,7 +70,6 @@ JS
 node "$T/deny.mjs" >"$T/deny.log" 2>&1 &
 DENY_PID=$!
 disown "$DENY_PID"
-trap 'kill "$MOCK_PID" "$DENY_PID" 2>/dev/null; rm -rf "$T"' EXIT
 port=""; dport=""
 for _ in 1 2 3 4 5 6 7 8 9 10; do
   port="$(sed -n 's/^MOCK_LLM_PORT=//p' "$T/mock.log" | head -1)"
