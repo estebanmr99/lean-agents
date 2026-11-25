@@ -15,8 +15,8 @@ export class Policy {
       this.readOnlyHints.set(server, map);
     }
     for (const t of toolsList) {
-      const ro = t.annotations && t.annotations.readOnlyHint;
-      map.set(t.name, Boolean(ro));
+      const ro = t.annotations && t.annotations.readOnlyHint === true;
+      map.set(t.name, ro);
     }
   }
 

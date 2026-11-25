@@ -52,5 +52,19 @@ export async function loadConfig(configPath) {
     }
   }
 
+  const enforceLimit = (val, def) => {
+    if (typeof val === 'number' && Number.isFinite(val) && val > 0) {
+      return val;
+    }
+    return def;
+  };
+
+  parsed.memoryLimit = enforceLimit(parsed.memoryLimit, 64 * 1024 * 1024);
+  parsed.stackSize = enforceLimit(parsed.stackSize, 512 * 1024);
+  parsed.wallTime = enforceLimit(parsed.wallTime, 15000);
+  parsed.callLimit = enforceLimit(parsed.callLimit, 25);
+  parsed.resultCap = enforceLimit(parsed.resultCap, 20000);
+  parsed.sessionBudget = enforceLimit(parsed.sessionBudget, 500);
+
   return parsed;
 }

@@ -30,17 +30,19 @@ function buildEnv(entryEnv) {
   return env;
 }
 
-function killTree(cp) {
+function killTree(cp, force = false) {
   let exited = false;
   cp.on('exit', () => { exited = true; });
   if (process.platform === 'win32') {
     const killer = spawn('taskkill', ['/pid', String(cp.pid), '/f', '/t'], { stdio: 'ignore' });
     killer.on('error', () => {});
   } else {
-    cp.kill('SIGTERM');
-    setTimeout(() => {
-      if (!exited) cp.kill('SIGKILL');
-    }, 2000).unref();
+    cp.kill(force ? 'SIGKILL' : 'SIGTERM');
+    if (!force) {
+      setTimeout(() => {
+        if (!exited) cp.kill('SIGKILL');
+      }, 2000).unref();
+    }
   }
 }
 
@@ -51,17 +53,17 @@ export class UpstreamManager {
     this.inFlightCalls = 0;
   }
 
-  async startAll(config) {
+  async startAll(config, auditLog) {
     const promises = [];
     if (!config || !config.mcpServers) return;
 
     for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
-      promises.push(this.startOne(name, serverConfig));
+      promises.push(this.startOne(name, serverConfig, auditLog));
     }
     await Promise.allSettled(promises);
   }
 
-  async startOne(name, config) {
+  async startOne(name, config, auditLog) {
     return new Promise((resolve) => {
       let command = config.command;
       const args = config.args || [];
@@ -78,6 +80,16 @@ export class UpstreamManager {
           stdio: ['pipe', 'pipe', 'pipe']
         });
         cp.stdin.on('error', () => {});
+        
+        if (cp.stderr && auditLog) {
+          cp.stderr.setEncoding('utf8');
+          cp.stderr.on('data', (chunk) => {
+            const lines = chunk.split('\n');
+            for (const line of lines) {
+              if (line.trim()) auditLog.logStderr(name, line);
+            }
+          });
+        }
       } catch (err) {
         this.upstreams.set(name, { status: 'unavailable', reason: err.message });
         return resolve();
@@ -282,7 +294,7 @@ export class UpstreamManager {
   killAll() {
     for (const upstream of this.upstreams.values()) {
       if (upstream.cp && !upstream.cp.killed) {
-        killTree(upstream.cp);
+        killTree(upstream.cp, true);
       }
     }
   }

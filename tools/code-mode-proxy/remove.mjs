@@ -26,7 +26,7 @@ async function main() {
   }
 
   const home = os.homedir();
-  const stateDir = process.env.LEAN_STATE_DIR || path.join(home, '.config', 'lean-agents');
+  const stateDir = path.join(home, '.config', 'lean-agents');
   
   let realStateDir;
   try {

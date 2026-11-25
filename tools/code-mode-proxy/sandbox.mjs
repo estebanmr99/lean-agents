@@ -144,7 +144,9 @@ export class Sandbox {
             // But we can extract the error message.
             const errDump = context.dump(stringifiedHandle.error);
             stringifiedHandle.error.dispose();
-            return { error: context.newError(typeof errDump === 'object' ? errDump.message : String(errDump)) };
+            let errMsg = typeof errDump === 'object' ? errDump.message : String(errDump);
+            if (errMsg && errMsg.length > this.resultCap) errMsg = errMsg.slice(0, this.resultCap) + '\n...[cut by proxy: result exceeded cap]';
+            return { error: context.newError(errMsg) };
           }
           
           const argsStr = context.getString(stringifiedHandle.value);
@@ -220,12 +222,18 @@ export class Sandbox {
             .catch(err => {
               if (isClosed) return;
               pendingPromises.delete(promiseHandle);
+              
+              let errMsg = err.message || String(err);
+              if (errMsg.length > this.resultCap) {
+                errMsg = errMsg.slice(0, this.resultCap) + '\n...[cut by proxy: result exceeded cap]';
+              }
+
               auditLog.logCall({
                 scriptSha256, count: callCount, server: serverName, tool: t.name,
-                duration: Date.now() - callStart, ok: false, blocked: false, error: err.message, args: argsStr
+                duration: Date.now() - callStart, ok: false, blocked: false, error: errMsg, args: argsStr
               });
 
-              const errHandle = context.newError(err.message);
+              const errHandle = context.newError(errMsg);
               promiseHandle.reject(errHandle);
               errHandle.dispose();
               if (typeof promiseHandle.resolve.dispose === 'function') promiseHandle.resolve.dispose();
@@ -271,8 +279,16 @@ export class Sandbox {
         return str;
       };
 
+      const processError = (errDump) => {
+        let str = String(errDump?.message || errDump);
+        if (str && str.length > this.resultCap) {
+          str = str.slice(0, this.resultCap) + '\n...[cut by proxy: result exceeded cap]';
+        }
+        return str;
+      };
+
       if (evalRes.error) {
-        finalResult = { error: String(context.dump(evalRes.error)?.message || context.dump(evalRes.error)) };
+        finalResult = { error: processError(context.dump(evalRes.error)) };
         evalRes.error.dispose();
       } else {
         const val = evalRes.value;
@@ -286,7 +302,7 @@ export class Sandbox {
             if (res.error) {
               const errDump = context.dump(res.error);
               res.error.dispose();
-              return { error: String(errDump?.message || errDump) };
+              return { error: processError(errDump) };
             } else {
               const dumped = processResult(res.value);
               res.value.dispose();
