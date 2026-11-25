@@ -8,6 +8,8 @@ on:
     paths:
       - tests/spike-opencode-cli.sh
       - .github/workflows/spike-opencode-cli.yml
+      - tests/fixtures/mock-llm.mjs
+      - scripts/ci-install-opencode-v2.sh
 
 permissions:
   contents: read

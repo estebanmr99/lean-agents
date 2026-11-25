@@ -384,8 +384,8 @@ Checked 2026-11-03. lean-agents does not add a Gemini CLI adapter: upstream says
 | `run --standalone` | yes |
 | Mock model answers | exit 0, events `step_start,tool_use,step_finish,text`, `sessionID` present |
 | Unknown model / unknown provider | exit 1, `error` event `provider.no-route` |
-| Provider answers 403 (spend cap shape) | exit 1, `step_start` then `error` `provider.auth 403` with the body message |
-| Provider port closed | exit 1, `step_start` then `error` |
+| Provider answers 403 (spend cap shape) | exit 1, `step_start` and `error` `provider.auth 403` with the body message (order varies by OS) |
+| Provider port closed | exit 1 after about 85 s of retries, `step_start` then `error` `provider.transport ECONNREFUSED` |
 | Empty prompt | exit 1, "You must provide a message" |
 
 - **For a coordinator:** exit code and the `error` event are reliable failure signals; a run can emit `step_start` before failing, so "started" does not mean "working". Piping `opencode run` through `tee` hides the exit code unless the shell uses `pipefail`.
