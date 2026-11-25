@@ -71,7 +71,10 @@ export function parseTokenUsage(out) {
   let inputTokens = 0;
   let outputTokens = 0;
   let cacheTokens = 0;
+  let cacheRead = 0;
+  let cacheWrite = 0;
   let cost = 0;
+  let turns = 0;
   for (const line of out.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed.startsWith('{')) continue;
@@ -83,16 +86,36 @@ export function parseTokenUsage(out) {
         inputTokens += (ev.inputTokens || 0);
         outputTokens += (ev.outputTokens || 0);
       } else if (/^step[-_]finish$/.test(ev.type)) {
+        turns += 1;
         const part = ev.part && ev.part.tokens ? ev.part : ev;
         const t = part.tokens || {};
         inputTokens += (t.input || 0);
         outputTokens += (t.output || 0) + (t.reasoning || 0);
-        cacheTokens += typeof t.cache === 'number' ? t.cache : ((t.cache?.read || 0) + (t.cache?.write || 0));
+        // A bare number has no read/write split; count it as read (the cheaper, common case).
+        if (typeof t.cache === 'number') {
+          cacheRead += t.cache;
+          cacheTokens += t.cache;
+        } else {
+          cacheRead += (t.cache?.read || 0);
+          cacheWrite += (t.cache?.write || 0);
+          cacheTokens += (t.cache?.read || 0) + (t.cache?.write || 0);
+        }
         if (typeof part.cost === 'number') cost += part.cost;
       }
     } catch {}
   }
-  return { inputTokens, outputTokens, cacheTokens, cost };
+  return { inputTokens, outputTokens, cacheTokens, cacheRead, cacheWrite, cost, turns };
+}
+
+// VERIFY: whether tokens.input already excludes cached tokens (check OpenCode docs).
+export function priceUsage(usage, prices) {
+  return (
+    ((usage.inputTokens || 0) * (prices.in || 0) +
+      (usage.cacheRead || 0) * (prices.cacheRead || 0) +
+      (usage.cacheWrite || 0) * (prices.cacheWrite || 0) +
+      (usage.outputTokens || 0) * (prices.out || 0)) /
+    1e6
+  );
 }
 
 const TASKS = [
@@ -216,13 +239,22 @@ test('failing test', () => { assert.strictEqual(val, 2); });
 ];
 
 // Exported for tests
-export function renderResultsMarkdown(summary, variants, totalCost = 0) {
+export function renderResultsMarkdown(summary, variants, totalCost = 0, prices = null) {
   let md = '| Task | Mode | Pass Rate | Median In | IQR In | Median Out | Median Time | Cost |\n';
-  md += '|---|---|---|---|---|---|---|---|\n';
+  if (prices) {
+    md = '| Task | Mode | Pass Rate | Median In | IQR In | Median Out | Median Turns | Median Time | Cost | Priced Cost |\n';
+    md += '|---|---|---|---|---|---|---|---|---|---|\n';
+  } else {
+    md += '|---|---|---|---|---|---|---|---|\n';
+  }
   for (const s of summary) {
     const iqrIn = `${s.in.p25.toFixed(0)}-${s.in.p75.toFixed(0)}`;
     const stableMark = s.stable ? ' ★' : '';
-    md += `| ${s.task} | ${s.mode} | ${(s.passRate * 100).toFixed(0)}% | ${s.in.median.toFixed(0)}${stableMark} | ${iqrIn} | ${s.out.median.toFixed(0)} | ${s.time.median.toFixed(0)}ms | $${s.totalCost.toFixed(4)} |\n`;
+    if (prices) {
+      md += `| ${s.task} | ${s.mode} | ${(s.passRate * 100).toFixed(0)}% | ${s.in.median.toFixed(0)}${stableMark} | ${iqrIn} | ${s.out.median.toFixed(0)} | ${s.turns.median.toFixed(0)} | ${s.time.median.toFixed(0)}ms | $${s.totalCost.toFixed(4)} | $${s.totalPricedCost.toFixed(4)} |\n`;
+    } else {
+      md += `| ${s.task} | ${s.mode} | ${(s.passRate * 100).toFixed(0)}% | ${s.in.median.toFixed(0)}${stableMark} | ${iqrIn} | ${s.out.median.toFixed(0)} | ${s.time.median.toFixed(0)}ms | $${s.totalCost.toFixed(4)} |\n`;
+    }
   }
 
   // Variants table
@@ -266,6 +298,7 @@ export function renderResultsMarkdown(summary, variants, totalCost = 0) {
     md += `\nlean vs baseline: input tokens ${avgPctSaved >= 0 ? '-' : '+'}${Math.abs(avgPctSaved).toFixed(1)}% (median over tasks)\n`;
   }
   md += `\nTotal cost: $${totalCost.toFixed(4)}\n`;
+  if (prices) md += `\nPriced Cost uses ${prices.in},${prices.cacheRead},${prices.cacheWrite},${prices.out} USD per 1M tokens (in, cache read, cache write, out) and assumes input excludes cached tokens (VERIFY).\n`;
   return md;
 }
 
@@ -279,6 +312,18 @@ async function main() {
   const MAX_USD = Math.min(4.5, parseFloat(arg('max-usd') || '4.5') || 4.5);
   const VARIANTS = (arg('variants') || process.env.VARIANTS || 'baseline,lean').split(',');
   const TASKS_TO_RUN = (arg('tasks') || process.env.TASKS || '') ? (arg('tasks') || process.env.TASKS).split(',') : TASKS.map(t => t.id);
+
+  let parsedPrices = null;
+  const pricesArg = arg('prices');
+  if (process.argv.includes('--prices')) {
+    const raw = (pricesArg || '').split(',');
+    const parts = raw.map(Number);
+    if (raw.length !== 4 || raw.some(p => !/^\d+(\.\d+)?$/.test(p.trim()))) {
+      console.error(`bench-savings: --prices needs 4 numbers: in,cacheRead,cacheWrite,out`);
+      process.exit(1);
+    }
+    parsedPrices = { in: parts[0], cacheRead: parts[1], cacheWrite: parts[2], out: parts[3] };
+  }
 
   // No rtk-only or context-mode-only variant: on OpenCode 2 lean installs nothing for rtk (#179), so those equal rules and lean.
   const ALLOWED_VARIANTS = ['baseline', 'rules', 'lean'];
@@ -409,6 +454,7 @@ async function main() {
         }
 
         const usage = parseTokenUsage(res.stdout || '');
+        const pricedCost = parsedPrices ? priceUsage(usage, parsedPrices) : null;
         // Event types only (no content), so a wrong parser shows up in the log.
         const types = [...new Set((res.stdout || '').split('\n').map((l) => { try { return JSON.parse(l).type; } catch { return null; } }).filter(Boolean))];
         
@@ -438,7 +484,11 @@ async function main() {
           inputTokens: usage.inputTokens,
           outputTokens: usage.outputTokens,
           cacheTokens: usage.cacheTokens,
+          cacheRead: usage.cacheRead,
+          cacheWrite: usage.cacheWrite,
+          turns: usage.turns,
           cost: usage.cost,
+          pricedCost,
           wallTime,
         });
       }
@@ -465,9 +515,11 @@ async function main() {
           passRate: taskResults.filter(r => r.pass).length / taskResults.length,
           in: getStats(taskResults.map(r => r.inputTokens)),
           out: getStats(taskResults.map(r => r.outputTokens)),
+          turns: getStats(taskResults.map(r => r.turns)),
           cost: getStats(taskResults.map(r => r.cost)),
           time: getStats(taskResults.map(r => r.wallTime)),
           totalCost: taskResults.reduce((sum, r) => sum + r.cost, 0),
+          totalPricedCost: parsedPrices ? taskResults.reduce((sum, r) => sum + r.pricedCost, 0) : null,
         });
       }
     }
@@ -492,13 +544,14 @@ async function main() {
       runUrl,
       repeats: REPEATS,
       variants: VARIANTS,
+      prices: parsedPrices,
       totalInput,
       tasks: summary,
       raw: results
     };
     fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(resultsJson, null, 2));
     
-    const md = renderResultsMarkdown(summary, VARIANTS, totalCost);
+    const md = renderResultsMarkdown(summary, VARIANTS, totalCost, parsedPrices);
     fs.writeFileSync(path.join(OUT, 'results.md'), md);
 
     // SVG Chart only if baseline and lean are present

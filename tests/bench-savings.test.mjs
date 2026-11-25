@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseTokenUsage, finalText, keySpend, redactKey, checkQuotaError, getStats, generateChart, renderResultsMarkdown } from './bench-savings.mjs';
+import { parseTokenUsage, finalText, keySpend, redactKey, checkQuotaError, getStats, generateChart, renderResultsMarkdown, priceUsage } from './bench-savings.mjs';
 import { doctor } from '../scripts/lib/doctor.mjs';
 import { buildSummary } from '../scripts/lib/summary-data.mjs';
 import { renderSummary } from '../scripts/lib/summary-html.mjs';
@@ -50,18 +50,34 @@ test('getStats on known arrays', () => {
   assert.strictEqual(s2.median, 15);
 });
 
-test('parseTokenUsage extracts tokens from OpenCode 2 JSON format', () => {
+test('parseTokenUsage extracts tokens from OpenCode 2 JSON format, counts turns, and splits cache', () => {
   const out = `
 Some text
 {"type":"message","content":"hello"}
 {"type":"usage","inputTokens":150,"outputTokens":45}
 {"type":"step-finish","tokens":{"input":10,"output":5,"cache":20},"cost":0.001}
+{"type":"step-finish","tokens":{"input":5,"output":2,"cache":{"read":15,"write":5}},"cost":0.002}
   `;
   const res = parseTokenUsage(out);
-  assert.strictEqual(res.inputTokens, 160);
-  assert.strictEqual(res.outputTokens, 50);
-  assert.strictEqual(res.cacheTokens, 20);
-  assert.strictEqual(res.cost, 0.001);
+  assert.strictEqual(res.inputTokens, 165);
+  assert.strictEqual(res.outputTokens, 52);
+  assert.strictEqual(res.cacheTokens, 40); // 20 + 15 + 5
+  assert.strictEqual(res.cacheRead, 35);   // 20 + 15
+  assert.strictEqual(res.cacheWrite, 5);
+  assert.strictEqual(res.cost, 0.003);
+  assert.strictEqual(res.turns, 2);
+});
+
+test('priceUsage calculates priced cost correctly and defaults missing keys to 0', () => {
+  const usage = { inputTokens: 100, cacheRead: 50, cacheWrite: 20, outputTokens: 10 };
+  
+  const p1 = priceUsage(usage, { in: 3, cacheRead: 1.5, cacheWrite: 3, out: 15 });
+  // (100*3 + 50*1.5 + 20*3 + 10*15) / 1e6 = (300 + 75 + 60 + 150) / 1e6 = 585 / 1e6 = 0.000585
+  assert.strictEqual(p1, 0.000585);
+
+  const p2 = priceUsage(usage, { in: 3, out: 15 }); // missing cacheRead, cacheWrite
+  // (100*3 + 50*0 + 20*0 + 10*15) / 1e6 = 450 / 1e6 = 0.00045
+  assert.strictEqual(p2, 0.00045);
 });
 
 test('bench-savings budget guards', async (t) => {
@@ -182,7 +198,7 @@ test('redactKey removes every copy of the key', () => {
 
 test('parseTokenUsage reads step_finish with a nested part and cache object', () => {
   const ev = { type: 'step_finish', part: { type: 'step-finish', tokens: { input: 100, output: 20, reasoning: 5, cache: { read: 7, write: 3 } }, cost: 0.002 } };
-  assert.deepStrictEqual(parseTokenUsage(JSON.stringify(ev)), { inputTokens: 100, outputTokens: 25, cacheTokens: 10, cost: 0.002 });
+  assert.deepStrictEqual(parseTokenUsage(JSON.stringify(ev)), { inputTokens: 100, outputTokens: 25, cacheTokens: 10, cacheRead: 7, cacheWrite: 3, cost: 0.002, turns: 1 });
 });
 
 test('finalText keeps assistant text and drops tool output', () => {
@@ -213,20 +229,41 @@ test('bench-savings variant and task parsing', () => {
   assert.strictEqual(res2.status, 2);
   assert.match(res2.stderr, /Unknown task: invalid/);
 
+  const res3 = spawnSync(process.execPath, [
+    path.join(ROOT, 'tests', 'bench-savings.mjs'),
+    '--home', home,
+    '--prices', '1,2,3'
+  ], { encoding: 'utf8' });
+  assert.strictEqual(res3.status, 1);
+  assert.match(res3.stderr, /bench-savings: --prices needs 4 numbers: in,cacheRead,cacheWrite,out/);
+  for (const bad of [[''], ['1,,2,3'], ['0x10,1,1,1'], []]) {
+    const r = spawnSync(process.execPath, [path.join(ROOT, 'tests', 'bench-savings.mjs'), '--home', home, '--prices', ...bad], { encoding: 'utf8' });
+    assert.strictEqual(r.status, 1, `--prices ${JSON.stringify(bad)}`);
+    assert.match(r.stderr, /--prices needs 4 numbers/);
+  }
+
   fs.rmSync(home, { recursive: true, force: true });
 });
 
-test('renderResultsMarkdown variants table and overhead', () => {
+test('renderResultsMarkdown variants table and overhead, and prices', () => {
   const summary = [
-    { task: 'task0', mode: 'baseline', in: { median: 100, p25: 100, p75: 100 }, out: { median: 5 }, time: { median: 500 }, passRate: 1, totalCost: 0 },
-    { task: 'task0', mode: 'lean', in: { median: 150, p25: 150, p75: 150 }, out: { median: 5 }, time: { median: 500 }, passRate: 1, totalCost: 0 },
-    { task: 'task1', mode: 'baseline', in: { median: 1000, p25: 1000, p75: 1000 }, out: { median: 50 }, time: { median: 2000 }, passRate: 1, totalCost: 0 },
-    { task: 'task1', mode: 'lean', in: { median: 800, p25: 800, p75: 800 }, out: { median: 50 }, time: { median: 2000 }, passRate: 0.9, totalCost: 0 }
+    { task: 'task0', mode: 'baseline', in: { median: 100, p25: 100, p75: 100 }, out: { median: 5 }, turns: { median: 1 }, time: { median: 500 }, passRate: 1, totalCost: 0, totalPricedCost: 0.001 },
+    { task: 'task0', mode: 'lean', in: { median: 150, p25: 150, p75: 150 }, out: { median: 5 }, turns: { median: 2 }, time: { median: 500 }, passRate: 1, totalCost: 0, totalPricedCost: 0.002 },
+    { task: 'task1', mode: 'baseline', in: { median: 1000, p25: 1000, p75: 1000 }, out: { median: 50 }, turns: { median: 1 }, time: { median: 2000 }, passRate: 1, totalCost: 0, totalPricedCost: 0.01 },
+    { task: 'task1', mode: 'lean', in: { median: 800, p25: 800, p75: 800 }, out: { median: 50 }, turns: { median: 1 }, time: { median: 2000 }, passRate: 0.9, totalCost: 0, totalPricedCost: 0.008 }
   ];
-  const md = renderResultsMarkdown(summary, ['baseline', 'lean'], 0.01);
-  assert.match(md, /### Variants Comparison/);
-  assert.match(md, /\| task0 \| 100 \| 150 \|/);
-  assert.match(md, /\| task1 \| 1000 \| 800 \(90%\) \|/);
-  assert.match(md, /\| \*\*Fixed overhead vs baseline \(task0\)\*\* \| 0 \| 50 \|/);
-  assert.match(md, /Total cost: \$0.0100/);
+  const mdNoPrices = renderResultsMarkdown(summary, ['baseline', 'lean'], 0.01);
+  assert.match(mdNoPrices, /### Variants Comparison/);
+  assert.match(mdNoPrices, /\| task0 \| 100 \| 150 \|/);
+  assert.match(mdNoPrices, /\| task1 \| 1000 \| 800 \(90%\) \|/);
+  assert.match(mdNoPrices, /\| \*\*Fixed overhead vs baseline \(task0\)\*\* \| 0 \| 50 \|/);
+  assert.match(mdNoPrices, /Total cost: \$0.0100/);
+  assert.match(mdNoPrices, /\| task0 \| baseline \| 100% \| 100 \| 100-100 \| 5 \| 500ms \| \$0.0000 \|/);
+  assert.doesNotMatch(mdNoPrices, /Median Turns/);
+  assert.doesNotMatch(mdNoPrices, /Priced Cost/);
+  
+  const mdPrices = renderResultsMarkdown(summary, ['baseline', 'lean'], 0.01, { in: 1, cacheRead: 0, cacheWrite: 0, out: 1 });
+  assert.match(mdPrices, /Priced Cost uses 1,0,0,1 USD per 1M tokens/);
+  assert.match(mdPrices, /\| Task \| Mode \| Pass Rate \| Median In \| IQR In \| Median Out \| Median Turns \| Median Time \| Cost \| Priced Cost \|/);
+  assert.match(mdPrices, /\| task0 \| baseline \| 100% \| 100 \| 100-100 \| 5 \| 1 \| 500ms \| \$0.0000 \| \$0.0010 \|/);
 });

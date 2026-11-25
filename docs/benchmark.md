@@ -37,6 +37,8 @@ node tests/bench-savings.mjs --home "$(mktemp -d)" --run --model <provider/model
 ```
 *Example: `--model google-vertex/gemini-3-flash-preview`*
 
+Add `--prices in,cacheRead,cacheWrite,out` (USD per million tokens, from the provider's price page) to get a cache-aware "Priced Cost" and a median turn count per task in the results.
+
 ### Results and Artifacts
 
 The benchmark produces several files in the `--out` directory:
