@@ -27,13 +27,13 @@ Repeat the same prompt for each session. Each session must leave the repository 
 - Negative checks in test scripts must not start with `! `: `set -e` ignores that. Use `refute` or `if`.
 - OpenCode 1 facts verified on 1.19.0: singular `agent` and `plugin`, flat `mcp`, `compaction.reserved`, `autoupdate`, `disabled_providers`. `opencode debug config` prints one object; `opencode agent list` lists agents. DCP now also installs on OpenCode 2, but lean-agents keeps it 1.x only; the notes in sections 6 and 14 saying it has no V2 release are out of date.
 - OpenCode 2 facts verified on 2.2.5: native keys are `agents` (not `agent`), top-level `policies`, `plugins`, `mcp.servers`, `compaction.buffer`, `update`, `share`. `opencode debug config` prints a JSON array of config sources (`{type, path, info}`); `opencode debug agents` lists agents.
-- The owner dropped the before/after savings claim (2026-11-03): the repo cannot show one, so the README "Why" has no numbers. `docs/launch.md`, `release.yml`, the banner, the demo GIF and the `assets` workflow exist. The 1.0.0 tag and release are the owner's step (checklist in the release prep PR).
+- The owner dropped the before/after savings claim (2026-11-03): the repo cannot show one, so the README "Why" has no numbers. `docs/launch.md`, `release.yml`, the banner, the demo GIF and the `assets` workflow exist. The release tags are the owner's step (checklist in the release prep PR).
 - Session 8 research is done (2026-11-03, Orca `v1.4.247`): `docs/compatibility.md` "Terminals". Orca's default permission mode adds no bypass flag; only Yolo adds one. Session 8 (2026-11-04): terminal integrations for users who already have Warp or Orca. Warp and Orca are optional: lean-agents installs the app only when the user picks it (--install-terminal, or --terminal warp|orca|both while the app is missing), pinned and undone by --uninstall; integrations as before. Owner decision 2026-11-19.
 - Testing policy: the owner does not test on their working machines. Every claim is proven in CI with throwaway HOME directories and real binaries (`tests/real-opencode.sh`).
 - Commits are authored by the owner (`git config user.name/user.email` set to their GitHub no-reply address) with a `Co-Authored-By` trailer for the agent.
 - Since session 6: Node.js 22.20+ (20.12+ before 0.6.0) and one more dependency, `@clack/prompts` (menus only on a real terminal). Network choices live in `scripts/lib/network.mjs` (`options.network` in `state.json`, `privacy` derived from it, so adapters can still read `opts.privacy`); undocumented settings in `scripts/lib/unverified.mjs` are never configured, only saved as user notes under `~/.config/lean-agents/notes/`.
 - Session 7 (2026-11-03): adapters `vscode-copilot` and `cursor`, `--project <dir>` team mode, `docs/claude-with-copilot.md`. Cursor user rules have no file (settings UI only). The VS Code user `mcp.json` path is proven by `code --add-mcp` in `real-vscode` (Linux, macOS); Copilot Chat ships built into VS Code; Cursor skills land in `~/.agents/skills`.
-- Latest release: 1.1.0 (2026-11-23, the owner tags it). Earlier: 1.0.0 (2026-11-20), 0.8.0 (2026-11-12), 0.7.0 and 0.6.0 (2026-11-06, minimum Node 22.20, breaking), 0.5.0 (2026-11-04). On hold: Session 9. `docs/ROADMAP.md` maps each issue to its release; "After 1.0.0" lists #103; the 1.1.0 gates are in `docs/audit-1.1.0.md`.
+- Latest release: 1.2.0 (2026-11-24, the owner tags it; audit in `docs/audit-1.2.0.md`). Earlier: 1.1.0 (2026-11-23), 1.0.0 (2026-11-20), 0.8.0 (2026-11-12), 0.7.0 and 0.6.0 (2026-11-06, minimum Node 22.20, breaking), 0.5.0 (2026-11-04). On hold: Session 9. `docs/ROADMAP.md` maps each issue to its release; "After 1.0.0" lists #103; the 1.2.0 gates are in `docs/audit-1.2.0.md` (earlier audits in `docs/archive/`).
 - Private terms are blocked by `scripts/check-private.sh` using the `PRIVATE_DENYLIST` repository secret in CI and a gitignored `.private-denylist` locally.
 
 ## 1. Product
@@ -514,11 +514,11 @@ Mark each `[x]` when merged.
 - [x] **Required checks on docs-only PRs** (#371 follow-up). Fix dynamic job names so SKIPPED reports correctly. PR #406.
 - [x] **Release 1.0.0 gates** (the owner). Issues #160 (OIDC proof), #145 (work-PC trial), #179 (fresh Mac and PC runs), #180 (logged-in VS Code agent run); the sessions for #80 part 2, #179, #180 and #182 are merged in code and docs, so the issues stay open for that proof. Tag and publish are the owner's; mark `[x]` when the tag run is green. (1.0.0 and 1.1.0 released 2026-11-23)
 - [ ] **Release 1.2.0**. Issue #429. Code of Conduct, social preview, repo cleanup and archive.
-- [ ] **Code Mode proxy, PRs 2 to 5**. Issue #407. Core proxy in lean-agents first, separate project second.
+- [ ] **Code Mode proxy, PRs 2 to 5** (1.3.0). Issue #407. PR 1 (core) merged in #423 for 1.2.0. Core proxy in lean-agents first, separate project second.
 - [ ] **Benchmark v2** (1.3.0). Issues #404, #430, #431.
 - [ ] **Multi-CLI orchestration** (1.3.0). Issues #428, #436.
-- [ ] **Codex CLI spike** (1.3.0). Issue #432.
-- [ ] **Gemini CLI spike** (1.3.0). Issue #433.
+- [x] **Codex CLI spike** (1.2.0). Issue #432, PR #445. Verdict go; adapter later.
+- [x] **Gemini CLI spike**: dropped. Issue #433, PR #448 closed: upstream made Gemini CLI enterprise-only (2026-06-18); Antigravity CLI covers individual accounts.
 
 ### Session 9 — Showcase
 

@@ -2,7 +2,7 @@
 
 What comes next, in order. Each step is one build session in `docs/SPEC.md` section 14 and one PR. A step is done when its CI job with real binaries is green and its issues are closed.
 
-Latest release: [`v1.1.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v1.1.0) (2026-11-23; the owner tags it). Earlier: [`v1.0.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v1.0.0) (2026-11-20), [`v0.8.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.8.0) (2026-11-12), [`v0.7.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.7.0) and [`v0.6.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.6.0) (2026-11-06, which raised the minimum Node to 22.20), and [`v0.5.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.5.0) (2026-11-04).
+Latest release: [`v1.2.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v1.2.0) (2026-11-24; the owner tags it). Earlier: [`v1.1.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v1.1.0) (2026-11-23), [`v1.0.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v1.0.0) (2026-11-20), [`v0.8.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.8.0) (2026-11-12), [`v0.7.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.7.0) and [`v0.6.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.6.0) (2026-11-06, which raised the minimum Node to 22.20), and [`v0.5.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.5.0) (2026-11-04).
 
 ## Done in 0.6.0: fixes from real installs (planned as 0.5.1)
 
@@ -75,19 +75,24 @@ Details in `CHANGELOG.md` and [`audit-1.0.0.md`](archive/audit-1.0.0.md). Closed
 
 ## 1.1.0 (released 2026-11-23)
 
-Details in `CHANGELOG.md` and [`audit-1.1.0.md`](audit-1.1.0.md).
+Details in `CHANGELOG.md` and [`audit-1.1.0.md`](archive/audit-1.1.0.md).
 
-## 1.2.0 (next)
+## 1.2.0 (released 2026-11-24)
 
-- [#407](https://github.com/estebanmr99/lean-agents/issues/407): own Code Mode MCP proxy core (first in lean-agents, then as a separate project).
+Details in `CHANGELOG.md` and [`audit-1.2.0.md`](audit-1.2.0.md).
+
+- [#407](https://github.com/estebanmr99/lean-agents/issues/407): own Code Mode MCP proxy core, PR 1 of 5 (groundwork: the installer does not use it yet).
+- Codex CLI spike ([#432](https://github.com/estebanmr99/lean-agents/issues/432)): verdict go; manual CI workflow.
+- CI guard: a PR that lowers the test count fails unless its body says why ([#443](https://github.com/estebanmr99/lean-agents/issues/443)).
 - Repo cleanup and archive: finished audits, checkpoints and sessions stay in `docs/archive/`.
-- Community basics: [Code of Conduct](../CODE_OF_CONDUCT.md) and the social preview image ([#429](https://github.com/estebanmr99/lean-agents/issues/429), [#442](https://github.com/estebanmr99/lean-agents/issues/442)).
+- Community basics: [Code of Conduct](../CODE_OF_CONDUCT.md) ([#429](https://github.com/estebanmr99/lean-agents/issues/429)); the social preview image is an owner step ([#442](https://github.com/estebanmr99/lean-agents/issues/442)).
 
 ## 1.3.0
 
 - Benchmark v2 and publish: [prove the savings](https://github.com/estebanmr99/lean-agents/issues/404), [publish the result](https://github.com/estebanmr99/lean-agents/issues/430), [multi-agent vs solo](https://github.com/estebanmr99/lean-agents/issues/431), [harness benchmark](https://github.com/estebanmr99/lean-agents/issues/103).
 - Multi-CLI orchestration: [one main session with visible worker status](https://github.com/estebanmr99/lean-agents/issues/428), [less slop in the coordinator](https://github.com/estebanmr99/lean-agents/issues/436).
-- Codex and Gemini CLI spikes ([#432](https://github.com/estebanmr99/lean-agents/issues/432), [#433](https://github.com/estebanmr99/lean-agents/issues/433)).
+- Code Mode proxy PRs 2 to 5 ([#407](https://github.com/estebanmr99/lean-agents/issues/407)): measurement, `--tools code-mode-proxy` in the installer, real-CLI checks, comparison with the native Code Modes.
+- Codex CLI adapter, after the spike's VERIFY rows are proven ([#432](https://github.com/estebanmr99/lean-agents/issues/432)). Gemini CLI: no-go ([#433](https://github.com/estebanmr99/lean-agents/issues/433)); upstream made it enterprise-only on 2026-06-18 and Antigravity CLI covers individual accounts.
 - [Launch](https://github.com/estebanmr99/lean-agents/issues/434) and [demo GIFs](https://github.com/estebanmr99/lean-agents/issues/435).
 - Handy and T3 investigations ([#420](https://github.com/estebanmr99/lean-agents/issues/420), [#422](https://github.com/estebanmr99/lean-agents/issues/422)).
 
@@ -95,7 +100,6 @@ Details in `CHANGELOG.md` and [`audit-1.1.0.md`](audit-1.1.0.md).
 
 - [#103](https://github.com/estebanmr99/lean-agents/issues/103): harness benchmark and personal vs enterprise recommendation (needs an inference budget).
 - Close the **VERIFY** items in `docs/compatibility.md` that need a logged-in app (Antigravity rule and skill loading, Copilot `model` format, VS Code reading Copilot CLI hooks).
-- Codex CLI and Gemini CLI adapter spikes: [#432](https://github.com/estebanmr99/lean-agents/issues/432), [#433](https://github.com/estebanmr99/lean-agents/issues/433).
 - Open issues and why they do not gate 1.0: `audit-1.0.0.md`.
 
 ## Promotion
