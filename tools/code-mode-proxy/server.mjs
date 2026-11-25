@@ -7,8 +7,8 @@ import { UpstreamManager } from './upstream.mjs';
 import { AuditLog } from './audit.mjs';
 import { Sandbox } from './sandbox.mjs';
 
-const home = process.env.LEAN_STATE_DIR ? null : os.homedir();
-const stateDir = process.env.LEAN_STATE_DIR || path.join(home, '.config', 'lean-agents');
+const home = os.homedir();
+const stateDir = path.join(home, '.config', 'lean-agents');
 const configPath = path.join(stateDir, 'code-mode-proxy.json');
 const logPath = path.join(stateDir, 'code-mode-proxy.log');
 
@@ -203,8 +203,9 @@ async function start() {
   });
 
   rpc.on('end', () => {
+    const deadline = Date.now() + 5000;
     const tryExit = () => {
-      if (activeRunScripts > 0) {
+      if (activeRunScripts > 0 && Date.now() < deadline) {
         setTimeout(tryExit, 50);
         return;
       }
@@ -224,6 +225,7 @@ async function start() {
 
 // Ensure process exit if stdin closes not gracefully
 process.stdin.on('close', () => {
+  if (initialized) return; // handled by rpc.on('end')
   if (upstreamManager) upstreamManager.killAll();
   if (auditLog) auditLog.close();
   process.exit(0);

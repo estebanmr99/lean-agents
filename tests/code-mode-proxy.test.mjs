@@ -20,7 +20,7 @@ async function waitOn(conditionFn, timeoutMs = 2000) {
     if (await conditionFn()) return true;
     await new Promise(r => setTimeout(r, 10));
   }
-  return false;
+  throw new Error('waitOn timeout after ' + timeoutMs + 'ms');
 }
 
 test.before(async () => {
@@ -46,6 +46,7 @@ test.before(async () => {
   
   await fs.writeFile(fakeUpstreamScript, `
 import readline from 'node:readline';
+import fs from 'node:fs';
 const rl = readline.createInterface({ input: process.stdin });
 rl.on('line', (line) => {
   if (!line.trim()) return;
@@ -55,7 +56,7 @@ rl.on('line', (line) => {
   if (msg.method === 'initialize') {
     console.log(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { capabilities: {} } }));
     // Test upstream-initiated request
-    console.log(JSON.stringify({ jsonrpc: '2.0', id: 999, method: 'upstream_request' }));
+    console.log(JSON.stringify({ jsonrpc: '2.0', id: 999, method: 'roots/list' }));
   } else if (msg.method === 'tools/list') {
     console.log(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { tools: [
       { name: 'echo', description: 'echoes', inputSchema: { type: 'object', properties: { p: { type: 'string' }, n: { type: 'number' }, b: { type: 'boolean' } }, required: ['p'] } },
@@ -65,6 +66,7 @@ rl.on('line', (line) => {
       { name: 'delete_allowed', inputSchema: {} },
       { name: '__proto__', inputSchema: {} },
       { name: 'slow', inputSchema: {} },
+      { name: 'sleep', inputSchema: {} },
       { name: 'env', inputSchema: {} },
       { name: 'large', inputSchema: {} },
       { name: 'never_resolving', inputSchema: {} },
@@ -81,6 +83,12 @@ rl.on('line', (line) => {
       }, 5000);
       return;
     }
+    if (msg.params.name === 'sleep') {
+      setTimeout(() => {
+        console.log(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { content: [{ type: 'text', text: 'woke' }] } }));
+      }, 500);
+      return;
+    }
     if (msg.params.name === 'never_resolving') return;
     if (msg.params.name === 'env') {
       console.log(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { keys: Object.keys(process.env).join(',') } }));
@@ -93,7 +101,7 @@ rl.on('line', (line) => {
     console.log(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { content: [{ type: 'text', text: msg.params.name }] } }));
   } else if (msg.id !== undefined && !msg.method && msg.error) {
     if (msg.error.code === -32601) {
-      console.error('UPSTREAM_GOT_32601_FOR_' + msg.id);
+      fs.writeFileSync('${tmpDir}/test_32601.log', 'UPSTREAM_GOT_32601_FOR_' + msg.id);
     }
   }
 });
@@ -192,6 +200,9 @@ async function setupEnv() {
   const auditLog = new AuditLog(logPath, false);
   await auditLog.init();
 
+  const oldNodeOptions = process.env.NODE_OPTIONS;
+  const oldNpmConfigFoo = process.env.npm_config_foo;
+  
   process.env.NODE_OPTIONS = '--max-old-space-size=512';
   process.env.npm_config_foo = 'bar'; // Set env to test stripping
   
@@ -211,20 +222,32 @@ async function setupEnv() {
   const listRes = await upstreamManager.request('fake', 'tools/list');
   policy.setTools('fake', listRes.tools);
   
-  return { config, policy, upstreamManager, auditLog, listRes, logPath, Sandbox };
+  return {
+    config, policy, upstreamManager, auditLog, listRes, logPath, Sandbox, Policy,
+    restoreEnv: () => {
+      if (oldNodeOptions === undefined) delete process.env.NODE_OPTIONS;
+      else process.env.NODE_OPTIONS = oldNodeOptions;
+      if (oldNpmConfigFoo === undefined) delete process.env.npm_config_foo;
+      else process.env.npm_config_foo = oldNpmConfigFoo;
+    }
+  };
 }
 
 test('Upstream Request Gets 32601 and Non-Object JSON Does Not Crash', async (t) => {
   if (skipReason) return t.skip(skipReason);
+  
+  const test32601File = `${tmpDir}/test_32601.log`;
+  await fs.unlink(test32601File).catch(()=>null);
+  
   const env = await setupEnv();
   
-  const upstream = env.upstreamManager.upstreams.get('fake');
-  let found = false;
-  await waitOn(() => {
-    return env.auditLog.stderrLines.get('fake') > 0;
+  await waitOn(async () => {
+    try {
+      return (await fs.stat(test32601File)).size > 0;
+    } catch(e) { return false; }
   }, 2000);
   
-  const content = await fs.readFile(env.logPath, 'utf8');
+  const content = await fs.readFile(test32601File, 'utf8');
   assert.match(content, /UPSTREAM_GOT_32601_FOR_999/);
   
   env.upstreamManager.killAll();
@@ -291,6 +314,52 @@ test('Sandbox Probes: exact error outcomes', async (t) => {
   const cleanupElapse = Date.now() - cleanupStart;
   assert.match(cleanupProbe.error, /interrupted/i);
   assert.ok(cleanupElapse < 1000 + 2000, `Cleanup took ${cleanupElapse}ms`);
+  
+  env.upstreamManager.killAll();
+  env.auditLog.close();
+});
+
+test('Limits: Session budget and per-script call limit', async (t) => {
+  if (skipReason) return t.skip(skipReason);
+  const env = await setupEnv();
+  
+  env.config.sessionBudget = 3;
+  env.policy = new env.Policy(env.config);
+  env.policy.setTools('fake', env.listRes.tools);
+  
+  const sb = new env.Sandbox({ wallTime: 2000, callLimit: 30 });
+  
+  for (let i = 0; i < 3; i++) {
+    const p = await sb.runScript(`tools.fake.echo({ p: "x" })`, { fake: env.listRes.tools }, env.policy, env.upstreamManager, env.auditLog);
+    assert.ok(!p.error, 'Should succeed: ' + p.error);
+  }
+  const budgetProbe = await sb.runScript(`
+    try { tools.fake.echo({ p: "x" }) } catch(e) { e.message }
+  `, { fake: env.listRes.tools }, env.policy, env.upstreamManager, env.auditLog);
+  assert.ok(budgetProbe.result || budgetProbe.error, 'budgetProbe missing result and error: ' + JSON.stringify(budgetProbe));
+  assert.match(budgetProbe.result || budgetProbe.error, /budget/i);
+  
+  env.config.sessionBudget = 1000;
+  env.policy = new env.Policy(env.config);
+  env.policy.setTools('fake', env.listRes.tools);
+  
+  const sb2 = new env.Sandbox({ wallTime: 5000, callLimit: 25 });
+  const capProbe = await sb2.runScript(`
+    (async () => {
+      let count = 0;
+      try {
+        for (let i=0; i<26; i++) {
+          await tools.fake.echo({ p: "x" });
+          count++;
+        }
+      } catch(e) {
+        return "caught: " + e.message + " at " + count;
+      }
+      return "done";
+    })()
+  `, { fake: env.listRes.tools }, env.policy, env.upstreamManager, env.auditLog);
+  assert.match(capProbe.result || capProbe.error, /limit|cap/i);
+  assert.match(capProbe.result || capProbe.error, /at 25/);
   
   env.upstreamManager.killAll();
   env.auditLog.close();
@@ -391,11 +460,31 @@ test('Proxy server.mjs tests', async (t) => {
     errRes = outputs.find(o => o.error && o.error.code === -32700);
     return !!errRes;
   });
-  assert.ok(errRes, 'Missing -32700 for malformed json. Outputs: ' + JSON.stringify(outputs) + ' Stderr: ' + srvErr);
+  assert.ok(errRes, 'Missing -32700 for malformed json');
   
+  cp.stdin.write('null\n');
+  let nullRes;
+  await waitOn(() => {
+    nullRes = outputs.find(o => o.error && o.error.code === -32600 && outputs.indexOf(o) > outputs.indexOf(errRes));
+    return !!nullRes;
+  });
+  assert.ok(nullRes, 'Missing -32600 for null');
+  
+  cp.stdin.write('5\n');
+  let numRes;
+  await waitOn(() => {
+    numRes = outputs.find(o => o.error && o.error.code === -32600 && outputs.indexOf(o) > outputs.indexOf(nullRes));
+    return !!numRes;
+  });
+  assert.ok(numRes, 'Missing -32600 for 5');
+
   const pingId = send({ method: 'ping' });
   const pingRes = await waitForId(pingId);
   assert.ok(pingRes.result);
+
+  const toolsListId = send({ method: 'tools/list' });
+  const toolsListRes = await waitForId(toolsListId);
+  assert.ok(toolsListRes.result.tools, 'Proxy should still answer tools/list after upstream sends invalid JSON');
 
   const searchId = send({ method: 'tools/call', params: { name: 'search_tools', arguments: { query: 'echo' } } });
   const searchRes = await waitForId(searchId);
@@ -422,7 +511,11 @@ test('Proxy server.mjs tests', async (t) => {
   assert.match(toolCallRes.result.content[0].text, /Untrusted tool output follows/);
 
   cp.stdin.end();
-  await new Promise(r => cp.on('exit', r));
+  let exited = false;
+  let exitCode = null;
+  cp.on('exit', (code) => { exited = true; exitCode = code; });
+  await waitOn(() => exited, 5000);
+  assert.equal(exitCode, 0, 'Proxy exited with code ' + exitCode + '. Stderr: ' + srvErr);
 });
 
 test('remove.mjs `<root>-evil` prefix refused', async (t) => {
@@ -459,4 +552,255 @@ test('Audit chmod on pre-existing 0644 file -> 0600', async (t) => {
   assert.equal(stats.mode & 0o777, 0o600);
   
   auditLog.close();
+});
+
+test('Sandbox Limits: Deep Recursion', async (t) => {
+  if (skipReason) return t.skip(skipReason);
+  const env = await setupEnv();
+  const sb = new env.Sandbox({ wallTime: 2000, callLimit: 5, stackSize: 64 * 1024 });
+  
+  const recurseProbe = await sb.runScript(`function f() { f() } f()`, { fake: env.listRes.tools }, env.policy, env.upstreamManager, env.auditLog);
+  assert.match(recurseProbe.error, /stack overflow|call stack size/i);
+  t.after(() => env.restoreEnv());
+  env.upstreamManager.killAll();
+  env.auditLog.close();
+});
+
+test('Sandbox Limits: Prototype Mutation', async (t) => {
+  if (skipReason) return t.skip(skipReason);
+  const env = await setupEnv();
+  const sb = new env.Sandbox({ wallTime: 2000, callLimit: 5, resultCap: 20000 });
+  
+  await sb.runScript(`Object.prototype.hacked = 42`, { fake: env.listRes.tools }, env.policy, env.upstreamManager, env.auditLog);
+  const protoProbe = await sb.runScript(`({}).hacked`, { fake: env.listRes.tools }, env.policy, env.upstreamManager, env.auditLog);
+  assert.equal(protoProbe.result, undefined);
+  t.after(() => env.restoreEnv());
+  env.upstreamManager.killAll();
+  env.auditLog.close();
+});
+
+test('Sandbox Limits: Result Cut', async (t) => {
+  if (skipReason) return t.skip(skipReason);
+  const env = await setupEnv();
+  const sb = new env.Sandbox({ wallTime: 2000, callLimit: 5, resultCap: 20000 });
+  
+  const cutProbe = await sb.runScript(`"x".repeat(30000)`, { fake: env.listRes.tools }, env.policy, env.upstreamManager, env.auditLog);
+  assert.match(cutProbe.result, /cut by proxy/);
+  assert.ok(cutProbe.result.length < 30000);
+  t.after(() => env.restoreEnv());
+  env.upstreamManager.killAll();
+  env.auditLog.close();
+});
+
+test('Upstream: late reply', async (t) => {
+  if (skipReason) return t.skip(skipReason);
+  const env = await setupEnv();
+  const sb = new env.Sandbox({ wallTime: 1000, callLimit: 5 });
+  
+  const lateProbe = await sb.runScript(`
+    try { tools.fake.slow(); } catch(e) { e.message }
+  `, { fake: env.listRes.tools }, env.policy, env.upstreamManager, env.auditLog);
+  assert.match(lateProbe.error, /timed out|interrupted/);
+  t.after(() => env.restoreEnv());
+  env.upstreamManager.killAll();
+  env.auditLog.close();
+});
+
+test('Upstream: never-resolving', async (t) => {
+  if (skipReason) return t.skip(skipReason);
+  const env = await setupEnv();
+  const sb = new env.Sandbox({ wallTime: 1000, callLimit: 5 });
+  
+  const neverStart = Date.now();
+  const neverProbe = await sb.runScript(`
+    try { tools.fake.never_resolving(); } catch(e) { e.message }
+  `, { fake: env.listRes.tools }, env.policy, env.upstreamManager, env.auditLog);
+  const neverElapse = Date.now() - neverStart;
+  assert.match(neverProbe.error, /timed out|interrupted/);
+  assert.ok(neverElapse < 1000 + 2000, 'Took ' + neverElapse);
+  t.after(() => env.restoreEnv());
+  env.upstreamManager.killAll();
+  env.auditLog.close();
+});
+
+test('Upstream: 1 MB line cap marks unavailable', async (t) => {
+  if (skipReason) return t.skip(skipReason);
+  const env = await setupEnv();
+  const sb = new env.Sandbox({ wallTime: 2000, callLimit: 5 });
+  
+  const largeProbe = await sb.runScript(`(async () => await tools.fake.large())()`, { fake: env.listRes.tools }, env.policy, env.upstreamManager, env.auditLog);
+  assert.ok(largeProbe.error, 'Expected error for large line');
+  
+  const upstream = env.upstreamManager.upstreams.get('fake');
+  assert.equal(upstream.status, 'unavailable');
+  
+  env.upstreamManager.killAll();
+  env.auditLog.close();
+});
+
+test('Audit log: redaction, rotation, 0600', async (t) => {
+  if (skipReason) return t.skip(skipReason);
+  const env = await setupEnv();
+  
+  env.auditLog.logArgs = true;
+  env.auditLog.logStderr('fake', 'Secret api_key="secret123" and gh_token github_' + 'pat_11ABCD00000000000000000000');
+  env.auditLog.logCall({
+    scriptSha256: 'abc', count: 1, server: 'fake', tool: 'echo', duration: 10, ok: true, blocked: false,
+    args: '{"x":"npm_' + '12345678901234567890"}', result: 'ok'
+  });
+  
+  env.auditLog.writeLine("x".repeat(1024 * 1024 + 10) + "\\n");
+
+  const log1 = env.logPath;
+  const log2 = env.logPath + '.1';
+  assert.ok(await fs.stat(log1));
+  assert.ok(await fs.stat(log2));
+
+  if (os.platform() !== 'win32') {
+    assert.equal(statSync(log1).mode & 0o777, 0o600);
+    assert.equal(statSync(log2).mode & 0o777, 0o600);
+  }
+  
+  const content = await fs.readFile(log2, 'utf8');
+  assert.match(content, /api_key=\\"<redacted>\\"/);
+  assert.match(content, /<redacted-token>/);
+  assert.ok(!content.includes('secret123'));
+  assert.ok(!content.includes('github_' + 'pat_11ABCD00000000000000000000'));
+  assert.ok(!content.includes('npm_' + '12345678901234567890'));
+  
+  env.upstreamManager.killAll();
+  env.auditLog.close();
+});
+
+test('remove.mjs logic', async (t) => {
+  if (skipReason) return t.skip(skipReason);
+  
+  const runRemove = (dir) => {
+    return spawnSync(process.execPath, [path.join(proxyDir, 'remove.mjs'), dir], { env: { LEAN_STATE_DIR: tmpDir } });
+  };
+
+  const fakeDir = path.join(tmpDir, 'to-remove');
+  await fs.mkdir(fakeDir);
+  const rm1 = runRemove(fakeDir);
+  assert.equal(rm1.status, 1);
+  assert.match(rm1.stderr.toString(), /marker file missing/);
+
+  await fs.writeFile(path.join(fakeDir, '.lean-agents-code-mode-proxy'), 'managed by lean-agents');
+  const rm2 = runRemove(fakeDir);
+  assert.equal(rm2.status, 0);
+
+  const outsideDir = path.join(os.tmpdir(), 'outside-test');
+  await fs.mkdir(outsideDir, { recursive: true });
+  const rm3 = runRemove(outsideDir);
+  assert.equal(rm3.status, 1);
+  assert.match(rm3.stderr.toString(), /outside lean data dir/);
+
+  const linkDir = path.join(tmpDir, 'link-remove');
+  await fs.symlink(tmpDir, linkDir, 'dir').catch(()=>null);
+  const rm4 = runRemove(linkDir);
+  assert.match(rm4.stderr.toString(), /is a symlink/);
+});
+
+test('Stdin close kills upstreams', async (t) => {
+  if (skipReason) return t.skip(skipReason);
+  const stateDir = path.join(tmpDir, '.config', 'lean-agents');
+  await fs.mkdir(stateDir, { recursive: true });
+  const srvConfig = path.join(stateDir, 'code-mode-proxy.json');
+  
+  const fakePidFile = path.join(tmpDir, 'fake.pid');
+  const fakeUpstreamScript2 = path.join(tmpDir, 'fake-upstream2.mjs');
+  await fs.writeFile(fakeUpstreamScript2, `
+    import fs from 'node:fs';
+    fs.writeFileSync('${fakePidFile}', String(process.pid));
+    setTimeout(() => {}, 60000);
+  `);
+  
+  await fs.writeFile(srvConfig, JSON.stringify({
+    "//": "managed by lean-agents",
+    allow: ['fake2.test'],
+    mcpServers: { fake2: { command: process.execPath, args: [fakeUpstreamScript2] } }
+  }));
+  
+  const proxyPath = path.join(proxyDir, 'server.mjs');
+  const cp = spawn(process.execPath, [proxyPath], {
+    env: { ...process.env, HOME: tmpDir },
+    stdio: ['pipe', 'pipe', 'pipe']
+  });
+
+  t.after(() => { cp.kill(); });
+  
+  await waitOn(async () => {
+    try { return await fs.stat(fakePidFile); } catch(e) { return false; }
+  }, 3000);
+  
+  const pidStr = await fs.readFile(fakePidFile, 'utf8');
+  const pid = parseInt(pidStr, 10);
+  assert.ok(pid > 0, 'Got pid ' + pid);
+  
+  cp.stdin.end();
+  
+  const dead = await waitOn(() => {
+    try {
+      process.kill(pid, 0);
+      return false;
+    } catch (e) {
+      return true; // process is dead
+    }
+  }, 10000).catch(() => {
+    throw new Error('Timeout waiting for pid ' + pid + ' to die');
+  });
+  
+  assert.ok(dead, 'Upstream should be dead after proxy stdin closed');
+});
+
+test('Flush on stdin end: waits for in-flight scripts', async (t) => {
+  if (skipReason) return t.skip(skipReason);
+  const stateDir = path.join(tmpDir, '.config', 'lean-agents');
+  await fs.mkdir(stateDir, { recursive: true });
+  const srvConfig = path.join(stateDir, 'code-mode-proxy.json');
+  
+  await fs.writeFile(srvConfig, JSON.stringify({
+    "//": "managed by lean-agents",
+    allow: ['fake.sleep'],
+    mcpServers: { fake: { command: process.execPath, args: [fakeUpstreamScript] } }
+  }));
+  
+  const proxyPath = path.join(proxyDir, 'server.mjs');
+  const cp = spawn(process.execPath, [proxyPath], {
+    env: { ...process.env, HOME: tmpDir },
+    stdio: ['pipe', 'pipe', 'pipe']
+  });
+
+  t.after(() => { cp.kill(); });
+  
+  let outputs = [];
+  let srvErr = '';
+  cp.stdout.on('data', d => {
+    const str = d.toString();
+    for (const line of str.split('\n')) {
+      if (line.trim()) {
+        try { outputs.push(JSON.parse(line.trim())); } catch(e) {}
+      }
+    }
+  });
+  cp.stderr.on('data', d => srvErr += d.toString());
+
+  cp.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }) + '\n');
+  await waitOn(() => outputs.find(o => o.id === 1));
+
+  cp.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'run_script', arguments: { code: '(async () => { await tools.fake.sleep(); return "done"; })()' } } }) + '\n');
+  
+  // Immediately close stdin
+  cp.stdin.end();
+  
+  let res2;
+  await waitOn(() => {
+    res2 = outputs.find(o => o.id === 2);
+    return !!res2;
+  }, 10000).catch(e => {
+    throw new Error('Timeout waiting for id=2. Outputs: ' + JSON.stringify(outputs) + ' Stderr: ' + srvErr);
+  });
+  
+  assert.ok(res2, 'Should receive reply for in-flight script before proxy exits');
+  assert.match(res2.result.content[0].text, /Result: done/);
 });
