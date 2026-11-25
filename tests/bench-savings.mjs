@@ -232,7 +232,16 @@ export function checkTask10(dir) {
   if (!validJson) return false;
   const state = HARNESS_STATE.get(dir);
   if (!state) return false;
-  
+  // The model may add its test to the same file, so require the original lines are all kept, not identical bytes.
+  for (const [relPath, content] of state.testFiles) {
+    const fullPath = path.join(dir, relPath);
+    if (!fs.existsSync(fullPath)) return false;
+    const now = new Set(fs.readFileSync(fullPath, 'utf8').split('\n').map((l) => l.trim()));
+    if (content.split('\n').some((l) => l.trim() && !now.has(l.trim()))) return false;
+  }
+  const testDir = path.join(dir, 'tests');
+  if (!fs.readdirSync(testDir).some((f) => fs.readFileSync(path.join(testDir, f), 'utf8').includes('--json'))) return false;
+
   const testRes = spawnSync(process.execPath, ['--test'], { cwd: dir, env, timeout: 60000 });
   const out = testRes.stdout?.toString() || '';
   const passMatch = out.match(/(?:#|\u2139) pass (\d+)/);

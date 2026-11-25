@@ -338,10 +338,18 @@ test('bench-savings task10 check function', () => {
                                               "} else {\n" +
                                               "  console.log(format(parsed));\n" +
                                               "}\n");
-  fs.writeFileSync(path.join(dir, 'tests', 'json.test.mjs'), "import test from 'node:test';\nimport assert from 'node:assert';\ntest('json', () => { assert.strictEqual(1, 1); });\n");
+  fs.writeFileSync(path.join(dir, 'tests', 'json.test.mjs'), "import test from 'node:test';\nimport assert from 'node:assert';\ntest('--json prints JSON', () => { assert.strictEqual(1, 1); });\n");
   const readmeContent = fs.readFileSync(path.join(dir, 'README.md'), 'utf8');
   fs.writeFileSync(path.join(dir, 'README.md'), readmeContent + '\nSupports --json flag\n');
   
+  assert.strictEqual(task.check(dir), true);
+
+  // gaming: original tests replaced by trivial ones
+  const cliTest = path.join(dir, 'tests', 'cli.test.mjs');
+  const origCliTest = fs.readFileSync(cliTest, 'utf8');
+  fs.writeFileSync(cliTest, "import test from 'node:test';\n" + "test('a', () => {});\n".repeat(20));
+  assert.strictEqual(task.check(dir), false);
+  fs.writeFileSync(cliTest, origCliTest);
   assert.strictEqual(task.check(dir), true);
 
   // gaming: always-JSON cli
