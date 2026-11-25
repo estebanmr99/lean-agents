@@ -236,10 +236,12 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
         const v = version(at, undefined, childEnv(network));
         add(at === bin ? `${bin} on PATH` : `${bin} found outside PATH`, v ? 'ok' : 'error', v ?? 'not found');
       }
-      for (const [bin, agent] of [['code', 'vscode-copilot'], ['cursor-agent', 'cursor']]) {
+      // VS Code: stable or Insiders, whichever is on PATH.
+      for (const [bins, agent] of [[['code', 'code-insiders'], 'vscode-copilot'], [['cursor-agent'], 'cursor']]) {
         if (!o.agents.includes(agent)) continue;
-        const v = version(bin, undefined, childEnv(network));
-        add(`${bin} on PATH`, v ? 'ok' : 'error', v ?? 'not found');
+        let hit = null;
+        for (const b of bins) { const v = version(b, undefined, childEnv(network)); if (v) { hit = [b, v]; break; } }
+        add(`${hit?.[0] ?? bins[0]} on PATH`, hit ? 'ok' : 'error', hit?.[1] ?? 'not found');
       }
       if (!withMcp && ['claude', 'cursor', 'copilot-cli', 'antigravity'].some((a) => o.agents.includes(a))) add('mcp servers', 'skipped', 'network off (outbound off): `mcp list` not run');
       if (o.agents.includes('cursor') && withMcp) checkCursor(o, add, q);

@@ -1,0 +1,43 @@
+name: Spike VS Code Insiders
+
+# 1.2.1: the real VS Code Insiders CLI and lean-agents write the same user mcp.json (`Code - Insiders/User`).
+# Insiders builds change daily, so this downloads the current one unpinned (a spike, not a release gate).
+# No login, no secrets, temp HOME. Runs on PRs that change the spike or the VS Code adapter.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - tests/spike-vscode-insiders.sh
+      - .github/workflows/spike-vscode-insiders.yml
+      - scripts/lib/adapters/vscode-copilot.mjs
+
+permissions:
+  contents: read
+
+jobs:
+  spike:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Install VS Code Insiders (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/insiders.tar.gz" https://update.code.visualstudio.com/latest/linux-x64/insider
+          tar -xzf "$RUNNER_TEMP/insiders.tar.gz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/VSCode-linux-x64/bin" >> "$GITHUB_PATH"
+      - name: Install VS Code Insiders (macOS)
+        if: runner.os == 'macOS'
+        run: brew install --cask visual-studio-code@insiders
+      - name: Spike
+        run: bash tests/spike-vscode-insiders.sh

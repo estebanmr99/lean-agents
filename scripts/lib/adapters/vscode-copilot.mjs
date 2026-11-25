@@ -1,5 +1,6 @@
 // VS Code Copilot adapter. VS Code reads the same user rules, agents and skills as Copilot CLI
 // (~/.copilot, ~/.agents/skills), so those are skipped when copilot-cli is installed too.
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { configHome, envDir } from '../system.mjs';
@@ -10,12 +11,19 @@ import { skillSource } from '../pins.mjs';
 // Read at import, before isolate() points HOME and USERPROFILE at --home.
 const REAL_HOME = os.homedir();
 
-export function vscodeUserDir(home) {
-  if (process.platform === 'darwin') return path.join(home, 'Library', 'Application Support', 'Code', 'User');
-  if (process.platform !== 'win32') return path.join(configHome(home), 'Code', 'User');
+// edition: 'Code' (stable) or 'Code - Insiders'.
+export function vscodeUserDir(home, edition = 'Code') {
+  if (process.platform === 'darwin') return path.join(home, 'Library', 'Application Support', edition, 'User');
+  if (process.platform !== 'win32') return path.join(configHome(home), edition, 'User');
   // Only the real home may use %APPDATA%: --home must keep every write inside the temp dir.
   const appData = home === REAL_HOME && process.env.APPDATA ? process.env.APPDATA : path.join(home, 'AppData', 'Roaming');
-  return path.join(appData, 'Code', 'User');
+  return path.join(appData, edition, 'User');
+}
+
+// Stable always (as before 1.2.1); Insiders too when its folder exists, so a machine with only Insiders is configured.
+export function vscodeUserDirs(home) {
+  const insiders = vscodeUserDir(home, 'Code - Insiders');
+  return [vscodeUserDir(home), ...(fs.existsSync(path.dirname(insiders)) ? [insiders] : [])];
 }
 
 // `servers` entries for a VS Code mcp.json, user or workspace.
@@ -27,7 +35,6 @@ export function vscodeServers(core, tools) {
 
 export function vscodeCopilotAdapter({ home, core, profile, opts, rules, adhdCommand }) {
   const tools = opts.tools;
-  const user = vscodeUserDir(home);
   const actions = [];
   const commands = [];
   if (!opts.agents.includes('copilot-cli')) {
@@ -43,14 +50,16 @@ export function vscodeCopilotAdapter({ home, core, profile, opts, rules, adhdCom
       commands.push(skills('i-have-adhd', 'i-have-adhd skill for VS Code Copilot', skillSource('i-have-adhd'), ['i-have-adhd']), adhdCommand);
     }
   }
-  const edits = vscodeServers(core, tools);
-  if (edits.length) actions.push({ kind: 'json', path: path.join(user, 'mcp.json'), edits });
-  if (opts.privacy === 'strict') {
-    actions.push({
-      kind: 'json',
-      path: path.join(user, 'settings.json'),
-      edits: [{ path: ['telemetry.telemetryLevel'], value: 'off', mode: 'set' }, { path: ['update.mode'], value: 'none', mode: 'set' }],
-    });
+  for (const user of vscodeUserDirs(home)) {
+    const edits = vscodeServers(core, tools);
+    if (edits.length) actions.push({ kind: 'json', path: path.join(user, 'mcp.json'), edits });
+    if (opts.privacy === 'strict') {
+      actions.push({
+        kind: 'json',
+        path: path.join(user, 'settings.json'),
+        edits: [{ path: ['telemetry.telemetryLevel'], value: 'off', mode: 'set' }, { path: ['update.mode'], value: 'none', mode: 'set' }],
+      });
+    }
   }
   return { actions, commands };
 }
