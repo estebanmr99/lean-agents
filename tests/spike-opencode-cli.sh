@@ -10,6 +10,9 @@ repo="$(cd "$(dirname "$0")/.." && pwd)"
 T="$(mktemp -d)"
 HOME="$T/home"
 export HOME
+# GitHub's Ubuntu runner sets XDG_CONFIG_HOME to the real home; keep every XDG dir inside the temp HOME too.
+unset OPENCODE_CONFIG OPENCODE_CONFIG_DIR
+export XDG_CONFIG_HOME="$HOME/.config" XDG_DATA_HOME="$HOME/.local/share" XDG_STATE_HOME="$HOME/.local/state" XDG_CACHE_HOME="$HOME/.cache"
 mkdir -p "$HOME" "$T/proj"
 export OPENCODE_DISABLE_AUTOUPDATE=1
 fail=0
