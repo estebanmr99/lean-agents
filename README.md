@@ -571,7 +571,7 @@ Details and linked issues: [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Contributing
 
-Issues and PRs are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first; every PR runs a secret and privacy scan.
+Issues and PRs are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first; every PR runs a secret and privacy scan. By taking part you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
