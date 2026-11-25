@@ -513,7 +513,7 @@ Mark each `[x]` when merged.
 - [x] **Issue #181 — Summary page** (1.0.0). Issue #181, PRs #275, #276, #286.
 - [x] **Required checks on docs-only PRs** (#371 follow-up). Fix dynamic job names so SKIPPED reports correctly. PR #406.
 - [x] **Release 1.0.0 gates** (the owner). Issues #160 (OIDC proof), #145 (work-PC trial), #179 (fresh Mac and PC runs), #180 (logged-in VS Code agent run); the sessions for #80 part 2, #179, #180 and #182 are merged in code and docs, so the issues stay open for that proof. Tag and publish are the owner's; mark `[x]` when the tag run is green. (1.0.0 and 1.1.0 released 2026-11-23)
-- [ ] **Release 1.2.0**. Issue #429. Code of Conduct, social preview, repo cleanup and archive.
+- [x] **Release 1.2.0**. Issue #429. Tagged 2026-11-24, npm 1.2.0 with provenance (run 45552951656). Code of Conduct, social preview, repo cleanup and archive.
 - [ ] **Code Mode proxy, PRs 2 to 5** (1.3.0). Issue #407. PR 1 (core) merged in #423 for 1.2.0. Core proxy in lean-agents first, separate project second.
 - [ ] **Benchmark v2** (1.3.0). Issues #404, #430, #431.
 - [ ] **Multi-CLI orchestration** (1.3.0). Issues #428, #436.
