@@ -11,13 +11,13 @@ How to roll out lean-agents across a team so everyone shares the same rules, sub
 Do not let teammates run `npx lean-agents@latest` independently, which can introduce differing rules or tool pins across machines. Instead, pin an exact version in your team runbook or package scripts:
 
 ```bash
-npx lean-agents@1.2.0 --project . --dry-run
+npx lean-agents@1.2.1 --project . --dry-run
 ```
 
 Preview with `--dry-run` first to inspect every planned action without touching files. Once reviewed, apply the plan:
 
 ```bash
-npx lean-agents@1.2.0 --project .
+npx lean-agents@1.2.1 --project .
 ```
 
 PowerShell takes the same command.
@@ -48,7 +48,7 @@ Team state is stored locally in `~/.config/lean-agents/projects/`, never inside 
 Optional tools (such as Serena or Playwright) can be included during `--project` setup using `--tools`:
 
 ```bash
-npx lean-agents@1.2.0 --project . --tools serena,playwright
+npx lean-agents@1.2.1 --project . --tools serena,playwright
 ```
 
 ## 3. Teammate onboarding and `--doctor`
@@ -56,14 +56,14 @@ npx lean-agents@1.2.0 --project . --tools serena,playwright
 When a teammate pulls the branch, git delivers the repository rules, subagents, and MCP configurations. Each teammate then installs the required agent tools locally:
 
 ```bash
-npx lean-agents@1.2.0 --dry-run
-npx lean-agents@1.2.0
+npx lean-agents@1.2.1 --dry-run
+npx lean-agents@1.2.1
 ```
 
 Every teammate then verifies their setup with `--doctor`:
 
 ```bash
-npx lean-agents@1.2.0 --doctor
+npx lean-agents@1.2.1 --doctor
 ```
 
 ### What doctor statuses mean
@@ -74,7 +74,7 @@ npx lean-agents@1.2.0 --doctor
 | `note` | Information only (for example, shell guidance, project Node notices, or manual settings). | None (information only, nothing to fix). |
 | `changed` | A file, pin, or setting differs from the installed state (for example, a rule file edited locally since install, or a pin drift indicating an update is available). | Review the change. Local edits are fine if intentional; otherwise run `--update`. |
 | `error` | A required tool, binary, MCP registration, or install command failed or is missing, or a managed file is missing. | Check the reported error detail and reinstall or fix the missing requirement. |
-| `missing` | lean-agents is not installed on this machine (`not installed (run the installer)`). | Run the install (`npx lean-agents@1.2.0`). |
+| `missing` | lean-agents is not installed on this machine (`not installed (run the installer)`). | Run the install (`npx lean-agents@1.2.1`). |
 
 You can also pass `--json` to `--doctor` for machine-readable output in scripts or verification checks.
 
@@ -87,7 +87,7 @@ If teammates work on corporate machines behind an authenticating proxy or custom
 - Pass `--network off` (or `--privacy strict`) if outbound telemetry, automatic update checks, or external network requests are restricted by corporate policy:
 
 ```bash
-npx lean-agents@1.2.0 --project . --network off
+npx lean-agents@1.2.1 --project . --network off
 ```
 
 ## 5. Updating across the team (`--update`)
@@ -96,8 +96,8 @@ When upgrading the team to a newer lean-agents version:
 
 1. **Maintainer updates the repository:**
    ```bash
-   npx lean-agents@1.2.0 --project . --update --dry-run
-   npx lean-agents@1.2.0 --project . --update
+   npx lean-agents@1.2.1 --project . --update --dry-run
+   npx lean-agents@1.2.1 --project . --update
    git add AGENTS.md .github .cursor .vscode
    git commit -m "chore: update lean-agents to 1.2.0"
    git push
@@ -106,9 +106,9 @@ When upgrading the team to a newer lean-agents version:
 2. **Teammates update their local environment:**
    After pulling the commit, each teammate runs:
    ```bash
-   npx lean-agents@1.2.0 --update --dry-run
-   npx lean-agents@1.2.0 --update
-   npx lean-agents@1.2.0 --doctor
+   npx lean-agents@1.2.1 --update --dry-run
+   npx lean-agents@1.2.1 --update
+   npx lean-agents@1.2.1 --doctor
    ```
 
 To remove all configurations added by lean-agents:

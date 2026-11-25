@@ -4,6 +4,8 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-25
+
 ### Added
 - VS Code Insiders: with `--agents vscode-copilot`, MCP servers and strict-privacy settings are also written to the Insiders user folder when it exists, and undone by `--uninstall`; `code-insiders` counts as VS Code in detection and `--doctor`.
 - OpenCode CLI spike (#428): a CI job records the real OpenCode 2 help surface, exit codes and event types for headless workers (mock LLM, no login).
