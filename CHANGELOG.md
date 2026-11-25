@@ -9,6 +9,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - Savings benchmark: supports OpenRouter DeepSeek, multiple repeats, raw log uploads, and budget guards for runs and cost (#103).
 - The Copilot usage meter in the OpenCode sidebar and the `/copilot-usage` toast now show one decimal for the percent left, truncated so it never rounds up past the real value ([#190](https://github.com/estebanmr99/lean-agents/issues/190)).
 - The Claude Code `code-mode` note and the README rows now say that Remote Control, Claude in Chrome, computer use and the VS Code panel do not work while Code Mode is on, and that RTK and Context Mode do ([#304](https://github.com/estebanmr99/lean-agents/issues/304)).
+- Docs: Orca facts refreshed to v1.4.274 (2026-11-24), including the moved orca.dev docs site, the mobile remote-control warning for work machines, the agent CLIs Orca 1.4.266 can install, and VERIFY marks for unconfirmed CLI and installer items.
 
 ### Added
 - Savings benchmark can compare lean-agents rules alone with the full setup, run chosen tasks only, and measures fixed overhead per request with a one-word task (#404).
