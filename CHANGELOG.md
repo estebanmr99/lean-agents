@@ -15,6 +15,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - One read-only `--doctor` row that warns when OpenCode Code Mode is turned off ([#304](https://github.com/estebanmr99/lean-agents/issues/304)).
 
 ### Fixed
+- `scripts/pins-latest.mjs` refuses to run outside CI (or without `--force`), so it no longer rewrites `core/pins.json` in a normal checkout.
 - Dynamic job names in CI correctly report SKIPPED on docs-only PRs, so they no longer block the merge (#371 follow-up).
 - `--tools rtk` on Linux without Homebrew now installs the pinned, sha256-checked rtk release into `~/.local/bin` instead of stopping with a manual link ([#411](https://github.com/estebanmr99/lean-agents/issues/411)).
 - The DCP row in `--doctor` now shows for unmanaged machines if they have an OpenCode config listing it ([#391](https://github.com/estebanmr99/lean-agents/issues/391)).
