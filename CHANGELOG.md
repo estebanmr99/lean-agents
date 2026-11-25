@@ -4,6 +4,9 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Fixed
+- README (EN, ES): the Antigravity pilot section no longer says lean-agents skips the IDE; it installs it with Homebrew or winget unless `--no-app`.
+
 ## [1.2.1] - 2026-11-25
 
 ### Added

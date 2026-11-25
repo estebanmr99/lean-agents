@@ -483,7 +483,7 @@ Si tu empresa paga GitHub Copilot, la forma oficial de usar Claude como agente e
 Antigravity tiene tres partes: la CLI (`agy`), el IDE y la extensión de VS Code `Google.google-antigravity`. La documentación oficial dice que el IDE y la CLI leen las mismas carpetas de `~/.gemini/config`; todavía no está probado en el IDE.
 
 - **lean-agents configura** (con el adaptador de la CLI, ámbito de usuario): reglas, agentes, skills y servidores MCP en `~/.gemini/config`, y RTK, i-have-adhd y Caveman donde se admiten.
-- **No hace**: instalar el IDE ni la extensión, editar sus ajustes, escribir `hooks.json` ni el ajuste de telemetría (`antigravity.enableTelemetry` está obsoleto y activado por defecto; apágalo tú en modo equipo).
+- **No hace**: instalar la extensión, editar los ajustes del IDE o de la extensión, escribir `hooks.json` ni el ajuste de telemetría (`antigravity.enableTelemetry` está obsoleto y activado por defecto; apágalo tú en modo equipo).
 - **Comprobaciones de solo lectura**: `--doctor` y `--adopt` indican cuáles de `~/.gemini/antigravity-ide`, `antigravity-cli`, el `antigravity` heredado y la extensión existen. `--doctor` también lista las variables de proxy y CA que leen la extensión y `agy` (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, `NODE_EXTRA_CA_CERTS`, `SSL_CERT_FILE`, `NODE_USE_SYSTEM_CA`) como definidas o no, nunca sus valores.
 - **Sin verificar**: rutas de Windows y Linux, si el IDE ejecuta `hooks.json` o carga `.agents/mcp_config.json`, Open VSX, actualización automática. Ver [docs/compatibility.md](docs/compatibility.md).
 
