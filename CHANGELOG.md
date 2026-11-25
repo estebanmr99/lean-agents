@@ -5,6 +5,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ## [Unreleased]
 
 ### Changed
+- Docs: finished audits (2026-11, 0.8.0, 1.0.0), architecture checkpoints and `sessions-done.md` moved to `docs/archive/`; links updated. The latest release audit stays in `docs/`.
 - Savings benchmark reports stable medians and a chart (#404).
 - Savings benchmark: supports OpenRouter DeepSeek, multiple repeats, raw log uploads, and budget guards for runs and cost (#103).
 - The Copilot usage meter in the OpenCode sidebar and the `/copilot-usage` toast now show one decimal for the percent left, truncated so it never rounds up past the real value ([#190](https://github.com/estebanmr99/lean-agents/issues/190)).
@@ -63,7 +64,7 @@ First stable release. Highlights since 0.8.0:
 - **Antigravity and Cursor:** Antigravity pilot (IDE and extension detection, proxy variables in `--doctor`), more pins (Antigravity cask, Bun, rtk, uv, gh), and the Cursor installer re-pinned twice.
 - **Summary page:** the finish step writes a local HTML page with the log-ins to do, an agent verify prompt and next steps ([#181](https://github.com/estebanmr99/lean-agents/issues/181)).
 - **CI:** macOS legs and the slow Windows legs skip pull requests (macOS runs nightly and on dispatch); the release workflow publishes to npm through trusted publishing only ([#160](https://github.com/estebanmr99/lean-agents/issues/160)).
-- **Hardening:** eight independent reviews and the 0.8.0 audit are fixed or tracked in [`docs/audit-1.0.0.md`](docs/audit-1.0.0.md).
+- **Hardening:** eight independent reviews and the 0.8.0 audit are fixed or tracked in [`docs/audit-1.0.0.md`](docs/archive/audit-1.0.0.md).
 
 ### Added
 - Summary page (#181 PR3, closes #181): `scripts/lib/summary-html.mjs` renders one self-contained HTML (inline CSS and JS, no network; EN and ES; light and dark; word budget tested): red Action needed (log-ins, the verify prompt with a copy button), Summary, Next steps, How to use, Updates. The finish step and `--summary` write it as an owned `summary.html` in the state dir (`--uninstall` removes it) and print its path; the browser opens only after a yes, never under CI, `--yes`, `--json` or `--no-open`. `--filed-issue "item=issue url"` records an issue the verify prompt filed.

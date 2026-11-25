@@ -1,6 +1,6 @@
 # Done build sessions
 
-Archive of finished session blocks from [`SPEC.md`](SPEC.md) section 14, moved during the 0.7.0 release prep. Each session keeps one status line in SPEC. Open sessions stay in SPEC.
+Archive of finished session blocks from [`SPEC.md`](../SPEC.md) section 14, moved during the 0.7.0 release prep. Each session keeps one status line in SPEC. Open sessions stay in SPEC.
 
 ### Session 3 — Windows + OpenCode 1.x + wider CI
 

@@ -521,7 +521,7 @@ En una terminal real el instalador muestra menús (flechas, espacio para marcar)
 
 ## Modelos siempre al día
 
-Los subagentes piden un nivel (`fast`, `balanced`, `strong`), no un modelo. En Claude Code eso son los alias `haiku`, `sonnet` y `opus`, que siempre apuntan a los modelos más nuevos. Los demás agentes usan [perfiles](profiles/) fechados por suscripción, y la skill `update-models` los actualiza con tu aprobación.
+Los subagentes piden un nivel (`fast`, `balanced`, `strong`), no un modelo. En Claude Code eso son los alias `haiku`, `sonnet` y `opus`, que siempre apuntan a los modelos más nuevos. Los demás agentes usan [perfiles](profiles) fechados por suscripción, y la skill `update-models` los actualiza con tu aprobación.
 
 ## Seguridad
 

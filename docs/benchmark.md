@@ -4,7 +4,7 @@ The savings benchmark measures the token efficiency and wall-clock speed of usin
 
 ### No published numbers yet
 
-We do not publish savings claims without proof (as per [launch rules](./launch.md)). The numbers will be published here once the benchmark is run.
+We do not publish savings claims without proof (as per [launch rules](launch.md)). The numbers will be published here once the benchmark is run.
 
 ### Tasks
 

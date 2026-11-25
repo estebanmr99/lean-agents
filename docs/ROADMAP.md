@@ -24,7 +24,7 @@ Found while installing on two Windows 11 work PCs behind a corporate proxy.
 
 ## 0.7.0: trust what runs, then ship to npm
 
-Scope and order from the architecture checkpoint [`docs/checkpoints/0.7.0.md`](checkpoints/0.7.0.md), accepted by the owner on 2026-11-06.
+Scope and order from the architecture checkpoint [`docs/checkpoints/0.7.0.md`](archive/checkpoints/0.7.0.md), accepted by the owner on 2026-11-06.
 
 | Session | Issues | What changes |
 | --- | --- | --- |
@@ -64,7 +64,7 @@ No 0.9.0 release was cut: its scope (the guided OpenCode 1.x to 2.x upgrade, [#8
 
 ## 1.0.0
 
-Details in `CHANGELOG.md` and [`audit-1.0.0.md`](audit-1.0.0.md). Closed: the 0.8.0 audit issues ([#155](https://github.com/estebanmr99/lean-agents/issues/155) to [#169](https://github.com/estebanmr99/lean-agents/issues/169) except [#160](https://github.com/estebanmr99/lean-agents/issues/160)), [#181](https://github.com/estebanmr99/lean-agents/issues/181) and the review follow-ups. Code and docs are merged for these; they stay open for proof only the owner can give (see the audit, "Owner-only gates"):
+Details in `CHANGELOG.md` and [`audit-1.0.0.md`](archive/audit-1.0.0.md). Closed: the 0.8.0 audit issues ([#155](https://github.com/estebanmr99/lean-agents/issues/155) to [#169](https://github.com/estebanmr99/lean-agents/issues/169) except [#160](https://github.com/estebanmr99/lean-agents/issues/160)), [#181](https://github.com/estebanmr99/lean-agents/issues/181) and the review follow-ups. Code and docs are merged for these; they stay open for proof only the owner can give (see the audit, "Owner-only gates"):
 
 - [#80](https://github.com/estebanmr99/lean-agents/issues/80) part 2: guided OpenCode 1.x to 2.x upgrade with `opencode1` side by side, permanent session backup, undo and rollback. Open: the work-PC trial ([#145](https://github.com/estebanmr99/lean-agents/issues/145)).
 - [#179](https://github.com/estebanmr99/lean-agents/issues/179): fresh machine, `--everything` from a clean Mac or Windows PC, nightly CI. Open: fresh Mac and PC runs by the owner.

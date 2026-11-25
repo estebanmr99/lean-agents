@@ -521,7 +521,7 @@ In a real terminal the installer shows menus (arrow keys, space to toggle), a pr
 
 ## Models that stay current
 
-Subagents ask for a tier (`fast`, `balanced`, `strong`), not a model ID. Claude Code maps tiers to the `haiku`, `sonnet` and `opus` aliases, which always point to the newest models. Other agents use dated [profiles](profiles/) per subscription, and the `update-models` skill refreshes them with your approval.
+Subagents ask for a tier (`fast`, `balanced`, `strong`), not a model ID. Claude Code maps tiers to the `haiku`, `sonnet` and `opus` aliases, which always point to the newest models. Other agents use dated [profiles](profiles) per subscription, and the `update-models` skill refreshes them with your approval.
 
 ## Safety
 
