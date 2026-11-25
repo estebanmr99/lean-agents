@@ -1,0 +1,79 @@
+name: Spike Codex CLI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  spike:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Spike Codex CLI
+        run: |
+          # Use a throwaway HOME
+          ORIG_HOME="$HOME"
+          export HOME="$(mktemp -d)"
+          echo "Temporary HOME: $HOME"
+
+          # Save initial state
+          export ORIG_HOME_FIND="$RUNNER_TEMP/home-before.txt"
+          export GLOBAL_NODEMODS_LS="$RUNNER_TEMP/nodemods-before.txt"
+          find "$ORIG_HOME" -maxdepth 2 | sort > "$ORIG_HOME_FIND"
+          ls "$(npm prefix -g)/lib/node_modules" | sort > "$GLOBAL_NODEMODS_LS"
+
+          # Pinned: 0.167.0, published 2026-11-06 (18 days old on 2026-11-24) (no pins.json entry until an adapter exists).
+          npm install -g --ignore-scripts @openai/codex@0.167.0
+          
+          # Print version
+          codex --version
+          
+          # Write minimal config
+          mkdir -p "$HOME/.codex"
+          cat <<EOF > "$HOME/.codex/config.toml"
+          [mcp_servers.stub]
+          command = "node"
+          args = ["-e", "console.log('stub mcp')"]
+          EOF
+          
+          # Run list command and verify stub registration
+          codex mcp list | tee /dev/stderr | grep -q stub
+          
+          # Show config location
+          echo "Config file:"
+          ls -l "$HOME/.codex/config.toml"
+          
+          # Uninstall
+          npm uninstall -g @openai/codex
+          
+          # Delete HOME
+          TMP_HOME="$HOME"
+          export HOME="$ORIG_HOME"
+          rm -rf "$TMP_HOME"
+          
+          # Show nothing is left (the directory is gone)
+          if [ ! -d "$TMP_HOME" ]; then
+            echo "Temporary HOME successfully removed."
+          else
+            echo "Error: Temporary HOME still exists."
+            exit 1
+          fi
+
+          # Verify no global leaks
+          find "$ORIG_HOME" -maxdepth 2 | sort > "$RUNNER_TEMP/home-after.txt"
+          ls "$(npm prefix -g)/lib/node_modules" | sort > "$RUNNER_TEMP/nodemods-after.txt"
+          
+          echo "--- Diff HOME ---"
+          diff "$ORIG_HOME_FIND" "$RUNNER_TEMP/home-after.txt"
+          echo "--- Diff node_modules ---"
+          diff "$GLOBAL_NODEMODS_LS" "$RUNNER_TEMP/nodemods-after.txt"

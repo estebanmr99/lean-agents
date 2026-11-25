@@ -15,6 +15,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Added
 - CI test-count guard: a pull request must not lower the test count in `tests/*.test.mjs` without an explanation in the PR body (`tests-removed: <reason>`) (#443).
+- Codex CLI spike (#432): research and official upstream compatibility table for installation, config, rules, and non-interactive mode; added a GitHub workflow to test installation in a throwaway HOME.
 - Code Mode proxy core with sandbox, allowlist and audit log (not wired into the installer yet) (#407).
 - Savings benchmark can compare lean-agents rules alone with the full setup, run chosen tasks only, and measures fixed overhead per request with a one-word task (#404).
 - One read-only `--doctor` row that warns when OpenCode Code Mode is turned off ([#304](https://github.com/estebanmr99/lean-agents/issues/304)).

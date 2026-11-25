@@ -348,6 +348,31 @@ Checked 2026-11-03. lean-agents does not add a Gemini CLI adapter: upstream says
 - Proven by `real-cursor` (Ubuntu, macOS): `agent mcp list` reads `~/.cursor/mcp.json` and the repo's `.cursor/mcp.json`; the RTK hook in `~/.cursor/hooks.json`; skills in `~/.agents/skills`; `--uninstall` removes them.
 - **VERIFY:** whether the Cursor CLI loads `~/.cursor/agents/*.md` and `.cursor/agents/*.md` (CI checks the files only); whether it applies `.cursor/rules/lean-agents.mdc`; Context Mode hooks for Cursor (MCP only for now); `network.useHttp1ForAgent` for proxies (not set yet); the Cursor IDE app itself (not in CI).
 
+## Codex CLI (spike, #432)
+
+| Feature | Codex CLI | Source (2026-11-24) |
+| --- | --- | --- |
+| Install | `npm install -g @openai/codex` (proven by the spike job); `brew install --cask codex` **VERIFY** | [GitHub](https://github.com/openai/codex) |
+| Binary | `codex` | same |
+| Version | `codex --version` | same |
+| Config | `~/.codex/config.toml` (TOML) | [Config Reference](https://developers.openai.com/codex/config-reference) |
+| Global rules | `~/.codex/AGENTS.override.md` or `~/.codex/AGENTS.md` | [AGENTS.md Guide](https://developers.openai.com/codex/agent-configuration/agents-md.md) |
+| Project rules | `AGENTS.override.md` or `AGENTS.md` in repo root | same |
+| Skills | `~/.agents/skills`, `.agents/skills` up to repo root | [Skills Guide](https://developers.openai.com/codex/skills.md) |
+| MCP Config | `[mcp_servers.<id>]` in `config.toml` | [MCP Guide](https://developers.openai.com/codex/extend/mcp.md) |
+| Non-interactive | `codex exec "<prompt>"` or `--json` | [Non-interactive](https://developers.openai.com/codex/noninteractive.md) |
+| Auth | `codex login`, `~/.codex/auth.json`, or `CODEX_API_KEY` | [Auth Docs](https://developers.openai.com/codex/auth.md) |
+| Privacy | `analytics.enabled = false` in `config.toml` | [Config Reference](https://developers.openai.com/codex/config-reference) |
+| check_for_update_on_startup | `false` | [Config Reference](https://developers.openai.com/codex/config-reference) |
+| Auto-update loop | `codex app-server daemon pid-update-loop` (**VERIFY**) | [GitHub](https://github.com/openai/codex) |
+
+- **How undo works:** `npm uninstall -g @openai/codex` removes the binary and the spike deletes its throwaway HOME; a future adapter must also remove what it wrote under `~/.codex`.
+- **Login/Account:** Handled via `auth.json` or `CODEX_API_KEY`. This spike performs no login and requires no account.
+- **CI Proof:** The spike proves MCP registration in `config.toml` and that `codex mcp list` sees it. It does NOT start the MCP server or make model calls (no API key).
+- **Follow-up:** Next session must prove a real model call through a worker agent and verify the `pid-update-loop` claim.
+
+**Verdict:** go, with the VERIFY rows proven first.
+
 ## Proxy and corporate CA
 
 lean-agents copies each proxy variable it finds (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY`) to the other letter case for the commands it runs, because tools disagree on the case. It reports CA variables but never copies them: each one replaces a tool's whole bundle.
