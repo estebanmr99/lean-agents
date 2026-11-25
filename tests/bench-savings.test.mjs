@@ -34,6 +34,15 @@ test('checkQuotaError detects 402 and provider.quota', () => {
   assert.strictEqual(checkQuotaError('{"type":"message"}'), null);
 });
 
+test('checkQuotaError detects a BYOK spend cap (provider.auth 403, reason in the body)', () => {
+  const body = JSON.stringify({ error: { message: 'Provider returned error', code: 403, metadata: { raw: 'Spend cap breached for project: projects/x' } } });
+  const out = JSON.stringify({ type: 'error', error: { type: 'provider.auth', message: 'Provider returned error', status: 403, response: { body } } }) + '\n';
+  assert.deepStrictEqual(checkQuotaError('{"type":"step_start"}\n' + out), { type: 'provider.auth', status: 403 });
+  const textOnly = JSON.stringify({ type: 'error', error: { type: 'provider.other', message: 'Spend cap breached', status: 400 } }) + '\n';
+  assert.deepStrictEqual(checkQuotaError(textOnly), { type: 'provider.other', status: 400 });
+  assert.strictEqual(checkQuotaError(JSON.stringify({ type: 'error', error: { type: 'provider.other', message: 'bad request', status: 400 } })), null);
+});
+
 test('getStats on known arrays', () => {
   const arr = [10, 20, 30, 40, 50];
   const s = getStats(arr);

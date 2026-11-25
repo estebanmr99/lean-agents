@@ -8,6 +8,9 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - Benchmark: three long multi-step tasks (`--long`) to measure lean over long sessions (#404).
 - Benchmark: `--prices in,cacheRead,cacheWrite,out` (USD per million tokens) adds a cache-aware "Priced Cost" and a median turn count to the results (#404).
 
+### Fixed
+- Benchmark: a provider spend cap or auth error (HTTP 401/403, e.g. a BYOK key over its cap) now stops the run with exit 2 instead of reporting zeros as results (#404).
+
 ## [1.2.0] - 2026-11-24
 
 ### Changed
