@@ -10,8 +10,9 @@ bin="$(command -v code-insiders)"
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 HOME="$(mktemp -d)"
 export HOME XDG_CONFIG_HOME="$HOME/.config"
+trap 'rm -rf "$HOME"' EXIT
 unset XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
-"$bin" --version | head -1
+"$bin" --version | sed -n 1p
 if [[ "$(uname)" == Darwin ]]; then user="$HOME/Library/Application Support/Code - Insiders/User"; else user="$HOME/.config/Code - Insiders/User"; fi
 
 # VS Code Insiders picks the folder itself: nothing exists before this call.
@@ -28,5 +29,4 @@ grep -q '"telemetry.telemetryLevel": "off"' "$user/settings.json"
 node "$repo/scripts/lean.mjs" --home "$HOME" --uninstall --yes --no-exec </dev/null >/dev/null
 echo "after uninstall: $(servers)"
 [[ "$(servers)" == probe ]]
-rm -rf "$HOME"
 echo "PASS: spike-vscode-insiders"

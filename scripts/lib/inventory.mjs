@@ -23,7 +23,7 @@ export function clients(home) {
   return [
     { client: 'claude', file: j(home, '.claude.json'), keyPath: ['mcpServers'] },
     { client: 'cursor', file: j(home, '.cursor', 'mcp.json'), keyPath: ['mcpServers'] },
-    { client: 'vscode', file: j(code, 'mcp.json'), keyPath: ['servers'] }, // VERIFY: Insiders user dir on a real machine
+    { client: 'vscode', file: j(code, 'mcp.json'), keyPath: ['servers'] },
     { client: 'vscode-insiders', file: j(insiders, 'mcp.json'), keyPath: ['servers'] }, // VERIFY: Insiders user dir on a real machine
     { client: 'opencode', file: oc, keyPath: ['mcp'] },
     { client: 'opencode', file: oc, keyPath: ['mcp', 'servers'] },

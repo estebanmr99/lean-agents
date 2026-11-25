@@ -239,7 +239,8 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
       // VS Code: stable or Insiders, whichever is on PATH.
       for (const [bins, agent] of [[['code', 'code-insiders'], 'vscode-copilot'], [['cursor-agent'], 'cursor']]) {
         if (!o.agents.includes(agent)) continue;
-        const hit = bins.map((b) => [b, version(b, undefined, childEnv(network))]).find(([, v]) => v);
+        let hit = null;
+        for (const b of bins) { const v = version(b, undefined, childEnv(network)); if (v) { hit = [b, v]; break; } }
         add(`${hit?.[0] ?? bins[0]} on PATH`, hit ? 'ok' : 'error', hit?.[1] ?? 'not found');
       }
       if (!withMcp && ['claude', 'cursor', 'copilot-cli', 'antigravity'].some((a) => o.agents.includes(a))) add('mcp servers', 'skipped', 'network off (outbound off): `mcp list` not run');
