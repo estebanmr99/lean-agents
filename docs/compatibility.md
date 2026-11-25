@@ -15,7 +15,8 @@ What lean-agents configures per agent, how, and when each command or key was las
 | Caveman | `npx skills add … -a claude-code -g` | `npx skills add … -a opencode -g` | `npx skills add … -a opencode -g` | `npx skills add … -a github-copilot -g` | `npx skills add … -a antigravity-cli -g` (partial) |
 | Compaction | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=80` | `compaction.auto` + `compaction.buffer` | `compaction.auto` + `compaction.reserved`, optional DCP | planned | planned |
 | Strict privacy | env flags (below) | `share`, `update`, `policies` | `share`, `autoupdate`, `experimental.openTelemetry`, `disabled_providers` | `autoUpdate: false`; telemetry only through the `--disable-client-telemetry` flag | account setting only, printed as a reminder |
-| Token usage reporting | ➖ | `opencode run --format json` (stream event `type: "usage"`, or `type: "step-finish"` with `tokens` and `cost`; task #103 hint and opencode repo) | 2026-11-23 | ➖ | ➖ |
+| Telemetry usage reporting | ➖ | `opencode run --format json` (stream event `type: "usage"`, or `type: "step-finish"` with `tokens` and `cost`; task #103 hint and opencode repo) | 2026-11-23 | ➖ | ➖ |
+| **Gemini CLI** | ➖ | ➖ | ➖ | ➖ | ➖ |
 
 ### VS Code Copilot and Cursor
 
@@ -206,6 +207,30 @@ A community script that downgrades 2.x back to 1.19 exists ([gist](https://gist.
 | GSD Core: `@opengsd/gsd-core` 1.19.0, MIT, repo `open-gsd/gsd-core`. `--copilot`, `--antigravity`, `--opencode`, `--claude`, `--cursor` with `--global`, `--uninstall`. `--cursor --global` (v1.20.0) installs cleanly on Windows and adds lifecycle hooks to `~/.cursor/hooks.json` next to the RTK preToolUse hook (real install, #20, 2026-11-05). `model_overrides` is read from `~/.gsd/defaults.json` (`bin/lib/config-loader.cjs`) | npm, package source, real binary | 2026-10-30 |
 | Model IDs for `github-copilot`, `openai-api`, `opencode-go` exist | [models.dev](https://models.dev/api.json), `scripts/models-refresh.mjs --check` | 2026-10-30 |
 | OpenCode Go training terms: the default models are marked not used for training; Contributor and Free models may train; DeepSeek needs a region setting, so it is not a default | [docs](https://opencode.ai/docs/go) | 2026-10-30 |
+
+## Gemini CLI (spike, #433)
+
+| Feature | Gemini CLI |
+| --- | --- |
+| Install | `npm install -g @google/gemini-cli@0.67.0` (2026-11-04) |
+| Binary | `gemini` |
+| Version | `gemini --version` (or `/about`) |
+| Config Path | `~/.gemini/settings.json` |
+| Config Format | JSON |
+| Rules/AGENTS.md | `GEMINI.md` (project root) |
+| MCP Config | `~/.gemini/settings.json` (`mcpServers` key) |
+| Non-interactive | `-p "query"` or `--output-format json` |
+| Auth | `GEMINI_API_KEY` (AI Studio), `GOOGLE_CLOUD_PROJECT` (Code Assist) |
+| Telemetry | `telemetry.enabled` in `settings.json` (Default: `false`) |
+| Auto-update | `general.enableAutoUpdate` in `settings.json` (Default: `true`) |
+
+**Overlap with Antigravity CLI:**
+Gemini CLI (`gemini`) is focused on Enterprise Gemini Code Assist (Google Cloud) and paid API tiers. Antigravity CLI (`agy`) is the successor for consumer, free, and Google One (Pro/Ultra) tiers. Both are open-source AI agents with MCP support, but `agy` is optimized for Gemini 4 Argon+ while `gemini` is maintained for stable enterprise workflows.
+
+**Recommendation:**
+Go. Gemini CLI provides a stable path for enterprise users on Google Cloud who are not yet moving to the Gemini 4/Antigravity stack. The configuration and MCP support are consistent with Antigravity, making the adapter logic reusable.
+
+*Checked: 2026-11-24. Source: [github.com/google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli), [geminicli.com](https://geminicli.com)*
 | OpenCode 2: `cli.json` replaces `tui.json` (migration code and docs inside the binary); `policies` accepted | real binary 2.1.4, `tests/real-opencode.sh` | 2026-10-30 |
 | i-have-adhd ships `disable-model-invocation: true`: a prompt cannot load it, only `/i-have-adhd` or the always-on flag. lean-agents sets it to `false` in the installed copies | plugin 0.4.1 | 2026-10-30 |
 | vhs: needs `ttyd` and `ffmpeg`; tape commands `Output`, `Set`, `Hide`, `Show`, `Type`, `Enter`, `Sleep`. `charmbracelet/vhs-action` latest is v2.1.1, input `path`; the tag `v2` is used in `assets.yml` | [vhs README](https://github.com/charmbracelet/vhs), [action](https://github.com/charmbracelet/vhs-action), `assets` job | 2026-10-31 |

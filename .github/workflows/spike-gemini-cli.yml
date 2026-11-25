@@ -1,0 +1,79 @@
+name: Gemini CLI Spike
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  spike:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Install Gemini CLI
+        run: |
+          npm install -g @google/gemini-cli@0.67.0 --ignore-scripts
+      - name: Test Gemini CLI in throwaway HOME
+        run: |
+          # Record initial state of real HOME (should be clean or standard)
+          REAL_HOME_BEFORE=$(ls -A "$HOME" | sort)
+          
+          TMP_HOME=$(mktemp -d)
+          export HOME="$TMP_HOME"
+          
+          echo "Initial throwaway HOME state:"
+          ls -R "$HOME"
+          
+          # Version check (print version)
+          # Use -p "/about" in case --version is not standard
+          gemini -p "/about" --output-format json
+          
+          # Write minimal config with MCP stub
+          mkdir -p "$HOME/.gemini"
+          cat > "$HOME/.gemini/settings.json" <<EOF
+          {
+            "mcpServers": {
+              "stub": {
+                "command": "node",
+                "args": ["-e", "console.log(JSON.stringify({mcpVersion: '1.0.0', capabilities: {}, serverInfo: {name: 'stub', version: '1.0.0'}}))"]
+              }
+            },
+            "telemetry": {
+              "enabled": false
+            },
+            "general": {
+              "enableAutoUpdate": false
+            }
+          }
+          EOF
+          
+          # Run the CLI's MCP list command
+          gemini -p "/mcp list" --output-format json
+          
+          # Cleanup throwaway HOME
+          rm -rf "$TMP_HOME"
+          
+          # Verify nothing left in throwaway HOME path
+          if [ -d "$TMP_HOME" ]; then
+            echo "ERROR: Throwaway HOME was not deleted"
+            exit 1
+          fi
+          
+          # Restore real HOME and verify no leak
+          export HOME="/home/runner"
+          REAL_HOME_AFTER=$(ls -A "$HOME" | sort)
+          
+          if [ "$REAL_HOME_BEFORE" != "$REAL_HOME_AFTER" ]; then
+            echo "ERROR: Real HOME was modified!"
+            diff <(echo "$REAL_HOME_BEFORE") <(echo "$REAL_HOME_AFTER")
+            exit 1
+          fi
+          
+          echo "Success: Nothing leaked outside throwaway HOME."
