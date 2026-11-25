@@ -343,7 +343,6 @@ Checked 2026-11-03. lean-agents does not add a Gemini CLI adapter: upstream says
 
 - **VERIFY:** Gemini CLI rules file (`~/.gemini/GEMINI.md`, `context.fileName` for `AGENTS.md`), skills and subagent folders, proxy, telemetry and usage statistics settings, the Node minimum, and whether `gemini mcp list` runs without a login.
 
-
 ### Cursor: what CI proves today
 
 - Proven by `real-cursor` (Ubuntu, macOS): `agent mcp list` reads `~/.cursor/mcp.json` and the repo's `.cursor/mcp.json`; the RTK hook in `~/.cursor/hooks.json`; skills in `~/.agents/skills`; `--uninstall` removes them.
@@ -353,7 +352,7 @@ Checked 2026-11-03. lean-agents does not add a Gemini CLI adapter: upstream says
 
 | Feature | Codex CLI | Source (2026-11-24) |
 | --- | --- | --- |
-| Install | `npm install -g @openai/codex` or `brew install --cask codex` | [GitHub](https://github.com/openai/codex) |
+| Install | `npm install -g @openai/codex` (proven by the spike job); `brew install --cask codex` **VERIFY** | [GitHub](https://github.com/openai/codex) |
 | Binary | `codex` | same |
 | Version | `codex --version` | same |
 | Config | `~/.codex/config.toml` (TOML) | [Config Reference](https://developers.openai.com/codex/config-reference) |
@@ -367,7 +366,7 @@ Checked 2026-11-03. lean-agents does not add a Gemini CLI adapter: upstream says
 | check_for_update_on_startup | `false` | [Config Reference](https://developers.openai.com/codex/config-reference) |
 | Auto-update loop | `codex app-server daemon pid-update-loop` (**VERIFY**) | [GitHub](https://github.com/openai/codex) |
 
-- **How undo works:** `npm uninstall -g @openai/codex` removes the binary; lean-agents also removes the `~/.codex` config directory.
+- **How undo works:** `npm uninstall -g @openai/codex` removes the binary and the spike deletes its throwaway HOME; a future adapter must also remove what it wrote under `~/.codex`.
 - **Login/Account:** Handled via `auth.json` or `CODEX_API_KEY`. This spike performs no login and requires no account.
 - **CI Proof:** The spike proves MCP registration in `config.toml` and that `codex mcp list` sees it. It does NOT start the MCP server or make model calls (no API key).
 - **Follow-up:** Next session must prove a real model call through a worker agent and verify the `pid-update-loop` claim.
