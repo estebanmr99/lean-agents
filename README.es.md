@@ -274,7 +274,7 @@ curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/i
 & ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -DryRun
 ```
 
-`LEAN_AGENTS_VERSION=1.2.0` fija un release. Ya instalado, `--dry-run`, `--doctor` y `--uninstall` no usan la red. Un checkout local (`bash install.sh` desde un clon) se confía tal cual; solo la descarga del release se comprueba con checksum.
+`LEAN_AGENTS_VERSION=1.2.1` fija un release. Ya instalado, `--dry-run`, `--doctor` y `--uninstall` no usan la red. Un checkout local (`bash install.sh` desde un clon) se confía tal cual; solo la descarga del release se comprueba con checksum.
 
 ## Por qué
 
@@ -559,7 +559,8 @@ lean-agents es pegamento. El trabajo pesado lo hacen estos proyectos; dales una 
 - [x] Sesiones de agentes en paralelo (`scripts/parallel.mjs`)
 - [x] Integraciones de Warp y Orca para quien ya las usa
 - [x] App y CLI de Antigravity en macOS, Linux y Windows (la carga en la app sigue en VERIFY)
-- [x] `v1.2.0` (último): rtk en Linux sin Homebrew, avisos más claros de versión de Node, base del proxy de Code Mode, spike de Codex CLI, Código de Conducta.
+- [x] `v1.2.1` (último): soporte de VS Code Insiders.
+- [x] `v1.2.0`: rtk en Linux sin Homebrew, avisos más claros de versión de Node, base del proxy de Code Mode, spike de Codex CLI, Código de Conducta.
 - [x] `v1.1.0`: Harness de benchmark, instaladores de Antigravity/Cursor para Windows, --add-tools y guía de despliegue para equipos.
 - [x] `v1.0.0`: `--everything` para una máquina nueva, actualización guiada de OpenCode 1.x a 2.x con copia y deshacer, instalación con el agente de VS Code Copilot, plan de actualización y `--update --undo`, página de resumen; Node.js 22.20 o superior
 - [x] `v0.8.0`: instalar y desinstalar agentes opcionales, la guía del coordinador, adoptar una máquina armada a mano, runtime de Node por herramienta en `--doctor`

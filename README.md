@@ -274,7 +274,7 @@ curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/i
 & ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -DryRun
 ```
 
-`LEAN_AGENTS_VERSION=1.2.0` pins a release. Once installed, `--dry-run`, `--doctor` and `--uninstall` need no network. A local checkout (`bash install.sh` from a clone) is trusted as it is; only the release download is checksum-verified.
+`LEAN_AGENTS_VERSION=1.2.1` pins a release. Once installed, `--dry-run`, `--doctor` and `--uninstall` need no network. A local checkout (`bash install.sh` from a clone) is trusted as it is; only the release download is checksum-verified.
 
 ## Why
 
@@ -559,7 +559,8 @@ lean-agents is glue. The heavy lifting is done by these projects; please star th
 - [x] Parallel agent sessions (`scripts/parallel.mjs`)
 - [x] Warp and Orca agent integrations for users who already have them
 - [x] Antigravity app and CLI on macOS, Linux and Windows (app loading stays VERIFY)
-- [x] `v1.2.0` (latest): rtk on Linux without Homebrew, clearer Node version hints, Code Mode proxy groundwork, Codex CLI spike, Code of Conduct.
+- [x] `v1.2.1` (latest): VS Code Insiders support.
+- [x] `v1.2.0`: rtk on Linux without Homebrew, clearer Node version hints, Code Mode proxy groundwork, Codex CLI spike, Code of Conduct.
 - [x] `v1.1.0`: Savings benchmark, Antigravity/Cursor Windows installers, --add-tools, and team rollout guide.
 - [x] `v1.0.0`: fresh-machine `--everything`, guided OpenCode 1.x to 2.x upgrade with backup and undo, install by the VS Code Copilot agent, update plan and `--update --undo`, summary page; Node.js 22.20 or newer
 - [x] `v0.8.0`: optional agent install and uninstall, the coordinator playbook, adopt a hand-built machine, Node runtime per tool in `--doctor`
