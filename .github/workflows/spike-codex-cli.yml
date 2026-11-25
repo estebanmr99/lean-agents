@@ -25,12 +25,14 @@ jobs:
           ORIG_HOME="$HOME"
           export HOME="$(mktemp -d)"
           echo "Temporary HOME: $HOME"
-          
-          # List before
-          echo "--- HOME before ---"
-          ls -la "$HOME"
-          
-          # Pinned: newest release at least 14 days old on 2026-11-24 (no pins.json entry until an adapter exists).
+
+          # Save initial state
+          export ORIG_HOME_FIND="$RUNNER_TEMP/home-before.txt"
+          export GLOBAL_NODEMODS_LS="$RUNNER_TEMP/nodemods-before.txt"
+          find "$ORIG_HOME" -maxdepth 2 | sort > "$ORIG_HOME_FIND"
+          ls "$(npm prefix -g)/lib/node_modules" | sort > "$GLOBAL_NODEMODS_LS"
+
+          # Pinned: 0.167.0, published 2026-11-06 (18 days old on 2026-11-24) (no pins.json entry until an adapter exists).
           npm install -g --ignore-scripts @openai/codex@0.167.0
           
           # Print version
@@ -44,12 +46,15 @@ jobs:
           args = ["-e", "console.log('stub mcp')"]
           EOF
           
-          # Run list command if exists
-          codex mcp list || codex --help
+          # Run list command and verify stub registration
+          codex mcp list | tee /dev/stderr | grep -q stub
           
           # Show config location
           echo "Config file:"
           ls -l "$HOME/.codex/config.toml"
+          
+          # Uninstall
+          npm uninstall -g @openai/codex
           
           # Delete HOME
           TMP_HOME="$HOME"
@@ -63,3 +68,12 @@ jobs:
             echo "Error: Temporary HOME still exists."
             exit 1
           fi
+
+          # Verify no global leaks
+          find "$ORIG_HOME" -maxdepth 2 | sort > "$RUNNER_TEMP/home-after.txt"
+          ls "$(npm prefix -g)/lib/node_modules" | sort > "$RUNNER_TEMP/nodemods-after.txt"
+          
+          echo "--- Diff HOME ---"
+          diff "$ORIG_HOME_FIND" "$RUNNER_TEMP/home-after.txt"
+          echo "--- Diff node_modules ---"
+          diff "$GLOBAL_NODEMODS_LS" "$RUNNER_TEMP/nodemods-after.txt"

@@ -343,6 +343,12 @@ Checked 2026-11-03. lean-agents does not add a Gemini CLI adapter: upstream says
 
 - **VERIFY:** Gemini CLI rules file (`~/.gemini/GEMINI.md`, `context.fileName` for `AGENTS.md`), skills and subagent folders, proxy, telemetry and usage statistics settings, the Node minimum, and whether `gemini mcp list` runs without a login.
 
+
+### Cursor: what CI proves today
+
+- Proven by `real-cursor` (Ubuntu, macOS): `agent mcp list` reads `~/.cursor/mcp.json` and the repo's `.cursor/mcp.json`; the RTK hook in `~/.cursor/hooks.json`; skills in `~/.agents/skills`; `--uninstall` removes them.
+- **VERIFY:** whether the Cursor CLI loads `~/.cursor/agents/*.md` and `.cursor/agents/*.md` (CI checks the files only); whether it applies `.cursor/rules/lean-agents.mdc`; Context Mode hooks for Cursor (MCP only for now); `network.useHttp1ForAgent` for proxies (not set yet); the Cursor IDE app itself (not in CI).
+
 ## Codex CLI (spike, #432)
 
 | Feature | Codex CLI | Source (2026-11-24) |
@@ -358,14 +364,15 @@ Checked 2026-11-03. lean-agents does not add a Gemini CLI adapter: upstream says
 | Non-interactive | `codex exec "<prompt>"` or `--json` | [Non-interactive](https://developers.openai.com/codex/noninteractive.md) |
 | Auth | `codex login`, `~/.codex/auth.json`, or `CODEX_API_KEY` | [Auth Docs](https://developers.openai.com/codex/auth.md) |
 | Privacy | `analytics.enabled = false` in `config.toml` | [Config Reference](https://developers.openai.com/codex/config-reference) |
-| Auto-update | `check_for_update_on_startup = false`, `codex app-server daemon pid-update-loop` (**VERIFY**) | [GitHub](https://github.com/openai/codex) |
+| check_for_update_on_startup | `false` | [Config Reference](https://developers.openai.com/codex/config-reference) |
+| Auto-update loop | `codex app-server daemon pid-update-loop` (**VERIFY**) | [GitHub](https://github.com/openai/codex) |
 
-**Recommendation:** Go. Codex CLI supports MCP, non-interactive mode via `exec`, and standard `AGENTS.md` rules, making it compatible with the lean-agents architecture.
+- **How undo works:** `npm uninstall -g @openai/codex` removes the binary; lean-agents also removes the `~/.codex` config directory.
+- **Login/Account:** Handled via `auth.json` or `CODEX_API_KEY`. This spike performs no login and requires no account.
+- **CI Proof:** The spike proves MCP registration in `config.toml` and that `codex mcp list` sees it. It does NOT start the MCP server or make model calls (no API key).
+- **Follow-up:** Next session must prove a real model call through a worker agent and verify the `pid-update-loop` claim.
 
-### Cursor: what CI proves today
-
-- Proven by `real-cursor` (Ubuntu, macOS): `agent mcp list` reads `~/.cursor/mcp.json` and the repo's `.cursor/mcp.json`; the RTK hook in `~/.cursor/hooks.json`; skills in `~/.agents/skills`; `--uninstall` removes them.
-- **VERIFY:** whether the Cursor CLI loads `~/.cursor/agents/*.md` and `.cursor/agents/*.md` (CI checks the files only); whether it applies `.cursor/rules/lean-agents.mdc`; Context Mode hooks for Cursor (MCP only for now); `network.useHttp1ForAgent` for proxies (not set yet); the Cursor IDE app itself (not in CI).
+**Verdict:** go, with the VERIFY rows proven first.
 
 ## Proxy and corporate CA
 
