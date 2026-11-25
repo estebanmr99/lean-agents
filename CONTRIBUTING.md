@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping. The full design is in [docs/SPEC.md](docs/SPEC.md); read its "Non-negotiable rules" first.
+Thanks for helping. The full design is in [docs/SPEC.md](docs/SPEC.md); read its "Non-negotiable rules" first. Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Development
 

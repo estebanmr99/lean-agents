@@ -73,15 +73,29 @@ Details in `CHANGELOG.md` and [`audit-1.0.0.md`](archive/audit-1.0.0.md). Closed
 - [#160](https://github.com/estebanmr99/lean-agents/issues/160): npm publish through trusted publishing only. Open until the tag run proves it.
 - Launch: run `docs/launch.md` after the tag.
 
-## 1.1.0 (current)
+## 1.1.0 (released 2026-11-23)
 
 Details in `CHANGELOG.md` and [`audit-1.1.0.md`](audit-1.1.0.md).
+
+## 1.2.0 (next)
+
+- [#407](https://github.com/estebanmr99/lean-agents/issues/407): own Code Mode MCP proxy core (first in lean-agents, then as a separate project).
+- Repo cleanup and archive: finished audits, checkpoints and sessions stay in `docs/archive/`.
+- Community basics: [Code of Conduct](../CODE_OF_CONDUCT.md) and the social preview image ([#429](https://github.com/estebanmr99/lean-agents/issues/429), [#442](https://github.com/estebanmr99/lean-agents/issues/442)).
+
+## 1.3.0
+
+- Benchmark v2 and publish: [prove the savings](https://github.com/estebanmr99/lean-agents/issues/404), [publish the result](https://github.com/estebanmr99/lean-agents/issues/430), [multi-agent vs solo](https://github.com/estebanmr99/lean-agents/issues/431), [harness benchmark](https://github.com/estebanmr99/lean-agents/issues/103).
+- Multi-CLI orchestration: [one main session with visible worker status](https://github.com/estebanmr99/lean-agents/issues/428), [less slop in the coordinator](https://github.com/estebanmr99/lean-agents/issues/436).
+- Codex and Gemini CLI spikes ([#432](https://github.com/estebanmr99/lean-agents/issues/432), [#433](https://github.com/estebanmr99/lean-agents/issues/433)).
+- [Launch](https://github.com/estebanmr99/lean-agents/issues/434) and [demo GIFs](https://github.com/estebanmr99/lean-agents/issues/435).
+- Handy and T3 investigations ([#420](https://github.com/estebanmr99/lean-agents/issues/420), [#422](https://github.com/estebanmr99/lean-agents/issues/422)).
 
 ## After 1.0.0
 
 - [#103](https://github.com/estebanmr99/lean-agents/issues/103): harness benchmark and personal vs enterprise recommendation (needs an inference budget).
 - Close the **VERIFY** items in `docs/compatibility.md` that need a logged-in app (Antigravity rule and skill loading, Copilot `model` format, VS Code reading Copilot CLI hooks).
-- Codex CLI and Gemini CLI adapters.
+- Codex CLI and Gemini CLI adapter spikes: [#432](https://github.com/estebanmr99/lean-agents/issues/432), [#433](https://github.com/estebanmr99/lean-agents/issues/433).
 - Open issues and why they do not gate 1.0: `audit-1.0.0.md`.
 
 ## Promotion

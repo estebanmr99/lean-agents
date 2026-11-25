@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compareCounts, countTests } from '../scripts/test-count.mjs';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 test('countTests counts correctly', () => {
   const code = `
@@ -69,4 +71,11 @@ test('compareCounts PR_BODY escape requires reason', () => {
   const prBody = 'tests-removed: '; // Empty reason
   const { errors } = compareCounts(base, head, prBody);
   assert.equal(errors.length, 1);
+});
+
+test('CLI fails closed when the base ref is missing', () => {
+  const script = fileURLToPath(new URL('../scripts/test-count.mjs', import.meta.url));
+  const r = spawnSync(process.execPath, [script, 'nonexistent-ref-xyz', 'HEAD'], { encoding: 'utf8' });
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /base ref nonexistent-ref-xyz not found/);
 });

@@ -5,6 +5,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ## [Unreleased]
 
 ### Changed
+- Docs: Contributor Covenant 2.1 Code of Conduct linked from CONTRIBUTING and both READMEs; roadmap 1.2.0 and 1.3.0 with the next sessions in the spec (#429).
 - Docs: finished audits (2026-11, 0.8.0, 1.0.0), architecture checkpoints and `sessions-done.md` moved to `docs/archive/`; links updated. The latest release audit stays in `docs/`.
 - Savings benchmark reports stable medians and a chart (#404).
 - Savings benchmark: supports OpenRouter DeepSeek, multiple repeats, raw log uploads, and budget guards for runs and cost (#103).
@@ -14,6 +15,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Added
 - CI test-count guard: a pull request must not lower the test count in `tests/*.test.mjs` without an explanation in the PR body (`tests-removed: <reason>`) (#443).
+- Code Mode proxy core with sandbox, allowlist and audit log (not wired into the installer yet) (#407).
 - Savings benchmark can compare lean-agents rules alone with the full setup, run chosen tasks only, and measures fixed overhead per request with a one-word task (#404).
 - One read-only `--doctor` row that warns when OpenCode Code Mode is turned off ([#304](https://github.com/estebanmr99/lean-agents/issues/304)).
 
