@@ -343,6 +343,25 @@ Checked 2026-11-03. lean-agents does not add a Gemini CLI adapter: upstream says
 
 - **VERIFY:** Gemini CLI rules file (`~/.gemini/GEMINI.md`, `context.fileName` for `AGENTS.md`), skills and subagent folders, proxy, telemetry and usage statistics settings, the Node minimum, and whether `gemini mcp list` runs without a login.
 
+## Codex CLI (spike, #432)
+
+| Feature | Codex CLI | Source (2026-11-24) |
+| --- | --- | --- |
+| Install | `npm install -g @openai/codex` or `brew install --cask codex` | [GitHub](https://github.com/openai/codex) |
+| Binary | `codex` | same |
+| Version | `codex --version` | same |
+| Config | `~/.codex/config.toml` (TOML) | [Config Reference](https://developers.openai.com/codex/config-reference) |
+| Global rules | `~/.codex/AGENTS.override.md` or `~/.codex/AGENTS.md` | [AGENTS.md Guide](https://developers.openai.com/codex/agent-configuration/agents-md.md) |
+| Project rules | `AGENTS.override.md` or `AGENTS.md` in repo root | same |
+| Skills | `~/.agents/skills`, `.agents/skills` up to repo root | [Skills Guide](https://developers.openai.com/codex/skills.md) |
+| MCP Config | `[mcp_servers.<id>]` in `config.toml` | [MCP Guide](https://developers.openai.com/codex/extend/mcp.md) |
+| Non-interactive | `codex exec "<prompt>"` or `--json` | [Non-interactive](https://developers.openai.com/codex/noninteractive.md) |
+| Auth | `codex login`, `~/.codex/auth.json`, or `CODEX_API_KEY` | [Auth Docs](https://developers.openai.com/codex/auth.md) |
+| Privacy | `analytics.enabled = false` in `config.toml` | [Config Reference](https://developers.openai.com/codex/config-reference) |
+| Auto-update | `check_for_update_on_startup = false`, `codex app-server daemon pid-update-loop` (**VERIFY**) | [GitHub](https://github.com/openai/codex) |
+
+**Recommendation:** Go. Codex CLI supports MCP, non-interactive mode via `exec`, and standard `AGENTS.md` rules, making it compatible with the lean-agents architecture.
+
 ### Cursor: what CI proves today
 
 - Proven by `real-cursor` (Ubuntu, macOS): `agent mcp list` reads `~/.cursor/mcp.json` and the repo's `.cursor/mcp.json`; the RTK hook in `~/.cursor/hooks.json`; skills in `~/.agents/skills`; `--uninstall` removes them.

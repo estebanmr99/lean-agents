@@ -1,0 +1,65 @@
+name: Spike Codex CLI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  spike:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Spike Codex CLI
+        run: |
+          # Use a throwaway HOME
+          ORIG_HOME="$HOME"
+          export HOME="$(mktemp -d)"
+          echo "Temporary HOME: $HOME"
+          
+          # List before
+          echo "--- HOME before ---"
+          ls -la "$HOME"
+          
+          # Install pinned version (latest for now since no pin in pins.json yet)
+          npm install -g @openai/codex
+          
+          # Print version
+          codex --version
+          
+          # Write minimal config
+          mkdir -p "$HOME/.codex"
+          cat <<EOF > "$HOME/.codex/config.toml"
+          [mcp_servers.stub]
+          command = "node"
+          args = ["-e", "console.log('stub mcp')"]
+          EOF
+          
+          # Run list command if exists
+          codex mcp list || codex --help
+          
+          # Show config location
+          echo "Config file:"
+          ls -l "$HOME/.codex/config.toml"
+          
+          # Delete HOME
+          TMP_HOME="$HOME"
+          export HOME="$ORIG_HOME"
+          rm -rf "$TMP_HOME"
+          
+          # Show nothing is left (the directory is gone)
+          if [ ! -d "$TMP_HOME" ]; then
+            echo "Temporary HOME successfully removed."
+          else
+            echo "Error: Temporary HOME still exists."
+            exit 1
+          fi

@@ -13,6 +13,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - Docs: Orca facts refreshed to v1.4.274 (2026-11-24), including the moved orca.dev docs site, the mobile remote-control warning for work machines, the agent CLIs Orca 1.4.266 can install, and VERIFY marks for unconfirmed CLI and installer items.
 
 ### Added
+- Codex CLI spike (#432): research and official upstream compatibility table for installation, config, rules, and non-interactive mode; added a GitHub workflow to test installation in a throwaway HOME.
 - Savings benchmark can compare lean-agents rules alone with the full setup, run chosen tasks only, and measures fixed overhead per request with a one-word task (#404).
 - One read-only `--doctor` row that warns when OpenCode Code Mode is turned off ([#304](https://github.com/estebanmr99/lean-agents/issues/304)).
 
