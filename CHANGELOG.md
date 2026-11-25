@@ -5,6 +5,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ## [Unreleased]
 
 ### Changed
+- Docs: Contributor Covenant 2.1 Code of Conduct linked from CONTRIBUTING and both READMEs; roadmap 1.2.0 and 1.3.0 with the next sessions in the spec (#429).
 - Docs: finished audits (2026-11, 0.8.0, 1.0.0), architecture checkpoints and `sessions-done.md` moved to `docs/archive/`; links updated. The latest release audit stays in `docs/`.
 - Savings benchmark reports stable medians and a chart (#404).
 - Savings benchmark: supports OpenRouter DeepSeek, multiple repeats, raw log uploads, and budget guards for runs and cost (#103).
