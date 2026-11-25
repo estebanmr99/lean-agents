@@ -571,7 +571,7 @@ Detalle e issues enlazados: [docs/ROADMAP.md](docs/ROADMAP.md) (en inglés).
 
 ## Contribuir
 
-Los issues y PRs son bienvenidos. Lee primero [CONTRIBUTING.md](CONTRIBUTING.md); cada PR pasa un escaneo de secretos y privacidad.
+Los issues y PRs son bienvenidos. Lee primero [CONTRIBUTING.md](CONTRIBUTING.md); cada PR pasa un escaneo de secretos y privacidad. Al participar aceptas el [Código de Conducta](CODE_OF_CONDUCT.md).
 
 ## Licencia
 
