@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseTokenUsage, finalText, keySpend, redactKey, checkQuotaError, getStats, generateChart, renderResultsMarkdown, priceUsage, TASKS, checkEnv } from './bench-savings.mjs';
+import { parseTokenUsage, finalText, keySpend, redactKey, checkQuotaError, isEmptyErrorRun, getStats, generateChart, renderResultsMarkdown, priceUsage, TASKS, checkEnv } from './bench-savings.mjs';
 import { doctor } from '../scripts/lib/doctor.mjs';
 import { buildSummary } from '../scripts/lib/summary-data.mjs';
 import { renderSummary } from '../scripts/lib/summary-html.mjs';
@@ -32,6 +32,26 @@ test('checkQuotaError detects 402 and provider.quota', () => {
   const out2 = '{"status":402,"error":{"message":"payment required"}}\n';
   assert.deepStrictEqual(checkQuotaError(out2), { type: undefined, status: 402 });
   assert.strictEqual(checkQuotaError('{"type":"message"}'), null);
+});
+
+test('checkQuotaError detects a BYOK spend cap (provider.auth 403, reason in the body)', () => {
+  const body = JSON.stringify({ error: { message: 'Provider returned error', code: 403, metadata: { raw: 'Spend cap breached for project: projects/x' } } });
+  const out = JSON.stringify({ type: 'error', error: { type: 'provider.auth', message: 'Provider returned error', status: 403, response: { body } } }) + '\n';
+  assert.deepStrictEqual(checkQuotaError('{"type":"step_start"}\n' + out), { type: 'provider.auth', status: 403 });
+  const textOnly = JSON.stringify({ type: 'error', error: { type: 'provider.other', message: 'Spend cap breached', status: 400 } }) + '\n';
+  assert.deepStrictEqual(checkQuotaError(textOnly), { type: 'provider.other', status: 400 });
+  assert.strictEqual(checkQuotaError(JSON.stringify({ type: 'error', error: { type: 'provider.other', message: 'bad request', status: 400 } })), null);
+});
+
+test('checkQuotaError ignores quota text and 403s outside error events', () => {
+  const ok = ['{"type":"step_start"}', JSON.stringify({ type: 'tool_use', status: 403, message: 'curl: 403 quota exceeded' }), '{"type":"text","message":"spend cap"}'].join('\n');
+  assert.strictEqual(checkQuotaError(ok), null);
+});
+
+test('isEmptyErrorRun: zero tokens plus an error event, even after step_start', () => {
+  assert.strictEqual(isEmptyErrorRun({ inputTokens: 0 }, ['step_start', 'error']), true);
+  assert.strictEqual(isEmptyErrorRun({ inputTokens: 0 }, ['step_start']), false);
+  assert.strictEqual(isEmptyErrorRun({ inputTokens: 12 }, ['step_start', 'error']), false);
 });
 
 test('getStats on known arrays', () => {
