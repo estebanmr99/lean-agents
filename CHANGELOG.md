@@ -4,6 +4,9 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Added
+- Benchmark: `--prices` gives a cache-aware cost per run, and turns are counted (#404).
+
 ## [1.2.0] - 2026-11-24
 
 ### Changed
