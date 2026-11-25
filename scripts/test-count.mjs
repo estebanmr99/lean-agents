@@ -1,24 +1,19 @@
 #!/usr/bin/env node
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 
 /**
  * Statically count test calls in a file's content.
  * Matches test(, it(, and t.test( on lines not starting with //.
+ * heuristic: top-level and t.test calls at line start
  */
 export function countTests(content) {
-  let count = 0;
-  const lines = content.split('\n');
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith('//')) continue;
-    const matches = trimmed.match(/\b(test|it|t\.test)\s*\(/g);
-    if (matches) {
-      count += matches.length;
-    }
-  }
-  return count;
+  // Strip // comments first
+  const clean = content.replace(/\/\/.*$/gm, '');
+  const matches = clean.match(/^\s*(?:await\s+)?(?:test|it|t\.test)\s*\(/gm);
+  return matches ? matches.length : 0;
 }
 
 /**
@@ -48,22 +43,23 @@ export function compareCounts(baseCounts, headCounts, prBody = '') {
 function getCountsForRef(ref) {
   let files;
   try {
-    files = execSync(`git ls-tree -r --name-only ${ref} tests/`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] })
+    files = execFileSync('git', ['ls-tree', '-r', '--name-only', ref, 'tests/'], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] })
       .split('\n')
       .filter(f => f.endsWith('.test.mjs'));
   } catch (e) {
-    // Ref might not exist (e.g. fresh repo)
-    return {};
+    process.stderr.write(`test-count: base ref ${ref} not found (fetch-depth: 0?)\n`);
+    process.exit(1);
   }
 
   const counts = {};
   for (const file of files) {
     if (!file) continue;
     try {
-      const content = execSync(`git show ${ref}:${file}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+      const content = execFileSync('git', ['show', `${ref}:${file}`], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
       counts[file] = countTests(content);
     } catch (e) {
-      // Ignore files that can't be shown
+      // A file missing at one ref is still fine: count 0.
+      counts[file] = 0;
     }
   }
   return counts;
@@ -100,10 +96,7 @@ async function main() {
 }
 
 // Run if called directly
-const isMain = process.argv[1] && (
-  process.argv[1] === fileURLToPath(import.meta.url) ||
-  process.argv[1].endsWith('test-count.mjs')
-);
+const isMain = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
 
 if (isMain) {
   main().catch(err => {

@@ -14,7 +14,22 @@ test('countTests counts correctly', () => {
       it('nested', () => {});
     });
   `;
+  // test, it, t.test, test, it (nested is indented but at start of line)
   assert.equal(countTests(code), 5);
+});
+
+test('countTests uses tighter regex', () => {
+  const code = `
+    test('one', () => {});
+    await t.test('two', () => {});
+      await t.test('three', () => {});
+    /re/.test(x);
+    foo.it('not me');
+    // test('ignored', () => {});
+    it('four', () => {});
+  `;
+  // Matches: test, await t.test,   await t.test, it
+  assert.equal(countTests(code), 4);
 });
 
 test('compareCounts flags drops', () => {
