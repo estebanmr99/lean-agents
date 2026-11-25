@@ -38,6 +38,13 @@ jobs:
           cd spikes/code-mode-deps
           npm audit --omit=dev --audit-level=high >> $GITHUB_STEP_SUMMARY
 
+      - name: Code Mode Proxy Deps
+        run: |
+          cd tools/code-mode-proxy
+          npm ci --ignore-scripts
+          npm audit signatures
+          npm audit --omit=dev --audit-level=high
+
       - name: Run Probe
         run: |
           cd spikes/code-mode-deps
