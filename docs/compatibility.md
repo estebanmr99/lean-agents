@@ -207,30 +207,6 @@ A community script that downgrades 2.x back to 1.19 exists ([gist](https://gist.
 | GSD Core: `@opengsd/gsd-core` 1.19.0, MIT, repo `open-gsd/gsd-core`. `--copilot`, `--antigravity`, `--opencode`, `--claude`, `--cursor` with `--global`, `--uninstall`. `--cursor --global` (v1.20.0) installs cleanly on Windows and adds lifecycle hooks to `~/.cursor/hooks.json` next to the RTK preToolUse hook (real install, #20, 2026-11-05). `model_overrides` is read from `~/.gsd/defaults.json` (`bin/lib/config-loader.cjs`) | npm, package source, real binary | 2026-10-30 |
 | Model IDs for `github-copilot`, `openai-api`, `opencode-go` exist | [models.dev](https://models.dev/api.json), `scripts/models-refresh.mjs --check` | 2026-10-30 |
 | OpenCode Go training terms: the default models are marked not used for training; Contributor and Free models may train; DeepSeek needs a region setting, so it is not a default | [docs](https://opencode.ai/docs/go) | 2026-10-30 |
-
-## Gemini CLI (spike, #433)
-
-| Feature | Gemini CLI |
-| --- | --- |
-| Install | `npm install -g @google/gemini-cli@0.67.0` (2026-11-04) |
-| Binary | `gemini` |
-| Version | `gemini --version` (or `/about`) |
-| Config Path | `~/.gemini/settings.json` |
-| Config Format | JSON |
-| Rules/AGENTS.md | `GEMINI.md` (project root) |
-| MCP Config | `~/.gemini/settings.json` (`mcpServers` key) |
-| Non-interactive | `-p "query"` or `--output-format json` |
-| Auth | `GEMINI_API_KEY` (AI Studio), `GOOGLE_CLOUD_PROJECT` (Code Assist) |
-| Telemetry | `telemetry.enabled` in `settings.json` (Default: `false`) |
-| Auto-update | `general.enableAutoUpdate` in `settings.json` (Default: `true`) |
-
-**Overlap with Antigravity CLI:**
-Gemini CLI (`gemini`) is focused on Enterprise Gemini Code Assist (Google Cloud) and paid API tiers. Antigravity CLI (`agy`) is the successor for consumer, free, and Google One (Pro/Ultra) tiers. Both are open-source AI agents with MCP support, but `agy` is optimized for Gemini 4 Argon+ while `gemini` is maintained for stable enterprise workflows.
-
-**Recommendation:**
-Go. Gemini CLI provides a stable path for enterprise users on Google Cloud who are not yet moving to the Gemini 4/Antigravity stack. The configuration and MCP support are consistent with Antigravity, making the adapter logic reusable.
-
-*Checked: 2026-11-24. Source: [github.com/google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli), [geminicli.com](https://geminicli.com)*
 | OpenCode 2: `cli.json` replaces `tui.json` (migration code and docs inside the binary); `policies` accepted | real binary 2.1.4, `tests/real-opencode.sh` | 2026-10-30 |
 | i-have-adhd ships `disable-model-invocation: true`: a prompt cannot load it, only `/i-have-adhd` or the always-on flag. lean-agents sets it to `false` in the installed copies | plugin 0.4.1 | 2026-10-30 |
 | vhs: needs `ttyd` and `ffmpeg`; tape commands `Output`, `Set`, `Hide`, `Show`, `Type`, `Enter`, `Sleep`. `charmbracelet/vhs-action` latest is v2.1.1, input `path`; the tag `v2` is used in `assets.yml` | [vhs README](https://github.com/charmbracelet/vhs), [action](https://github.com/charmbracelet/vhs-action), `assets` job | 2026-10-31 |
@@ -354,24 +330,35 @@ Checked 2026-11-10 for Session 64 (#64, #66, #75). Every value is read from the 
 | Installer-script pins (`version: "script"` in `core/pins.json`): `ci-latest` (`scripts/pins-latest.mjs`) re-hashes the URL and tests the new script; after a green run `scripts/bump-pins.mjs` writes the new `sha256` into the pin-bump PR, with no 14-day rule (a fixed URL has no release date). The Windows Cursor script (`cursor.com/install?win32=true`, `tests/real-cursor.ps1`) has no pin and no hash check yet. **VERIFY** on the first ci-latest run after an upstream script change | `tests/ci-latest.test.mjs`; live hashes of all 6 script pins matched on 2026-11-20, #245 | 2026-11-20 |
 | `tests/real-cursor.ps1` and `tests/real-antigravity.ps1` still run the upstream PowerShell installer from a script block (`irm`); pin them in a follow-up | Left as is: another worker edits the real-cursor/antigravity tests | 2026-11-10 |
 
-## Gemini CLI (not supported)
-
-Checked 2026-11-03. lean-agents does not add a Gemini CLI adapter: upstream says free individual access and Google AI Pro and Ultra moved to Antigravity CLI on 2026-06-18, and Gemini CLI now serves Gemini Code Assist Standard and Enterprise. Antigravity CLI is supported instead.
-
-| Item | Source | Checked |
-| --- | --- | --- |
-| Access moved to Antigravity CLI on 2026-06-18; Gemini CLI targets Code Assist Standard and Enterprise | [README](https://github.com/google-gemini/gemini-cli), [MCP docs](https://geminicli.com/docs/tools/mcp-server) | 2026-11-03 |
-| Install: `npm install -g @google/gemini-cli`, `npx @google/gemini-cli`, `brew install gemini-cli`, MacPorts, conda | [README](https://github.com/google-gemini/gemini-cli) | 2026-11-03 |
-| MCP: `~/.gemini/settings.json` `mcpServers` (`command`, `url` or `httpUrl`; `args`, `env`, `cwd`, `timeout`, `trust`, `includeTools`, `excludeTools`); `gemini mcp add [-s user\|project] [-t stdio\|sse\|http]`, `gemini mcp list`, `gemini mcp remove`; stdio servers connect only in trusted folders | [MCP docs](https://geminicli.com/docs/tools/mcp-server) | 2026-11-03 |
-| Auto-update: `general.enableAutoUpdate` (default true); `skills.enabled` (default true) | [settings](https://geminicli.com/docs/cli/settings) | 2026-11-03 |
-| RTK: `rtk init -g --gemini` (BeforeTool hook) | [rtk](https://github.com/rtk-ai/rtk) | 2026-11-03 |
-
-- **VERIFY:** Gemini CLI rules file (`~/.gemini/GEMINI.md`, `context.fileName` for `AGENTS.md`), skills and subagent folders, proxy, telemetry and usage statistics settings, the Node minimum, and whether `gemini mcp list` runs without a login.
-
-### Cursor: what CI proves today
+## Cursor: what CI proves today
 
 - Proven by `real-cursor` (Ubuntu, macOS): `agent mcp list` reads `~/.cursor/mcp.json` and the repo's `.cursor/mcp.json`; the RTK hook in `~/.cursor/hooks.json`; skills in `~/.agents/skills`; `--uninstall` removes them.
 - **VERIFY:** whether the Cursor CLI loads `~/.cursor/agents/*.md` and `.cursor/agents/*.md` (CI checks the files only); whether it applies `.cursor/rules/lean-agents.mdc`; Context Mode hooks for Cursor (MCP only for now); `network.useHttp1ForAgent` for proxies (not set yet); the Cursor IDE app itself (not in CI).
+
+## Gemini CLI (spike, #433)
+
+Gemini CLI targets Code Assist Standard and Enterprise. Free individual access and Google AI Pro/Ultra moved to Antigravity CLI on 2026-06-18.
+
+| Item | Source | Checked |
+| --- | --- | --- |
+| Install: `npm install -g @google/gemini-cli@0.67.0` (pinned; published 2026-11-04, 20 days old on 2026-11-24) | [README](https://github.com/google-gemini/gemini-cli) | 2026-11-24 |
+| Config: `~/.gemini/settings.json` (JSON format) | [configuration](https://raw.githubusercontent.com/google-gemini/gemini-cli/main/docs/reference/configuration.md) | 2026-11-24 |
+| MCP: `mcpServers` key; `gemini mcp list` | [MCP docs](https://geminicli.com/docs/tools/mcp-server) | 2026-11-24 |
+| Rules: `GEMINI.md` default context file | [README](https://github.com/google-gemini/gemini-cli) | 2026-11-24 |
+| Auto-update: `general.enableAutoUpdate` (default true) | [configuration](https://raw.githubusercontent.com/google-gemini/gemini-cli/main/docs/reference/configuration.md) | 2026-11-24 |
+| Privacy: `privacy.usageStatisticsEnabled` (default true) | [configuration](https://raw.githubusercontent.com/google-gemini/gemini-cli/main/docs/reference/configuration.md) | 2026-11-24 |
+| **VERIFY:** `telemetry.enabled` default | | |
+| **VERIFY:** `gemini --version` output | | |
+| **VERIFY:** `gemini mcp list` syntax | | |
+| **VERIFY:** skills and extension paths | | |
+| **VERIFY:** `brew install @google/gemini-cli` | | |
+| RTK: `rtk init -g --gemini` (BeforeTool hook) | [rtk](https://github.com/rtk-ai/rtk) | 2026-11-03 |
+
+**Verdict: conditional go**
+- (a) Gemini CLI and Antigravity both write under `~/.gemini` (Antigravity: `~/.gemini/config/mcp_config.json`, Gemini CLI: `~/.gemini/settings.json`), so an adapter must not touch the other's files, and uninstall of one must leave the other intact;
+- (b) Adapter code is not shared with Antigravity's (different file and format), only the `GEMINI.md` block idea;
+- (c) The spike job (`spike-gemini-cli.yml`, manual) proves the pinned install, `gemini --version`, that `gemini mcp list` reads a `settings.json` written into a throwaway HOME, and that uninstall leaves the real HOME and the npm prefix as they were. It does not log in, call a model, or start the stub MCP server.
+- (d) Next session: a `gemini` adapter (`GEMINI.md` block + `settings.json` `mcpServers` as a `json` action), and what would flip it to no-go (upstream drops headless/MCP config, or the `~/.gemini` collision cannot be kept apart).
 
 ## Proxy and corporate CA
 

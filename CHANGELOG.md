@@ -13,6 +13,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - Docs: Orca facts refreshed to v1.4.274 (2026-11-24), including the moved orca.dev docs site, the mobile remote-control warning for work machines, the agent CLIs Orca 1.4.266 can install, and VERIFY marks for unconfirmed CLI and installer items.
 
 ### Added
+- Gemini CLI spike (#433): research notes and a manual CI workflow, no adapter yet.
 - Savings benchmark can compare lean-agents rules alone with the full setup, run chosen tasks only, and measures fixed overhead per request with a one-word task (#404).
 - One read-only `--doctor` row that warns when OpenCode Code Mode is turned off ([#304](https://github.com/estebanmr99/lean-agents/issues/304)).
 
