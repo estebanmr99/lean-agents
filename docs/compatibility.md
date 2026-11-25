@@ -373,6 +373,24 @@ Checked 2026-11-03. lean-agents does not add a Gemini CLI adapter: upstream says
 
 **Verdict:** go, with the VERIFY rows proven first.
 
+## OpenCode 2 headless workers (spike, #428)
+
+`tests/spike-opencode-cli.sh` in `spike-opencode-cli.yml` runs the real pinned binary (`bash scripts/ci-install-opencode-v2.sh`) on ubuntu-latest and macos-latest with a throwaway HOME, all XDG dirs inside it (the Ubuntu runner sets `XDG_CONFIG_HOME`), a local mock LLM and a stub that answers HTTP 403. No login, no paid model. Source: CI run [45624183533](https://github.com/estebanmr99/lean-agents/actions/runs/45624183533), 2026-11-25, OpenCode 2.2.5.
+
+| Case | Result (both OSes) |
+| --- | --- |
+| Top-level `--prompt` | yes |
+| `run --attach` | no (use `attach`/`serve` subcommands; both `--help` exit 0) |
+| `run --standalone` | yes |
+| Mock model answers | exit 0, events `step_start,tool_use,step_finish,text`, `sessionID` present |
+| Unknown model / unknown provider | exit 1, `error` event `provider.no-route` |
+| Provider answers 403 (spend cap shape) | exit 1, `step_start` then `error` `provider.auth 403` with the body message |
+| Provider port closed | exit 1, `step_start` then `error` |
+| Empty prompt | exit 1, "You must provide a message" |
+
+- **For a coordinator:** exit code and the `error` event are reliable failure signals; a run can emit `step_start` before failing, so "started" does not mean "working". Piping `opencode run` through `tee` hides the exit code unless the shell uses `pipefail`.
+- **Not proven:** real provider calls, long runs, `serve` + `attach` as a worker pool.
+
 ## Proxy and corporate CA
 
 lean-agents copies each proxy variable it finds (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY`) to the other letter case for the commands it runs, because tools disagree on the case. It reports CA variables but never copies them: each one replaces a tool's whole bundle.
