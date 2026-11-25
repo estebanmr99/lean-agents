@@ -30,7 +30,7 @@ jobs:
           export ORIG_HOME_FIND="$RUNNER_TEMP/home-before.txt"
           export GLOBAL_NODEMODS_LS="$RUNNER_TEMP/nodemods-before.txt"
           find "$ORIG_HOME" -maxdepth 2 | sort > "$ORIG_HOME_FIND"
-          ls "$(npm prefix -g)/lib/node_modules" | sort > "$GLOBAL_NODEMODS_LS"
+          npm ls -g --depth=0 --parseable | sort > "$GLOBAL_NODEMODS_LS"
 
           # Pinned: 0.167.0, published 2026-11-06 (18 days old on 2026-11-24) (no pins.json entry until an adapter exists).
           npm install -g --ignore-scripts @openai/codex@0.167.0
@@ -71,7 +71,7 @@ jobs:
 
           # Verify no global leaks
           find "$ORIG_HOME" -maxdepth 2 | sort > "$RUNNER_TEMP/home-after.txt"
-          ls "$(npm prefix -g)/lib/node_modules" | sort > "$RUNNER_TEMP/nodemods-after.txt"
+          npm ls -g --depth=0 --parseable | sort > "$RUNNER_TEMP/nodemods-after.txt"
           
           echo "--- Diff HOME ---"
           diff "$ORIG_HOME_FIND" "$RUNNER_TEMP/home-after.txt"

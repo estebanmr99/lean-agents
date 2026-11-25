@@ -368,7 +368,7 @@ Checked 2026-11-03. lean-agents does not add a Gemini CLI adapter: upstream says
 
 - **How undo works:** `npm uninstall -g @openai/codex` removes the binary and the spike deletes its throwaway HOME; a future adapter must also remove what it wrote under `~/.codex`.
 - **Login/Account:** Handled via `auth.json` or `CODEX_API_KEY`. This spike performs no login and requires no account.
-- **CI Proof:** The spike proves MCP registration in `config.toml` and that `codex mcp list` sees it. It does NOT start the MCP server or make model calls (no API key).
+- **CI Proof:** The spike proves MCP registration in `config.toml` and that `codex mcp list` sees it. It does NOT start the MCP server or make model calls (no API key). First run [45549814258](https://github.com/estebanmr99/lean-agents/actions/runs/45549814258) (2026-11-24): `codex-cli 0.167.0` installed and `codex mcp list` listed the stub server from the throwaway HOME; the leak check then failed only on the empty `@openai` scope folder npm leaves after uninstall, so it now compares `npm ls -g --parseable`.
 - **Follow-up:** Next session must prove a real model call through a worker agent and verify the `pid-update-loop` claim.
 
 **Verdict:** go, with the VERIFY rows proven first.

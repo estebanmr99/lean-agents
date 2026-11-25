@@ -4,7 +4,10 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-24
+
 ### Changed
+- Gemini CLI is not planned: upstream made it enterprise-only on 2026-06-18 and Antigravity CLI, already supported, covers individual accounts (#433).
 - Docs: Contributor Covenant 2.1 Code of Conduct linked from CONTRIBUTING and both READMEs; roadmap 1.2.0 and 1.3.0 with the next sessions in the spec (#429).
 - Docs: finished audits (2026-11, 0.8.0, 1.0.0), architecture checkpoints and `sessions-done.md` moved to `docs/archive/`; links updated. The latest release audit stays in `docs/`.
 - Savings benchmark reports stable medians and a chart (#404).
@@ -16,11 +19,13 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ### Added
 - CI test-count guard: a pull request must not lower the test count in `tests/*.test.mjs` without an explanation in the PR body (`tests-removed: <reason>`) (#443).
 - Codex CLI spike (#432): research and official upstream compatibility table for installation, config, rules, and non-interactive mode; added a GitHub workflow to test installation in a throwaway HOME.
-- Code Mode proxy core with sandbox, allowlist and audit log (not wired into the installer yet) (#407).
+- Groundwork, not usable yet: Code Mode proxy core with a QuickJS sandbox, allowlist and audit log in `tools/code-mode-proxy/`. Nothing in the installer uses it; `--tools code-mode-proxy` comes in 1.3.0 (#407).
 - Savings benchmark can compare lean-agents rules alone with the full setup, run chosen tasks only, and measures fixed overhead per request with a one-word task (#404).
 - One read-only `--doctor` row that warns when OpenCode Code Mode is turned off ([#304](https://github.com/estebanmr99/lean-agents/issues/304)).
 
 ### Fixed
+- Codex CLI spike workflow: the leak check compares `npm ls -g` so the empty scope folder npm leaves after uninstall no longer fails it.
+- `SECURITY.md`: 1.2.x is current; 1.1.x gets security fixes only.
 - `scripts/pins-latest.mjs` refuses to run outside CI (or without `--force`), so it no longer rewrites `core/pins.json` in a normal checkout.
 - Dynamic job names in CI correctly report SKIPPED on docs-only PRs, so they no longer block the merge (#371 follow-up).
 - `--tools rtk` on Linux without Homebrew now installs the pinned, sha256-checked rtk release into `~/.local/bin` instead of stopping with a manual link ([#411](https://github.com/estebanmr99/lean-agents/issues/411)).
