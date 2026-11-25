@@ -15,7 +15,7 @@ The benchmark consists of several tasks designed to test various agent capabilit
 3. **Task 5 (Fix)**: Fix a single failing test in a small project.
 4. **Task 6 (Large Fix)**: Fix a failing test among 60 tests in a 400-line output.
 5. **Task 7 (Refactor)**: Rename a configuration key across 30 files where only 3 files actually use it. Tests the agent's ability to prune searches and edits.
-6. **Task 8 (Log Analysis)**: Identify the function and line number from a 5,000-line log file containing one stack trace.
+7. **Tasks 9-11 (Long)**: Multi-step workflows requiring many turns (multi-file bug hunt, adding a cross-file feature, large-file refactoring). These measure whether lean's tools pay off over extended reasoning sessions. Run these alone using the `--long` flag.
 
 ### What "stable" means
 

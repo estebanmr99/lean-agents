@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseTokenUsage, finalText, keySpend, redactKey, checkQuotaError, getStats, generateChart, renderResultsMarkdown, priceUsage } from './bench-savings.mjs';
+import { parseTokenUsage, finalText, keySpend, redactKey, checkQuotaError, getStats, generateChart, renderResultsMarkdown, priceUsage, TASKS } from './bench-savings.mjs';
 import { doctor } from '../scripts/lib/doctor.mjs';
 import { buildSummary } from '../scripts/lib/summary-data.mjs';
 import { renderSummary } from '../scripts/lib/summary-html.mjs';
@@ -94,7 +94,7 @@ test('bench-savings budget guards', async (t) => {
       '--max-runs', '50'
     ], { encoding: 'utf8' });
     assert.strictEqual(res.status, 2);
-    assert.match(res.stderr, /Estimated runs \(180\) exceed --max-runs \(50\)/);
+    assert.match(res.stderr, /Estimated runs \(240\) exceed --max-runs \(50\)/);
   });
 
   fs.rmSync(home, { recursive: true, force: true });
@@ -266,4 +266,103 @@ test('renderResultsMarkdown variants table and overhead, and prices', () => {
   assert.match(mdPrices, /Priced Cost uses 1,0,0,1 USD per 1M tokens/);
   assert.match(mdPrices, /\| Task \| Mode \| Pass Rate \| Median In \| IQR In \| Median Out \| Median Turns \| Median Time \| Cost \| Priced Cost \|/);
   assert.match(mdPrices, /\| task0 \| baseline \| 100% \| 100 \| 100-100 \| 5 \| 1 \| 500ms \| \$0.0000 \| \$0.0010 \|/);
+});
+
+test('bench-savings --long and --tasks conflict', () => {
+  const home = path.join(os.tmpdir(), `bench-long-conflict-${Date.now()}`);
+  fs.mkdirSync(home, { recursive: true });
+
+  const res = spawnSync(process.execPath, [
+    path.join(ROOT, 'tests', 'bench-savings.mjs'),
+    '--home', home,
+    '--long',
+    '--tasks', 'task9'
+  ], { encoding: 'utf8' });
+  
+  assert.strictEqual(res.status, 1);
+  assert.match(res.stderr, /bench-savings: use --long or --tasks, not both/);
+  
+  fs.rmSync(home, { recursive: true, force: true });
+});
+
+test('bench-savings task9 check function', () => {
+  const task = TASKS.find(t => t.id === 'task9');
+  const dir = path.join(os.tmpdir(), `bench-task9-${Date.now()}`);
+  fs.mkdirSync(dir, { recursive: true });
+  task.setup(dir);
+  
+  // untouched should fail
+  assert.strictEqual(task.check(dir), false);
+  
+  // apply fix
+  fs.writeFileSync(path.join(dir, 'src', 'math.mjs'), 'export function add(a, b) { return a + b; }\n');
+  fs.writeFileSync(path.join(dir, 'src', 'string.mjs'), 'export function upper(s) { return s.toUpperCase(); }\n');
+  fs.writeFileSync(path.join(dir, 'src', 'logic.mjs'), 'export function isTrue(v) { return true; }\n');
+  
+  // now it should pass
+  assert.strictEqual(task.check(dir), true);
+  
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('bench-savings task10 check function', () => {
+  const task = TASKS.find(t => t.id === 'task10');
+  const dir = path.join(os.tmpdir(), `bench-task10-${Date.now()}`);
+  fs.mkdirSync(dir, { recursive: true });
+  task.setup(dir);
+  
+  assert.strictEqual(task.check(dir), false);
+  
+  fs.writeFileSync(path.join(dir, 'cli.mjs'), "import { parse } from './lib/parse.mjs';\n" +
+                                              "import { format } from './lib/format.mjs';\n" +
+                                              "const input = process.argv[process.argv.indexOf('--json') > -1 ? 3 : 2] || 'a,b';\n" +
+                                              "const parsed = parse(input);\n" +
+                                              "if (process.argv.includes('--json')) {\n" +
+                                              "  console.log(JSON.stringify(parsed));\n" +
+                                              "} else {\n" +
+                                              "  console.log(format(parsed));\n" +
+                                              "}\n");
+  const testContent = fs.readFileSync(path.join(dir, 'tests', 'cli.test.mjs'), 'utf8');
+  fs.writeFileSync(path.join(dir, 'tests', 'cli.test.mjs'), testContent + "\ntest('json', () => assert.strictEqual(1, 1));\n");
+  const readmeContent = fs.readFileSync(path.join(dir, 'README.md'), 'utf8');
+  fs.writeFileSync(path.join(dir, 'README.md'), readmeContent + '\nSupports --json flag\n');
+  
+  assert.strictEqual(task.check(dir), true);
+  
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('bench-savings task11 check function', () => {
+  const task = TASKS.find(t => t.id === 'task11');
+  const dir = path.join(os.tmpdir(), `bench-task11-${Date.now()}`);
+  fs.mkdirSync(dir, { recursive: true });
+  task.setup(dir);
+  
+  assert.strictEqual(task.check(dir), false);
+  
+  let content = fs.readFileSync(path.join(dir, 'legacy.mjs'), 'utf8');
+  content = `export function shared(result) {
+  const step1 = result + 1;
+  const step2 = step1 * 2;
+  const UNIQUE_MARKER = "DUPLICATED_BLOCK_MARKER_STRING";
+  return step2 + UNIQUE_MARKER.length;
+}\n` + content;
+
+  for (let i = 1; i <= 5; i++) {
+    content = content.replace(
+      `  // duplicated block start\n` +
+      `  const step1 = result + 1;\n` +
+      `  const step2 = step1 * 2;\n` +
+      `  const UNIQUE_MARKER = "DUPLICATED_BLOCK_MARKER_STRING";\n` +
+      `  result = step2 + UNIQUE_MARKER.length;\n` +
+      `  // duplicated block end`,
+      `  result = shared(result);`
+    );
+  }
+  
+  fs.writeFileSync(path.join(dir, 'legacy.mjs'), content);
+  
+  assert.strictEqual(task.check(dir), true);
+  
+  fs.rmSync(dir, { recursive: true, force: true });
 });

@@ -118,7 +118,7 @@ export function priceUsage(usage, prices) {
   );
 }
 
-const TASKS = [
+export const TASKS = [
   {
     id: 'task0',
     prompt: 'Reply with the single word OK and nothing else.',
@@ -168,7 +168,10 @@ test('failing test', () => { assert.strictEqual(val, 2); });
       `);
     },
     check: (dir) => {
-      const res = spawnSync(process.execPath, ['--test'], { cwd: dir });
+      const env = { ...process.env };
+      delete env.NODE_TEST_CONTEXT;
+      delete env.NODE_TEST_WORKER_ID;
+      const res = spawnSync(process.execPath, ['--test'], { cwd: dir, env });
       return res.status === 0;
     },
   },
@@ -185,7 +188,10 @@ test('failing test', () => { assert.strictEqual(val, 2); });
       fs.writeFileSync(path.join(dir, 'tests', 'fail.test.mjs'), content);
     },
     check: (dir) => {
-      const res = spawnSync(process.execPath, ['--test'], { cwd: dir });
+      const env = { ...process.env };
+      delete env.NODE_TEST_CONTEXT;
+      delete env.NODE_TEST_WORKER_ID;
+      const res = spawnSync(process.execPath, ['--test'], { cwd: dir, env });
       return res.status === 0;
     },
   },
@@ -234,6 +240,119 @@ test('failing test', () => { assert.strictEqual(val, 2); });
     check: (dir, stdout) => {
       const lower = (stdout || '').toLowerCase();
       return lower.includes('buggyfunction') && lower.includes('123');
+    },
+  },
+  {
+    id: 'task9',
+    prompt: 'Run the tests with node --test and fix every failing test without editing the test files.',
+    long: true,
+    setup: (dir) => {
+      fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+      fs.mkdirSync(path.join(dir, 'tests'), { recursive: true });
+      fs.writeFileSync(path.join(dir, 'src', 'math.mjs'), 'export function add(a, b) { return a - b; } // bug 1\n');
+      fs.writeFileSync(path.join(dir, 'src', 'string.mjs'), 'export function upper(s) { return s.toLowerCase(); } // bug 2\n');
+      fs.writeFileSync(path.join(dir, 'src', 'logic.mjs'), 'export function isTrue(v) { return false; } // bug 3\n');
+      fs.writeFileSync(path.join(dir, 'src', 'index.mjs'), 'export * from "./math.mjs";\nexport * from "./string.mjs";\nexport * from "./logic.mjs";\n');
+      for (let i = 1; i <= 6; i++) {
+        fs.writeFileSync(path.join(dir, 'src', `filler${i}.mjs`), `export function noop${i}() { return ${i}; }\n`);
+      }
+      const testContent = "import test from 'node:test';\n" +
+                          "import assert from 'node:assert';\n" +
+                          "import { add, upper, isTrue } from '../src/index.mjs';\n\n" +
+                          "test('add', () => assert.strictEqual(add(2, 3), 5));\n" +
+                          "test('upper', () => assert.strictEqual(upper('hello'), 'HELLO'));\n" +
+                          "test('isTrue', () => assert.strictEqual(isTrue(true), true));\n";
+      fs.writeFileSync(path.join(dir, 'tests', 'all.test.mjs'), testContent);
+      fs.writeFileSync(path.join(dir, '.test-hash'), testContent);
+    },
+    check: (dir) => {
+      const env = { ...process.env };
+      delete env.NODE_TEST_CONTEXT;
+      delete env.NODE_TEST_WORKER_ID;
+      const res = spawnSync(process.execPath, ['--test'], { cwd: dir, env });
+      const orig = fs.readFileSync(path.join(dir, '.test-hash'), 'utf8');
+      const current = fs.readFileSync(path.join(dir, 'tests', 'all.test.mjs'), 'utf8');
+      return res.status === 0 && orig === current;
+    },
+  },
+  {
+    id: 'task10',
+    prompt: 'Add a --json flag that prints the result as JSON, with a test for it, and document it in README.',
+    long: true,
+    setup: (dir) => {
+      fs.mkdirSync(path.join(dir, 'lib'), { recursive: true });
+      fs.mkdirSync(path.join(dir, 'tests'), { recursive: true });
+      fs.writeFileSync(path.join(dir, 'lib', 'parse.mjs'), 'export function parse(input) { return input.split(","); }\n');
+      fs.writeFileSync(path.join(dir, 'lib', 'format.mjs'), 'export function format(parsed) { return parsed.join(" | "); }\n');
+      fs.writeFileSync(path.join(dir, 'cli.mjs'), "import { parse } from './lib/parse.mjs';\n" +
+                                                  "import { format } from './lib/format.mjs';\n" +
+                                                  "const input = process.argv[2] || 'a,b';\n" +
+                                                  "console.log(format(parse(input)));\n");
+      fs.writeFileSync(path.join(dir, 'README.md'), '# CLI\nUsage: node cli.mjs <input>\n');
+      fs.writeFileSync(path.join(dir, 'tests', 'cli.test.mjs'), "import test from 'node:test';\n" +
+                                                                "import assert from 'node:assert';\n" +
+                                                                "import { parse } from '../lib/parse.mjs';\n" +
+                                                                "test('parse', () => assert.deepStrictEqual(parse('a,b'), ['a', 'b']));\n");
+    },
+    check: (dir) => {
+      const env = { ...process.env };
+      delete env.NODE_TEST_CONTEXT;
+      delete env.NODE_TEST_WORKER_ID;
+      const res = spawnSync(process.execPath, ['cli.mjs', '--json', 'x,y'], { cwd: dir, env });
+      let validJson = false;
+      try {
+        const out = JSON.parse(res.stdout.toString().trim());
+        if (Array.isArray(out) && out[0] === 'x' && out[1] === 'y') validJson = true;
+      } catch (e) {}
+      const testRes = spawnSync(process.execPath, ['--test'], { cwd: dir, env });
+      const readme = fs.readFileSync(path.join(dir, 'README.md'), 'utf8');
+      return validJson && testRes.status === 0 && readme.includes('--json');
+    },
+  },
+  {
+    id: 'task11',
+    prompt: 'Extract the duplicated block into one function and keep all tests passing.',
+    long: true,
+    setup: (dir) => {
+      fs.mkdirSync(path.join(dir, 'tests'), { recursive: true });
+      let content = '';
+      for (let i = 0; i < 50; i++) {
+        content += `export function f${i}() { return ${i}; }\n`;
+      }
+      for (let i = 1; i <= 5; i++) {
+        content += `\nexport function processThing${i}(data) {\n` +
+                   `  let result = data;\n` +
+                   `  // duplicated block start\n` +
+                   `  const step1 = result + 1;\n` +
+                   `  const step2 = step1 * 2;\n` +
+                   `  const UNIQUE_MARKER = "DUPLICATED_BLOCK_MARKER_STRING";\n` +
+                   `  result = step2 + UNIQUE_MARKER.length;\n` +
+                   `  // duplicated block end\n` +
+                   `  return result + ${i};\n` +
+                   `}\n`;
+        for (let j = 0; j < 10; j++) {
+           content += `export function f${i}_${j}() { return ${j}; }\n`;
+        }
+      }
+      fs.writeFileSync(path.join(dir, 'legacy.mjs'), content);
+      fs.writeFileSync(path.join(dir, 'tests', 'legacy.test.mjs'), "import test from 'node:test';\n" +
+                                                                    "import assert from 'node:assert';\n" +
+                                                                    "import { processThing1, processThing5 } from '../legacy.mjs';\n" +
+                                                                    "test('process1', () => assert.strictEqual(processThing1(0), 33));\n" +
+                                                                    "test('process5', () => assert.strictEqual(processThing5(0), 37));\n");
+    },
+    check: (dir) => {
+      const env = { ...process.env };
+      delete env.NODE_TEST_CONTEXT;
+      delete env.NODE_TEST_WORKER_ID;
+      const testRes = spawnSync(process.execPath, ['--test'], { cwd: dir, env });
+      const files = fs.readdirSync(dir).filter(f => f.endsWith('.mjs'));
+      let markerCount = 0;
+      for (const f of files) {
+        const text = fs.readFileSync(path.join(dir, f), 'utf8');
+        markerCount += (text.match(/DUPLICATED_BLOCK_MARKER_STRING/g) || []).length;
+      }
+      return testRes.status === 0 && markerCount === 1;
     },
   },
 ];
@@ -311,7 +430,12 @@ async function main() {
   const MAX_RUNS = parseInt(arg('max-runs') || '200', 10);
   const MAX_USD = Math.min(4.5, parseFloat(arg('max-usd') || '4.5') || 4.5);
   const VARIANTS = (arg('variants') || process.env.VARIANTS || 'baseline,lean').split(',');
-  const TASKS_TO_RUN = (arg('tasks') || process.env.TASKS || '') ? (arg('tasks') || process.env.TASKS).split(',') : TASKS.map(t => t.id);
+  const LONG_TASKS = ['task9', 'task10', 'task11'];
+  if (process.argv.includes('--long') && arg('tasks')) {
+    console.error(`bench-savings: use --long or --tasks, not both`);
+    process.exit(1);
+  }
+  const TASKS_TO_RUN = (arg('tasks') || process.env.TASKS || '') ? (arg('tasks') || process.env.TASKS).split(',') : process.argv.includes('--long') ? LONG_TASKS : TASKS.map(t => t.id);
 
   let parsedPrices = null;
   const pricesArg = arg('prices');
