@@ -38,7 +38,11 @@ const seen = [];
 for (const l of require("fs").readFileSync(process.argv[1], "utf8").split("\n")) {
   try { const t = JSON.parse(l).type; if (t && !seen.includes(t)) seen.push(t); } catch {}
 }
-console.log(seen.join(",") || "none");' "$1"
+let msg = "";
+for (const l of require("fs").readFileSync(process.argv[1], "utf8").split("\n")) {
+  try { const e = JSON.parse(l); if (e.type === "error" && !msg) msg = [e.error?.type, e.error?.status, e.error?.message].filter(Boolean).join(" "); } catch {}
+}
+console.log((seen.join(",") || "none") + (msg ? " error=" + msg.slice(0, 100) : ""));' "$1"
 }
 has_session() { grep -q '"sessionID"' "$1" && echo yes || echo no; }
 
