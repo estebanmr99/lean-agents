@@ -91,6 +91,7 @@ export function parseTokenUsage(out) {
         const t = part.tokens || {};
         inputTokens += (t.input || 0);
         outputTokens += (t.output || 0) + (t.reasoning || 0);
+        // A bare number has no read/write split; count it as read (the cheaper, common case).
         if (typeof t.cache === 'number') {
           cacheRead += t.cache;
           cacheTokens += t.cache;
@@ -297,6 +298,7 @@ export function renderResultsMarkdown(summary, variants, totalCost = 0, prices =
     md += `\nlean vs baseline: input tokens ${avgPctSaved >= 0 ? '-' : '+'}${Math.abs(avgPctSaved).toFixed(1)}% (median over tasks)\n`;
   }
   md += `\nTotal cost: $${totalCost.toFixed(4)}\n`;
+  if (prices) md += `\nPriced Cost uses ${prices.in},${prices.cacheRead},${prices.cacheWrite},${prices.out} USD per 1M tokens (in, cache read, cache write, out) and assumes input excludes cached tokens (VERIFY).\n`;
   return md;
 }
 
@@ -313,9 +315,10 @@ async function main() {
 
   let parsedPrices = null;
   const pricesArg = arg('prices');
-  if (pricesArg) {
-    const parts = pricesArg.split(',').map(Number);
-    if (parts.length !== 4 || parts.some(p => !Number.isFinite(p) || p < 0)) {
+  if (process.argv.includes('--prices')) {
+    const raw = (pricesArg || '').split(',');
+    const parts = raw.map(Number);
+    if (raw.length !== 4 || raw.some(p => !/^\d+(\.\d+)?$/.test(p.trim()))) {
       console.error(`bench-savings: --prices needs 4 numbers: in,cacheRead,cacheWrite,out`);
       process.exit(1);
     }
@@ -451,7 +454,7 @@ async function main() {
         }
 
         const usage = parseTokenUsage(res.stdout || '');
-        const pricedCost = parsedPrices ? priceUsage(usage, parsedPrices) : 0;
+        const pricedCost = parsedPrices ? priceUsage(usage, parsedPrices) : null;
         // Event types only (no content), so a wrong parser shows up in the log.
         const types = [...new Set((res.stdout || '').split('\n').map((l) => { try { return JSON.parse(l).type; } catch { return null; } }).filter(Boolean))];
         
@@ -516,7 +519,7 @@ async function main() {
           cost: getStats(taskResults.map(r => r.cost)),
           time: getStats(taskResults.map(r => r.wallTime)),
           totalCost: taskResults.reduce((sum, r) => sum + r.cost, 0),
-          totalPricedCost: taskResults.reduce((sum, r) => sum + r.pricedCost, 0),
+          totalPricedCost: parsedPrices ? taskResults.reduce((sum, r) => sum + r.pricedCost, 0) : null,
         });
       }
     }
@@ -541,6 +544,7 @@ async function main() {
       runUrl,
       repeats: REPEATS,
       variants: VARIANTS,
+      prices: parsedPrices,
       totalInput,
       tasks: summary,
       raw: results

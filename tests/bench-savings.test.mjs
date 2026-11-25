@@ -236,6 +236,11 @@ test('bench-savings variant and task parsing', () => {
   ], { encoding: 'utf8' });
   assert.strictEqual(res3.status, 1);
   assert.match(res3.stderr, /bench-savings: --prices needs 4 numbers: in,cacheRead,cacheWrite,out/);
+  for (const bad of [[''], ['1,,2,3'], ['0x10,1,1,1'], []]) {
+    const r = spawnSync(process.execPath, [path.join(ROOT, 'tests', 'bench-savings.mjs'), '--home', home, '--prices', ...bad], { encoding: 'utf8' });
+    assert.strictEqual(r.status, 1, `--prices ${JSON.stringify(bad)}`);
+    assert.match(r.stderr, /--prices needs 4 numbers/);
+  }
 
   fs.rmSync(home, { recursive: true, force: true });
 });
@@ -258,6 +263,7 @@ test('renderResultsMarkdown variants table and overhead, and prices', () => {
   assert.doesNotMatch(mdNoPrices, /Priced Cost/);
   
   const mdPrices = renderResultsMarkdown(summary, ['baseline', 'lean'], 0.01, { in: 1, cacheRead: 0, cacheWrite: 0, out: 1 });
+  assert.match(mdPrices, /Priced Cost uses 1,0,0,1 USD per 1M tokens/);
   assert.match(mdPrices, /\| Task \| Mode \| Pass Rate \| Median In \| IQR In \| Median Out \| Median Turns \| Median Time \| Cost \| Priced Cost \|/);
   assert.match(mdPrices, /\| task0 \| baseline \| 100% \| 100 \| 100-100 \| 5 \| 1 \| 500ms \| \$0.0000 \| \$0.0010 \|/);
 });
