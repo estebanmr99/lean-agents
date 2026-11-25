@@ -249,6 +249,10 @@ test('renderResultsMarkdown variants table and overhead, and prices', () => {
   ];
   const mdNoPrices = renderResultsMarkdown(summary, ['baseline', 'lean'], 0.01);
   assert.match(mdNoPrices, /### Variants Comparison/);
+  assert.match(mdNoPrices, /\| task0 \| 100 \| 150 \|/);
+  assert.match(mdNoPrices, /\| task1 \| 1000 \| 800 \(90%\) \|/);
+  assert.match(mdNoPrices, /\| \*\*Fixed overhead vs baseline \(task0\)\*\* \| 0 \| 50 \|/);
+  assert.match(mdNoPrices, /Total cost: \$0.0100/);
   assert.match(mdNoPrices, /\| task0 \| baseline \| 100% \| 100 \| 100-100 \| 5 \| 500ms \| \$0.0000 \|/);
   assert.doesNotMatch(mdNoPrices, /Median Turns/);
   assert.doesNotMatch(mdNoPrices, /Priced Cost/);
