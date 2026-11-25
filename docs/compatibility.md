@@ -49,7 +49,7 @@ With both `copilot-cli` and `vscode-copilot`, the shared `~/.copilot` files and 
 
 ## Terminals
 
-Session 8. lean-agents never installs the apps; for a user who already has Warp or Orca (`--terminal`, detected by default) it adds the integrations below. Checked 2026-11-03: Warp docs, Orca `v1.4.247` (released 2026-11-03); the Orca facts listed as confirmed on 2026-11-24 were re-checked against `v1.4.274`.
+Session 8. lean-agents installs the apps only when the user asks (`--install-terminal warp|orca|both`, or interactively; pinned and undone by `--uninstall`); for a user who already has Warp or Orca (`--terminal`, detected by default) it adds the integrations below. Checked 2026-11-03: Warp docs, Orca `v1.4.247` (released 2026-11-03); the Orca facts listed as confirmed on 2026-11-24 were re-checked against `v1.4.274`.
 
 ### What lean-agents does
 
