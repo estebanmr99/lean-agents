@@ -40,6 +40,8 @@ export function checkQuotaError(out) {
     if (!trimmed.startsWith('{')) continue;
     try {
       const ev = JSON.parse(trimmed);
+      // Only error events (and the old top-level 402 shape) count, so a tool result mentioning "quota" never stops a run.
+      if (ev.type !== 'error' && !ev.error && ev.status !== 402) continue;
       const err = ev.error || ev;
       // A BYOK spend cap comes back as provider.auth / 403 with the reason only in the body (run 45563150706).
       const text = `${err.message || ''} ${err.response?.body || ''}`;
@@ -49,6 +51,11 @@ export function checkQuotaError(out) {
     } catch {}
   }
   return null;
+}
+
+// Exported for tests. OpenCode 2 emits step_start before a provider error, so "zero tokens and an error" is the signal, not "only errors".
+export function isEmptyErrorRun(usage, types) {
+  return usage.inputTokens === 0 && types.includes('error');
 }
 
 // Exported for tests
@@ -695,8 +702,7 @@ async function main() {
         // Event types only (no content), so a wrong parser shows up in the log.
         const types = [...new Set((res.stdout || '').split('\n').map((l) => { try { return JSON.parse(l).type; } catch { return null; } }).filter(Boolean))];
         
-        // OpenCode 2 emits step_start before a provider error, so "zero tokens and an error" is the signal, not "only errors".
-        if (usage.inputTokens === 0 && types.includes('error')) {
+        if (isEmptyErrorRun(usage, types)) {
           consecutiveEmptyErrors++;
         } else {
           consecutiveEmptyErrors = 0;
