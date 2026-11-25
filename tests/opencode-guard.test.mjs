@@ -124,7 +124,8 @@ test('--install-agent never installs OpenCode 1.x; opencode-v2 plans only the pi
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /never installed or removed/);
   const plan = lean(tmp(), ['--install-agent', 'opencode-v2', '--dry-run']);
-  assert.match(plan, /opencode-installer\.sh --version 2\.2\.5 --no-modify-path/);
+  const pinned = JSON.parse(fs.readFileSync(path.join(ROOT, 'core', 'pins.json'), 'utf8')).pins['opencode-v2'].version;
+  assert.ok(plan.includes(`opencode-installer.sh --version ${pinned} --no-modify-path`), plan);
   assert.ok(!/opencode-ai|opencode upgrade|opencode uninstall/.test(plan), 'plan touches 1.x or the OpenCode uninstaller');
 });
 
