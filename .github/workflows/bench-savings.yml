@@ -70,7 +70,7 @@ jobs:
             --run \
             --model "$MODEL" \
             --repeats "$REPEATS" \
-            --max-runs 300 \
+            --max-runs 200 \
             --max-usd "$MAX_USD" \
             --variants "$VARIANTS" \
             --tasks "$TASKS" \

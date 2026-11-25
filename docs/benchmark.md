@@ -17,6 +17,9 @@ The benchmark consists of several tasks designed to test various agent capabilit
 5. **Task 7 (Refactor)**: Rename a configuration key across 30 files where only 3 files actually use it. Tests the agent's ability to prune searches and edits.
 6. **Task 8 (Log Analysis)**: Identify the function and line number from a 5,000-line log file containing one stack trace.
 7. **Tasks 9-11 (Long)**: Multi-step workflows requiring many turns (multi-file bug hunt, adding a cross-file feature, large-file refactoring). These measure whether lean's tools pay off over extended reasoning sessions. Run these alone using the `--long` flag.
+   - **Task 9 (Bug Hunt)**: ~40 generated modules in an import chain, 3 bugs at different depths, ~3,600 lines across files.
+   - **Task 10 (Feature)**: A CLI tool with ~15 helpers and documentation, ~1,500 lines total.
+   - **Task 11 (Refactoring)**: Extract a duplicated logic block from a legacy script of ~600 lines.
 
 ### What "stable" means
 
