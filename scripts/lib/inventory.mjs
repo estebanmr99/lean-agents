@@ -19,12 +19,12 @@ const j = path.join;
 export function clients(home) {
   const oc = configPath(j(configHome(home), 'opencode'));
   const code = vscodeUserDir(home);
-  const insiders = j(path.dirname(path.dirname(code)), 'Code - Insiders', 'User');
+  const insiders = vscodeUserDir(home, 'Code - Insiders');
   return [
     { client: 'claude', file: j(home, '.claude.json'), keyPath: ['mcpServers'] },
     { client: 'cursor', file: j(home, '.cursor', 'mcp.json'), keyPath: ['mcpServers'] },
-    { client: 'vscode', file: j(code, 'mcp.json'), keyPath: ['servers'] },
-    { client: 'vscode-insiders', file: j(insiders, 'mcp.json'), keyPath: ['servers'] }, // VERIFY: user dir
+    { client: 'vscode', file: j(code, 'mcp.json'), keyPath: ['servers'] }, // VERIFY: Insiders user dir on a real machine
+    { client: 'vscode-insiders', file: j(insiders, 'mcp.json'), keyPath: ['servers'] }, // VERIFY: Insiders user dir on a real machine
     { client: 'opencode', file: oc, keyPath: ['mcp'] },
     { client: 'opencode', file: oc, keyPath: ['mcp', 'servers'] },
     { client: 'copilot-cli', file: j(envDir(home, 'COPILOT_HOME', j(home, '.copilot')), 'mcp-config.json'), keyPath: ['mcpServers'] },

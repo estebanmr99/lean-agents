@@ -5,6 +5,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ## [Unreleased]
 
 ### Added
+- VS Code Insiders: with `--agents vscode-copilot`, MCP servers and strict-privacy settings are also written to the Insiders user folder when it exists, and undone by `--uninstall`; `code-insiders` counts as VS Code in detection and `--doctor`.
 - OpenCode CLI spike (#428): a CI job records the real OpenCode 2 help surface, exit codes and event types for headless workers (mock LLM, no login).
 - Benchmark: three long multi-step tasks (`--long`) to measure lean over long sessions (#404).
 - Benchmark: `--prices in,cacheRead,cacheWrite,out` (USD per million tokens) adds a cache-aware "Priced Cost" and a median turn count to the results (#404).

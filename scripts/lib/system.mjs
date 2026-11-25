@@ -88,7 +88,7 @@ export function detectAgents() {
   if (copilot) found['copilot-cli'] = copilot;
   const agy = agyVersion(os.homedir());
   if (agy) found.antigravity = agy;
-  const code = version('code');
+  const code = version('code') || version('code-insiders');
   if (code) found['vscode-copilot'] = code;
   // The Cursor installer links both `agent` and `cursor-agent`; the second name is unambiguous.
   const cursor = version('cursor-agent');

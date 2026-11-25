@@ -965,6 +965,28 @@ test('Cursor: subagents, MCP, kept user values, no global rules, full uninstall'
   assert.deepEqual(after, before);
 });
 
+test('VS Code Insiders: its user dir gets MCP and strict settings when it exists, stable too, full uninstall', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const args = ['--yes', '--no-exec', '--agents', 'vscode-copilot', '--tools', 'serena', '--privacy', 'strict', '--lang', 'en', '--profile', 'none'];
+  lean(home, args);
+  assert.ok(!fs.existsSync(path.dirname(vscodeUserDir(home, 'Code - Insiders'))), 'no Insiders folder is created');
+  lean(home, ['--uninstall', '--yes', '--no-exec']);
+
+  const insiders = vscodeUserDir(home, 'Code - Insiders');
+  fs.mkdirSync(insiders, { recursive: true });
+  fs.writeFileSync(path.join(insiders, 'settings.json'), '{\n  // mine\n  "editor.fontSize": 13\n}\n');
+  const mine = () => Object.fromEntries(Object.entries(snapshot(home)).filter(([f]) => !f.startsWith('.config/lean-agents/')));
+  const before = mine();
+  lean(home, args);
+  for (const user of [vscodeUserDir(home), insiders]) {
+    assert.equal(parse(fs.readFileSync(path.join(user, 'mcp.json'), 'utf8')).servers.serena.type, 'stdio', user);
+    assert.equal(parse(fs.readFileSync(path.join(user, 'settings.json'), 'utf8'))['telemetry.telemetryLevel'], 'off', user);
+  }
+  assert.equal(parse(fs.readFileSync(path.join(insiders, 'settings.json'), 'utf8'))['editor.fontSize'], 13);
+  lean(home, ['--uninstall', '--yes', '--no-exec']);
+  assert.deepEqual(mine(), before);
+});
+
 test('with --home, %APPDATA% outside it is never written (Ponytail, VS Code)', { skip: process.platform !== 'win32' }, () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
   const appData = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-appdata-'));
