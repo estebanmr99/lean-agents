@@ -24,7 +24,7 @@ export function clients(home) {
     { client: 'claude', file: j(home, '.claude.json'), keyPath: ['mcpServers'] },
     { client: 'cursor', file: j(home, '.cursor', 'mcp.json'), keyPath: ['mcpServers'] },
     { client: 'vscode', file: j(code, 'mcp.json'), keyPath: ['servers'] },
-    { client: 'vscode-insiders', file: j(insiders, 'mcp.json'), keyPath: ['servers'] }, // VERIFY: Insiders user dir on a real machine
+    { client: 'vscode-insiders', file: j(insiders, 'mcp.json'), keyPath: ['servers'] }, // Linux and macOS proven by spike-vscode-insiders; Windows VERIFY
     { client: 'opencode', file: oc, keyPath: ['mcp'] },
     { client: 'opencode', file: oc, keyPath: ['mcp', 'servers'] },
     { client: 'copilot-cli', file: j(envDir(home, 'COPILOT_HOME', j(home, '.copilot')), 'mcp-config.json'), keyPath: ['mcpServers'] },
