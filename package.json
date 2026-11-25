@@ -18,6 +18,7 @@
     "scripts/",
     "core/",
     "profiles/",
+    "tools/code-mode-proxy/",
     "CHANGELOG.md"
   ],
   "bundleDependencies": true,
