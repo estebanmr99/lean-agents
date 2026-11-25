@@ -7,6 +7,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ### Added
 - Benchmark: three long multi-step tasks (`--long`) to measure lean over long sessions (#404).
 - Benchmark: `--prices in,cacheRead,cacheWrite,out` (USD per million tokens) adds a cache-aware "Priced Cost" and a median turn count to the results (#404).
+- Tests: every relative link in a tracked Markdown file must point to an existing file (#437).
 
 ## [1.2.0] - 2026-11-24
 
