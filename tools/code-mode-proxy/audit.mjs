@@ -33,7 +33,7 @@ export class AuditLog {
       this.size = 0;
     }
     
-    const fd = fs.openSync(this.logPath, 'a');
+    const fd = fs.openSync(this.logPath, 'a', 0o600);
     fs.fchmodSync(fd, 0o600);
     this.stream = fs.createWriteStream(null, { fd });
   }
@@ -49,7 +49,7 @@ export class AuditLog {
       fs.renameSync(this.logPath, this.logPath + '.1');
     } catch (e) {}
     this.size = 0;
-    const fd = fs.openSync(this.logPath, 'a');
+    const fd = fs.openSync(this.logPath, 'a', 0o600);
     fs.fchmodSync(fd, 0o600);
     this.stream = fs.createWriteStream(null, { fd });
   }

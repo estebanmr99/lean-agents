@@ -31,13 +31,15 @@ function buildEnv(entryEnv) {
 }
 
 function killTree(cp) {
+  let exited = false;
+  cp.on('exit', () => { exited = true; });
   if (process.platform === 'win32') {
     const killer = spawn('taskkill', ['/pid', String(cp.pid), '/f', '/t'], { stdio: 'ignore' });
     killer.on('error', () => {});
   } else {
     cp.kill('SIGTERM');
     setTimeout(() => {
-      if (cp.killed === false) cp.kill('SIGKILL');
+      if (!exited) cp.kill('SIGKILL');
     }, 2000).unref();
   }
 }
@@ -75,6 +77,7 @@ export class UpstreamManager {
           windowsHide: true,
           stdio: ['pipe', 'pipe', 'pipe']
         });
+        cp.stdin.on('error', () => {});
       } catch (err) {
         this.upstreams.set(name, { status: 'unavailable', reason: err.message });
         return resolve();
@@ -110,6 +113,9 @@ export class UpstreamManager {
       });
 
       stream.on('error', (err) => {
+        if (err.message.includes('Parse error') || err.message.includes('parse')) {
+          return;
+        }
         upstream.status = 'unavailable';
         upstream.reason = 'RpcStream error: ' + err.message;
         for (const req of upstream.pendingRequests.values()) {
@@ -183,6 +189,7 @@ export class UpstreamManager {
   }
 
   handleMessage(upstream, msg) {
+    if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return;
     if (msg.id !== undefined && !msg.method) {
       // It's a response
       const req = upstream.pendingRequests.get(msg.id);

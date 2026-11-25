@@ -185,7 +185,6 @@ export class Sandbox {
           }
 
           const promiseHandle = context.newPromise();
-          scope.manage(promiseHandle);
           pendingPromises.add(promiseHandle);
 
           const callStart = Date.now();
@@ -214,6 +213,8 @@ export class Sandbox {
                 promiseHandle.resolve(parsedRes.value);
                 parsedRes.value.dispose();
               }
+              if (typeof promiseHandle.resolve.dispose === 'function') promiseHandle.resolve.dispose();
+              if (typeof promiseHandle.reject.dispose === 'function') promiseHandle.reject.dispose();
               pumpJobs();
             })
             .catch(err => {
@@ -227,10 +228,14 @@ export class Sandbox {
               const errHandle = context.newError(err.message);
               promiseHandle.reject(errHandle);
               errHandle.dispose();
+              if (typeof promiseHandle.resolve.dispose === 'function') promiseHandle.resolve.dispose();
+              if (typeof promiseHandle.reject.dispose === 'function') promiseHandle.reject.dispose();
               pumpJobs();
             });
 
-          return promiseHandle.handle.dup();
+          const ret = promiseHandle.handle.dup();
+          promiseHandle.handle.dispose();
+          return ret;
         });
 
         scope.manage(fn);
@@ -316,6 +321,8 @@ export class Sandbox {
           const errHandle = context.newError('Script closed');
           p.reject(errHandle);
           errHandle.dispose();
+          if (typeof p.resolve.dispose === 'function') p.resolve.dispose();
+          if (typeof p.reject.dispose === 'function') p.reject.dispose();
         } catch(e) {}
       }
       try { 

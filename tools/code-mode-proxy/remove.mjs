@@ -43,7 +43,7 @@ async function main() {
   let markerFound = false;
   try {
     const markerPath = path.join(absDir, '.lean-agents-code-mode-proxy');
-    const stats = fsSync.statSync(markerPath);
+    const stats = fsSync.lstatSync(markerPath);
     if (stats.isFile()) {
       const content = await fs.readFile(markerPath, 'utf8');
       if (content.trim() === 'managed by lean-agents') {

@@ -37,10 +37,8 @@ export class RpcStream extends EventEmitter {
         const msg = JSON.parse(trimmed);
         this.emit('message', msg);
       } catch (err) {
-        // Just emit error but keep processing? Usually protocol error kills connection.
         this.emit('error', new Error('Failed to parse JSON-RPC message: ' + err.message));
-        this.stream.destroy();
-        return;
+        continue;
       }
     }
 

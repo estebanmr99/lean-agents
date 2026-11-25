@@ -29,6 +29,10 @@ export async function loadConfig(configPath) {
     throw new Error(`Config at ${configPath} is not valid JSON: ${err.message}`);
   }
 
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error(`Config at ${configPath} must be a JSON object`);
+  }
+
   if (!parsed['//'] || typeof parsed['//'] !== 'string' || !parsed['//'].includes('managed by lean-agents')) {
     throw new Error(`Config at ${configPath} is missing the "managed by lean-agents" mark at top-level "//" key`);
   }
