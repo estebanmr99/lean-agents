@@ -17,6 +17,8 @@ Thanks for helping. The full design is in [docs/SPEC.md](docs/SPEC.md); read its
 
 - **No private data.** No personal usernames or home paths (use `~`, `$HOME`, `%USERPROFILE%`), company names or internal tools, cloud project IDs, emails, keys or tokens.
 - Run `scripts/check-private.sh` before committing. CI runs it plus gitleaks on every PR.
+- **Test count guard.** Pull requests must not lower the test count in `tests/*.test.mjs`. If you must remove tests (e.g. during a refactor), explain why in the PR body with a line starting with `tests-removed:`.
+  Example: `tests-removed: merged duplicate cases into engine.test.mjs`. Moving tests to another file also counts as removing them from the original. Editing the PR body alone does not rerun CI; push a commit (or an empty commit with `git commit --allow-empty`) after adding the line.
 - Verify every install command and config key against the tool's current upstream docs, and record the date in `docs/compatibility.md`.
 - Keep `core/AGENTS.md` short: it is loaded on every turn of every agent.
 - Third-party tools are installed from upstream and credited, never vendored.
