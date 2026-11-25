@@ -51,6 +51,10 @@ export async function bump(pins, get, hash) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  if (!process.env.CI && !process.argv.includes('--force')) {
+    console.error('pins-latest.mjs only runs in CI (it rewrites core/pins.json). Set CI=true or pass --force to run it on purpose.');
+    process.exit(1);
+  }
   const { GITHUB_TOKEN } = process.env;
   const get = async (url) => {
     const r = await fetch(url, { headers: { accept: 'application/json', ...(url.includes('api.github.com') && GITHUB_TOKEN ? { authorization: `Bearer ${GITHUB_TOKEN}` } : {}) } });
