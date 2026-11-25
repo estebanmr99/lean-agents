@@ -33,23 +33,25 @@ export class AuditLog {
       this.size = 0;
     }
     
-    // We append. Open with 0600. 
-    // fs.createWriteStream doesn't easily create with 0600 if it exists, but we pass mode.
-    this.stream = fs.createWriteStream(this.logPath, { flags: 'a', mode: 0o600 });
+    const fd = fs.openSync(this.logPath, 'a');
+    fs.fchmodSync(fd, 0o600);
+    this.stream = fs.createWriteStream(null, { fd });
   }
 
-  async rotate() {
+  rotate() {
     if (this.stream) {
+      // Need to flush before rename
+      // We can just open a new stream and rename
       this.stream.end();
       this.stream = null;
     }
     try {
-      await fsPromises.rename(this.logPath, this.logPath + '.1');
-    } catch (e) {
-      // ignore
-    }
+      fs.renameSync(this.logPath, this.logPath + '.1');
+    } catch (e) {}
     this.size = 0;
-    this.stream = fs.createWriteStream(this.logPath, { flags: 'a', mode: 0o600 });
+    const fd = fs.openSync(this.logPath, 'a');
+    fs.fchmodSync(fd, 0o600);
+    this.stream = fs.createWriteStream(null, { fd });
   }
 
   logCall(record) {
@@ -65,8 +67,8 @@ export class AuditLog {
     };
     
     if (this.logArgs) {
-      entry.args = record.args;
-      entry.result = record.result;
+      entry.args = redact(record.args);
+      entry.result = redact(record.result);
     }
     if (record.error) {
       entry.error = redact(record.error);
@@ -98,11 +100,13 @@ export class AuditLog {
   writeLine(line) {
     const buf = Buffer.from(line, 'utf8');
     this.size += buf.length;
+    
+    if (this.size >= ROTATE_SIZE) {
+      this.rotate();
+    }
+
     if (this.stream) {
       this.stream.write(buf);
-    }
-    if (this.size >= ROTATE_SIZE) {
-      this.rotate().catch(() => {});
     }
   }
 

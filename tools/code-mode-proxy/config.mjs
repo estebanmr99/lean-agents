@@ -14,10 +14,6 @@ export async function loadConfig(configPath) {
     throw new Error(`Failed to read config at ${configPath}: ${err.message}`);
   }
 
-  if (!content.includes('managed by lean-agents')) {
-    throw new Error(`Config at ${configPath} is missing the "managed by lean-agents" mark`);
-  }
-
   // POSIX check: not group/world writable
   if (os.platform() !== 'win32') {
     const stats = statSync(configPath);
@@ -33,10 +29,18 @@ export async function loadConfig(configPath) {
     throw new Error(`Config at ${configPath} is not valid JSON: ${err.message}`);
   }
 
+  if (!parsed['//'] || typeof parsed['//'] !== 'string' || !parsed['//'].includes('managed by lean-agents')) {
+    throw new Error(`Config at ${configPath} is missing the "managed by lean-agents" mark at top-level "//" key`);
+  }
+
   if (parsed.mcpServers) {
     for (const [name, server] of Object.entries(parsed.mcpServers)) {
       if (!server.command) continue;
       
+      if (!path.isAbsolute(server.command)) {
+        throw new Error(`Command for upstream ${name} is not an absolute path: ${server.command}`);
+      }
+
       const isCmdOrBat = /\.cmd$/i.test(server.command) || /\.bat$/i.test(server.command);
       if (isCmdOrBat) {
         throw new Error(`Command for upstream ${name} ends in .cmd or .bat, which is rejected`);

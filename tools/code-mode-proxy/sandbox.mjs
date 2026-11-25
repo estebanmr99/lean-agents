@@ -38,30 +38,45 @@ export class Sandbox {
     const scope = new Scope();
 
     const start = Date.now();
-    let isClosed = false;
+    const abortController = new AbortController();
     let callCount = 0;
+    const toolsCalled = {};
+    let isClosed = false;
     
-    // QuickJS-Emscripten shouldInterruptAfterDeadline returns a function
     const pendingPromises = new Set();
-
     const interruptHandler = shouldInterruptAfterDeadline(start + this.wallTime);
-    
-    // We override it to also check isClosed
-    const customInterrupt = () => {
-      // Don't interrupt if we are cleaning up, so pending jobs can flush
-      if (isClosed) return false;
-      return interruptHandler();
+    runtime.setInterruptHandler(interruptHandler);
+
+    const pumpJobs = () => {
+      let jobs = 1;
+      while (jobs > 0 && !interruptHandler()) {
+        try {
+          const res = runtime.executePendingJobs();
+          if (res && res.error) {
+            res.error.dispose();
+            break;
+          }
+          jobs = res?.value ?? 0;
+        } catch(e) {
+          break;
+        }
+      }
     };
-    
-    runtime.setInterruptHandler(customInterrupt);
 
     let logs = [];
+    let logsTotalLength = 0;
     const consoleHandle = context.newObject();
     scope.manage(consoleHandle);
 
     const logHandle = context.newFunction('log', (...args) => {
+      if (logsTotalLength >= this.resultCap) return;
       const parts = args.map(a => context.dump(a));
-      logs.push(parts.join(' '));
+      let line = parts.join(' ');
+      if (logsTotalLength + line.length > this.resultCap) {
+        line = line.slice(0, this.resultCap - logsTotalLength) + '...[cut by proxy]';
+      }
+      logsTotalLength += line.length + 1;
+      logs.push(line);
     });
     scope.manage(logHandle);
     context.setProp(consoleHandle, 'log', logHandle);
@@ -96,14 +111,18 @@ export class Sandbox {
           if (isClosed) return context.undefined;
           
           if (callCount >= this.callLimit) {
-            return { error: context.newError(`Tool call limit exceeded (${this.callLimit})`) };
+            const err = context.newError(`Tool call limit exceeded (${this.callLimit})`);
+            return { error: err };
           }
           callCount++;
+          const key = `${serverName}.${t.name}`;
+          toolsCalled[key] = (toolsCalled[key] || 0) + 1;
 
           try {
             policy.checkBudget();
           } catch (e) {
-            return { error: context.newError(e.message) };
+            const err = context.newError(e.message);
+            return { error: err };
           }
 
           if (policy.isBlocked(serverName, t.name)) {
@@ -111,7 +130,8 @@ export class Sandbox {
               scriptSha256, count: callCount, server: serverName, tool: t.name,
               duration: 0, ok: false, blocked: true
             });
-            return { error: context.newError(`Tool ${serverName}.${t.name} is blocked by policy`) };
+            const err = context.newError(`Tool ${serverName}.${t.name} is blocked by policy`);
+            return { error: err };
           }
 
           const jsonStringify = context.getProp(context.global, 'JSON').consume(json => context.getProp(json, 'stringify'));
@@ -119,7 +139,12 @@ export class Sandbox {
           jsonStringify.dispose();
           
           if (stringifiedHandle.error) {
-            return stringifiedHandle.error;
+            // The instruction says: return { error } and dispose the handle via the scope.
+            // Actually, if we return {error: handle}, ownership transfers to QuickJS.
+            // But we can extract the error message.
+            const errDump = context.dump(stringifiedHandle.error);
+            stringifiedHandle.error.dispose();
+            return { error: context.newError(typeof errDump === 'object' ? errDump.message : String(errDump)) };
           }
           
           const argsStr = context.getString(stringifiedHandle.value);
@@ -131,8 +156,32 @@ export class Sandbox {
             if (typeof parsedArgs !== 'object' || parsedArgs === null || Array.isArray(parsedArgs)) {
               throw new Error('Arguments must be a plain object');
             }
+
+            const properties = t.inputSchema?.properties || {};
+            const required = t.inputSchema?.required || [];
+            
+            for (const req of required) {
+              if (!(req in parsedArgs)) {
+                throw new Error(`Missing required argument: ${req}`);
+              }
+            }
+            
+            for (const [key, val] of Object.entries(parsedArgs)) {
+              const propSchema = properties[key];
+              if (propSchema && propSchema.type) {
+                const type = propSchema.type;
+                const valType = typeof val;
+                if (type === 'string' && valType !== 'string') throw new Error(`Argument ${key} must be a string`);
+                if (type === 'number' && valType !== 'number') throw new Error(`Argument ${key} must be a number`);
+                if (type === 'integer' && (!Number.isInteger(val))) throw new Error(`Argument ${key} must be an integer`);
+                if (type === 'boolean' && valType !== 'boolean') throw new Error(`Argument ${key} must be a boolean`);
+                if (type === 'object' && (valType !== 'object' || val === null || Array.isArray(val))) throw new Error(`Argument ${key} must be an object`);
+                if (type === 'array' && !Array.isArray(val)) throw new Error(`Argument ${key} must be an array`);
+              }
+            }
           } catch (e) {
-            return { error: context.newError(`Invalid arguments: ${e.message}`) };
+            const err = context.newError(`Invalid arguments: ${e.message}`);
+            return { error: err };
           }
 
           const promiseHandle = context.newPromise();
@@ -141,7 +190,7 @@ export class Sandbox {
 
           const callStart = Date.now();
 
-          upstreamManager.request(serverName, 'tools/call', { name: t.name, arguments: parsedArgs })
+          upstreamManager.request(serverName, 'tools/call', { name: t.name, arguments: parsedArgs }, Math.max(0, start + this.wallTime - callStart), abortController.signal)
             .then(result => {
               if (isClosed) return;
               pendingPromises.delete(promiseHandle);
@@ -165,7 +214,7 @@ export class Sandbox {
                 promiseHandle.resolve(parsedRes.value);
                 parsedRes.value.dispose();
               }
-              runtime.executePendingJobs();
+              pumpJobs();
             })
             .catch(err => {
               if (isClosed) return;
@@ -178,10 +227,10 @@ export class Sandbox {
               const errHandle = context.newError(err.message);
               promiseHandle.reject(errHandle);
               errHandle.dispose();
-              runtime.executePendingJobs();
+              pumpJobs();
             });
 
-          return promiseHandle.handle;
+          return promiseHandle.handle.dup();
         });
 
         scope.manage(fn);
@@ -206,6 +255,7 @@ export class Sandbox {
 
     try {
       evalRes = context.evalCode(code);
+      pumpJobs();
       
       const processResult = (valHandle) => {
         let dump = context.dump(valHandle);
@@ -221,7 +271,7 @@ export class Sandbox {
         evalRes.error.dispose();
       } else {
         const val = evalRes.value;
-        const isPromise = context.typeof(val) === 'object' && context.dump(context.getProp(val, 'constructor').consume(c => context.getProp(c, 'name'))) === 'Promise';
+        const isPromise = context.typeof(val) === 'object' && context.getProp(val, 'constructor').consume(c => context.getProp(c, 'name').consume(n => context.dump(n))) === 'Promise';
         
         if (isPromise) {
           const hostPromise = context.resolvePromise(val);
@@ -239,7 +289,6 @@ export class Sandbox {
             }
           });
 
-          // Wait with timeout
           let timer;
           const timeoutPromise = new Promise((_, reject) => {
             timer = setTimeout(() => {
@@ -261,6 +310,7 @@ export class Sandbox {
       finalResult = { error: err.message || String(err) };
     } finally {
       isClosed = true;
+      abortController.abort();
       for (const p of pendingPromises) {
         try {
           const errHandle = context.newError('Script closed');
@@ -269,16 +319,19 @@ export class Sandbox {
         } catch(e) {}
       }
       try { 
-        let jobs = 1;
-        while (jobs > 0) {
-          jobs = runtime.executePendingJobs();
-        }
+        pumpJobs();
       } catch(e) {}
 
-      scope.dispose();
-      context.dispose();
-      runtime.dispose();
+      try {
+        scope.dispose();
+        context.dispose();
+        runtime.dispose();
+      } catch(e) {
+        finalResult.error = (finalResult.error || '') + ' (sandbox crashed: ' + e.message + ')';
+      }
     }
+
+    finalResult.toolsCalled = toolsCalled;
 
     if (logs.length > 0) {
       let logsStr = logs.join('\n');

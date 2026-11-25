@@ -32,7 +32,8 @@ function buildEnv(entryEnv) {
 
 function killTree(cp) {
   if (process.platform === 'win32') {
-    spawn('taskkill', ['/pid', cp.pid, '/f', '/t'], { stdio: 'ignore' });
+    const killer = spawn('taskkill', ['/pid', String(cp.pid), '/f', '/t'], { stdio: 'ignore' });
+    killer.on('error', () => {});
   } else {
     cp.kill('SIGTERM');
     setTimeout(() => {
@@ -45,6 +46,7 @@ export class UpstreamManager {
   constructor(cwd) {
     this.cwd = cwd;
     this.upstreams = new Map(); // name -> { status, reason, ... }
+    this.inFlightCalls = 0;
   }
 
   async startAll(config) {
@@ -105,6 +107,17 @@ export class UpstreamManager {
           req.reject(new Error('Upstream exited'));
         }
         upstream.pendingRequests.clear();
+      });
+
+      stream.on('error', (err) => {
+        upstream.status = 'unavailable';
+        upstream.reason = 'RpcStream error: ' + err.message;
+        for (const req of upstream.pendingRequests.values()) {
+          clearTimeout(req.timer);
+          req.reject(new Error('RpcStream error: ' + err.message));
+        }
+        upstream.pendingRequests.clear();
+        killTree(cp);
       });
 
       stream.on('message', (msg) => {
@@ -203,7 +216,19 @@ export class UpstreamManager {
     }
   }
 
-  async request(name, method, params, timeoutMs = 15000) {
+  async request(name, method, params, timeoutMs = 15000, abortSignal) {
+    if (this.inFlightCalls >= 4) {
+      throw new Error('Too many in-flight upstream calls (cap is 4)');
+    }
+    this.inFlightCalls++;
+    try {
+      return await this._requestInternal(name, method, params, timeoutMs, abortSignal);
+    } finally {
+      this.inFlightCalls--;
+    }
+  }
+
+  async _requestInternal(name, method, params, timeoutMs = 15000, abortSignal) {
     const upstream = this.upstreams.get(name);
     if (!upstream || upstream.status !== 'ok') {
       throw new Error(`Upstream ${name} is not available`);
@@ -214,12 +239,27 @@ export class UpstreamManager {
     if (params !== undefined) msg.params = params;
 
     return new Promise((resolve, reject) => {
+      let aborted = false;
       const timer = setTimeout(() => {
+        if (aborted) return;
         upstream.pendingRequests.delete(id);
         reject(new Error(`Upstream ${name} timed out after ${timeoutMs}ms for ${method}`));
       }, timeoutMs);
 
-      upstream.pendingRequests.set(id, { resolve, reject, timer });
+      const req = { resolve, reject, timer };
+      upstream.pendingRequests.set(id, req);
+
+      const onAbort = () => {
+        aborted = true;
+        upstream.pendingRequests.delete(id);
+        clearTimeout(timer);
+        reject(new Error('Aborted'));
+      };
+      if (abortSignal) {
+        abortSignal.addEventListener('abort', onAbort);
+        req.resolve = (val) => { abortSignal.removeEventListener('abort', onAbort); resolve(val); };
+        req.reject = (err) => { abortSignal.removeEventListener('abort', onAbort); reject(err); };
+      }
 
       try {
         const serialized = JSON.stringify(msg);

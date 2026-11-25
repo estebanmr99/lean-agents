@@ -10,54 +10,47 @@ async function main() {
     process.exit(1);
   }
 
-  const absDir = path.resolve(dir);
-  const home = os.homedir();
-  const stateDir = process.env.LEAN_STATE_DIR || path.join(home, '.config', 'lean-agents');
-
-  if (!absDir.startsWith(stateDir) || absDir === stateDir) {
-    console.error(`Refusing to remove ${absDir}: outside lean data dir`);
+  let absDir;
+  try {
+    const rawAbs = path.resolve(dir);
+    const stats = fsSync.lstatSync(rawAbs);
+    if (stats.isSymbolicLink()) {
+      console.error(`Refusing to remove ${rawAbs}: it is a symlink`);
+      process.exit(1);
+    }
+    absDir = fsSync.realpathSync(rawAbs);
+  } catch (err) {
+    if (err.code === 'ENOENT') process.exit(0);
+    console.error(`Stat failed for ${dir}: ${err.message}`);
     process.exit(1);
   }
 
+  const home = os.homedir();
+  const stateDir = process.env.LEAN_STATE_DIR || path.join(home, '.config', 'lean-agents');
+  
+  let realStateDir;
   try {
-    const stats = fsSync.lstatSync(absDir);
-    if (stats.isSymbolicLink()) {
-      console.error(`Refusing to remove ${absDir}: it is a symlink`);
-      process.exit(1);
-    }
-    if (!stats.isDirectory()) {
-      console.error(`Refusing to remove ${absDir}: not a directory`);
-      process.exit(1);
-    }
-  } catch (err) {
-    if (err.code === 'ENOENT') process.exit(0);
-    console.error(`Stat failed for ${absDir}: ${err.message}`);
+    realStateDir = fsSync.realpathSync(stateDir);
+  } catch(e) {
+    realStateDir = path.resolve(stateDir);
+  }
+
+  if (!absDir.startsWith(realStateDir + path.sep)) {
+    console.error(`Refusing to remove ${absDir}: outside lean data dir (${realStateDir})`);
     process.exit(1);
   }
 
   let markerFound = false;
   try {
-    const files = await fs.readdir(absDir);
-    for (const f of files) {
-      if (f === '.lean-agents-marker' || f === '.managed-by-lean-agents') {
+    const markerPath = path.join(absDir, '.lean-agents-code-mode-proxy');
+    const stats = fsSync.statSync(markerPath);
+    if (stats.isFile()) {
+      const content = await fs.readFile(markerPath, 'utf8');
+      if (content.trim() === 'managed by lean-agents') {
         markerFound = true;
-        break;
       }
-      try {
-        const stats = fsSync.statSync(path.join(absDir, f));
-        if (stats.isFile() && stats.size < 1024 * 1024) {
-          const text = await fs.readFile(path.join(absDir, f), 'utf8');
-          if (text.includes('managed by lean-agents')) {
-            markerFound = true;
-            break;
-          }
-        }
-      } catch (e) {}
     }
-  } catch (err) {
-    console.error(`Failed to read dir ${absDir}: ${err.message}`);
-    process.exit(1);
-  }
+  } catch(e) {}
 
   if (!markerFound) {
     console.error(`Refusing to remove ${absDir}: marker file missing`);
