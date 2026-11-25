@@ -2,14 +2,9 @@ name: Spike VS Code Insiders
 
 # 1.2.1: the real VS Code Insiders CLI and lean-agents write the same user mcp.json (`Code - Insiders/User`).
 # Insiders builds change daily, so this downloads the current one unpinned (a spike, not a release gate).
-# No login, no secrets, temp HOME. Runs on PRs that change the spike or the VS Code adapter.
+# No login, no secrets, temp HOME. Manual dispatch only (audit 1.2.1): the unpinned download never runs on PRs.
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - tests/spike-vscode-insiders.sh
-      - .github/workflows/spike-vscode-insiders.yml
-      - scripts/lib/adapters/vscode-copilot.mjs
 
 permissions:
   contents: read
