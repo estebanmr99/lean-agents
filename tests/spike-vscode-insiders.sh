@@ -29,4 +29,5 @@ grep -q '"telemetry.telemetryLevel": "off"' "$user/settings.json"
 node "$repo/scripts/lean.mjs" --home "$HOME" --uninstall --yes --no-exec </dev/null >/dev/null
 echo "after uninstall: $(servers)"
 [[ "$(servers)" == probe ]]
+if grep -q 'telemetry.telemetryLevel' "$user/settings.json" 2>/dev/null; then echo "strict settings left after uninstall" >&2; exit 1; fi
 echo "PASS: spike-vscode-insiders"
