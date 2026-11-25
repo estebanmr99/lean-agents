@@ -30,8 +30,8 @@ jobs:
           echo "--- HOME before ---"
           ls -la "$HOME"
           
-          # Install pinned version (latest for now since no pin in pins.json yet)
-          npm install -g @openai/codex
+          # Pinned: newest release at least 14 days old on 2026-11-24 (no pins.json entry until an adapter exists).
+          npm install -g --ignore-scripts @openai/codex@0.167.0
           
           # Print version
           codex --version
