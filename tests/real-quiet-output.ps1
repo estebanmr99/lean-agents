@@ -24,3 +24,16 @@ if ($text -notmatch '\[\d+/\d+\] ') { throw 'no [n/N] step lines on the terminal
 if (($text + $errText) -match 'STUB-(ERR|OUT)-') { throw 'a stub command output reached the terminal' }
 $log = Get-ChildItem -Path (Join-Path $caseHome '.config\lean-agents\logs') -Filter *.log | Select-Object -First 1
 if (-not $log -or -not ((Get-Content -Raw $log.FullName) -match 'STUB-ERR-claude')) { throw 'the log does not hold the stub stderr' }
+
+# A failing step: the stub npx exits 3. The terminal shows the failure line, the last lines of that step and the log path; the exit code is non-zero.
+$failHome = Join-Path $tmp "quiet-fail-home-$stamp"
+New-Item -ItemType Directory -Path $failHome -Force | Out-Null
+Set-Content -Path "$bin\npx.cmd" -Value "@echo off`r`necho STUB-ERR-npx %* 1>&2`r`nexit /b 3" -Encoding ASCII
+$ErrorActionPreference = 'Continue'
+$failText = (& node "$repo\scripts\lean.mjs" --home $failHome --yes --agents claude --tools context-mode 2>$errFile | Out-String)
+$failExit = $LASTEXITCODE
+$ErrorActionPreference = 'Stop'
+Write-Output $failText
+if ($failExit -eq 0) { throw 'expected a non-zero exit when a step fails' }
+if ($failText -notmatch 'STUB-ERR-npx') { throw 'the failing step tail is missing' }
+if ($failText -notmatch 'full output: ~[\\/]\.config[\\/]lean-agents[\\/]logs') { throw 'the log path (with ~) is missing' }

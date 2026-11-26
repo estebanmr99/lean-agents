@@ -278,19 +278,34 @@ export const bunPresent = (home) => Boolean(which('bun')) || fs.existsSync(path.
 // Node < 24.20 on Windows can abort on exit after the skills CLI finished (nodejs/node#56645); its "Done!" is the proof.
 export const exitCrashAfterDone = (argv, status, out) => status !== 0 && argv.some((a) => /^skills@/.test(a)) && /Done!/.test(out) && /UV_HANDLE_CLOSING/.test(out);
 
+// Quiet mode: the child writes straight to the log file (no buffer limit); the last lines of this command are read back for a failure report.
+// Returns null when the log cannot be opened, so the caller falls back to the terminal.
+function runLogged(argv, env, logFile, tail) {
+  let fd;
+  try { fd = fs.openSync(logFile, 'a+', 0o600); } catch { return null; }
+  try {
+    const start = fs.fstatSync(fd).size;
+    fs.writeSync(fd, `$ ${argv.join(' ')}\n`);
+    const r = spawnSync(argv[0], argv.slice(1), { stdio: ['ignore', fd, fd], shell: useShell(argv[0]), env: { ...allowedEnv(), ...env } });
+    const size = fs.fstatSync(fd).size;
+    const buf = Buffer.alloc(Math.min(size - start, 65536));
+    fs.readSync(fd, buf, 0, buf.length, size - buf.length);
+    const out = buf.toString('utf8');
+    let ok = r.status === 0;
+    if (exitCrashAfterDone(argv, r.status, out)) { fs.writeSync(fd, '(the skills CLI finished, then Node crashed on exit: nodejs/node#56645, fixed in Node 24.20; counted as done)\n'); ok = true; }
+    fs.writeSync(fd, `${r.error ? `${r.error.message}\n` : ''}[exit ${r.status ?? r.signal ?? -1}]\n`);
+    tail?.push(...out.split(/\r?\n/).filter(Boolean).slice(-20));
+    return { ok, status: r.status ?? -1 };
+  } finally { fs.closeSync(fd); }
+}
+
 // `codes` collects the exit status; `json` sends the child's stdout to stderr so stdout stays one JSON object.
 // `logFile` (quiet mode): stdout and stderr go to that file, never to the terminal; `tail` collects the last lines of this command for a failure report.
 // stdin is closed so a child that asks a question takes its default instead of waiting for an answer nobody can see; `rtk init` keeps the terminal.
 export function run(argv, { dryRun, log, env, json, codes, logFile, tail }) {
-  if (logFile && !(argv[0] === 'rtk' && argv[1] === 'init')) {
-    fs.appendFileSync(logFile, `$ ${argv.join(' ')}\n`);
-    if (dryRun) return true;
-    const r = spawnSync(argv[0], argv.slice(1), { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8', shell: useShell(argv[0]), env: { ...allowedEnv(), ...env } });
-    const out = `${r.stdout ?? ''}${r.stderr ?? ''}${r.error ? `${r.error.message}\n` : ''}`;
-    fs.appendFileSync(logFile, `${out}[exit ${r.status ?? r.signal ?? -1}]\n`);
-    tail?.push(`$ ${argv.join(' ')}`, ...out.split(/\r?\n/).filter(Boolean));
-    codes?.push(r.status ?? -1);
-    return r.status === 0 || exitCrashAfterDone(argv, r.status, out);
+  if (logFile && !dryRun && !(argv[0] === 'rtk' && argv[1] === 'init')) {
+    const q = runLogged(argv, env, logFile, tail);
+    if (q) { codes?.push(q.status); return q.ok; }
   }
   log(`  $ ${argv.join(' ')}`);
   if (dryRun) return true;

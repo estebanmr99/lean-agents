@@ -50,7 +50,12 @@ export function changelogNotes(text, from, to) {
 }
 
 const CHANGELOG_URL = 'https://github.com/estebanmr99/lean-agents/blob/main/CHANGELOG.md';
-const briefBody = (body) => body.split('\n').filter((l) => /^\s*- /.test(l)).map((l) => `- ${l.replace(/^\s*- /, '').replace(/^(.*?[.!?])(\s.*)?$/, '$1').slice(0, 160)}`).join('\n');
+// First sentence: ends at . ! ? before a space or the end, not after e.g. / i.e. / etc. / vs. and not inside a version like v1.2.0.
+const firstSentence = (t) => {
+  for (const m of t.matchAll(/[.!?](?=\s|$)/g)) if (!/\b(e\.g|i\.e|etc|vs)$/i.test(t.slice(0, m.index))) { t = t.slice(0, m.index + 1); break; }
+  return t.length > 160 ? `${t.slice(0, 159)}…` : t;
+};
+const briefBody = (body) => body.split('\n').filter((l) => /^\s*- /.test(l)).map((l) => `- ${firstSentence(l.replace(/^\s*- /, ''))}`).join('\n');
 
 // `brief`: one line per release-note entry (its first sentence), then the CHANGELOG link (#491).
 export function formatUpdatePlan(rows, notes, brief = false) {
