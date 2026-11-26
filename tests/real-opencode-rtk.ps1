@@ -41,6 +41,15 @@ export default {
   id: 'probe',
   async setup(ctx) {
     log('setup PATH has rtk-bin: ' + /rtk-bin/.test(process.env.PATH ?? '') + ' | Path: ' + /rtk-bin/.test(process.env.Path ?? ''))
+    const { existsSync, statSync } = await import('node:fs')
+    const { delimiter, join } = await import('node:path')
+    const exts = (process.env.PATHEXT ?? '.EXE;.CMD;.BAT;.COM').split(';')
+    let found = null
+    for (const dir of (process.env.PATH ?? '').split(delimiter).filter(Boolean)) {
+      for (const ext of exts) { const f = join(dir, 'rtk' + ext); if (!found && existsSync(f) && !statSync(f).isDirectory()) found = f }
+    }
+    log('resolved rtk: ' + found + ' | PATHEXT=' + process.env.PATHEXT)
+    if (found) await new Promise((resolve) => { const t = Date.now(); execFile(found, ['hook', 'opencode', '--help'], { encoding: 'utf8', timeout: 3000, windowsHide: true }, (err) => { log('probe --help: ' + (err ? 'ERR ' + err.message : 'ok') + ' in ' + (Date.now() - t) + 'ms'); resolve() }) })
     await ctx.tool.hook('execute.before', (e) => {
       log('hook ' + JSON.stringify({ tool: e.tool, input: e.input, keys: Object.keys(e) }))
       return new Promise((resolve) => execFile('rtk', ['hook', 'opencode', '--agent', 'build', 'ls'], { encoding: 'utf8', timeout: 5000, windowsHide: true }, (err, out) => { log('spawn rtk: ' + (err ? 'ERR ' + err.message : out)); resolve() }))
