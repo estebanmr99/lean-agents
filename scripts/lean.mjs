@@ -22,6 +22,7 @@ import { MIGRATE_SOURCES, MIGRATE_TARGETS, readSource, detectSources, migratePla
 import { adhdCommand } from './lib/adhd.mjs';
 import { version as binVersion, versionFull, gitHint, detectAgents, packageManager, prereqFor, antigravityPrereqs, cursorAppPrereqs, bunInstall, bunPathCommand, bunPresent, rtkInstall, which, run, quiet, exists, isolate, configHome, envDir } from './lib/system.mjs';
 import { doctor } from './lib/doctor.mjs';
+import { preflight, formatPreflight } from './lib/preflight.mjs';
 import { probePlugins } from './lib/plugin-health.mjs';
 import { adopt, inventory, saveState } from './lib/adopt.mjs';
 import { planPrereqs, pendingPrereqs, everythingAgents, undoArgv, nvmDirExistedBefore } from './lib/prereqs.mjs';
@@ -132,6 +133,7 @@ function parseArgs(argv) {
       case '--add-tools': o.command = 'update'; o.addTools = list(next()); break;
       case '--uninstall': o.command = 'uninstall'; break;
       case '--doctor': o.command = 'doctor'; break;
+      case '--preflight': o.command = 'preflight'; break;
       case '--summary': o.command = 'summary'; break;
       case '--no-open': o.noOpen = true; break;
       case '--filed-issue': (o.filedIssues ??= []).push(next()); break;
@@ -194,7 +196,7 @@ const HELP = `Usage: lean-agents [options]
                          pass --network on|off when nothing is installed yet. Files nothing.
   --no-exec              Run no external command (no installs, no version probes); --uninstall refuses it when commands need undoing
   --probe-plugins        With --doctor or --adopt: start a short-lived opencode serve (throwaway state dir, loopback) and check a plugin's command registers
-  --json                 With --dry-run, --doctor or --yes: print one JSON object on stdout (messages go to stderr)
+  --json                 With --dry-run, --doctor, --preflight or --yes: print one JSON object on stdout (messages go to stderr)
   --no-app               Do not install the Antigravity app (the CLI is still installed when missing)
   --cursor-app           With Cursor: also install the Cursor app when missing (brew or winget; opt-in)
   --bun / --no-bun       Install Bun for Context Mode (default: on; faster JS, TypeScript)
@@ -215,6 +217,8 @@ const HELP = `Usage: lean-agents [options]
                          upgraded agent CLIs alone; use --uninstall-agent for ones lean-agents installed
   --uninstall            Undo everything lean-agents changed
   --doctor               Check the install
+  --preflight            Read-only: every agent CLI and tool on PATH (all copies, which one wins), versions below the minimum, a window PATH
+                         older than the stored one; one fix line each, exit 1 on a blocker (with --json: one JSON object)
   --summary              Write the summary page (summary.html in the state dir; --uninstall removes it) and ask before opening it.
                          --filed-issue "item=issue url" records an issue you filed; --no-open only prints the path
   --adopt                List what a hand-built machine already has (MCPs, hooks, plugins, skills, npm copies),
@@ -1297,7 +1301,7 @@ function checkNodeFloor(o) {
   const override = /^v?\d+(\.\d+){0,2}$/.test(fake) ? fake.replace(/^v/, '').split('.').concat('0', '0').slice(0, 3).join('.') : null;
   const running = [process.versions.node, override].find((v) => v && !satisfies(v, floor));
   if (!running) return;
-  const readOnly = ['help', 'version', 'doctor', 'usage', 'feedback'].includes(o.command) || (o.command === 'upgrade-agent' && !o.yes) || o.dryRun || (o.command === 'adopt' && !o.yes && !o.undo);
+  const readOnly = ['help', 'version', 'doctor', 'preflight', 'usage', 'feedback'].includes(o.command) || (o.command === 'upgrade-agent' && !o.yes) || o.dryRun || (o.command === 'adopt' && !o.yes && !o.undo);
   const allow = process.env.LEAN_AGENTS_ALLOW_OLD_NODE === '1';
   const nvm = findNvm({ env: process.env, home: os.homedir(), platform: process.platform, realHome: REAL_HOME });
   const nodes = nvm ? installedNodes(nvm) : [];
@@ -1318,6 +1322,11 @@ async function main() {
   shareProxy();
   if (o.command === 'help') return console.log(HELP);
   if (o.command === 'version') return console.log(JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version);
+  if (o.command === 'preflight') {
+    const report = preflight({ home: o.home });
+    process.stdout.write(`${formatPreflight(report, { home: o.home, json: o.json })}\n`);
+    return process.exit(report.ok ? 0 : 1);
+  }
   if (o.command === 'doctor') {
     const state = readState(o.home);
     const probe = o.probePlugins && state?.options.agents.some((a) => a.startsWith('opencode')) ? await probePlugins(o.home) : [];

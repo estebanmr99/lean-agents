@@ -4,6 +4,9 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Added
+- `--preflight` (and `--preflight --json`) is a read-only report of setup blockers in one pass (#471). For every agent CLI and tool it lists all copies on PATH and which one wins (an old rtk ahead of a new one), flags a copy below the pin's minimum, and on Windows says when the window's PATH lacks a folder the stored user or machine PATH has (restart the terminal or VS Code). One fix line per finding; exit 1 when there is a blocker. It only runs `--version` and, on Windows, `reg query`; home paths print as `~`. Config shape, nvm Nodes and disk space follow in a later release.
+
 ## [1.2.2] - 2026-11-26
 
 ### Added
