@@ -71,11 +71,11 @@ test('prompts never hang: a child that reads stdin gets EOF', { skip: !posix }, 
 });
 
 test('A2: the file list shows only changes, then one "N unchanged" line', () => {
-  const planned = [{ status: 'create', path: '/h/a' }, { status: 'unchanged', path: '/h/b' }, { status: 'unchanged', path: '/h/c' }, { status: 'modify', path: '/h/d' }];
-  const text = describe(planned, '/h', true);
-  assert.doesNotMatch(text, /\/b|\/c/);
-  assert.match(text, /^ {2}create {4}~\/a\n {2}modify {4}~\/d\n {2}2 unchanged$/);
-  assert.match(describe(planned, '/h'), /unchanged +~\/b/);
+  const h = path.join(os.tmpdir(), 'h');
+  const f = (n) => path.join(h, n);
+  const planned = [{ status: 'create', path: f('a') }, { status: 'unchanged', path: f('b') }, { status: 'unchanged', path: f('c') }, { status: 'modify', path: f('d') }];
+  assert.equal(describe(planned, h, true), `  create    ~${path.sep}a\n  modify    ~${path.sep}d\n  2 unchanged`);
+  assert.match(describe(planned, h), /unchanged +~.b/);
 });
 
 test('A3: brief release notes keep the first sentence of each entry and link the changelog', () => {

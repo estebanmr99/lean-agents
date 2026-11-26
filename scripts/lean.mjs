@@ -852,7 +852,7 @@ async function install(o) {
     } catch (e) { console.log(`! cannot write the step log (${e.code ?? e.message}); showing every command's output instead.`); logFile = null; }
   }
   const tail = [];
-  const showFailure = (c) => console.log(`${redactText(tail.slice(-20).map((l) => `    ${l}`).join('\n'), { home: o.home })}\n  ! failed: ${c.desc}. full output: ${tilde(logFile, o.home)}`);
+  const showFailure = (c) => console.log(`${redactText(tail.slice(-20).map((l) => `    ${l}`).join('\n'), { home: o.home })}\n  ! failed: ${c.desc}. full output: ${tilde(logFile, o.home)}${c.optional && c.tool === 'lean-update' ? '; install it later with --update' : ''}`);
   const total = logFile && o.exec ? commands.filter((c) => !c.manual && !(c.bin && !behind.has(c.tool) && which(c.bin)) && (behind.has(c.tool) || !((c.skipIfExists && exists(c.skipIfExists)) || (c.skipIfOutput && quiet(c.skipIfOutput.cmd).ok)))).length : 0;
   let step = 0;
   const stepLine = (c, ok) => console.log(redactText(`[${step}/${Math.max(total, step)}] ${c.desc} ${ok ? '✓' : '✗'}`, { home: o.home }));
@@ -948,7 +948,7 @@ async function install(o) {
       if (ui) ui.result(ok || c.optional, c.desc);
       else if (!ok && !c.optional && !logFile) console.log(`  ! failed: ${c.desc}. Run the command above by hand, then --doctor.`);
       // An optional step (Bun) that fails only means Context Mode runs on Node; nothing to undo.
-      if (!ok && c.optional) { console.log(c.tool === 'gh' ? '! gh install failed; install it yourself (--no-gh skips it).' : c.tool === 'lean-update' ? '! lean-update skill failed to install; run the command above by hand later.' : '! Bun install failed; Context Mode will run on Node.'); ran.pop(); save(); continue; }
+      if (!ok && c.optional) { if (!(logFile && c.tool === 'lean-update')) console.log(c.tool === 'gh' ? '! gh install failed; install it yourself (--no-gh skips it).' : c.tool === 'lean-update' ? '! lean-update skill failed to install; run the command above by hand later.' : '! Bun install failed; Context Mode will run on Node.'); ran.pop(); save(); continue; }
       if (!ok) failed++;
       rec.ok = ok;
       save();
