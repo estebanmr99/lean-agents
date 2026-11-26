@@ -51,5 +51,17 @@
     "sha256": "2ba6ab6290fdc7d1e608e76c97577ca6e1df772b2d59ab8ebc01e10788de8e57",
     "checked": "2026-11-11",
     "version": "v2.0.1"
+  },
+  "rtk-linux-x64": {
+    "url": "https://github.com/rtk-ai/rtk/releases/download/v1.2.0/rtk-x86_64-unknown-linux-musl.tar.gz",
+    "sha256": "70fee7b4a548c43dde94c77e2335550981b0bc2fb013691d8c8109b5bd0eda37",
+    "checked": "2026-11-25",
+    "version": "v1.2.0"
+  },
+  "rtk-windows-x64": {
+    "url": "https://github.com/rtk-ai/rtk/releases/download/v1.2.0/rtk-x86_64-pc-windows-msvc.zip",
+    "sha256": "b291b4e53d37f84b7f1696bc20559207396fb0190f20ed3c949db1b7e1c0c378",
+    "checked": "2026-11-25",
+    "version": "v1.2.0"
   }
 }

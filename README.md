@@ -288,7 +288,7 @@ curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/i
 | --- | --- | --- | --- | --- | --- |
 | Global rules (AGENTS.md) | ✅ | ✅ | ✅ | ✅ | ⚠️ written, load unproven |
 | Subagents by cost tier | ✅ | ✅ | ✅ | ✅ | ✅ flash, pro |
-| RTK (shell output compression) | ✅ | ➖ plugin refused (#179) | ✅ | ✅ | ✅ |
+| RTK (shell output compression) | ✅ | ✅ rtk 1.2.0+ plugin (#478) | ✅ | ✅ | ✅ |
 | Context Mode | ✅ plugin | ✅ MCP | ✅ plugin | ✅ MCP | ➖ skipped (no v2 setup) |
 | Serena + Playwright MCP | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Signed-in browser (opt-in) | ➖ Claude in Chrome | ✅ opt-in | ✅ opt-in | ✅ opt-in | ➖ |
@@ -300,6 +300,8 @@ curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/i
 | Context compaction | ✅ auto 80% | ✅ native | ✅ native, optional DCP | ➖ | ➖ |
 | Network presets (telemetry, updates, outbound) | ✅ | ✅ updates, sharing | ✅ | ⚠️ updates; telemetry is a reminder | ⚠️ reminders only |
 | Proxy passed to every install command | ✅ | ✅ | ✅ | ✅ | ⚠️ checked in CI, undocumented upstream |
+
+On OpenCode, rtk's own plugin (`plugins/rtk.ts`, rtk 1.2.0 or newer) passes every shell command through `rtk hook opencode`; `--update` regenerates an older one.
 
 ✅ supported · ⚠️ partial · ➖ not available for this agent. Details and verification dates: [docs/compatibility.md](docs/compatibility.md).
 
