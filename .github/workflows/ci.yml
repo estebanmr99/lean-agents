@@ -318,6 +318,12 @@ jobs:
         run: |
           bash scripts/ci-install-opencode-v2.sh
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+      - name: Install the pinned rtk (the RTK plugin check in real-opencode.sh)
+        run: |
+          bash scripts/ci-download.sh rtk-linux-x64 "$RUNNER_TEMP/rtk.tar.gz"
+          mkdir -p "$RUNNER_TEMP/rtk-bin"
+          tar -xzf "$RUNNER_TEMP/rtk.tar.gz" -C "$RUNNER_TEMP/rtk-bin" rtk
+          echo "$RUNNER_TEMP/rtk-bin" >> "$GITHUB_PATH"
       - name: Install lean-agents and check what OpenCode resolved
         run: bash tests/real-opencode.sh
       - name: --install-agent and --uninstall-agent (installer script)
@@ -669,6 +675,17 @@ jobs:
       - name: Probe the shell the bash/shell tool uses
         shell: pwsh
         run: ./tests/real-opencode-shell.ps1 -Major ${{ matrix.major }}
+      - name: Install the pinned rtk (OpenCode 2 only)
+        if: matrix.major == 'v2'
+        shell: bash
+        run: |
+          bash scripts/ci-download.sh rtk-windows-x64 "$RUNNER_TEMP/rtk.zip"
+          powershell -NoProfile -Command "Expand-Archive -Path \"$RUNNER_TEMP/rtk.zip\" -DestinationPath \"$RUNNER_TEMP/rtk-bin\" -Force"
+          echo "$RUNNER_TEMP/rtk-bin" >> "$GITHUB_PATH"
+      - name: RTK plugin on OpenCode 2 (load, rewrite)
+        if: matrix.major == 'v2'
+        shell: pwsh
+        run: ./tests/real-opencode-rtk.ps1
 
   real-parallel:
     # Real git worktrees in a throwaway repo and HOME; real Claude Code and OpenCode only get their flags checked.

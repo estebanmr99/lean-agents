@@ -1064,7 +1064,7 @@ async function applyUpgrade(o) {
   const { problems, baseline } = applyPreflight({ home: o.home, stamp, upgrade: S.upgrade, exec: o.exec, list: listProcesses, opencodeRunning });
   if (problems.length) return refuse(problems);
   const save = () => saveJournalState(o, S);
-  const inv = upgradeInventory(await inventory({ home: o.home, env: process.env, realHome: REAL_HOME }), { home: o.home });
+  const inv = upgradeInventory(await inventory({ home: o.home, env: process.env, realHome: REAL_HOME }), { home: o.home, tools: S.options?.tools ?? [] });
   const steps = createSteps(upgradeDeps(o, S, save, { inv, stamp }));
   S.upgrade = { backup: stamp.dir, baseline };
   const ctx = makeCtx({ home: o.home, stamp, journal: S.upgrade });
@@ -1333,7 +1333,7 @@ async function main() {
     const norm = (p) => (process.platform === 'win32' ? path.resolve(p).toLowerCase() : path.resolve(p));
     const own = norm(o.home) === norm(REAL_HOME);
     const binVer = bin && o.exec ? (own ? binVersion('opencode') : 'not probed (--home)') : null;
-    const r = upgradeInventory(inv, { home: o.home, binary: { path: bin, version: binVer } });
+    const r = upgradeInventory(inv, { home: o.home, binary: { path: bin, version: binVer }, tools: readState(o.home)?.options?.tools ?? [] });
     if (o.json) process.stdout.write(`${JSON.stringify(r, null, 2)}\n`); else console.log(formatUpgrade(r));
     return process.exit(0);
   }
