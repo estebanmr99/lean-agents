@@ -38,7 +38,7 @@ import { buildSummary } from './lib/summary-data.mjs';
 import { loginRows } from './lib/logins.mjs';
 import { renderSummary, canOffer, openArgv } from './lib/summary-html.mjs';
 import { planUpdate, changelogNotes, formatUpdatePlan } from './lib/update-plan.mjs';
-import { PINS, pinVersions, behindPins, pinTool, nodeRange, npmSpec } from './lib/pins.mjs';
+import { PINS, pinVersions, behindPins, pinTool, nodeRange, npmSpec, rtkPin, rtkTooOld } from './lib/pins.mjs';
 import { findNvm, installedNodes, nodeFloorFix, resolveToolNodes, nvmLatest, nvmInstallArgv, nvmEnv, toolEnv, satisfies, compare } from './lib/node-runtime.mjs';
 import { leanUpdateCommands, coordinateCommands, leanMigrateCommands } from './lib/lean-update.mjs';
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
@@ -781,6 +781,18 @@ async function install(o) {
         return;
       }
     }
+  }
+
+  // #467: an rtk below the pinned min fails the rtk steps; skip them and say how to update instead.
+  const rtkV = o.exec && commands.some((c) => c.tool === 'rtk') && which('rtk') ? binVersion('rtk') : null;
+  if (rtkTooOld(rtkV)) {
+    const skipped = commands.filter((c) => c.tool === 'rtk' && (c.run ?? []).some((argv) => argv[0] === 'rtk'));
+    for (const c of skipped) commands.splice(commands.indexOf(c), 1);
+    const pm = packageManager();
+    const how = pm === 'brew' ? 'brew upgrade rtk' : pm === 'winget' ? 'winget upgrade --id rtk-ai.rtk -e' : prereqFor('rtk', pm).manual;
+    const warn = `! rtk ${rtkV} is older than ${rtkPin().min}, which lean-agents needs: skipped ${skipped.length} RTK steps (${skipped.map((c) => c.desc).join(', ')}). Update rtk (${how}), make it first on PATH, then run --update`;
+    if (o.json) console.error(warn);
+    else console.log(warn);
   }
 
   const noGit = migration ? null : gitHint(packageManager());

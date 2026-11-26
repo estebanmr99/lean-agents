@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { compare } from './node-runtime.mjs';
 
 const FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'core', 'pins.json');
 export const PINS = JSON.parse(fs.readFileSync(FILE, 'utf8')).pins;
@@ -26,6 +27,8 @@ export const pinSpec = (key) => (pin(key).kind === 'git' ? gitSpec(key) : npmSpe
 export const nodeRange = (key) => pin(key).node;
 export const bunPin = () => pin('bun');
 export const rtkPin = () => pin('rtk');
+// An rtk older than the pinned min lacks flags the rtk steps use (0.42 has no `--agent antigravity`, #467).
+export const rtkTooOld = (v) => Boolean(v) && compare(v, pin('rtk').min) < 0;
 export const skillsCli = () => npmSpec('skills-cli');
 // `download` pins (Bun) are verified by SHA256 at install time; `tool` (rtk, uv, gh) and `cask` (Antigravity) pins are
 // package-manager installs we cannot pin, so they are a minimum and a known-good version, not something state.json records.
