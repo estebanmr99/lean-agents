@@ -54,5 +54,5 @@ Release audit of lean-agents for 1.2.2 (2026-11-26). Range: v1.2.1..015df1b (mai
 ## Owner-only gates
 
 1. **Tag v1.2.2:** approved by the owner on 2026-11-26.
-2. **Release run green:** `release.yml` must pass on the tag.
-3. **OIDC publish proof:** npm shows 1.2.2 as `latest`, with provenance.
+2. **Release run green:** `release.yml` run 45821165819 passed on the tag (2026-11-26).
+3. **OIDC publish proof:** npm shows 1.2.2 as `latest`, with SLSA provenance (checked 2026-11-26).
