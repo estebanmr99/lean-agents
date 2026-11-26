@@ -300,13 +300,20 @@ function checkAntigravityIde({ home, exec, run, platform, fsx }, add) {
   const found = antigravityFootprint(home, fsx);
   if (!found.length) return;
   const folders = found.map((f) => f.name).join(', ');
-  let app = 'unknown';
-  if (platform === 'darwin') app = ['/Applications', path.join(home, 'Applications')].some((d) => fsx.existsSync(path.join(d, 'Antigravity.app'))) ? 'present' : 'absent';
-  else if (platform === 'win32' && exec) app = wingetAnswer(run(['winget', 'list', '--id', 'Google.Antigravity', '-e'], 20000));
-  if (app === 'present') return add('antigravity ide', 'ok', folders);
-  add('antigravity ide', 'note', app === 'absent'
-    ? `app not installed (config found: ${folders}). lean-agents installs it unless --no-app; or https://antigravity.google/download`
-    : `could not check whether the app is installed (config found: ${folders}); https://antigravity.google/download`);
+  const link = 'https://antigravity.google/download';
+  if (platform === 'darwin') {
+    const there = ['/Applications', path.join(home, 'Applications')].some((d) => fsx.existsSync(path.join(d, 'Antigravity.app')));
+    if (there) return add('antigravity ide', 'ok', folders);
+    return add('antigravity ide', 'note', `app not installed (config found: ${folders}); download: ${link}`);
+  }
+  if (platform === 'win32') {
+    if (!exec) return add('antigravity ide', 'note', `app check skipped without exec (config found: ${folders})`);
+    const app = wingetAnswer(run(['winget', 'list', '--id', 'Google.Antigravity', '-e'], 20000));
+    if (app === 'present') return add('antigravity ide', 'ok', folders);
+    if (app === 'absent') return add('antigravity ide', 'note', `app not installed (config found: ${folders}); download: ${link}`);
+    return add('antigravity ide', 'note', `could not check whether the app is installed (config found: ${folders}); download: ${link}`);
+  }
+  add('antigravity ide', 'note', `app check not available on this OS (config found: ${folders})`);
 }
 
 function checkOpenCode(o, add, q) {
