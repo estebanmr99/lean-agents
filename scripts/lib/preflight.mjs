@@ -3,12 +3,18 @@
 // A blocker is something that stops setup (rtk below its minimum, a newer copy hidden behind an older one, a tool the window cannot
 // see yet). Everything else is a warning and does not change the exit code.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { PINS, npmSpec } from './pins.mjs';
 import { compare } from './node-runtime.mjs';
 import { versionFull, prereqFor, packageManager } from './system.mjs';
 import { redactText } from './redact.mjs';
+import { findNvm, installedNodes } from './node-runtime.mjs';
+import { clients, npmCopies } from './inventory.mjs';
+import { mcpServers } from './migrate.mjs';
+import { backupLayout, listSource, neededBytes, nearest, gb, stamp, opencodeRunning, listProcesses } from './opencode-backup.mjs';
 
 // [executable name, pin key]. The pin gives `min`, the pinned version and the update source.
 const TOOLS = [['claude', 'claude-code'], ['opencode', 'opencode-v2'], ['copilot', 'copilot-cli'], ['agy', 'antigravity-cask'], ['context-mode', 'context-mode'],
@@ -19,6 +25,7 @@ const BEHIND_PIN = new Set(['claude-code', 'copilot-cli', 'context-mode']);
 const PREREQ = { rtk: 'rtk', uv: 'serena', gh: 'gh' };
 // Below `min` blocks only where lean-agents skips or fails its steps (rtk, #467); for the rest `min` is just the verified release.
 const BLOCKING_MIN = new Set(['rtk']);
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PROBE_MS = 5000;
 const DEADLINE_MS = 60000;
 
@@ -91,14 +98,59 @@ export function staleWindowPath({ env, readWinPath = readWinPathFromRegistry, fs
 function updateFix(pinKey, platform, pm) {
   const p = PINS[pinKey];
   if (p.kind === 'npm') return `npm install -g ${npmSpec(pinKey)}`;
+  // jq has no prereqFor row; these ids are the ones prereqs.mjs installs it with.
+  if (pinKey === 'jq') return platform === 'win32' ? 'winget upgrade --id jqlang.jq' : pm === 'brew' ? 'brew upgrade jq' : `install ${p.min ?? p.version} or newer from https://github.com/${p.source}/releases, or run lean-agents --update`;
   const inst = PREREQ[pinKey] && prereqFor(PREREQ[pinKey], platform === 'win32' ? 'winget' : pm)?.install?.[0];
   if (inst?.[0] === 'winget') return `winget upgrade --id ${inst[inst.indexOf('--id') + 1]}`;
   if (inst?.[0] === 'brew') return `brew upgrade ${inst.at(-1)}`;
   return `install ${p.min ?? p.version} or newer from https://github.com/${p.source}/releases, or run lean-agents --update`;
 }
 
+// Several nvm Nodes with the same pinned npm tool in more than one, or only in a Node that is not the active one (#465).
+function nvmCopies({ home, env, platform, realHome, pathVar, fsx, add }) {
+  const nvm = findNvm({ env, home, platform, realHome });
+  if (!nvm || installedNodes(nvm).length < 2) return;
+  const active = findCopies('node', { path: pathVar, platform, env, fsx }).map((f) => f.match(/[\\/]v(\d+\.\d+\.\d+)[\\/]/)?.[1]).find(Boolean);
+  const by = {};
+  for (const c of npmCopies(nvm)) (by[c.pin] ??= []).push(c);
+  for (const [pin, cs] of Object.entries(by)) {
+    if (cs.length < 2 && (!active || cs[0].node === active)) continue;
+    add({ tool: pin, kind: 'nvm-copies', blocker: false, copies: cs.map((c) => ({ node: c.node, version: c.version })), active: active ?? null,
+      fix: 'run lean-agents --adopt to see which copy is used and clean up the others' });
+  }
+}
+
+// Only with an OpenCode 1.x data dir: the same free-space rule the backup applies, so the refusal shows up before --upgrade-agent.
+function backupSpace({ home, statfs, add }) {
+  try {
+    const L = backupLayout(home, stamp());
+    if (!fs.existsSync(path.join(L.live, 'opencode.db'))) return;
+    const src = listSource(L);
+    const bytes = [...src.data, ...src.config].reduce((n, f) => n + f.size, 0);
+    const dbBytes = src.data.filter((f) => f.rel.startsWith('opencode.db')).reduce((n, f) => n + f.size, 0);
+    const st = statfs(nearest(L.lean));
+    const free = Number(st.bavail) * Number(st.bsize);
+    const need = neededBytes(bytes, dbBytes);
+    if (free < need) add({ tool: 'opencode', kind: 'backup-space', blocker: true, free: gb(free), needed: gb(need), fix: `free up disk space (${gb(need - free)} more) before --upgrade-agent opencode --backup` });
+  } catch { /* unreadable data dir or statfs: the backup step reports it itself */ }
+}
+
+// MCP server names in the OpenCode config: the ones lean-agents installs print as-is, any other is <user-mcp-N> so the report can be shared.
+function configShape(home) {
+  let managed = [];
+  try { managed = Object.keys(JSON.parse(fs.readFileSync(path.join(ROOT, 'core', 'mcp.json'), 'utf8')).servers); } catch { /* no core dir: every name is a user name */ }
+  const names = [];
+  for (const { client, file, keyPath } of clients(home)) {
+    if (client !== 'opencode') continue;
+    for (const s of mcpServers(file, keyPath)) if (!(keyPath.length === 1 && s.name === 'servers') && !names.includes(s.name)) names.push(s.name);
+  }
+  if (!names.length) return null;
+  let n = 0;
+  return { mcp: names.map((x) => (managed.includes(x) ? x : `<user-mcp-${++n}>`)) };
+}
+
 export function preflight({ home, env = process.env, platform = process.platform, fsx = fs, exec = true, now = Date.now,
-  pm = platform === 'win32' ? 'winget' : packageManager(), probe = (f) => versionFull(f, ['--version'], {}, PROBE_MS), readWinPath }) {
+  pm = platform === 'win32' ? 'winget' : packageManager(), list = listProcesses, statfs = fs.statfsSync, realHome = os.homedir(), probe = (f) => versionFull(f, ['--version'], {}, PROBE_MS), readWinPath }) {
   const findings = [];
   const add = (f) => findings.push(f);
   const pathVar = envGet(env, 'PATH') ?? '';
@@ -133,8 +185,15 @@ export function preflight({ home, env = process.env, platform = process.platform
         fix: `this window started before PATH changed: ${missing.join('; ')} ${missing.length > 1 ? 'are' : 'is'} missing. Close and reopen the terminal or VS Code, then run --preflight again.` });
     }
   }
+  nvmCopies({ home, env, platform, realHome, pathVar, fsx, add });
+  backupSpace({ home, statfs, add });
+  if (exec) {
+    let running = false;
+    try { running = opencodeRunning(list()); } catch { /* cannot list: stay silent, the backup step refuses on its own */ }
+    if (running) add({ tool: 'opencode', kind: 'opencode-running', blocker: true, fix: 'run `opencode service stop` (OpenCode 2) or close the OpenCode app, then run --update or --upgrade-agent' });
+  }
   const blockers = findings.filter((f) => f.blocker).length;
-  return { ok: blockers === 0, blockers, warnings: findings.length - blockers, findings };
+  return { ok: blockers === 0, blockers, warnings: findings.length - blockers, findings, shape: configShape(home) };
 }
 
 function line(f) {
@@ -144,6 +203,9 @@ function line(f) {
   if (f.kind === 'behind-pin') return [`${tag}  ${f.tool} ${f.version} at ${f.path} is older than the pinned ${f.pinned}`, `  fix: ${f.fix}`];
   if (f.kind === 'relative-path') return [`${tag}  relative PATH entries skipped: ${f.entries.join('; ')}`, `  fix: ${f.fix}`];
   if (f.kind === 'stale-path') return [`${tag}  ${f.fix}`, ...(f.hidden.length ? [`    not visible in this window: ${f.hidden.join(', ')}`] : [])];
+  if (f.kind === 'nvm-copies') return [`${tag}  ${f.tool} is installed under ${f.copies.length} nvm Node${f.copies.length === 1 ? '' : 's'}${f.active ? ` (active: ${f.active})` : ''}: ${f.copies.map((c) => `${c.node} has ${c.version}`).join(', ')}`, `  fix: ${f.fix}`];
+  if (f.kind === 'backup-space') return [`${tag}  not enough disk space for the OpenCode 1.x backup: ${f.free} free, ${f.needed} needed`, `  fix: ${f.fix}`];
+  if (f.kind === 'opencode-running') return [`${tag}  an opencode process is running`, `  fix: ${f.fix}`];
   return [`${tag}  ${f.tool}: ${f.copies.length} copies on PATH, the first one wins`,
     ...f.copies.map((c, i) => `    ${i === 0 ? 'wins ' : '     '} ${c.path} (${v(c.version)})`), `  fix: ${f.fix}`];
 }
@@ -156,5 +218,5 @@ export function formatPreflight(report, { home, env = process.env, json = false 
   const red = (s) => redactText(s, { home, env });
   if (json) return JSON.stringify(deep(report, red), null, 2);
   const s = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
-  return red([...report.findings.flatMap(line), `${s(report.blockers, 'blocker')}, ${s(report.warnings, 'warning')}. Nothing was changed.`].join('\n'));
+  return red([...report.findings.flatMap(line), ...(report.shape ? [`config  OpenCode MCP servers: ${report.shape.mcp.join(', ')}`] : []), `${s(report.blockers, 'blocker')}, ${s(report.warnings, 'warning')}. Nothing was changed.`].join('\n'));
 }
