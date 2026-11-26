@@ -86,6 +86,9 @@ try {
   & opencode service set port (Get-Random -Minimum 20000 -Maximum 60000) | Out-Null
   $out = & opencode run --format json --standalone 'list files' 2>"$caseHome\err.txt"
   $exit = $LASTEXITCODE
+  # rtk may honor XDG_DATA_HOME and record the rewritten call in the throwaway profile's own database: count there too.
+  $inCase = Get-RtkCommandCount
+  Write-Output "history.db files: $((Get-ChildItem $caseHome -Recurse -Filter history.db -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }) -join ', ') | count with the case env: $inCase"
 } finally {
   & opencode service stop 2>$null | Out-Null
   foreach ($k in $saved.Keys) { Set-Item -Path "Env:$k" -Value $saved[$k] }
@@ -102,6 +105,6 @@ $after = Get-RtkCommandCount
 Write-Output "--- rtk gain after the turn ---"; & rtk gain 2>&1 | Out-String | Write-Output
 Write-Output '--- probe plugin log ---'; if (Test-Path $probeLog) { Get-Content $probeLog | Write-Output } else { Write-Output 'no probe log: setup never ran' }
 Write-Output '--- plugin warnings in the logs ---'; ($text -split "`n") | Where-Object { $_ -match '\[rtk\]|rtk\.ts|plugin' } | ForEach-Object { $_.Substring(0, [Math]::Min(300, $_.Length)) } | Write-Output
-if ($after -gt $before) { Write-Output "ok    the 2.x hook rewrote the shell call: rtk ran it (commands $before -> $after)" }
+if ($after -gt $before -or $inCase -gt 0) { Write-Output "ok    the 2.x hook rewrote the shell call: rtk ran it (commands $before -> $after, in the throwaway profile $inCase)" }
 else { Write-Output "FAIL  rtk did not run the shell call (commands $before -> $after)"; $failed = $true }
 if ($failed) { Write-Output '--- output ---'; Write-Output $text; exit 1 }
