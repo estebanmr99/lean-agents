@@ -135,3 +135,24 @@ test('A4: plan command lines print the home dir as ~', { skip: !posix }, () => {
   const r = lean(s, ['--dry-run']);
   assert.ok(!r.stdout.includes(s.home), 'no full home path in the plan');
 });
+
+// #489: the parent keeps stdin open (a terminal nobody types into); a planned command that reads stdin must still finish, in quiet and verbose mode.
+for (const quietMode of [true, false]) {
+  test(`#489: a command that reads stdin does not wait (${quietMode ? 'quiet' : 'verbose'})`, async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-stdin-'));
+    const sys = path.join(path.dirname(LEAN), 'lib', 'system.mjs');
+    const reader = "process.stdin.resume(); process.stdin.on('end', () => process.exit(0))";
+    const wrapper = `import { run } from ${JSON.stringify(new URL(`file://${sys.replace(/\\/g, '/')}`).href)};
+const ok = run([process.execPath, '-e', ${JSON.stringify(reader)}], { log() {}, ${quietMode ? `logFile: ${JSON.stringify(path.join(dir, 'run.log'))}, tail: []` : ''} });
+process.exit(ok ? 0 : 1);`;
+    fs.writeFileSync(path.join(dir, 'w.mjs'), wrapper);
+    const { spawn } = await import('node:child_process');
+    const child = spawn(process.execPath, [path.join(dir, 'w.mjs')], { stdio: ['pipe', 'ignore', 'inherit'] });
+    const code = await new Promise((res) => {
+      const t = setTimeout(() => { child.kill(); res('timeout'); }, 15000);
+      child.on('exit', (c) => { clearTimeout(t); res(c); });
+    });
+    child.stdin.destroy();
+    assert.equal(code, 0, 'the stdin reader got EOF and exited instead of waiting');
+  });
+}

@@ -301,9 +301,9 @@ function runLogged(argv, env, logFile, tail) {
 
 // `codes` collects the exit status; `json` sends the child's stdout to stderr so stdout stays one JSON object.
 // `logFile` (quiet mode): stdout and stderr go to that file, never to the terminal; `tail` collects the last lines of this command for a failure report.
-// stdin is closed so a child that asks a question takes its default instead of waiting for an answer nobody can see; `rtk init` keeps the terminal.
+// stdin is closed so a child that asks a question takes its default instead of waiting for an answer nobody can see (rtk init: N, #489).
 export function run(argv, { dryRun, log, env, json, codes, logFile, tail }) {
-  if (logFile && !dryRun && !(argv[0] === 'rtk' && argv[1] === 'init')) {
+  if (logFile && !dryRun) {
     const q = runLogged(argv, env, logFile, tail);
     if (q) { codes?.push(q.status); return q.ok; }
   }
@@ -311,8 +311,8 @@ export function run(argv, { dryRun, log, env, json, codes, logFile, tail }) {
   if (dryRun) return true;
   const isSkills = argv.some((a) => /^skills@/.test(a));
   const r = isSkills
-    ? spawnSync(argv[0], argv.slice(1), { stdio: ['inherit', 'pipe', 'pipe'], encoding: 'utf8', shell: useShell(argv[0]), env: { ...allowedEnv(), ...env } })
-    : spawnSync(argv[0], argv.slice(1), { stdio: json ? ['inherit', 2, 2] : 'inherit', shell: useShell(argv[0]), env: { ...allowedEnv(), ...env } });
+    ? spawnSync(argv[0], argv.slice(1), { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8', shell: useShell(argv[0]), env: { ...allowedEnv(), ...env } })
+    : spawnSync(argv[0], argv.slice(1), { stdio: ['ignore', json ? 2 : 'inherit', json ? 2 : 'inherit'], shell: useShell(argv[0]), env: { ...allowedEnv(), ...env } });
   if (isSkills) {
     (json ? process.stderr : process.stdout).write(r.stdout ?? '');
     process.stderr.write(r.stderr ?? '');

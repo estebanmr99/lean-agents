@@ -115,3 +115,16 @@ test('--update --dry-run on a hand-built machine without state.json says run --a
 
   fs.rmSync(home, { recursive: true, force: true });
 });
+
+test('#489: --update reuses a saved profile none and does not ask for it again', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const env = { PATH: path.dirname(process.execPath), HOME: home, ...(process.env.NVM_DIR && { NVM_DIR: process.env.NVM_DIR }) };
+  const lean = (args) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, '--no-exec', ...args], { encoding: 'utf8', env, input: '' });
+  assert.equal(lean(['--yes', '--agents', 'opencode-v2', '--tools', 'caveman', '--lang', 'en', '--profile', 'none']).status, 0);
+  const state = JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'state.json'), 'utf8'));
+  assert.equal(state.options.profile, null, 'none is saved as null');
+  // No --dry-run: a dry run without a terminal takes the defaults and would hide the question. The plan question then fails on empty stdin.
+  const r = lean(['--update']);
+  assert.doesNotMatch(`${r.stdout}${r.stderr}`, /OpenCode model profile/);
+  assert.match(r.stdout, /profile: none/);
+});
