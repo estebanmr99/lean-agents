@@ -33,7 +33,7 @@ Repeat the same prompt for each session. Each session must leave the repository 
 - Commits are authored by the owner (`git config user.name/user.email` set to their GitHub no-reply address) with a `Co-Authored-By` trailer for the agent.
 - Since session 6: Node.js 22.20+ (20.12+ before 0.6.0) and one more dependency, `@clack/prompts` (menus only on a real terminal). Network choices live in `scripts/lib/network.mjs` (`options.network` in `state.json`, `privacy` derived from it, so adapters can still read `opts.privacy`); undocumented settings in `scripts/lib/unverified.mjs` are never configured, only saved as user notes under `~/.config/lean-agents/notes/`.
 - Session 7 (2026-11-03): adapters `vscode-copilot` and `cursor`, `--project <dir>` team mode, `docs/claude-with-copilot.md`. Cursor user rules have no file (settings UI only). The VS Code user `mcp.json` path is proven by `code --add-mcp` in `real-vscode` (Linux, macOS); Copilot Chat ships built into VS Code; Cursor skills land in `~/.agents/skills`.
-- Latest release: 1.2.1 (2026-11-25, VS Code Insiders; the owner tags it; audit in `docs/audit-1.2.1.md`). Earlier: 1.2.0 (2026-11-24), 1.1.0 (2026-11-23), 1.0.0 (2026-11-20), 0.8.0 (2026-11-12), 0.7.0 and 0.6.0 (2026-11-06, minimum Node 22.20, breaking), 0.5.0 (2026-11-04). On hold: Session 9. `docs/ROADMAP.md` maps each issue to its release; "After 1.0.0" lists #103; the 1.2.1 gates are in `docs/audit-1.2.1.md` (earlier audits in `docs/archive/`).
+- Latest release: 1.2.2 (2026-11-26, RTK on OpenCode 2 and upgrade fixes; the owner tags it; audit in `docs/audit-1.2.2.md`). Earlier: 1.2.1 (2026-11-25), 1.2.0 (2026-11-24), 1.1.0 (2026-11-23), 1.0.0 (2026-11-20), 0.8.0 (2026-11-12), 0.7.0 and 0.6.0 (2026-11-06, minimum Node 22.20, breaking), 0.5.0 (2026-11-04). On hold: Session 9. `docs/ROADMAP.md` maps each issue to its release; "After 1.0.0" lists #103; the 1.2.2 gates are in `docs/audit-1.2.2.md` (earlier audits in `docs/archive/`).
 - Private terms are blocked by `scripts/check-private.sh` using the `PRIVATE_DENYLIST` repository secret in CI and a gitignored `.private-denylist` locally.
 
 ## 1. Product
@@ -515,6 +515,7 @@ Mark each `[x]` when merged.
 - [x] **Release 1.0.0 gates** (the owner). Issues #160 (OIDC proof), #145 (work-PC trial), #179 (fresh Mac and PC runs), #180 (logged-in VS Code agent run); the sessions for #80 part 2, #179, #180 and #182 are merged in code and docs, so the issues stay open for that proof. Tag and publish are the owner's; mark `[x]` when the tag run is green. (1.0.0 and 1.1.0 released 2026-11-23)
 - [x] **Release 1.2.0**. Issue #429. Tagged 2026-11-24, npm 1.2.0 with provenance (run 45552951656). Code of Conduct, social preview, repo cleanup and archive.
 - [x] **Release 1.2.1**. VS Code Insiders (PR #458), audit PR #461. Tagged 2026-11-25, npm 1.2.1 with provenance (run 45653965535).
+- [x] **Release 1.2.2**. RTK on OpenCode 2 (PR #481), upgrade keeps servers and plugins (PR #482), DCP pin in tui.json (PR #483), release PR #484. Tagged 2026-11-26, npm 1.2.2 with provenance (run 45821165819).
 - [ ] **Code Mode proxy, PRs 2 to 5** (1.3.0). Issue #407. PR 1 (core) merged in #423 for 1.2.0. Core proxy in lean-agents first, separate project second.
 - [ ] **Benchmark v2** (1.3.0). Issues #404, #430, #431.
 - [ ] **Multi-CLI orchestration** (1.3.0). Issues #428, #436.
