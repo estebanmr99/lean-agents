@@ -54,7 +54,8 @@ try {
   $inCase = Get-RtkCommandCount
 } finally {
   & opencode service stop 2>$null | Out-Null
-  foreach ($k in $saved.Keys) { Set-Item -Path "Env:$k" -Value $saved[$k] }
+  # A variable that was not set before is removed, not restored as an empty string.
+  foreach ($k in $saved.Keys) { if ($null -eq $saved[$k]) { Remove-Item "Env:$k" -ErrorAction SilentlyContinue } else { Set-Item -Path "Env:$k" -Value $saved[$k] } }
   Stop-Process -Id $mock.Id -Force -ErrorAction SilentlyContinue
 }
 

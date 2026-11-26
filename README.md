@@ -301,6 +301,8 @@ curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/i
 | Network presets (telemetry, updates, outbound) | ✅ | ✅ updates, sharing | ✅ | ⚠️ updates; telemetry is a reminder | ⚠️ reminders only |
 | Proxy passed to every install command | ✅ | ✅ | ✅ | ✅ | ⚠️ checked in CI, undocumented upstream |
 
+On OpenCode, rtk's own plugin (`plugins/rtk.ts`, rtk 1.2.0 or newer) passes every shell command through `rtk hook opencode`; `--update` regenerates an older one.
+
 ✅ supported · ⚠️ partial · ➖ not available for this agent. Details and verification dates: [docs/compatibility.md](docs/compatibility.md).
 
 | Feature | VS Code Copilot | Cursor (IDE and CLI) | Team repo (`--project`) |

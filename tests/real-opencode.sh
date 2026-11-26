@@ -96,11 +96,13 @@ JS
 # RTK on 2.x (#478): rtk's own plugins/rtk.ts has both entries, so 2.x loads it and the hook rewrites a shell call.
 # A mock LLM (tests/fixtures/mock-llm.mjs) asks for `ls -la`; an `rtk` wrapper on PATH logs every call and runs the real rtk.
 # Needs rtk with `hook opencode` on PATH: CI installs it, locally the check is skipped when it is missing.
+rtk_usable=1
 if ! command -v rtk >/dev/null || ! rtk hook opencode --help >/dev/null 2>&1; then
   [ -z "${CI:-}" ] || { echo "FAIL  rtk with 'hook opencode' is not on PATH in CI" >&2; exit 1; }
   echo "skip  rtk plugin on 2.x (no rtk with 'hook opencode' on PATH)"
-  exit 0
+  rtk_usable=0
 fi
+if [ "$rtk_usable" = 1 ]; then
 real_rtk="$(command -v rtk)"
 HOME="$(mktemp -d)"
 export HOME
@@ -145,7 +147,12 @@ srv_port="$(port)"
 export OPENCODE_SERVER_PASSWORD="rtk-test-$$" OPENCODE_PASSWORD="rtk-test-$$"
 (cd "$T/work" && exec opencode serve --hostname 127.0.0.1 --port "$srv_port" >"$T/serve.out" 2>&1) &
 pids="$pids $!"
-sleep 5
+up=0
+for _ in $(seq 1 60); do
+  if curl -s -o /dev/null "http://127.0.0.1:$srv_port/" 2>/dev/null; then up=1; break; fi
+  sleep 0.5
+done
+[ "$up" = 1 ] || { echo "FAIL  opencode serve did not start"; tail -n 5 "$T/serve.out"; exit 1; }
 (cd "$T/work" && exec opencode run --server "http://127.0.0.1:$srv_port" --format json 'list files' >"$T/turn.out" 2>&1) &
 turn=$!
 for _ in $(seq 1 90); do kill -0 "$turn" 2>/dev/null || break; sleep 1; done
@@ -164,3 +171,8 @@ else
   echo "FAIL  no rewrite seen; rtk calls:"; cat "$T/rtk.log" 2>/dev/null || true; tail -n 5 "$T/turn.out"; rtk_ok=0
 fi
 [ "$rtk_ok" = 1 ] || exit 1
+# The undo lean-agents registers for rtk on 2.x removes the plugin again.
+"$real_rtk" init -g --opencode --uninstall >"$T/uninstall.out" 2>&1 || { cat "$T/uninstall.out"; echo "FAIL  rtk init -g --opencode --uninstall"; exit 1; }
+if [ -e "$XDG_CONFIG_HOME/opencode/plugins/rtk.ts" ]; then echo "FAIL  --uninstall left plugins/rtk.ts"; exit 1; fi
+echo "ok    rtk init --uninstall removes plugins/rtk.ts"
+fi

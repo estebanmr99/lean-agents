@@ -5,7 +5,9 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ## [Unreleased]
 
 ### Added
-- RTK now works on OpenCode 2 (#478): rtk 1.2.0 writes one plugin file that both OpenCode 1.x and 2.x load, so `--tools rtk` runs `rtk init -g --opencode` there too (removed again by `--uninstall`). Proved with a mock model and a throwaway HOME: OpenCode 2 loads the plugin without an error and the plugin rewrites a shell command through rtk. `--upgrade-agent opencode` keeps an `rtk.ts` that already works on 2.x, and plans a regeneration with `rtk init -g --opencode` (run by `--update`) for an old 1.x-only one, or lists it as a manual item when rtk is not selected. lean-agents does not edit that file itself.
+- RTK now works on OpenCode 2 (#478). `--tools rtk` runs `rtk init -g --opencode` there too, as on OpenCode 1.x, and `--uninstall` removes it again. You need rtk 1.2.0 or newer; with an older or missing rtk the step is skipped and the output says how to update it.
+- `--upgrade-agent opencode` keeps an `rtk.ts` that already works on OpenCode 2. For an old OpenCode 1.x-only `rtk.ts` it prints the next step, `lean-agents --update`, which rewrites the file with rtk; lean-agents never edits that file itself.
+- Checked in CI on Linux and Windows with OpenCode 2.2.7 and rtk 1.2.0 (the plugin loads and rewrites a shell command). Not checked: macOS in CI, and the newer rtk 1.2.1 plugin file.
 
 ### Fixed
 - `--doctor` no longer reports "edited since install" for files that changed while one of lean-agents' own commands ran (`rtk init`, plugin installs), including files left unchanged by this run; the stored hash is refreshed only for files that changed across a command, so later user edits still show (#470).

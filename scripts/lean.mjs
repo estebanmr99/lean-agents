@@ -25,7 +25,7 @@ import { doctor } from './lib/doctor.mjs';
 import { probePlugins } from './lib/plugin-health.mjs';
 import { adopt, inventory, saveState } from './lib/adopt.mjs';
 import { planPrereqs, pendingPrereqs, everythingAgents, undoArgv, nvmDirExistedBefore } from './lib/prereqs.mjs';
-import { upgradeInventory, formatUpgrade } from './lib/upgrade.mjs';
+import { upgradeInventory, formatUpgrade, nextRtkStep } from './lib/upgrade.mjs';
 import { backupOpencode, backupLayout, listProcesses, opencodeRunning } from './lib/opencode-backup.mjs';
 import { readBackupStamp } from './lib/backup-stamp.mjs';
 import { isActive, failAt, applyPreflight, verifyBackup, configDrift, createSteps, makeCtx, runApply, runUndo, restoreData } from './lib/opencode-upgrade.mjs';
@@ -788,8 +788,7 @@ async function install(o) {
   if (rtkTooOld(rtkV)) {
     const skipped = commands.filter((c) => c.tool === 'rtk' && (c.run ?? []).some((argv) => argv[0] === 'rtk'));
     for (const c of skipped) commands.splice(commands.indexOf(c), 1);
-    const pm = packageManager();
-    const how = pm === 'brew' ? 'brew upgrade rtk' : pm === 'winget' ? 'winget upgrade --id rtk-ai.rtk -e' : prereqFor('rtk', pm).manual;
+    const how = rtkUpdateHow();
     const warn = `! rtk ${rtkV} (${which('rtk')}) is older than ${rtkPin().min}, which lean-agents needs: skipped ${skipped.length} RTK steps (${skipped.map((c) => c.desc).join(', ')}). Update rtk (${how}), make it first on PATH, then run --update`;
     if (o.json) console.error(warn);
     else console.log(warn);
@@ -1057,6 +1056,19 @@ function saveJournalState(o, S) {
 
 const refuse = (problems) => { console.log(`refused, nothing changed:\n${problems.map((x) => `  - ${x}`).join('\n')}`); return false; };
 
+// How to update rtk with the package manager at hand (the #467 skip warning and the upgrade plan share it).
+const rtkUpdateHow = () => {
+  const pm = packageManager();
+  return pm === 'brew' ? 'brew upgrade rtk' : pm === 'winget' ? 'winget upgrade --id rtk-ai.rtk -e' : prereqFor('rtk', pm).manual;
+};
+// rtk as the upgrade plan sees it. Not probed without exec (dry runs, tests): the plan then assumes a usable rtk.
+const rtkForUpgrade = (o) => {
+  if (!o.exec) return { state: 'ok' };
+  if (!which('rtk')) return { state: 'missing', how: rtkUpdateHow() };
+  const version = binVersion('rtk');
+  return rtkTooOld(version) ? { state: 'old', version, how: rtkUpdateHow() } : { state: 'ok', version };
+};
+
 async function applyUpgrade(o) {
   const fail = failAt();
   const S = readState(o.home) ?? blankState();
@@ -1064,7 +1076,7 @@ async function applyUpgrade(o) {
   const { problems, baseline } = applyPreflight({ home: o.home, stamp, upgrade: S.upgrade, exec: o.exec, list: listProcesses, opencodeRunning });
   if (problems.length) return refuse(problems);
   const save = () => saveJournalState(o, S);
-  const inv = upgradeInventory(await inventory({ home: o.home, env: process.env, realHome: REAL_HOME }), { home: o.home, tools: S.options?.tools ?? [] });
+  const inv = upgradeInventory(await inventory({ home: o.home, env: process.env, realHome: REAL_HOME }), { home: o.home, tools: S.options?.tools ?? [], rtk: rtkForUpgrade(o) });
   const steps = createSteps(upgradeDeps(o, S, save, { inv, stamp }));
   S.upgrade = { backup: stamp.dir, baseline };
   const ctx = makeCtx({ home: o.home, stamp, journal: S.upgrade });
@@ -1072,6 +1084,8 @@ async function applyUpgrade(o) {
   const ok = await runApply({ steps, journal: S.upgrade, save, ctx, fail, restore: () => restoreData({ home: o.home, backupDir: stamp.dir }) });
   if (!ok) { process.exitCode = 1; return false; }
   console.log('done. Start OpenCode 2 once: it migrates the live session db (the backup and the frozen copy hold the 1.x state). `opencode1` runs 1.x on the frozen copy.\n`--upgrade-agent opencode --undo --yes` goes back to 1.x; the backup and the frozen copy are never deleted.');
+  const next = nextRtkStep(inv);
+  if (next) console.log(next);
   return true;
 }
 
@@ -1333,7 +1347,7 @@ async function main() {
     const norm = (p) => (process.platform === 'win32' ? path.resolve(p).toLowerCase() : path.resolve(p));
     const own = norm(o.home) === norm(REAL_HOME);
     const binVer = bin && o.exec ? (own ? binVersion('opencode') : 'not probed (--home)') : null;
-    const r = upgradeInventory(inv, { home: o.home, binary: { path: bin, version: binVer }, tools: readState(o.home)?.options?.tools ?? [] });
+    const r = upgradeInventory(inv, { home: o.home, binary: { path: bin, version: binVer }, tools: readState(o.home)?.options?.tools ?? [], rtk: rtkForUpgrade(o) });
     if (o.json) process.stdout.write(`${JSON.stringify(r, null, 2)}\n`); else console.log(formatUpgrade(r));
     return process.exit(0);
   }
