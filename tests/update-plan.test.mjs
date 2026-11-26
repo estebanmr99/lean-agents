@@ -128,3 +128,18 @@ test('#489: --update reuses a saved profile none and does not ask for it again',
   assert.doesNotMatch(`${r.stdout}${r.stderr}`, /OpenCode model profile/);
   assert.match(r.stdout, /profile: none/);
 });
+
+test('#489: an older saved state with OpenCode but no profile key is reused as none', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const env = { PATH: path.dirname(process.execPath), HOME: home, ...(process.env.NVM_DIR && { NVM_DIR: process.env.NVM_DIR }) };
+  const lean = (args) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, '--no-exec', ...args], { encoding: 'utf8', env, input: '' });
+  assert.equal(lean(['--yes', '--agents', 'claude', '--tools', 'caveman', '--lang', 'en']).status, 0);
+  const file = path.join(home, '.config', 'lean-agents', 'state.json');
+  const state = JSON.parse(fs.readFileSync(file, 'utf8'));
+  delete state.options.profile;
+  state.options.agents = ['opencode-v2'];
+  fs.writeFileSync(file, JSON.stringify(state));
+  const r = lean(['--update']);
+  assert.doesNotMatch(`${r.stdout}${r.stderr}`, /OpenCode model profile/);
+  assert.match(r.stdout, /profile: none/);
+});

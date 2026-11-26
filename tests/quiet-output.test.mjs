@@ -156,3 +156,20 @@ process.exit(ok ? 0 : 1);`;
     assert.equal(code, 0, 'the stdin reader got EOF and exited instead of waiting');
   });
 }
+
+// #489: `rtk init` used to keep the terminal; a stub rtk that reads stdin must finish too.
+test('#489: rtk init gets no stdin either', { skip: !posix }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-rtk-'));
+  fs.writeFileSync(path.join(dir, 'rtk'), '#!/bin/sh\ncat >/dev/null\nexit 0\n', { mode: 0o755 });
+  const sys = path.join(path.dirname(LEAN), 'lib', 'system.mjs');
+  fs.writeFileSync(path.join(dir, 'w.mjs'), `import { run } from ${JSON.stringify(new URL(`file://${sys}`).href)};
+process.exit(run(['rtk', 'init', '-g', '--opencode'], { log() {} }) ? 0 : 1);`);
+  const { spawn } = await import('node:child_process');
+  const child = spawn(process.execPath, [path.join(dir, 'w.mjs')], { stdio: ['pipe', 'ignore', 'inherit'], env: { ...process.env, PATH: `${dir}${path.delimiter}${process.env.PATH}` } });
+  const code = await new Promise((res) => {
+    const t = setTimeout(() => { child.kill(); res('timeout'); }, 15000);
+    child.on('exit', (c) => { clearTimeout(t); res(c); });
+  });
+  child.stdin.destroy();
+  assert.equal(code, 0);
+});
