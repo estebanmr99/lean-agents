@@ -48,7 +48,7 @@ export default {
   },
 }
 "@
-Set-Content -Path "$cfgDir\plugins\probe.mjs" -Value $probeJs -Encoding UTF8
+Set-Content -Path "$cfgDir\plugins\probe.js" -Value $probeJs -Encoding UTF8
 
 $probe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
 $probe.Start(); $port = $probe.LocalEndpoint.Port; $probe.Stop()
