@@ -43,6 +43,10 @@ The backup needs free space of 2 x the size of your OpenCode data + 1 GB (the da
 
 `lean-agents --upgrade-agent opencode --undo` shows the plan (OpenCode closed); add `--yes` to run it. It removes the `opencode1` shim and PATH entry, puts the 1.x binary and config back, moves the 2.x-migrated database, storage and snapshot aside to `backups/opencode2-db-<timestamp>/` and copies the frozen copy back (checked by sha256 and session count first; the permanent backup is used when the frozen copy has fewer sessions). End state: `opencode --version` shows 1.x with your sessions. Config files you changed after the apply and that differ from the snapshot are reported, never overwritten. `--uninstall` also removes `opencode1`.
 
+## If an earlier upgrade dropped a server
+
+lean-agents 1.2.1 dropped a lean-agents-added MCP server (for example `playwright`) from the 2.x config when its tool was not selected, and it does not repair machines already upgraded. Copy the entry back by hand: open `<data>/lean-agents/backups/opencode1-sessions-<timestamp>/config/opencode.jsonc` (the 1.x config snapshot), take the server under `mcp.<name>`, and paste it under `mcp.servers.<name>` in the 2.x `opencode.jsonc` (`~/.config/opencode/`, or `$XDG_CONFIG_HOME/opencode/`). Keep the same `<name>`, `command` and `enabled` values.
+
 ## Windows notes
 
 CI proves the full apply on Linux only; on Windows and macOS it is **VERIFY** (compatibility.md, "Upgrade apply and `--undo`"). The backup, `opencode1` and the PATH edit have Windows tests.

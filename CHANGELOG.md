@@ -4,6 +4,9 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Fixed
+- `--upgrade-agent opencode` no longer drops an MCP server (for example `playwright`) or a Warp plugin that lean-agents added on OpenCode 1.x when the upgrade will not write it again. It is now kept with its own name and command, and the plan says so (#480). Machines already upgraded with 1.2.1 are not repaired automatically: copy the entry back by hand as described in `docs/migrate-opencode-v1-to-v2.md` ("If an earlier upgrade dropped a server").
+
 ### Added
 - RTK now works on OpenCode 2 (#478). `--tools rtk` runs `rtk init -g --opencode` there too, as on OpenCode 1.x, and `--uninstall` removes it again. You need rtk 1.2.0 or newer; with an older or missing rtk the step is skipped and the output says how to update it.
 - `--upgrade-agent opencode` keeps an `rtk.ts` that already works on OpenCode 2. For an old OpenCode 1.x-only `rtk.ts` it prints the next step, `lean-agents --update`, which rewrites the file with rtk; lean-agents never edits that file itself.
