@@ -31,6 +31,24 @@ $caseHome = Join-Path $env:RUNNER_TEMP "rtk-v2-$([guid]::NewGuid())"
 $cfgDir = "$caseHome\.config\opencode"
 New-Item -ItemType Directory -Path "$cfgDir\plugins" -Force | Out-Null
 Copy-Item $plugin "$cfgDir\plugins\rtk.ts"
+# Diagnostic plugin (temporary): does the 2.x hook fire on Windows, and can a plugin spawn rtk the way rtk.ts does?
+$probeLog = "$caseHome\probe.log"
+$probeJs = @"
+import { execFile } from 'node:child_process'
+import { appendFileSync } from 'node:fs'
+const log = (m) => appendFileSync(String.raw``$probeLog``, m + '\n')
+export default {
+  id: 'probe',
+  async setup(ctx) {
+    log('setup PATH has rtk-bin: ' + /rtk-bin/.test(process.env.PATH ?? '') + ' | Path: ' + /rtk-bin/.test(process.env.Path ?? ''))
+    await ctx.tool.hook('execute.before', (e) => {
+      log('hook ' + JSON.stringify({ tool: e.tool, input: e.input, keys: Object.keys(e) }))
+      return new Promise((resolve) => execFile('rtk', ['hook', 'opencode', '--agent', 'build', 'ls'], { encoding: 'utf8', timeout: 5000, windowsHide: true }, (err, out) => { log('spawn rtk: ' + (err ? 'ERR ' + err.message : out)); resolve() }))
+    })
+  },
+}
+"@
+Set-Content -Path "$cfgDir\plugins\probe.mjs" -Value $probeJs -Encoding UTF8
 
 $probe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
 $probe.Start(); $port = $probe.LocalEndpoint.Port; $probe.Stop()
@@ -73,6 +91,7 @@ if ($text -match 'LoadError|failed to load plugin') { Write-Output 'FAIL  OpenCo
 else { Write-Output 'ok    OpenCode 2 loads plugins/rtk.ts (no LoadError)' }
 $after = Get-RtkCommandCount
 Write-Output "--- rtk gain after the turn ---"; & rtk gain 2>&1 | Out-String | Write-Output
+Write-Output '--- probe plugin log ---'; if (Test-Path $probeLog) { Get-Content $probeLog | Write-Output } else { Write-Output 'no probe log: setup never ran' }
 Write-Output '--- plugin warnings in the logs ---'; ($text -split "`n") | Where-Object { $_ -match '\[rtk\]|rtk\.ts|plugin' } | ForEach-Object { $_.Substring(0, [Math]::Min(300, $_.Length)) } | Write-Output
 if ($after -gt $before) { Write-Output "ok    the 2.x hook rewrote the shell call: rtk ran it (commands $before -> $after)" }
 else { Write-Output "FAIL  rtk did not run the shell call (commands $before -> $after)"; $failed = $true }
