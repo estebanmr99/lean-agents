@@ -432,7 +432,8 @@ async function choose(o, saved) {
   o.lang ??= saved?.lang ?? (await p.select({ ask: 'Language for rules and replies (en/es)?', message: 'Language for rules and replies', options: [{ value: 'en', label: 'English' }, { value: 'es', label: 'Español' }], def: 'en' }));
   if (o.agents.some((a) => a.startsWith('opencode')) && !o.profile) {
     const profiles = ['github-copilot', 'vertex-gemini', 'anthropic-api', 'opencode-go', 'openai-api', 'none'];
-    o.profile = saved?.profile ?? (await p.select({ ask: `OpenCode model profile (${profiles.join(', ')})?`, message: 'OpenCode model profile', options: profiles.map((v) => ({ value: v })), def: 'none' }));
+    // Reuse the saved profile when OpenCode was already set up (`none` is saved as null); ask only when OpenCode is new (#489).
+    o.profile = saved?.agents?.some((a) => a.startsWith('opencode')) ? saved.profile ?? 'none' : (await p.select({ ask: `OpenCode model profile (${profiles.join(', ')})?`, message: 'OpenCode model profile', options: profiles.map((v) => ({ value: v })), def: 'none' }));
   }
   if (o.profile === 'none') o.profile = null;
   if (o.tools.includes('i-have-adhd')) o.adhdAlways ??= saved?.adhdAlways ?? yesNo(await p.ask('Use i-have-adhd on every answer?', 'y'));
