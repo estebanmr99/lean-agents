@@ -235,6 +235,8 @@ export function plan(actions, roots = [], prior = []) {
       after = r.text;
       applied = r.applied;
       keptKeys = r.kept.map((k) => k.path.join('.'));
+      const moved = r.applied.filter((e) => e.mode === 'arrayAdd' && /@\d+\.\d+\.\d+$/.test(e.replaced ?? '')).map((e) => `${path.basename(a.path)} ${e.label ?? 'pin'} ${e.replaced.replace(/^.*@/, '')} -> ${e.value.replace(/^.*@/, '')}${e.why ? ` ${e.why}` : ''}`);
+      if (moved.length) note = moved.join('; ');
       if (r.kept.length) note = `kept your values for: ${r.kept.map((k) => k.path.join('.')).join(', ')}`;
     } else if (a.kind === 'block') {
       after = setBlock(before, a.body, a.toml, a.id);

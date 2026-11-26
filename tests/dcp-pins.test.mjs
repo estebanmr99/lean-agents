@@ -61,13 +61,31 @@ for (const agent of Object.keys(AGENTS)) {
     assert.deepEqual(bytes(f), before);
   });
 
-  test(`${agent}: bare name becomes the pin, an exact user version stays`, () => {
+  test(`${agent}: bare name becomes the pin, a user's exact pin stays in both files; tui follows our server pin`, () => {
     const bare = setup(agent, [PKG], [PKG]);
     install(bare.home, agent);
     assert.deepEqual([list(bare.server, key), list(bare.tui, 'plugin')], [[PIN], [PIN]]);
-    const mine = setup(agent, [`${PKG}@3.1.0`], [`${PKG}@3.1.0`]);
-    install(mine.home, agent);
-    assert.deepEqual([list(mine.server, key), list(mine.tui, 'plugin')], [[`${PKG}@3.1.0`], [`${PKG}@3.1.0`]]);
+    for (const spec of [`${PKG}@3.0.0`, `${PKG}@3.1.15`, `${PKG}@^3.1.0`, `${PKG}@3.2.0-rc.1`]) {
+      const mine = setup(agent, [spec], [spec]);
+      install(mine.home, agent);
+      assert.deepEqual([list(mine.server, key), list(mine.tui, 'plugin')], [[spec], [spec]], spec);
+    }
+    // our pin in the server, an exact other version in tui: tui moves, uninstall restores, doctor sees no mismatch
+    const old = setup(agent, [PIN], [`${PKG}@3.1.15`]);
+    const before = bytes(old);
+    install(old.home, agent);
+    assert.deepEqual([list(old.server, key), list(old.tui, 'plugin')], [[PIN], [PIN]]);
+    const rows = [];
+    doctor({ home: old.home, state: null, exec: false, collect: rows });
+    assert.ok(!JSON.stringify(rows).includes('spec-mismatch'));
+    uninstall(old.home, agent);
+    assert.deepEqual(bytes(old), before);
+    // ranges and pre-releases in tui stay even when the server is ours
+    for (const spec of [`${PKG}@^3.1.0`, `${PKG}@3.2.0-rc.1`]) {
+      const f = setup(agent, [PIN], [spec]);
+      install(f.home, agent);
+      assert.deepEqual(list(f.tui, 'plugin'), [spec], spec);
+    }
   });
 
   test(`${agent}: no TUI file is created; dcp.jsonc autoUpdate is set off only when absent`, () => {
@@ -137,4 +155,11 @@ test('doctor DCP row on unmanaged machines', () => {
   rows = [];
   doctor({ home: h, state: null, exec: false, collect: rows });
   assert.ok(rows.some(r => r.item === 'DCP'));
+});
+
+test('plan says when tui DCP moves to match the server', () => {
+  const f = setup('opencode-v2', [PIN], [`${PKG}@3.1.15`]);
+  const { actions } = opencodeV2Adapter({ home: f.home, core: loadCore(ROOT), profile: null, opts: { tools: ['dcp'], network: {}, terminals: [], platform: 'linux', env: {}, shell: 'default' }, rulesPath: path.join(f.home, 'rules.md') });
+  const notes = plan(actions, [f.home], []).filter((a) => a.path === f.tui).map((a) => a.note);
+  assert.deepEqual(notes, ['tui.json DCP 3.1.15 -> 3.2.0 to match opencode.jsonc']);
 });

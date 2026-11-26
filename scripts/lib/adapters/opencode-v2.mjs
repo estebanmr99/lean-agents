@@ -68,16 +68,37 @@ export function dcpPluginEdit(key) {
   return { path: [key], value: npmSpec('opencode-dcp'), mode: 'arrayAdd', legacy: [`${pkg}@latest`, pkg], restore: true };
 }
 
-// tui.json(c) edit, only for a file that already exists and already lists DCP (shared by 1.x and 2.x).
+// DCP specs the server config lists (`plugin` on 1.x, `plugins` on 2.x).
+function serverDcpSpecs(dir) {
+  const pkg = PINS['opencode-dcp'].source;
+  for (const file of ['opencode.jsonc', 'opencode.json']) {
+    try {
+      const c = parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+      return [...(c?.plugins ?? []), ...(c?.plugin ?? [])].filter(x => typeof x === 'string' && (x === pkg || x.startsWith(`${pkg}@`)));
+    } catch (e) {
+      // missing or unreadable: no DCP entry there
+    }
+  }
+  return [];
+}
+
+// tui.json(c) edit, only for a file that already exists and already lists DCP (shared by 1.x and 2.x). tui follows the server
+// config (#479): when the server ends up with our pin (none yet, the pin, a bare name or `@latest`), an exact other version in
+// tui moves to it too; a server pin the user chose leaves tui alone. Ranges and pre-releases are never moved.
 export function dcpTuiActions(dir) {
   const pkg = PINS['opencode-dcp'].source;
+  const pin = npmSpec('opencode-dcp');
+  const ours = serverDcpSpecs(dir).every(x => x === pin || x === pkg || x === `${pkg}@latest`);
   const actions = [];
   for (const file of ['tui.json', 'tui.jsonc']) {
     const p = path.join(dir, file);
     if (!fs.existsSync(p)) continue;
     try {
       const plugins = parse(fs.readFileSync(p, 'utf8'))?.plugin;
-      if (Array.isArray(plugins) && plugins.some(x => typeof x === 'string' && (x === pkg || x.startsWith(`${pkg}@`)))) actions.push({ kind: 'json', path: p, edits: [dcpPluginEdit('plugin')] });
+      if (!Array.isArray(plugins) || !plugins.some(x => typeof x === 'string' && (x === pkg || x.startsWith(`${pkg}@`)))) continue;
+      const edit = dcpPluginEdit('plugin');
+      if (ours) edit.legacy = [...edit.legacy, ...plugins.filter(x => typeof x === 'string' && x.startsWith(`${pkg}@`) && /^\d+\.\d+\.\d+$/.test(x.slice(pkg.length + 1)))];
+      actions.push({ kind: 'json', path: p, edits: [{ ...edit, label: 'DCP', why: 'to match opencode.jsonc' }] });
     } catch (e) {
       // unreadable file: leave it alone
     }
