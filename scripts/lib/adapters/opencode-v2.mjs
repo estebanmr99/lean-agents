@@ -62,7 +62,7 @@ export function dcpConfigAction(dir, profile) {
 }
 
 // DCP plugin edit for the server (`plugin` on 1.x, `plugins` on 2.x) or tui.json: a bare name or `@latest` moves to the pin
-// in place; an exact version the user chose is not in `legacy`, so it stays and nothing is added (#212) and nothing is added (#212).
+// in place; an exact version the user chose is not in `legacy`, so it stays and nothing is added (#212).
 export function dcpPluginEdit(key) {
   const pkg = PINS['opencode-dcp'].source;
   return { path: [key], value: npmSpec('opencode-dcp'), mode: 'arrayAdd', legacy: [`${pkg}@latest`, pkg], restore: true };
