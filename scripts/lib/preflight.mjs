@@ -2,16 +2,16 @@
 // It never writes a file or installs anything; the only commands it runs are `<copy> --version` probes and, on Windows, `reg.exe query`.
 // A blocker is something that stops setup (rtk below its minimum, a newer copy hidden behind an older one, a tool the window cannot
 // see yet). Everything else is a warning and does not change the exit code.
+// backupSpace and configShape also read files under --home (the OpenCode data and config) with the real fs, read-only.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { PINS, npmSpec } from './pins.mjs';
-import { compare } from './node-runtime.mjs';
+import { compare, findNvm, installedNodes } from './node-runtime.mjs';
 import { versionFull, prereqFor, packageManager } from './system.mjs';
 import { redactText } from './redact.mjs';
-import { findNvm, installedNodes } from './node-runtime.mjs';
 import { clients, npmCopies } from './inventory.mjs';
 import { mcpServers } from './migrate.mjs';
 import { backupLayout, listSource, neededBytes, nearest, gb, stamp, opencodeRunning, listProcesses } from './opencode-backup.mjs';
@@ -110,6 +110,7 @@ function updateFix(pinKey, platform, pm) {
 function nvmCopies({ home, env, platform, realHome, pathVar, fsx, add }) {
   const nvm = findNvm({ env, home, platform, realHome });
   if (!nvm || installedNodes(nvm).length < 2) return;
+  // shortcut: the active Node comes from a vX.Y.Z folder in the PATH entry; nvm-windows' NVM_SYMLINK folder has none, so there only 2+ copies warn. Upgrade if that matters.
   const active = findCopies('node', { path: pathVar, platform, env, fsx }).map((f) => f.match(/[\\/]v(\d+\.\d+\.\d+)[\\/]/)?.[1]).find(Boolean);
   const by = {};
   for (const c of npmCopies(nvm)) (by[c.pin] ??= []).push(c);
@@ -142,6 +143,7 @@ function configShape(home) {
   const names = [];
   for (const { client, file, keyPath } of clients(home)) {
     if (client !== 'opencode') continue;
+    // 2.x: the ['mcp'] read also sees `servers` (the container) as a server; drop it
     for (const s of mcpServers(file, keyPath)) if (!(keyPath.length === 1 && s.name === 'servers') && !names.includes(s.name)) names.push(s.name);
   }
   if (!names.length) return null;
@@ -190,7 +192,9 @@ export function preflight({ home, env = process.env, platform = process.platform
   if (exec) {
     let running = false;
     try { running = opencodeRunning(list()); } catch { /* cannot list: stay silent, the backup step refuses on its own */ }
-    if (running) add({ tool: 'opencode', kind: 'opencode-running', blocker: true, fix: 'run `opencode service stop` (OpenCode 2) or close the OpenCode app, then run --update or --upgrade-agent' });
+    // A blocker only with 1.x data: the upgrade backup refuses to copy a live db. Without it, a warning.
+    const has1x = fs.existsSync(path.join(backupLayout(home, stamp()).live, 'opencode.db'));
+    if (running) add({ tool: 'opencode', kind: 'opencode-running', blocker: has1x, fix: 'close the OpenCode app, or run opencode service stop (OpenCode 2), then run --update or --upgrade-agent' });
   }
   const blockers = findings.filter((f) => f.blocker).length;
   return { ok: blockers === 0, blockers, warnings: findings.length - blockers, findings, shape: configShape(home) };
@@ -218,5 +222,5 @@ export function formatPreflight(report, { home, env = process.env, json = false 
   const red = (s) => redactText(s, { home, env });
   if (json) return JSON.stringify(deep(report, red), null, 2);
   const s = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
-  return red([...report.findings.flatMap(line), ...(report.shape ? [`config  OpenCode MCP servers: ${report.shape.mcp.join(', ')}`] : []), `${s(report.blockers, 'blocker')}, ${s(report.warnings, 'warning')}. Nothing was changed.`].join('\n'));
+  return red([...report.findings.flatMap(line), ...(report.shape ? [`config  OpenCode MCP servers (yours masked as <user-mcp-N>): ${report.shape.mcp.join(', ')}`] : []), `${s(report.blockers, 'blocker')}, ${s(report.warnings, 'warning')}. Nothing was changed.`].join('\n'));
 }

@@ -217,6 +217,9 @@ test('A6 config shape: managed MCP names print as-is, user names as <user-mcp-N>
   const v1 = tmp();
   writeJson(path.join(v1, '.config', 'opencode', 'opencode.json'), { mcp: { 'my-private': { type: 'local', command: ['a'] }, 'context-mode': { type: 'local', command: ['b'] } } });
   assert.deepEqual(preflight(base(v1, [])).shape.mcp, ['<user-mcp-1>', 'context-mode']);
+  const v2 = tmp();
+  writeJson(path.join(v2, '.config', 'opencode', 'opencode.json'), { mcp: { servers: { 'only-one': { type: 'local', command: ['a'] } } } });
+  assert.deepEqual(preflight(base(v2, [])).shape.mcp, ['<user-mcp-1>'], 'the servers container is not a server');
 });
 
 test('A6 a missing or unparseable config gives no shape and no crash', { skip: win }, () => {
@@ -250,6 +253,8 @@ test('A7 nvm: a pinned tool under two Nodes, or only under a non-active one, is 
   assert.ok(preflight(base(h2, [path.join(nvm, 'versions', 'node', 'v22.20.0', 'bin')])).findings.some((x) => x.kind === 'nvm-copies'), 'only under a non-active Node');
   assert.ok(!preflight(base(h2, [path.join(nvm, 'versions', 'node', 'v24.1.0', 'bin')])).findings.some((x) => x.kind === 'nvm-copies'));
   assert.ok(!preflight(base(tmp(), [])).findings.some((x) => x.kind === 'nvm-copies'), 'no nvm: nothing');
+  const flat = path.join(h2, 'nodejs'); fake(flat, 'node', '24.1.0'); // nvm-windows style: the active folder has no version
+  assert.ok(!preflight(base(h2, [flat])).findings.some((x) => x.kind === 'nvm-copies'), 'active Node unknown: no false warning');
 });
 
 test('A8 backup space: blocker with GB figures when the disk is too small, nothing when roomy or no 1.x data', { skip: win }, () => {
@@ -263,13 +268,27 @@ test('A8 backup space: blocker with GB figures when the disk is too small, nothi
   assert.match(formatPreflight(r, { home, env: {} }), /0\.00 GB free, 1\.00 GB needed[\s\S]*fix: free up disk space/);
 });
 
-test('#488 a running opencode is a blocker with a stop line; --no-exec does not list processes', { skip: win }, () => {
+test('#488 a running opencode (blocker with 1.x data, else warning) has a stop line; --no-exec does not list processes', () => {
   const home = tmp();
+  writeJson(path.join(home, '.local', 'share', 'opencode', 'opencode.db'), 'db');
   const f = preflight(base(home, [], { list: () => ['node', '/usr/bin/opencode'] })).findings.find((x) => x.kind === 'opencode-running');
   assert.equal(f.blocker, true); assert.match(f.fix, /opencode service stop/);
   assert.ok(!preflight(base(home, [], { list: () => ['launchd'] })).findings.some((x) => x.kind === 'opencode-running'));
   assert.ok(!preflight(base(home, [], { list: () => { throw new Error('ps failed'); } })).findings.some((x) => x.kind === 'opencode-running'));
-  assert.ok(!preflight(base(home, [], { exec: false, list: () => { throw new Error('must not list'); } })).findings.some((x) => x.kind === 'opencode-running'));
+  let calls = 0;
+  preflight(base(home, [], { exec: false, list: () => { calls++; return ['opencode']; } }));
+  assert.equal(calls, 0);
+  const warn = preflight(base(tmp(), [], { list: () => ['opencode.exe'] }));
+  assert.equal(warn.findings.find((x) => x.kind === 'opencode-running').blocker, false, 'no 1.x db: warning');
+  writeJson(path.join(home, '.local', 'share', 'opencode', 'opencode.db'), 'db');
+  assert.equal(preflight(base(home, [], { list: () => ['C:\\x\\opencode.exe'] })).findings.find((x) => x.kind === 'opencode-running').blocker, true);
+});
+
+test('jq fix line on win32 is winget (pure logic)', () => {
+  const env = { PATH: 'C:\\b' };
+  const fsx = { statSync: () => ({ isFile: () => true }), accessSync() {}, realpathSync: (p) => p, existsSync: () => false };
+  const r = preflight({ home: 'C:\\h', env, platform: 'win32', fsx, probe: () => '1.6.0', readWinPath: () => ({ user: '', machine: '' }), pm: 'winget', list: () => [], statfs: () => ({ bavail: 1e9, bsize: 4096 }) });
+  assert.equal(r.findings.find((x) => x.tool === 'jq' && x.kind === 'below-min').fix, 'winget upgrade --id jqlang.jq');
 });
 
 test('jq below its minimum gets a package-manager fix line', { skip: win }, () => {
@@ -286,9 +305,9 @@ test('A4/A5 the new findings are read-only and redacted through the CLI', { skip
   fakeNvm(home, { '22.20.0': '1.0.1', '24.1.0': '1.0.5' });
   writeJson(path.join(home, '.local', 'share', 'opencode', 'opencode.db'), 'db');
   const before = treeHash(home);
-  const text = leanCli(['--home', home], { PATH: d, USER: 'alice' }).stdout;
+  const text = leanCli(['--no-exec', '--home', home], { PATH: d, USER: 'alice' }).stdout;
   assert.match(text, /nvm Nodes/);
-  for (const out of [text, leanCli(['--json', '--home', home], { PATH: d, USER: 'alice' }).stdout]) {
+  for (const out of [text, leanCli(['--json', '--no-exec', '--home', home], { PATH: d, USER: 'alice' }).stdout]) {
     assert.ok(!out.includes('alice'), out);
     assert.match(out, /<user-mcp-1>/);
   }
