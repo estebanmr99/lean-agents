@@ -5,6 +5,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ## [Unreleased]
 
 ### Fixed
+- `--doctor` no longer reports "edited since install" for files that changed while one of lean-agents' own commands ran (`rtk init`, plugin installs), including files left unchanged by this run; the stored hash is refreshed only for files that changed across a command, so later user edits still show (#470).
 - `--doctor`: the Antigravity IDE row is `ok` only when the app is installed (macOS app folder, Windows `winget list`); config folders alone give a `note` (#466).
 - An rtk older than v1.2.0 no longer fails the install: the RTK steps are skipped with one line naming the old rtk's path and how to update it, and `--doctor` flags it (#467).
 - README (EN, ES): the Antigravity pilot section no longer says lean-agents skips the IDE; it installs it with Homebrew or winget unless `--no-app`.

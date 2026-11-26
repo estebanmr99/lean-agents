@@ -7,7 +7,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import tty from 'node:tty';
 import { fileURLToPath } from 'node:url';
-import { plan, apply, undo, describe, writePrivate, privateDir, dropBackups, renameRetry } from './lib/fsops.mjs';
+import { plan, apply, undo, describe, sha, writePrivate, privateDir, dropBackups, renameRetry } from './lib/fsops.mjs';
 import { loadCore, renderRules, loadProfile, useToolNode } from './lib/render.mjs';
 import { claudeAdapter } from './lib/adapters/claude.mjs';
 import { opencodeV1Adapter } from './lib/adapters/opencode-v1.mjs';
@@ -840,6 +840,11 @@ async function install(o) {
   // Saved as the run goes, so an error or a killed command still leaves a state --uninstall can undo.
   // Resume stamps only matter for an interrupted run; once everything finished they would hide a later removal.
   let finished = false;
+  // Content hash per tracked file (this run's and earlier runs'), so a command's own edits can be told from the user's (#470).
+  const tracked = () => [...(previous?.files ?? []), ...files];
+  const snap = () => new Map(tracked().map((f) => [f.path, fs.existsSync(f.path) && fs.statSync(f.path).isFile() ? sha(fs.readFileSync(f.path, 'utf8')) : null]));
+  // A file that changed while one of our commands ran (rtk init, plugin installs) counts as ours: new hash, so --doctor stays ok.
+  const refreshHashes = (before) => { for (const [p, h] of snap()) if (h !== null && h !== before.get(p)) for (const f of tracked()) if (f.path === p) f.hash = h; };
   const save = () => {
     const state = {
       version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version,
@@ -902,8 +907,10 @@ async function install(o) {
       ran.push(rec);
       save();
       const codes = [];
+      const before = snap();
       const ok = c.run.every((argv) => run(argv, { dryRun: false, log: console.log, env: c.env, json: o.json, codes }));
       for (const argv of c.always ?? []) run(argv, { dryRun: false, log: console.log, env: c.env, json: o.json });
+      refreshHashes(before);
       report.push({ desc: c.desc, ok, exit: codes.at(-1) ?? null });
       if (!ok && !c.optional) errors.push(c.desc);
       if (ui) ui.result(ok || c.optional, c.desc);
