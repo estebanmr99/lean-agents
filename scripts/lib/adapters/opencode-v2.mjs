@@ -62,10 +62,10 @@ export function dcpConfigAction(dir, profile) {
 }
 
 // DCP plugin edit for the server (`plugin` on 1.x, `plugins` on 2.x) or tui.json: a bare name or `@latest` moves to the pin
-// in place; an older exact pin moves too; a newer or non-semver spec the user chose stays and nothing is added (#212).
+// in place; an exact pin lean-agents shipped earlier (`previous` in core/pins.json) moves too; any other spec the user chose stays and nothing is added (#212).
 export function dcpPluginEdit(key) {
   const pkg = PINS['opencode-dcp'].source;
-  return { path: [key], value: npmSpec('opencode-dcp'), mode: 'arrayAdd', legacy: [`${pkg}@latest`, pkg], older: true, restore: true };
+  return { path: [key], value: npmSpec('opencode-dcp'), mode: 'arrayAdd', legacy: [`${pkg}@latest`, pkg, ...(PINS['opencode-dcp'].previous ?? []).map(v => `${pkg}@${v}`)], restore: true };
 }
 
 // tui.json(c) edit, only for a file that already exists and already lists DCP (shared by 1.x and 2.x).

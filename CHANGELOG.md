@@ -10,7 +10,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - Checked in CI on Linux and Windows with OpenCode 2.2.7 and rtk 1.2.0 (the plugin loads and rewrites a shell command). Not checked: macOS in CI, and the newer rtk 1.2.1 plugin file.
 
 ### Fixed
-- DCP's pin now moves in `opencode.jsonc` and `tui.json` together (#479). An older exact pin of DCP that lean-agents wrote earlier used to stay in `tui.json`, so `--doctor` reported a spec mismatch; both files now move to the current pin and `--uninstall` puts the old one back. A newer pin, or a `file:`/git spec, is still left alone.
+- DCP's pin now moves in `opencode.jsonc` and `tui.json` together (#479). A DCP pin that an earlier lean-agents wrote (3.1.15) used to stay in `tui.json` and `--doctor` reported a version mismatch; it now moves to the current pin in both files and the output says so. Any other version you set yourself is left alone, and `--uninstall` puts the old value back.
 - `--doctor` no longer reports "edited since install" for files that changed while one of lean-agents' own commands ran (`rtk init`, plugin installs), including files left unchanged by this run; the stored hash is refreshed only for files that changed across a command, so later user edits still show (#470).
 - `--doctor`: the Antigravity IDE row is `ok` only when the app is installed (macOS app folder, Windows `winget list`); config folders alone give a `note` (#466).
 - An rtk older than v1.2.0 no longer fails the install: the RTK steps are skipped with one line naming the old rtk's path and how to update it, and `--doctor` flags it (#467).

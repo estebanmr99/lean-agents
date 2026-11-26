@@ -61,16 +61,15 @@ for (const agent of Object.keys(AGENTS)) {
     assert.deepEqual(bytes(f), before);
   });
 
-  test(`${agent}: bare name becomes the pin, a newer user version stays, an older exact pin moves and uninstall restores it`, () => {
+  test(`${agent}: bare name becomes the pin, user specs stay, a shipped older pin moves with a note and uninstall restores it`, () => {
     const bare = setup(agent, [PKG], [PKG]);
     install(bare.home, agent);
     assert.deepEqual([list(bare.server, key), list(bare.tui, 'plugin')], [[PIN], [PIN]]);
-    const mine = setup(agent, [`${PKG}@99.0.0`, `${PKG}x`], [`${PKG}@99.0.0`]);
-    install(mine.home, agent);
-    assert.deepEqual([list(mine.server, key)[0], list(mine.tui, 'plugin')], [`${PKG}@99.0.0`, [`${PKG}@99.0.0`]]);
-    const git = setup(agent, ['github:me/dcp'], null);
-    install(git.home, agent);
-    assert.ok(list(git.server, key).includes('github:me/dcp'));
+    for (const spec of [`${PKG}@3.0.0`, `${PKG}@^3.1.0`, `${PKG}@3.2.0-rc.1`]) {
+      const mine = setup(agent, [spec], [spec]);
+      install(mine.home, agent);
+      assert.deepEqual([list(mine.server, key), list(mine.tui, 'plugin')], [[spec], [spec]], spec);
+    }
     const old = setup(agent, [`${PKG}@3.1.15`], [`${PKG}@3.1.15`]);
     const before = bytes(old);
     install(old.home, agent);
@@ -149,4 +148,11 @@ test('doctor DCP row on unmanaged machines', () => {
   rows = [];
   doctor({ home: h, state: null, exec: false, collect: rows });
   assert.ok(rows.some(r => r.item === 'DCP'));
+});
+
+test('plan says when lean-agents\' old DCP pin moves', () => {
+  const f = setup('opencode-v2', [`${PKG}@3.1.15`], [`${PKG}@3.1.15`]);
+  const { actions } = opencodeV2Adapter({ home: f.home, core: loadCore(ROOT), profile: null, opts: { tools: ['dcp'], network: {}, terminals: [], platform: 'linux', env: {}, shell: 'default' }, rulesPath: path.join(f.home, 'rules.md') });
+  const notes = plan(actions, [f.home], []).filter((a) => a.path === f.tui || a.path === f.server).map((a) => a.note);
+  assert.deepEqual(notes, [`moved lean-agents' pin 3.1.15 -> 3.2.0`, `moved lean-agents' pin 3.1.15 -> 3.2.0`]);
 });
