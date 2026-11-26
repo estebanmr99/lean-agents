@@ -788,8 +788,8 @@ async function install(o) {
   if (rtkTooOld(rtkV)) {
     const skipped = commands.filter((c) => c.tool === 'rtk' && (c.run ?? []).some((argv) => argv[0] === 'rtk'));
     for (const c of skipped) commands.splice(commands.indexOf(c), 1);
-    const pre = prereqFor('rtk', packageManager());
-    const how = pre.install?.[0]?.join(' ').replace('brew install', 'brew upgrade') ?? pre.manual;
+    const pm = packageManager();
+    const how = pm === 'brew' ? 'brew upgrade rtk' : pm === 'winget' ? 'winget upgrade --id rtk-ai.rtk -e' : prereqFor('rtk', pm).manual;
     const warn = `! rtk ${rtkV} is older than ${rtkPin().min}, which lean-agents needs: skipped ${skipped.length} RTK steps (${skipped.map((c) => c.desc).join(', ')}). Update rtk (${how}), make it first on PATH, then run --update`;
     if (o.json) console.error(warn);
     else console.log(warn);

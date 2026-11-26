@@ -256,6 +256,12 @@ test('an rtk older than the pinned min skips the rtk steps and says how to updat
   const ok = run('1.2.0');
   assert.ok(ok.rtkSteps > 0);
   assert.doesNotMatch(ok.err, /older than/);
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-bin-'));
+  fs.writeFileSync(path.join(bin, 'rtk'), '#!/bin/sh\necho "rtk 0.42.0"\n', { mode: 0o755 });
+  lean(home, ['--yes', '--no-exec', '--agents', 'opencode-v1', '--tools', 'rtk', '--privacy', 'standard', '--lang', 'en', '--profile', 'none']);
+  const doc = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, '--doctor'], { encoding: 'utf8', env: { ...process.env, PATH: bin } });
+  assert.match(doc.stdout, /rtk on PATH.*0\.42\.0, older than v1\.2\.0/);
 });
 
 test('winget installs accept agreements, or they stop at a prompt without a TTY', () => {
