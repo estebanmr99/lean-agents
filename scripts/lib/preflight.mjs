@@ -1,6 +1,6 @@
 // --preflight (#471): one read-only report of old or duplicate tool copies and a terminal opened before a PATH change.
 // It never writes a file or installs anything; the only commands it runs are `<copy> --version` probes and, on Windows, `reg.exe query`.
-// A blocker is something that stops setup (a copy below the minimum, a newer copy hidden behind an older one, a tool the window cannot
+// A blocker is something that stops setup (rtk below its minimum, a newer copy hidden behind an older one, a tool the window cannot
 // see yet). Everything else is a warning and does not change the exit code.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,6 +17,8 @@ const TOOLS = [['claude', 'claude-code'], ['opencode', 'opencode-v2'], ['copilot
 const BEHIND_PIN = new Set(['claude-code', 'copilot-cli', 'context-mode']);
 // tool -> the prereqFor() key whose install row has the package-manager ids.
 const PREREQ = { rtk: 'rtk', uv: 'serena', gh: 'gh' };
+// Below `min` blocks only where lean-agents skips or fails its steps (rtk, #467); for the rest `min` is just the verified release.
+const BLOCKING_MIN = new Set(['rtk']);
 const PROBE_MS = 5000;
 const DEADLINE_MS = 60000;
 
@@ -111,7 +113,7 @@ export function preflight({ home, env = process.env, platform = process.platform
     const [win] = copies;
     const pin = PINS[pinKey];
     if (known(win.version) && pin.min && compare(win.version, pin.min) < 0) {
-      add({ tool, kind: 'below-min', blocker: true, version: win.version, min: pin.min, path: win.path, fix: updateFix(pinKey, platform, pm) });
+      add({ tool, kind: 'below-min', blocker: BLOCKING_MIN.has(pinKey), version: win.version, min: pin.min, path: win.path, fix: updateFix(pinKey, platform, pm) });
     } else if (known(win.version) && BEHIND_PIN.has(pinKey) && compare(win.version, pin.version) < 0) {
       add({ tool, kind: 'behind-pin', blocker: false, version: win.version, pinned: pin.version, path: win.path, fix: updateFix(pinKey, platform, pm) });
     }

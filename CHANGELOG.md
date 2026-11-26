@@ -5,7 +5,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ## [Unreleased]
 
 ### Added
-- `--preflight` (and `--preflight --json`) is a read-only check for old or duplicate copies of the agent CLIs and tools on PATH and for a terminal opened before a PATH change (#471). It lists every copy and which one wins, and gives one fix line per finding. Blockers (exit 1): a copy below its minimum version, a newer copy hidden behind an older one, a tool this window cannot see yet. Everything else, such as an older copy later on PATH or a CLI behind its pinned version, is a warning. It only runs `--version` (and `reg.exe query` on Windows); `--no-exec` skips both. Config shape, nvm Nodes and disk space follow later.
+- `--preflight` (and `--preflight --json`) is a read-only check for old or duplicate copies of the agent CLIs and tools on PATH and for a terminal opened before a PATH change (#471). It lists every copy and which one wins, and gives one fix line per finding. Blockers (exit 1): rtk below its minimum version (its steps are skipped), a newer copy hidden behind an older one, a tool this window cannot see yet. Everything else, such as an older copy later on PATH, uv, jq or gh below their verified version, or a CLI behind its pinned version, is a warning. It only runs `--version` (and `reg.exe query` on Windows); `--no-exec` skips both. Config shape, nvm Nodes and disk space follow later.
 
 ## [1.2.2] - 2026-11-26
 

@@ -188,3 +188,16 @@ test('exit 0 when there are no blockers', { skip: win }, () => {
   const r = leanCli(['--home', home], { PATH: `${d}` });
   assert.equal(r.status, 0, r.stdout + r.stderr);
 });
+
+test('below min blocks only for rtk; uv and gh below min are warnings with exit 0', { skip: win }, () => {
+  const home = tmp(); const d = path.join(home, 'bin');
+  fake(d, 'uv', '0.13.5'); fake(d, 'gh', '2.103.0');
+  const r = preflight(base(home, [d], { pm: 'brew' }));
+  const rows = r.findings.filter((x) => x.kind === 'below-min');
+  assert.deepEqual(rows.map((x) => x.tool).sort(), ['gh', 'uv']);
+  assert.ok(rows.every((x) => !x.blocker && x.fix));
+  assert.equal(r.ok, true);
+  assert.equal(leanCli(['--home', home], { PATH: d }).status, 0);
+  fake(d, 'rtk', '0.42.0');
+  assert.equal(leanCli(['--home', home], { PATH: d }).status, 1);
+});
