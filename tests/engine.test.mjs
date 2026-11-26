@@ -1613,7 +1613,7 @@ test('pinned OpenCode plugins: an old unversioned entry is replaced in place, a 
   assert.deepEqual(own.plugins(), ['@dietrichgebert/ponytail@1.2.3']);
 });
 
-test('DCP plugin spec (#212): a bare or @latest entry moves to the pin, an exact version is kept, never a second entry', async () => {
+test('DCP plugin spec (#212): a bare or @latest entry moves to the pin, a newer exact version is kept, never a second entry', async () => {
   const pkg = PINS['opencode-dcp'].source;
   const dcp = npmSpec('opencode-dcp');
   const { opencodeV2Adapter } = await import('../scripts/lib/adapters/opencode-v2.mjs');
@@ -1643,7 +1643,7 @@ test('DCP plugin spec (#212): a bare or @latest entry moves to the pin, an exact
     assert.deepEqual(run(['mine']), ['mine', dcp], run.name);
     assert.deepEqual(run(['mine', `${pkg}@latest`]), ['mine', dcp], run.name);
     assert.deepEqual(run([pkg]), [dcp], run.name);
-    assert.deepEqual(run([`${pkg}@3.1.15`]), [`${pkg}@3.1.15`], run.name);
+    assert.deepEqual(run([`${pkg}@99.0.0`]), [`${pkg}@99.0.0`], run.name);
   }
 });
 

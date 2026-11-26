@@ -61,13 +61,25 @@ for (const agent of Object.keys(AGENTS)) {
     assert.deepEqual(bytes(f), before);
   });
 
-  test(`${agent}: bare name becomes the pin, an exact user version stays`, () => {
+  test(`${agent}: bare name becomes the pin, a newer user version stays, an older exact pin moves and uninstall restores it`, () => {
     const bare = setup(agent, [PKG], [PKG]);
     install(bare.home, agent);
     assert.deepEqual([list(bare.server, key), list(bare.tui, 'plugin')], [[PIN], [PIN]]);
-    const mine = setup(agent, [`${PKG}@3.1.0`], [`${PKG}@3.1.0`]);
+    const mine = setup(agent, [`${PKG}@99.0.0`, `${PKG}x`], [`${PKG}@99.0.0`]);
     install(mine.home, agent);
-    assert.deepEqual([list(mine.server, key), list(mine.tui, 'plugin')], [[`${PKG}@3.1.0`], [`${PKG}@3.1.0`]]);
+    assert.deepEqual([list(mine.server, key)[0], list(mine.tui, 'plugin')], [`${PKG}@99.0.0`, [`${PKG}@99.0.0`]]);
+    const git = setup(agent, ['github:me/dcp'], null);
+    install(git.home, agent);
+    assert.ok(list(git.server, key).includes('github:me/dcp'));
+    const old = setup(agent, [`${PKG}@3.1.15`], [`${PKG}@3.1.15`]);
+    const before = bytes(old);
+    install(old.home, agent);
+    assert.deepEqual([list(old.server, key), list(old.tui, 'plugin')], [[PIN], [PIN]]);
+    const rows = [];
+    doctor({ home: old.home, state: null, exec: false, collect: rows });
+    assert.ok(!JSON.stringify(rows).includes('spec-mismatch'));
+    uninstall(old.home, agent);
+    assert.deepEqual(bytes(old), before);
   });
 
   test(`${agent}: no TUI file is created; dcp.jsonc autoUpdate is set off only when absent`, () => {

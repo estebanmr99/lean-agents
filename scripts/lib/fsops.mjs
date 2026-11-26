@@ -90,6 +90,14 @@ function isLegacy(current, legacy = []) {
 // Package name of an npm plugin spec: 'pkg@1.2.3' and '@scope/pkg@1.2.3' lose the version.
 const pkgName = (v) => (typeof v === 'string' ? v.replace(/(?!^)@[^@/]*$/, '') : v);
 
+// `older` edits: an exact 'pkg@x.y.z' lower than the edit's own pin counts as legacy (a newer pin or file:/git spec does not).
+const semverOf = (v) => (typeof v === 'string' ? /@(\d+)\.(\d+)\.(\d+)$/.exec(v)?.slice(1).map(Number) : undefined);
+function isOlderPin(v, e) {
+  const a = e.older && pkgName(v) === pkgName(e.value) ? semverOf(v) : undefined;
+  const b = semverOf(e.value);
+  return !!a && !!b && (a.find((n, i) => n !== b[i]) ?? 0) < (b.find((n, i) => n !== a[i]) ?? 0);
+}
+
 // Returns { text, applied: [edit], kept: [{path, value}] }.
 // `owned`: arrayAdd edits an earlier run recorded in state.json for this file, so a past pin counts as ours.
 export function applyJsonEdits(original, edits, owned = []) {
@@ -105,11 +113,12 @@ export function applyJsonEdits(original, edits, owned = []) {
         // Pinned plugin spec: an exact legacy value, or a pin we recorded earlier, becomes the pinned one in place; any
         // other entry for the same package is the user's own choice, so it stays and nothing is added.
         const wrote = (v) => owned.some((o) => o.mode === 'arrayAdd' && JSON.stringify(o.path) === JSON.stringify(e.path) && o.value === v && pkgName(v) === pkgName(e.value));
-        const old = list.findIndex((v) => e.legacy.includes(v) || wrote(v));
+        const isOld = (v) => e.legacy.includes(v) || isOlderPin(v, e);
+        const old = list.findIndex((v) => isOld(v) || wrote(v));
         if (old >= 0) {
           // `replaced`: the user's own legacy entry, so --uninstall can put it back; over an earlier pin of ours (a pin bump) it carries that pin's.
           const earlier = owned.find((o) => o.mode === 'arrayAdd' && JSON.stringify(o.path) === JSON.stringify(e.path) && o.value === list[old]);
-          const replaced = !e.restore ? undefined : wrote(list[old]) ? earlier?.replaced : e.legacy.includes(list[old]) ? list[old] : undefined;
+          const replaced = !e.restore ? undefined : wrote(list[old]) ? earlier?.replaced : isOld(list[old]) ? list[old] : undefined;
           text = applyEdits(text, modify(text, [...e.path, old], e.value, FORMAT));
           applied.push(replaced === undefined ? e : { ...e, replaced });
           continue;
