@@ -279,7 +279,19 @@ export const bunPresent = (home) => Boolean(which('bun')) || fs.existsSync(path.
 export const exitCrashAfterDone = (argv, status, out) => status !== 0 && argv.some((a) => /^skills@/.test(a)) && /Done!/.test(out) && /UV_HANDLE_CLOSING/.test(out);
 
 // `codes` collects the exit status; `json` sends the child's stdout to stderr so stdout stays one JSON object.
-export function run(argv, { dryRun, log, env, json, codes }) {
+// `logFile` (quiet mode): stdout and stderr go to that file, never to the terminal; `tail` collects the last lines of this command for a failure report.
+// stdin is closed so a child that asks a question takes its default instead of waiting for an answer nobody can see; `rtk init` keeps the terminal.
+export function run(argv, { dryRun, log, env, json, codes, logFile, tail }) {
+  if (logFile && !(argv[0] === 'rtk' && argv[1] === 'init')) {
+    fs.appendFileSync(logFile, `$ ${argv.join(' ')}\n`);
+    if (dryRun) return true;
+    const r = spawnSync(argv[0], argv.slice(1), { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8', shell: useShell(argv[0]), env: { ...allowedEnv(), ...env } });
+    const out = `${r.stdout ?? ''}${r.stderr ?? ''}${r.error ? `${r.error.message}\n` : ''}`;
+    fs.appendFileSync(logFile, `${out}[exit ${r.status ?? r.signal ?? -1}]\n`);
+    tail?.push(`$ ${argv.join(' ')}`, ...out.split(/\r?\n/).filter(Boolean));
+    codes?.push(r.status ?? -1);
+    return r.status === 0 || exitCrashAfterDone(argv, r.status, out);
+  }
   log(`  $ ${argv.join(' ')}`);
   if (dryRun) return true;
   const isSkills = argv.some((a) => /^skills@/.test(a));

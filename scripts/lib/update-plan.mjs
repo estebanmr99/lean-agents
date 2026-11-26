@@ -49,12 +49,17 @@ export function changelogNotes(text, from, to) {
   return out.map((s) => ({ version: s.version, body: s.body.join('\n').trim() }));
 }
 
-export function formatUpdatePlan(rows, notes) {
+const CHANGELOG_URL = 'https://github.com/estebanmr99/lean-agents/blob/main/CHANGELOG.md';
+const briefBody = (body) => body.split('\n').filter((l) => /^\s*- /.test(l)).map((l) => `- ${l.replace(/^\s*- /, '').replace(/^(.*?[.!?])(\s.*)?$/, '$1').slice(0, 160)}`).join('\n');
+
+// `brief`: one line per release-note entry (its first sentence), then the CHANGELOG link (#491).
+export function formatUpdatePlan(rows, notes, brief = false) {
   const out = [];
   const moves = rows.filter((r) => r.action === 'update');
   const rest = rows.filter((r) => r.action !== 'update');
   if (moves.length) out.push('Pins that will change (old -> new):', ...moves.map((r) => `${r.tool}: ${r.installed} -> ${r.pinned}`));
   if (rest.length) out.push('Not updated:', ...rest.map((r) => `${r.tool}: ${r.installed}${r.pinned && r.pinned !== r.installed ? ` -> ${r.pinned}` : ''} (${r.reason})`));
-  if (notes.length) out.push(`Release notes since your version (${notes.map((n) => n.version).join(', ')}):`, ...notes.flatMap((n) => [`## ${n.version}`, n.body]));
+  if (notes.length) out.push(`Release notes since your version (${notes.map((n) => n.version).join(', ')}):`, ...notes.flatMap((n) => [`## ${n.version}`, brief ? briefBody(n.body) : n.body]));
+  if (notes.length && brief) out.push(`Full notes: ${CHANGELOG_URL}`);
   return out.join('\n');
 }

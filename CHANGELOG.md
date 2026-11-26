@@ -4,6 +4,9 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Changed
+- Quieter output (#491): each install or `--update` step prints one line `[n/N] description ✓` (or `✗` with the last 20 lines and the log path); the commands' own output goes to one log per run in `~/.config/lean-agents/logs/` (removed by `--uninstall`), so a child's stderr no longer shows red in PowerShell on a good run. The plan lists only `create`/`modify`/`remove` files plus one `N unchanged` line, release notes show the first sentence of each entry plus the CHANGELOG link, and command lines print the home as `~`. `--verbose` restores the full output; `--json` is unchanged. Child commands get no stdin (they take their default instead of waiting); `rtk init` keeps the terminal because it can ask a question (#489).
+
 ### Added
 - `--preflight` (and `--preflight --json`) is a read-only check for old or duplicate copies of the agent CLIs and tools on PATH and for a terminal opened before a PATH change (#471). It lists every copy and which one wins, and gives one fix line per finding. Blockers (exit 1): rtk below its minimum version (its steps are skipped), a newer copy hidden behind an older one, a tool this window cannot see yet. Everything else, such as an older copy later on PATH, uv, jq or gh below their verified version, or a CLI behind its pinned version, is a warning. It only runs `--version` (and `reg.exe query` on Windows); `--no-exec` skips both. It also lists the OpenCode MCP server names (your own as `<user-mcp-N>`, so the report can be shared), warns when a pinned npm tool sits under several nvm Nodes or only under an inactive one (#465), and blocks when the disk is too small for the OpenCode 1.x backup or an OpenCode process is running (#488). jq and the other tools get a package-manager fix line.
 

@@ -12,7 +12,7 @@ const WRITE = /\b(?:fs|fsx)\.(?:writeFileSync|appendFileSync|renameSync|rmSync|u
 
 const ALLOWED = {
   'scripts/lib/fsops.mjs': 8, // the action kinds themselves
-  'scripts/lean.mjs': 1, // removes its own scratch HOME after probing versions
+  'scripts/lean.mjs': 2, // removes its own scratch HOME after probing versions; --uninstall removes the step logs
   'scripts/lib/adapters/opencode-v2.mjs': 1, // inside the vendor undo script, guarded by unsafe()
   'scripts/lib/adopt.mjs': 10, // --adopt --yes: backup first, automatic undo on failure, --adopt --undo restores
   'scripts/lib/agent-lifecycle.mjs': 3, // removes the files it recorded, only while their sha256 still matches; downloaded installers
@@ -23,7 +23,7 @@ const ALLOWED = {
   'scripts/lib/parallel.mjs': 6, // its own worker state and logs under the lean-agents state dir
   'scripts/lib/plugin-health.mjs': 3, // copies config into a temp XDG dir to probe plugins, then removes it
   'scripts/lib/prereqs.mjs': 2, // inside a node -e undo script
-  'scripts/lib/system.mjs': 1, // inside the Bun undo script
+  'scripts/lib/system.mjs': 3, // inside the Bun undo script; the per-run step log lean-agents owns (#491)
   'scripts/lib/verify-commit.mjs': 1, // its own temp clone
   'scripts/lib/verify-sha256.mjs': 1, // deletes a download that fails its sha256
 };
