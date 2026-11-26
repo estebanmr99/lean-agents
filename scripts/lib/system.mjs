@@ -17,10 +17,24 @@ export function which(bin) {
 // Windows .cmd shims (npm, npx) need a shell; real .exe files must not get one, or paths with spaces split.
 const useShell = (bin) => isWin && !/\.exe$/i.test(bin) && !/\.exe$/i.test(which(bin) ?? '');
 
+// Windows .cmd/.bat files run through cmd.exe /d /s /c "<quoted file> <args>" (#475): no shell option, and a path with a cmd
+// metacharacter is refused (null) instead of being quoted. Args are fixed words from callers, so they need no quoting.
+const CMD_UNSAFE = /["&|<>^%]/;
+export function cmdInvocation(file, args = [], comspec = process.env.ComSpec || 'cmd.exe') {
+  if (CMD_UNSAFE.test(file) || args.some((a) => !/^[\w.=-]+$/.test(a))) return null;
+  return { file: comspec, argv: ['/d', '/s', '/c', `"${[`"${file}"`, ...args].join(' ')}"`] };
+}
+
 // The version string as the binary prints it, pre-release tag included (2.0.1-beta): what an undo must reinstall.
-export function versionFull(bin, args = ['--version'], env = {}) {
+export function versionFull(bin, args = ['--version'], env = {}, timeout = 20000) {
   if (!path.isAbsolute(bin) && !which(bin)) return null;
-  const r = spawnSync(bin, args, { encoding: 'utf8', shell: useShell(bin), timeout: 20000, env: { ...allowedEnv(), ...env } });
+  const opts = { encoding: 'utf8', timeout, env: { ...allowedEnv(), ...env } };
+  let r;
+  if (isWin && path.isAbsolute(bin) && /\.(cmd|bat)$/i.test(bin)) {
+    const inv = cmdInvocation(bin, args);
+    if (!inv) return 'unknown';
+    r = spawnSync(inv.file, inv.argv, { ...opts, windowsVerbatimArguments: true });
+  } else r = spawnSync(bin, args, { ...opts, shell: useShell(bin) });
   const m = `${r.stdout}${r.stderr}`.match(/\d+\.\d+\.\d+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?/);
   return m ? m[0] : 'unknown';
 }

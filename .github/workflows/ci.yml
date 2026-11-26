@@ -687,6 +687,32 @@ jobs:
         shell: pwsh
         run: ./tests/real-opencode-rtk.ps1
 
+  real-preflight:
+    # --preflight (#471) on Windows: a planted old rtk stub earlier on PATH than the real pinned rtk 1.2.0.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
+      - run: npm ci
+      - name: Install the pinned rtk
+        shell: bash
+        run: |
+          bash scripts/ci-download.sh rtk-windows-x64 "$RUNNER_TEMP/rtk.zip"
+          powershell -NoProfile -Command "Expand-Archive -Path \"$RUNNER_TEMP/rtk.zip\" -DestinationPath \"$RUNNER_TEMP/rtk-bin\" -Force"
+          echo "$RUNNER_TEMP/rtk-bin" >> "$GITHUB_PATH"
+      - name: Preflight reports the shadowed rtk
+        shell: pwsh
+        run: ./tests/real-preflight.ps1
+
   real-parallel:
     # Real git worktrees in a throwaway repo and HOME; real Claude Code and OpenCode only get their flags checked.
     # The Orca path stays VERIFY until a job installs Orca.
