@@ -95,8 +95,8 @@ export function countCopy(dir, count = countInChild) {
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 
-const nearest = (p) => { while (!fs.existsSync(p) && path.dirname(p) !== p) p = path.dirname(p); return p; };
-const gb = (n) => `${(n / GIB).toFixed(2)} GB`;
+export const nearest = (p) => { while (!fs.existsSync(p) && path.dirname(p) !== p) p = path.dirname(p); return p; };
+export const gb = (n) => `${(n / GIB).toFixed(2)} GB`;
 
 function restoreText(L, ts, sessions) {
   return `# Restore the OpenCode 1.x data (backup ${ts}, ${sessions} sessions)

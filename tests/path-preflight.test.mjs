@@ -25,7 +25,7 @@ function treeHash(dir) {
   walk(dir);
   return h.digest('hex');
 }
-const base = (home, dirs, extra = {}) => ({ home, env: { PATH: dirs.join(path.delimiter), USER: 'alice' }, platform: 'linux', ...extra });
+const base = (home, dirs, extra = {}) => ({ home, env: { PATH: dirs.join(path.delimiter), USER: 'alice' }, platform: 'linux', list: () => [], statfs: () => ({ bavail: 1e9, bsize: 4096 }), ...extra });
 const noFs = { statSync() { throw new Error('ENOENT'); }, accessSync() {}, realpathSync: (p) => p, existsSync: () => false };
 const leanCli = (args, env) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--preflight', ...args], { encoding: 'utf8', env });
 
@@ -88,14 +88,14 @@ test('A3 stale window PATH: a stored folder that exists but is missing is a warn
   const stored = { user: '"%USERPROFILE%\\bin";C:\\x;C:\\gone;%UNKNOWN%\\z;C:\\Windows\\', machine: '' };
   const dirs = ['c:\\profiles\\bob\\bin', 'c:\\x', 'c:\\windows'];
   assert.deepEqual(staleWindowPath({ env, readWinPath: () => stored, fsx: winFs([], dirs) }), ['C:\\Profiles\\bob\\bin']);
-  const warn = preflight({ home: 'C:\\h', env, platform: 'win32', readWinPath: () => stored, fsx: winFs([], dirs), pm: 'winget' });
+  const warn = preflight({ home: 'C:\\h', env, platform: 'win32', readWinPath: () => stored, fsx: winFs([], dirs), pm: 'winget', list: () => [], statfs: () => ({ bavail: 1e9, bsize: 4096 }) });
   const f = warn.findings.find((x) => x.kind === 'stale-path');
   assert.equal(f.blocker, false); assert.equal(warn.ok, true);
   assert.match(formatPreflight(warn, { home: 'C:\\h', env }), /this window started before PATH changed: C:\\Profiles\\bob\\bin is missing\. Close and reopen the terminal or VS Code, then run --preflight again\./);
-  const hid = preflight({ home: 'C:\\h', env, platform: 'win32', readWinPath: () => stored, fsx: winFs(['c:\\profiles\\bob\\bin\\rtk.exe'], dirs), probe: () => '1.2.0', pm: 'winget' });
+  const hid = preflight({ home: 'C:\\h', env, platform: 'win32', readWinPath: () => stored, fsx: winFs(['c:\\profiles\\bob\\bin\\rtk.exe'], dirs), probe: () => '1.2.0', pm: 'winget', list: () => [], statfs: () => ({ bavail: 1e9, bsize: 4096 }) });
   const g = hid.findings.find((x) => x.kind === 'stale-path');
   assert.equal(g.blocker, true); assert.deepEqual(g.hidden, ['rtk']); assert.equal(hid.ok, false);
-  const ok = preflight({ home: 'C:\\h', env: { PATH: 'C:\\a' }, platform: 'win32', readWinPath: () => ({ user: 'C:\\a', machine: '' }), fsx: noFs, pm: 'winget' });
+  const ok = preflight({ home: 'C:\\h', env: { PATH: 'C:\\a' }, platform: 'win32', readWinPath: () => ({ user: 'C:\\a', machine: '' }), fsx: noFs, pm: 'winget', list: () => [], statfs: () => ({ bavail: 1e9, bsize: 4096 }) });
   assert.equal(ok.findings.some((x) => x.kind === 'stale-path'), false);
 });
 
@@ -153,7 +153,7 @@ test('cmdInvocation: quotes a path with spaces and refuses cmd metacharacters', 
 test('A5 --json redacts a Windows path whose backslashes JSON would escape', () => {
   const env = { USERNAME: 'carol', PATH: 'C:\\Profiles\\carol\\a;C:\\Profiles\\carol\\b' };
   const fsx = winFs(['c:\\profiles\\carol\\a\\rtk.exe', 'c:\\profiles\\carol\\b\\rtk.exe']);
-  const r = preflight({ home: 'C:\\Profiles\\carol', env, platform: 'win32', fsx, probe: (f) => (f.includes('\\a\\') ? '0.42.0' : '1.2.0'), readWinPath: () => ({ user: '', machine: '' }), pm: 'winget' });
+  const r = preflight({ home: 'C:\\Profiles\\carol', env, platform: 'win32', fsx, probe: (f) => (f.includes('\\a\\') ? '0.42.0' : '1.2.0'), readWinPath: () => ({ user: '', machine: '' }), pm: 'winget', list: () => [], statfs: () => ({ bavail: 1e9, bsize: 4096 }) });
   const out = formatPreflight(r, { home: 'C:\\Profiles\\carol', env, json: true });
   assert.ok(!/carol/i.test(out), out);
   assert.match(out, /~\\\\a\\\\rtk\.EXE/);
@@ -200,4 +200,116 @@ test('below min blocks only for rtk; uv and gh below min are warnings with exit 
   assert.equal(leanCli(['--home', home], { PATH: d }).status, 0);
   fake(d, 'rtk', '0.42.0');
   assert.equal(leanCli(['--home', home], { PATH: d }).status, 1);
+});
+
+const writeJson = (f, o) => { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, typeof o === 'string' ? o : JSON.stringify(o)); };
+
+test('A6 config shape: managed MCP names print as-is, user names as <user-mcp-N>, never the real name (text and JSON)', { skip: win }, () => {
+  const home = tmp();
+  writeJson(path.join(home, '.config', 'opencode', 'opencode.jsonc'), `{ // user
+    "mcp": { "servers": { "acme-secret-db": { "type": "local", "command": ["x"] }, "playwright": { "type": "local", "command": ["y"] }, "zeta-internal": { "type": "local", "command": ["z"] } } } }`);
+  const r = preflight(base(home, []));
+  assert.deepEqual(r.shape.mcp, ['<user-mcp-1>', 'playwright', '<user-mcp-2>']);
+  for (const out of [formatPreflight(r, { home, env: {}, json: true }), formatPreflight(r, { home, env: {} })]) {
+    assert.match(out, /playwright/); assert.match(out, /<user-mcp-1>/); assert.match(out, /<user-mcp-2>/);
+    assert.ok(!/acme-secret-db|zeta-internal/.test(out), out);
+  }
+  const v1 = tmp();
+  writeJson(path.join(v1, '.config', 'opencode', 'opencode.json'), { mcp: { 'my-private': { type: 'local', command: ['a'] }, 'context-mode': { type: 'local', command: ['b'] } } });
+  assert.deepEqual(preflight(base(v1, [])).shape.mcp, ['<user-mcp-1>', 'context-mode']);
+  const v2 = tmp();
+  writeJson(path.join(v2, '.config', 'opencode', 'opencode.json'), { mcp: { servers: { 'only-one': { type: 'local', command: ['a'] } } } });
+  assert.deepEqual(preflight(base(v2, [])).shape.mcp, ['<user-mcp-1>'], 'the servers container is not a server');
+});
+
+test('A6 a missing or unparseable config gives no shape and no crash', { skip: win }, () => {
+  const home = tmp();
+  assert.equal(preflight(base(home, [])).shape, null);
+  writeJson(path.join(home, '.config', 'opencode', 'opencode.jsonc'), '{ "mcp": {{{');
+  assert.equal(preflight(base(home, [])).shape, null);
+});
+
+function fakeNvm(home, nodes) {
+  const nvm = path.join(home, '.nvm');
+  fs.mkdirSync(nvm, { recursive: true }); fs.writeFileSync(path.join(nvm, 'nvm.sh'), '');
+  for (const [v, ver] of Object.entries(nodes)) {
+    const d = path.join(nvm, 'versions', 'node', `v${v}`);
+    fake(path.join(d, 'bin'), 'node', v);
+    if (ver) writeJson(path.join(d, 'lib', 'node_modules', 'context-mode', 'package.json'), { version: ver });
+  }
+  return nvm;
+}
+
+test('A7 nvm: a pinned tool under two Nodes, or only under a non-active one, is a warning listing each Node', { skip: win }, () => {
+  const home = tmp();
+  fakeNvm(home, { '22.20.0': '1.0.1', '24.1.0': '1.0.5' });
+  const r = preflight(base(home, []));
+  const f = r.findings.find((x) => x.kind === 'nvm-copies');
+  assert.equal(f.blocker, false); assert.equal(f.tool, 'context-mode');
+  assert.deepEqual(f.copies, [{ node: '22.20.0', version: '1.0.1' }, { node: '24.1.0', version: '1.0.5' }]);
+  const text = formatPreflight(r, { home, env: {} });
+  assert.match(text, /22\.20\.0 has 1\.0\.1/); assert.match(text, /24\.1\.0 has 1\.0\.5/); assert.match(text, /fix: .*--adopt/);
+  const h2 = tmp(); const nvm = fakeNvm(h2, { '22.20.0': null, '24.1.0': '1.0.5' });
+  assert.ok(preflight(base(h2, [path.join(nvm, 'versions', 'node', 'v22.20.0', 'bin')])).findings.some((x) => x.kind === 'nvm-copies'), 'only under a non-active Node');
+  assert.ok(!preflight(base(h2, [path.join(nvm, 'versions', 'node', 'v24.1.0', 'bin')])).findings.some((x) => x.kind === 'nvm-copies'));
+  assert.ok(!preflight(base(tmp(), [])).findings.some((x) => x.kind === 'nvm-copies'), 'no nvm: nothing');
+  const flat = path.join(h2, 'nodejs'); fake(flat, 'node', '24.1.0'); // nvm-windows style: the active folder has no version
+  assert.ok(!preflight(base(h2, [flat])).findings.some((x) => x.kind === 'nvm-copies'), 'active Node unknown: no false warning');
+});
+
+test('A8 backup space: blocker with GB figures when the disk is too small, nothing when roomy or no 1.x data', { skip: win }, () => {
+  const home = tmp();
+  assert.ok(!preflight(base(home, [])).findings.some((x) => x.kind === 'backup-space'), 'no opencode.db');
+  writeJson(path.join(home, '.local', 'share', 'opencode', 'opencode.db'), 'db bytes');
+  assert.ok(!preflight(base(home, [])).findings.some((x) => x.kind === 'backup-space'), 'roomy');
+  const r = preflight(base(home, [], { statfs: () => ({ bavail: 10, bsize: 4096 }) }));
+  const f = r.findings.find((x) => x.kind === 'backup-space');
+  assert.equal(f.blocker, true); assert.equal(r.ok, false);
+  assert.match(formatPreflight(r, { home, env: {} }), /0\.00 GB free, 1\.00 GB needed[\s\S]*fix: free up disk space/);
+});
+
+test('#488 a running opencode (blocker with 1.x data, else warning) has a stop line; --no-exec does not list processes', () => {
+  const home = tmp();
+  writeJson(path.join(home, '.local', 'share', 'opencode', 'opencode.db'), 'db');
+  const f = preflight(base(home, [], { list: () => ['node', '/usr/bin/opencode'] })).findings.find((x) => x.kind === 'opencode-running');
+  assert.equal(f.blocker, true); assert.match(f.fix, /opencode service stop/);
+  assert.ok(!preflight(base(home, [], { list: () => ['launchd'] })).findings.some((x) => x.kind === 'opencode-running'));
+  assert.ok(!preflight(base(home, [], { list: () => { throw new Error('ps failed'); } })).findings.some((x) => x.kind === 'opencode-running'));
+  let calls = 0;
+  preflight(base(home, [], { exec: false, list: () => { calls++; return ['opencode']; } }));
+  assert.equal(calls, 0);
+  const warn = preflight(base(tmp(), [], { list: () => ['opencode.exe'] }));
+  assert.equal(warn.findings.find((x) => x.kind === 'opencode-running').blocker, false, 'no 1.x db: warning');
+  writeJson(path.join(home, '.local', 'share', 'opencode', 'opencode.db'), 'db');
+  assert.equal(preflight(base(home, [], { list: () => ['C:\\x\\opencode.exe'] })).findings.find((x) => x.kind === 'opencode-running').blocker, true);
+});
+
+test('jq fix line on win32 is winget (pure logic)', () => {
+  const env = { PATH: 'C:\\b' };
+  const fsx = { statSync: () => ({ isFile: () => true }), accessSync() {}, realpathSync: (p) => p, existsSync: () => false };
+  const r = preflight({ home: 'C:\\h', env, platform: 'win32', fsx, probe: () => '1.6.0', readWinPath: () => ({ user: '', machine: '' }), pm: 'winget', list: () => [], statfs: () => ({ bavail: 1e9, bsize: 4096 }) });
+  assert.equal(r.findings.find((x) => x.tool === 'jq' && x.kind === 'below-min').fix, 'winget upgrade --id jqlang.jq');
+});
+
+test('jq below its minimum gets a package-manager fix line', { skip: win }, () => {
+  const home = tmp(); const d = path.join(home, 'bin'); fake(d, 'jq', '1.6.0');
+  const fix = (pm) => preflight(base(home, [d], { pm })).findings.find((x) => x.tool === 'jq' && x.kind === 'below-min').fix;
+  assert.equal(fix('brew'), 'brew upgrade jq');
+  assert.match(fix(null), /^install .* or newer from https:\/\/github\.com\/jqlang\/jq/);
+});
+
+test('A4/A5 the new findings are read-only and redacted through the CLI', { skip: win }, () => {
+  const root = tmp(); const home = path.join(root, 'alice'); const d = path.join(home, 'bin');
+  fake(d, 'rtk', '1.2.0');
+  writeJson(path.join(home, '.config', 'opencode', 'opencode.jsonc'), { mcp: { 'alice-vpn': { type: 'local', command: ['a'] } } });
+  fakeNvm(home, { '22.20.0': '1.0.1', '24.1.0': '1.0.5' });
+  writeJson(path.join(home, '.local', 'share', 'opencode', 'opencode.db'), 'db');
+  const before = treeHash(home);
+  const text = leanCli(['--no-exec', '--home', home], { PATH: d, USER: 'alice' }).stdout;
+  assert.match(text, /nvm Nodes/);
+  for (const out of [text, leanCli(['--json', '--no-exec', '--home', home], { PATH: d, USER: 'alice' }).stdout]) {
+    assert.ok(!out.includes('alice'), out);
+    assert.match(out, /<user-mcp-1>/);
+  }
+  assert.equal(treeHash(home), before);
 });

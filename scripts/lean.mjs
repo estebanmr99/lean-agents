@@ -217,8 +217,9 @@ const HELP = `Usage: lean-agents [options]
                          upgraded agent CLIs alone; use --uninstall-agent for ones lean-agents installed
   --uninstall            Undo everything lean-agents changed
   --doctor               Check the install
-  --preflight            Read-only: old or duplicate copies of each agent CLI and tool on PATH, a tool below its minimum version, and a terminal
-                         that started before a PATH change; one fix line each, exit 1 when something blocks setup (with --json: one JSON object;
+  --preflight            Read-only: old or duplicate copies of each agent CLI and tool on PATH, a tool below its minimum version, a terminal
+                         that started before a PATH change, tools under several nvm Nodes, too little disk for the OpenCode 1.x backup, a running
+                         OpenCode, and the OpenCode MCP server names (yours as <user-mcp-N>); one fix line each, exit 1 when something blocks setup (with --json: one JSON object;
                          with --no-exec no version is probed)
   --summary              Write the summary page (summary.html in the state dir; --uninstall removes it) and ask before opening it.
                          --filed-issue "item=issue url" records an issue you filed; --no-open only prints the path
