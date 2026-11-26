@@ -20,3 +20,4 @@ foreach ($needle in @($oldDir, $realDir, 'wins', 'fix:', '0.42.0')) {
 }
 if (@(Get-ChildItem $caseHome -Recurse -Force).Count -ne 0) { throw '--preflight wrote into HOME' }
 Write-Output 'ok    --preflight named the old rtk, the newer one and the fix; HOME untouched'
+exit 0

@@ -78,9 +78,9 @@ test('A2 below min: one row with version, min and update command', { skip: win }
 test('A3 stale window PATH: stored PATH has an entry the process lacks (reader injected, any OS)', () => {
   const reg = (v) => `\r\nHKEY_CURRENT_USER\\Environment\r\n    Path    REG_EXPAND_SZ    ${v}\r\n`;
   assert.equal(parseRegPath(reg('%USERPROFILE%\\bin;C:\\x')), '%USERPROFILE%\\bin;C:\\x');
-  const env = { USERPROFILE: 'C:\\Users\\bob', PATH: 'C:\\Windows;c:\\X\\' };
+  const env = { USERPROFILE: 'C:\\Profiles\\bob', PATH: 'C:\\Windows;c:\\X\\' };
   const missing = staleWindowPath({ env, readWinPath: () => ({ user: '%USERPROFILE%\\bin;C:\\x', machine: 'C:\\Windows' }) });
-  assert.deepEqual(missing, ['C:\\Users\\bob\\bin']);
+  assert.deepEqual(missing, ['C:\\Profiles\\bob\\bin']);
   const r = preflight({ home: tmp(), env, platform: 'win32', readWinPath: () => ({ user: '%USERPROFILE%\\bin', machine: '' }), fsx: noFs });
   const f = r.findings.find((x) => x.kind === 'stale-path');
   assert.ok(f && f.blocker);
