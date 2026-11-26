@@ -22,7 +22,7 @@ const STAMP = { verified: true };
 async function setup(tools = ['ponytail', 'dcp', 'context-mode']) {
   const home = fs.realpathSync(fs.mkdtempSync(j(os.tmpdir(), 'upgrade-apply-')));
   seedWorkPc(home);
-  const inv = upgradeInventory(await inventory({ home, env: { HOME: home, PATH: '' }, platform: process.platform, realHome: '/nowhere' }), { home });
+  const inv = upgradeInventory(await inventory({ home, env: { HOME: home, PATH: '' }, platform: process.platform, realHome: '/nowhere' }), { home, tools });
   const opts = { tools, network: {}, terminals: [], platform: 'linux', env: {}, shell: 'default', ponytailMode: 'lite' };
   const adapter = opencodeV2Adapter({ home, core: loadCore(ROOT), profile: null, opts, rulesPath: j(home, 'rules.md') });
   return { home, inv, adapter, backupDir: j(home, 'bk'), cfg: j(home, '.config', 'opencode', 'opencode.jsonc') };
@@ -105,4 +105,37 @@ test('a 2.x value already in the file wins and the 1.x source key is kept; an un
   assert.equal(c.compaction.buffer, 2); assert.equal(c.compaction.reserved, 1);
   fs.writeFileSync(s.cfg, '{ not json');
   assert.throws(() => upgradeApply({ ...s, stamp: STAMP }), /could not be parsed/);
+});
+
+// #480: a managed MCP is "reinstalled" only when the applied tools include it; otherwise it is kept under its own name.
+async function withPlaywright(tools) {
+  const home = fs.realpathSync(fs.mkdtempSync(j(os.tmpdir(), 'upgrade-480-')));
+  const cfg = j(home, '.config', 'opencode', 'opencode.jsonc');
+  fs.mkdirSync(path.dirname(cfg), { recursive: true });
+  fs.writeFileSync(cfg, JSON.stringify({ mcp: { playwright: { type: 'local', command: ['npx', '-y', '@playwright/mcp@0.0.85'], enabled: true } } }));
+  const inv = upgradeInventory(await inventory({ home, env: { HOME: home, PATH: '' }, platform: process.platform, realHome: '/nowhere' }), { home, tools });
+  const opts = { tools, network: {}, terminals: [], platform: 'linux', env: {}, shell: 'default', ponytailMode: 'lite' };
+  const adapter = opencodeV2Adapter({ home, core: loadCore(ROOT), profile: null, opts, rulesPath: j(home, 'rules.md') });
+  return { home, inv, adapter, backupDir: j(home, 'bk'), cfg };
+}
+
+test('managed playwright the tools do not select is kept under mcp.servers.playwright, and the plan says so', { skip }, async () => {
+  const s = await withPlaywright(['rtk', 'context-mode']);
+  assert.equal(s.inv.items.find((i) => i.name === 'playwright').upgrade.class, 'user-translatable');
+  assert.deepEqual(s.inv.upgrade.plan.filter((l) => /playwright/.test(l)), ['translate mcp.playwright -> mcp.servers.playwright']);
+  const original = fs.readFileSync(s.cfg, 'utf8');
+  const r = upgradeApply({ ...s, stamp: STAMP });
+  assert.deepEqual(read(s.cfg).mcp.servers.playwright.command, ['npx', '-y', '@playwright/mcp@0.0.85'], 'the 1.x command is kept as is');
+  undo(r.entries, [j(s.home, '.config', 'opencode')]);
+  assert.equal(fs.readFileSync(s.cfg, 'utf8'), original, '--undo restores the 1.x config');
+});
+
+test('managed playwright the tools select is written by the adapter: one entry, plan says reinstall', { skip }, async () => {
+  const s = await withPlaywright(['playwright']);
+  assert.equal(s.inv.items.find((i) => i.name === 'playwright').upgrade.class, 'managed');
+  assert.deepEqual(s.inv.upgrade.plan, ['reinstall 1 managed items through the 2.x adapter']);
+  upgradeApply({ ...s, stamp: STAMP });
+  const c = read(s.cfg);
+  assert.deepEqual(Object.keys(c.mcp.servers), ['playwright']);
+  assert.equal(c.mcp.playwright, undefined);
 });

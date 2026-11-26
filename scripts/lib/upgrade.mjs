@@ -74,7 +74,9 @@ function rtkPluginClass(it, text, tools, rtk) {
 
 // Classify one adopt item of the OpenCode 1.x config (mcp, plugin, plugins/ file) or a skill.
 function classifyItem(it, stopgaps, home, fsx, tools, rtk) {
-  if (it.owner === 'managed') return managed(`${it.kind} ${it.name}`, it.kind === 'plugin' ? 'plugins[]' : it.kind === 'mcp' ? `mcp.servers.${it.name}` : it.file);
+  // Only what the applied tools make the 2.x adapter write again is "reinstalled"; the rest is kept like a user item (#480).
+  const gone = it.owner === 'managed' && ((it.kind === 'mcp' && !tools.includes(it.name)) || (it.kind === 'plugin' && /opencode-dcp/.test(it.name) && !tools.includes('dcp')));
+  if (it.owner === 'managed' && !gone) return managed(`${it.kind} ${it.name}`, it.kind === 'plugin' ? 'plugins[]' : it.kind === 'mcp' ? `mcp.servers.${it.name}` : it.file);
   if (it.kind === 'mcp') return translate(row('mcp'), it.name);
   if (it.kind === 'skill') { const t = row('skills'); return t.verified ? translate(t, it.name, `skill ${it.name}`) : verifyRow(t, `skill ${it.name}`); }
   if (it.kind === 'plugin' && it.keyPath.length) {
