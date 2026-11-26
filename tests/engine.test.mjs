@@ -252,7 +252,7 @@ test('an rtk older than the pinned min skips the rtk steps and says how to updat
   };
   const old = run('0.42.0');
   assert.equal(old.rtkSteps, 0);
-  assert.match(old.err, /rtk 0\.42\.0 is older than v1\.2\.0.*skipped 1 RTK steps/);
+  assert.match(old.err, /rtk 0\.42\.0 \(\S+rtk\) is older than v1\.2\.0.*skipped 1 RTK steps/);
   const ok = run('1.2.0');
   assert.ok(ok.rtkSteps > 0);
   assert.doesNotMatch(ok.err, /older than/);
