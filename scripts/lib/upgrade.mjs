@@ -74,8 +74,10 @@ function rtkPluginClass(it, text, tools, rtk) {
 
 // Classify one adopt item of the OpenCode 1.x config (mcp, plugin, plugins/ file) or a skill.
 function classifyItem(it, stopgaps, home, fsx, tools, rtk) {
-  // Only what the applied tools make the 2.x adapter write again is "reinstalled"; the rest is kept like a user item (#480).
-  const gone = it.owner === 'managed' && ((it.kind === 'mcp' && !tools.includes(it.name)) || (it.kind === 'plugin' && /opencode-dcp/.test(it.name) && !tools.includes('dcp')));
+  // Only what the 2.x adapter really writes again is "reinstalled"; the rest is kept like a user item (#480). The upgrade adapter has
+  // no terminals (so never writes warp), writes an MCP only for a selected tool, and context-mode only as that MCP. DCP always runs.
+  const gone = it.owner === 'managed' && ((it.kind === 'mcp' && !tools.includes(it.name))
+    || (it.kind === 'plugin' && it.keyPath?.length && ((/opencode-warp/.test(it.name)) || (/context-mode/.test(it.name) && !tools.includes('context-mode')))));
   if (it.owner === 'managed' && !gone) return managed(`${it.kind} ${it.name}`, it.kind === 'plugin' ? 'plugins[]' : it.kind === 'mcp' ? `mcp.servers.${it.name}` : it.file);
   if (it.kind === 'mcp') return translate(row('mcp'), it.name);
   if (it.kind === 'skill') { const t = row('skills'); return t.verified ? translate(t, it.name, `skill ${it.name}`) : verifyRow(t, `skill ${it.name}`); }

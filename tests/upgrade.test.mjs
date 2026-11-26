@@ -40,11 +40,11 @@ test('every class appears and translation rows give the right before/after', { s
   assert.deepEqual(pair('./x.ts', 'plugin'), ['user-manual', 'plugin ./x.ts', null]);
   assert.deepEqual(pair('plugins/graphify.js', 'plugin'), ['user-manual', 'plugin plugins/graphify.js', null]);
   assert.deepEqual(pair('my-plugin.mjs', 'plugin'), ['user-manual', 'plugin my-plugin.mjs', null]);
-  assert.deepEqual(pair('@warp-dot-dev/opencode-warp@0.1.7', 'plugin'), ['managed', 'plugin @warp-dot-dev/opencode-warp@0.1.7', 'plugins[]']);
+  assert.deepEqual(pair('@warp-dot-dev/opencode-warp@0.1.7', 'plugin'), ['user-translatable', 'plugin @warp-dot-dev/opencode-warp@0.1.7', 'plugins[]']);
   assert.deepEqual(pair('compaction.reserved'), ['user-translatable', 'compaction.reserved', 'compaction.buffer']);
   assert.deepEqual(pair('autoupdate'), ['user-translatable', 'autoupdate: false', 'update: "disable"']);
   assert.deepEqual(pair('disabled_providers'), ['user-translatable', 'disabled_providers[]', 'policies: deny provider.use']);
-  assert.equal(up(r, 'context-mode', 'plugin').upgrade.class, 'managed');
+  assert.equal(up(r, 'context-mode', 'plugin').upgrade.class, 'user-translatable'); // no tools passed: the 2.x adapter writes no context-mode
   assert.equal(up(r, 'agent/lean.md').upgrade.class, 'managed');
   assert.equal(up(r, 'agents/mine.md').upgrade.class, 'user-translatable');
 
