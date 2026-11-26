@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sha } from './fsops.mjs';
-import { PINS, npmSpec, behindPins, nodeRange } from './pins.mjs';
+import { PINS, npmSpec, behindPins, nodeRange, rtkPin, rtkTooOld } from './pins.mjs';
 import { version, quiet, findAgy, antigravityFootprint } from './system.mjs';
 import { redactText } from './redact.mjs';
 import { satisfies, compare, nodeSkipLine, minVersion, findNvm, nodeAt, installedNodes, nodeFloorFix } from './node-runtime.mjs';
@@ -234,6 +234,7 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
         }
         const at = bin === 'agy' ? findAgy(home, platform, env) ?? bin : bin;
         const v = version(at, undefined, childEnv(network));
+        if (bin === 'rtk' && rtkTooOld(v)) { add('rtk on PATH', 'error', `${v}, older than ${rtkPin().min} (lean-agents min): update it and make it first on PATH`); continue; }
         add(at === bin ? `${bin} on PATH` : `${bin} found outside PATH`, v ? 'ok' : 'error', v ?? 'not found');
       }
       // VS Code: stable or Insiders, whichever is on PATH.

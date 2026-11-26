@@ -5,6 +5,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ## [Unreleased]
 
 ### Fixed
+- rtk older than the pinned minimum (v1.2.0): the RTK steps are skipped with one line saying how to update, instead of failing (`rtk init --agent antigravity` does not exist in 0.42); `--doctor` flags the old rtk (#467).
 - README (EN, ES): the Antigravity pilot section no longer says lean-agents skips the IDE; it installs it with Homebrew or winget unless `--no-app`.
 
 ## [1.2.1] - 2026-11-25

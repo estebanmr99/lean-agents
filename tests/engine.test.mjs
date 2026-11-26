@@ -240,6 +240,24 @@ test('a failed install command exits 1 and still records state', { skip: process
   assert.ok(fs.existsSync(path.join(home, '.config', 'lean-agents', 'state.json')));
 });
 
+test('an rtk older than the pinned min skips the rtk steps and says how to update (#467)', { skip: process.platform === 'win32' }, () => {
+  const run = (v) => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+    const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-bin-'));
+    fs.writeFileSync(path.join(bin, 'rtk'), `#!/bin/sh\necho "rtk ${v}"\n`, { mode: 0o755 });
+    const args = ['--yes', '--dry-run', '--json', '--agents', 'opencode-v1', '--tools', 'rtk', '--privacy', 'standard', '--lang', 'en', '--profile', 'none'];
+    const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args], { encoding: 'utf8', env: { ...process.env, PATH: bin } });
+    assert.equal(r.status, 0, r.stderr);
+    return { rtkSteps: JSON.parse(r.stdout).commands.filter((c) => c.run.some((a) => a[0] === 'rtk')).length, err: r.stderr };
+  };
+  const old = run('0.42.0');
+  assert.equal(old.rtkSteps, 0);
+  assert.match(old.err, /rtk 0\.42\.0 is older than v1\.2\.0.*skipped 1 RTK steps/);
+  const ok = run('1.2.0');
+  assert.ok(ok.rtkSteps > 0);
+  assert.doesNotMatch(ok.err, /older than/);
+});
+
 test('winget installs accept agreements, or they stop at a prompt without a TTY', () => {
   for (const tool of ['rtk', 'serena']) assert.ok(prereqFor(tool, 'winget').install[0].includes('--accept-package-agreements'));
 });
