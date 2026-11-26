@@ -4,8 +4,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
-### Fixed
-- `--upgrade-agent opencode` no longer drops an MCP server (for example `playwright`) or a Warp plugin that lean-agents added on OpenCode 1.x when the upgrade will not write it again. It is now kept with its own name and command, and the plan says so (#480). Machines already upgraded with 1.2.1 are not repaired automatically: copy the entry back by hand as described in `docs/migrate-opencode-v1-to-v2.md` ("If an earlier upgrade dropped a server").
+## [1.2.2] - 2026-11-26
 
 ### Added
 - RTK now works on OpenCode 2 (#478). `--tools rtk` runs `rtk init -g --opencode` there too, as on OpenCode 1.x, and `--uninstall` removes it again. You need rtk 1.2.0 or newer; with an older or missing rtk the step is skipped and the output says how to update it.
@@ -13,6 +12,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - Checked in CI on Linux and Windows with OpenCode 2.2.7 and rtk 1.2.0 (the plugin loads and rewrites a shell command). Not checked: macOS in CI, and the newer rtk 1.2.1 plugin file.
 
 ### Fixed
+- `--upgrade-agent opencode` no longer drops an MCP server (for example `playwright`) or a Warp plugin that lean-agents added on OpenCode 1.x when the upgrade will not write it again. It is now kept with its own name and command, and the plan says so (#480). Machines already upgraded with 1.2.1 are not repaired automatically: copy the entry back by hand as described in `docs/migrate-opencode-v1-to-v2.md` ("If an earlier upgrade dropped a server").
 - `tui.json` now follows `opencode.jsonc` for DCP (#479). When the server config ends up with lean-agents' DCP pin, an exact older or newer DCP version left in `tui.json` (for example from `opencode plugin ... --global`) moves to the same pin, so `--doctor` no longer reports a version mismatch; the output says `tui.json DCP 3.1.15 -> 3.2.0 to match opencode.jsonc` and `--uninstall` puts the old value back. A DCP version you set yourself in `opencode.jsonc` is still never changed, and then `tui.json` stays too.
 - `--doctor` no longer reports "edited since install" for files that changed while one of lean-agents' own commands ran (`rtk init`, plugin installs), including files left unchanged by this run; the stored hash is refreshed only for files that changed across a command, so later user edits still show (#470).
 - `--doctor`: the Antigravity IDE row is `ok` only when the app is installed (macOS app folder, Windows `winget list`); config folders alone give a `note` (#466).
