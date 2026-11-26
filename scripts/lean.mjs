@@ -7,7 +7,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import tty from 'node:tty';
 import { fileURLToPath } from 'node:url';
-import { plan, apply, undo, describe, sha, writePrivate, privateDir, dropBackups, renameRetry } from './lib/fsops.mjs';
+import { plan, apply, undo, describe, tilde, sha, writePrivate, privateDir, dropBackups, renameRetry } from './lib/fsops.mjs';
 import { loadCore, renderRules, loadProfile, useToolNode } from './lib/render.mjs';
 import { claudeAdapter } from './lib/adapters/claude.mjs';
 import { opencodeV1Adapter } from './lib/adapters/opencode-v1.mjs';
@@ -38,6 +38,7 @@ import { draftIssue, addFiledIssue } from './lib/feedback.mjs';
 import { buildSummary } from './lib/summary-data.mjs';
 import { loginRows } from './lib/logins.mjs';
 import { renderSummary, canOffer, openArgv } from './lib/summary-html.mjs';
+import { redactText } from './lib/redact.mjs';
 import { planUpdate, changelogNotes, formatUpdatePlan } from './lib/update-plan.mjs';
 import { PINS, pinVersions, behindPins, pinTool, nodeRange, npmSpec, rtkPin, rtkTooOld } from './lib/pins.mjs';
 import { findNvm, installedNodes, nodeFloorFix, resolveToolNodes, nvmLatest, nvmInstallArgv, nvmEnv, toolEnv, satisfies, compare } from './lib/node-runtime.mjs';
@@ -111,6 +112,7 @@ function parseArgs(argv) {
       case '--gh': o.gh = true; break;
       case '--no-gh': o.gh = false; break;
       case '--json': o.json = true; break;
+      case '--verbose': o.verbose = true; break;
       case '--probe-plugins': o.probePlugins = true; break;
       case '--feedback-draft': o.command = 'feedback'; break;
       case '--failed-command': o.failedCommand = next(); break;
@@ -196,6 +198,7 @@ const HELP = `Usage: lean-agents [options]
                          pass --network on|off when nothing is installed yet. Files nothing.
   --no-exec              Run no external command (no installs, no version probes); --uninstall refuses it when commands need undoing
   --probe-plugins        With --doctor or --adopt: start a short-lived opencode serve (throwaway state dir, loopback) and check a plugin's command registers
+  --verbose              Print every command's own output (default: one line per step, the output goes to a log under the state dir; the log can hold tool output, keep it private)
   --json                 With --dry-run, --doctor, --preflight or --yes: print one JSON object on stdout (messages go to stderr)
   --no-app               Do not install the Antigravity app (the CLI is still installed when missing)
   --cursor-app           With Cursor: also install the Cursor app when missing (brew or winget; opt-in)
@@ -678,7 +681,7 @@ function printPlan(o, planned, commands, behind = new Set()) {
   if (o.notes.length) console.log(`  your notes for undocumented settings (saved, never applied): ${o.notes.map((n) => path.basename(n.path, '.md')).join(', ')}`);
   console.log('');
   console.log('Files:');
-  console.log(describe(planned, o.home));
+  console.log(describe(planned, o.home, !o.verbose));
   if (commands.length) {
     console.log('\nCommands:');
     for (const c of commands) {
@@ -686,7 +689,7 @@ function printPlan(o, planned, commands, behind = new Set()) {
       const there = !behind.has(c.tool) && ((c.skipIfExists && exists(c.skipIfExists)) || (o.exec && c.skipIfOutput && quiet(c.skipIfOutput.cmd).ok));
       console.log(`  - ${c.desc}${c.agent ? ` (${c.agent})` : ''}${there ? ': already there, skipped' : ''}`);
       if (there) continue;
-      for (const argv of [...c.run, ...(c.always ?? [])]) console.log(`      $ ${argv.join(' ')}`);
+      for (const argv of [...c.run, ...(c.always ?? [])]) console.log(`      $ ${tilde(argv.join(' '), o.home)}`);
     }
   }
   console.log('');
@@ -811,7 +814,7 @@ async function install(o) {
     if (every) printPrereqs(every.steps, o.exec);
     printPlan(o, planned, commands, behind);
   }
-  if (update) { const text = formatUpdatePlan(update.rows, update.notes); if (text) console.log(text); }
+  if (update) { const text = formatUpdatePlan(update.rows, update.notes, !o.verbose); if (text) console.log(text); }
   else if (saved) {
     if (behindPins(saved).length) console.log('Pins that will change (old -> new):');
     for (const b of behindPins(saved)) console.log(`${b.tool}: ${b.installed} -> ${b.pinned}`);
@@ -838,6 +841,21 @@ async function install(o) {
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupDir = path.join(stateDir(o.home), 'backups', stamp);
+  // Quiet by default: each step's output goes to one log per run (#491); --verbose and --json keep it on the terminal.
+  // The log can hold tool output: owner-only dir and file. If it cannot be created, fall back to the terminal.
+  let logFile = o.verbose || o.json ? null : path.join(stateDir(o.home), 'logs', `${stamp}.log`);
+  if (logFile) {
+    try {
+      fs.mkdirSync(path.dirname(logFile), { recursive: true, mode: 0o700 });
+      if (process.platform !== 'win32') fs.chmodSync(path.dirname(logFile), 0o700);
+      fs.closeSync(fs.openSync(logFile, 'a', 0o600));
+    } catch (e) { console.log(`! cannot write the step log (${e.code ?? e.message}); showing every command's output instead.`); logFile = null; }
+  }
+  const tail = [];
+  const showFailure = (c) => console.log(`${redactText(tail.slice(-20).map((l) => `    ${l}`).join('\n'), { home: o.home })}\n  ! failed: ${c.desc}. full output: ${tilde(logFile, o.home)}${c.optional && c.tool === 'lean-update' ? '; install it later with --update' : ''}`);
+  const total = logFile && o.exec ? commands.filter((c) => !c.manual && !(c.bin && !behind.has(c.tool) && which(c.bin)) && (behind.has(c.tool) || !((c.skipIfExists && exists(c.skipIfExists)) || (c.skipIfOutput && quiet(c.skipIfOutput.cmd).ok)))).length : 0;
+  let step = 0;
+  const stepLine = (c, ok) => console.log(redactText(`[${step}/${Math.max(total, step)}] ${c.desc} ${ok ? '✓' : '✗'}`, { home: o.home }));
   const previous = readState(o.home);
   const files = [];
   const ran = [];
@@ -888,21 +906,25 @@ async function install(o) {
       if (there) {
         if (!behind.has(c.tool)) continue;
         // Installed at an older pin: undo it, then add it again at the new pin.
-        if (!c.undo.every((argv) => run(undoArgv(argv), { dryRun: false, log: console.log, env: c.env, json: o.json }))) {
-          console.log(`  ! could not remove the old ${c.desc}; left as it is. Fix it by hand, then --update.`);
+        tail.length = 0;
+        if (!c.undo.every((argv) => run(undoArgv(argv), { dryRun: false, log: (l) => console.log(tilde(l, o.home)), env: c.env, json: o.json, logFile, tail }))) {
+          if (logFile) console.log(redactText(tail.slice(-20).map((l) => `    ${l}`).join('\n'), { home: o.home }));
+          console.log(`  ! could not remove the old ${c.desc}; left as it is.${logFile ? ` full output: ${tilde(logFile, o.home)}.` : ''} Fix it by hand, then --update.`);
           failed++;
           errors.push(`could not remove the old ${c.desc}`);
           continue;
         }
       }
+      step++;
       if (ui) ui.step(i + 1, commands.length, c.desc);
-      else console.log(`- ${c.desc}`);
+      else if (!logFile) console.log(`- ${c.desc}`);
       if (c.lifecycle) {
-        await agentLifecycle({ mode: 'install', agents: [c.lifecycle], home: o.home, realHome: REAL_HOME, stateDir: stateDir(o.home), dryRun: false, exec: true, yes: true, ask: async (_q, def) => def, yesNo });
+        await agentLifecycle({ mode: 'install', agents: [c.lifecycle], home: o.home, realHome: REAL_HOME, stateDir: stateDir(o.home), dryRun: false, exec: true, yes: true, ask: async (_q, def) => def, yesNo, logFile });
         const bin = c.bins.find((b) => fs.existsSync(b));
         // The installer's PATH change reaches new terminals only: put its folder first here so the agent's steps below find it.
         if (bin) process.env.PATH = `${path.dirname(bin)}${path.delimiter}${process.env.PATH ?? ''}`;
         else { failed++; errors.push(c.desc); noCli.add(c.lifecycle); }
+        if (logFile && !ui) { stepLine(c, !!bin); if (!bin) console.log(`  ! failed: ${c.desc}. full output: ${tilde(logFile, o.home)}`); }
         report.push({ desc: c.desc, ok: !!bin, exit: null });
         if (ui) ui.result(!!bin, c.desc);
         continue;
@@ -913,15 +935,20 @@ async function install(o) {
       save();
       const codes = [];
       const before = snap();
-      const ok = c.run.every((argv) => run(argv, { dryRun: false, log: console.log, env: c.env, json: o.json, codes }));
-      for (const argv of c.always ?? []) run(argv, { dryRun: false, log: console.log, env: c.env, json: o.json });
+      tail.length = 0;
+      const out = (l) => console.log(tilde(l, o.home));
+      const ok = c.run.every((argv) => { tail.length = 0; return run(argv, { dryRun: false, log: out, env: c.env, json: o.json, codes, logFile, tail }); });
+      for (const argv of c.always ?? []) run(argv, { dryRun: false, log: out, env: c.env, json: o.json, logFile, tail });
+      if (logFile && !ui) stepLine(c, ok);
+      if (logFile && !ok && !ui) showFailure(c);
+      else if (logFile && !ok) console.log(redactText(tail.slice(-20).map((l) => `    ${l}`).join('\n'), { home: o.home }));
       refreshHashes(before);
       report.push({ desc: c.desc, ok, exit: codes.at(-1) ?? null });
       if (!ok && !c.optional) errors.push(c.desc);
       if (ui) ui.result(ok || c.optional, c.desc);
-      else if (!ok && !c.optional) console.log(`  ! failed: ${c.desc}. Run the command above by hand, then --doctor.`);
+      else if (!ok && !c.optional && !logFile) console.log(`  ! failed: ${c.desc}. Run the command above by hand, then --doctor.`);
       // An optional step (Bun) that fails only means Context Mode runs on Node; nothing to undo.
-      if (!ok && c.optional) { console.log(c.tool === 'gh' ? '! gh install failed; install it yourself (--no-gh skips it).' : c.tool === 'lean-update' ? '! lean-update skill failed to install; run the command above by hand later.' : '! Bun install failed; Context Mode will run on Node.'); ran.pop(); save(); continue; }
+      if (!ok && c.optional) { if (!(logFile && c.tool === 'lean-update')) console.log(c.tool === 'gh' ? '! gh install failed; install it yourself (--no-gh skips it).' : c.tool === 'lean-update' ? '! lean-update skill failed to install; run the command above by hand later.' : '! Bun install failed; Context Mode will run on Node.'); ran.pop(); save(); continue; }
       if (!ok) failed++;
       rec.ok = ok;
       save();
@@ -1233,6 +1260,7 @@ async function uninstall(o) {
     console.log(`Not finished: ${failed.size} undo command(s) failed and stay recorded. Fix the cause (or run them by hand), then run --uninstall again.`);
     return;
   }
+  fs.rmSync(path.join(stateDir(o.home), 'logs'), { recursive: true, force: true }); // the per-run step logs (#491)
   renameRetry(stateFile, path.join(stateDir(o.home), `state.uninstalled-${Date.now()}.json`));
   if (state.adopt) {
     saveState(stateDir(o.home), state.adopt);

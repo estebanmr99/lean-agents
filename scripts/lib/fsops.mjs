@@ -249,10 +249,22 @@ export function plan(actions, roots = [], prior = []) {
   });
 }
 
-export function describe(planned, home) {
+// Home as `~` inside free text: only a whole folder (home + a separator), never an empty home or `/`.
+export function tilde(text, home) {
+  if (!home || home === '/' || home === path.sep) return text;
+  let out = text;
+  for (const h of new Set([home, home.replace(/\\/g, '/')])) out = out.split(`${h}/`).join('~/').split(`${h}\\`).join('~\\');
+  return out;
+}
+
+// `brief`: unchanged files are counted on one line instead of listed (#491).
+export function describe(planned, home, brief = false) {
   const rel = (p) => (p === home || p.startsWith(home + path.sep) ? `~${p.slice(home.length)}` : p);
-  return planned
+  const same = brief ? planned.filter((p) => p.status === 'unchanged').length : 0;
+  return [...planned
+    .filter((p) => !(brief && p.status === 'unchanged'))
     .map((p) => `  ${p.status.padEnd(9)} ${rel(p.path)}${p.note ? `  (${p.note})` : ''}`)
+    , ...(same ? [`  ${same} unchanged`] : [])]
     .join('\n');
 }
 

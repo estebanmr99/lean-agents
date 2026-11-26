@@ -20,7 +20,7 @@ export function redactText(text, { home, env = process.env, user = env.USER || e
   if (user && user.length > 1) out = out.replace(new RegExp(`\\b${esc(user)}\\b`, 'g'), '<user>');
   if (host && host.length > 2) out = out.replace(new RegExp(`\\b${esc(host)}\\b`, 'gi'), '<host>');
   return out
-    .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, '<email>')
+    .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)*\.[A-Za-z]{2,}\b/g, '<email>')
     .replace(/\bAuthorization(["']?\s*[:=]\s*["']?)(Basic|Bearer|Token)\s+[^\s"',;]+/gi, 'Authorization$1$2 <token>')
     .replace(/\beyJ[\w-]+\.eyJ[\w-]+\.[\w-]+/g, '<token>')
     .replace(/\b(gh[pousr]_|github_pat_|sk-|xox[bp]-|glpat-|ya29\.|(?:sk|rk)_(?:live|test)_)[\w-]{8,}|\bnpm_[A-Za-z0-9]{8,}\b|\bhf_[A-Za-z0-9]{8,}\b|\bAKIA[0-9A-Z]{12,}|\bAIza[\w-]{20,}/g, '<token>')

@@ -713,6 +713,26 @@ jobs:
         shell: pwsh
         run: ./tests/real-preflight.ps1
 
+  real-quiet-output:
+    # Quiet step output (#491) on Windows PowerShell 5.1: stub commands write to stderr, the terminal stays clean, the log holds it.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: ${{ inputs.latest }}
+        uses: ./.github/actions/latest-pins
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_FOR_CONTEXT_MODE }}
+      - run: npm ci
+      - name: Stub stderr stays off the terminal
+        shell: powershell
+        run: ./tests/real-quiet-output.ps1
+
   real-parallel:
     # Real git worktrees in a throwaway repo and HOME; real Claude Code and OpenCode only get their flags checked.
     # The Orca path stays VERIFY until a job installs Orca.

@@ -181,7 +181,8 @@ async function vscodeLifecycle(o) {
 
 // o: { mode: 'install'|'uninstall', fromUpgrade (only --upgrade-agent may install 2.x next to 1.x), agents, home, realHome, platform, stateDir, dryRun, exec, yes, ask, yesNo, vscode }
 export async function agentLifecycle(o) {
-  const log = console.log;
+  // Quiet install: chatter goes to the step log, only warnings ("  !") reach the terminal.
+  const log = o.logFile ? (l) => { fs.appendFileSync(o.logFile, `${l}\n`); if (/^\s*!/.test(l)) console.log(l); } : console.log;
   const winPath = o.winPath ?? winPathDefault;
   for (const a of o.agents) {
     if (a === 'opencode-v1') throw new Error('opencode-v1 is never installed or removed by lean-agents (work PCs run 1.x on purpose, #79)');
@@ -231,7 +232,7 @@ export async function agentLifecycle(o) {
         pathDir = row.pathDir;
         pathAbsent = winPath('has', pathDir) === 'absent';
       }
-      const ok = row.run.every((argv) => run(argv, { dryRun: false, log, env: { ...env, ...row.env } }));
+      const ok = row.run.every((argv) => run(argv, { dryRun: false, log, env: { ...env, ...row.env }, logFile: o.logFile }));
       if (row.download) fs.rmSync(row.download, { force: true });
       const rec = diffSnapshots(before, snapshot(row.dirs));
       let pathEntry = false;
