@@ -7,6 +7,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { cmdInvocation } from '../scripts/lib/system.mjs';
 import { preflight, findCopies, parseRegPath, staleWindowPath, formatPreflight } from '../scripts/lib/preflight.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -25,7 +26,7 @@ function treeHash(dir) {
   return h.digest('hex');
 }
 const base = (home, dirs, extra = {}) => ({ home, env: { PATH: dirs.join(path.delimiter), USER: 'alice' }, platform: 'linux', ...extra });
-const noFs = { statSync() { throw new Error('ENOENT'); }, accessSync() {}, realpathSync: (p) => p };
+const noFs = { statSync() { throw new Error('ENOENT'); }, accessSync() {}, realpathSync: (p) => p, existsSync: () => false };
 const leanCli = (args, env) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--preflight', ...args], { encoding: 'utf8', env });
 
 test('A1 shadowed copy: old rtk first on PATH, newer later; both listed, old wins, fix line', { skip: win }, () => {
@@ -67,26 +68,95 @@ test('A1 Windows: PATHEXT is honored and the walk is case-insensitive', () => {
 test('A2 below min: one row with version, min and update command', { skip: win }, () => {
   const home = tmp(); const d = path.join(home, 'bin');
   fake(d, 'rtk', '0.42.0');
-  const r = preflight(base(home, [d]));
+  const r = preflight(base(home, [d], { pm: 'brew' }));
   const rows = r.findings.filter((x) => x.tool === 'rtk' && x.kind === 'below-min');
   assert.equal(rows.length, 1);
   assert.equal(rows[0].blocker, true);
   const text = formatPreflight(r, { home, env: {} });
   assert.match(text, /0\.42\.0/); assert.match(text, /v1\.2\.0/); assert.match(text, /brew upgrade rtk/);
+  assert.match(text, /1 blocker, 0 warnings\. Nothing was changed\./);
 });
 
-test('A3 stale window PATH: stored PATH has an entry the process lacks (reader injected, any OS)', () => {
-  const reg = (v) => `\r\nHKEY_CURRENT_USER\\Environment\r\n    Path    REG_EXPAND_SZ    ${v}\r\n`;
+// A Windows fake: files in `files` (lower-case paths) exist.
+const winFs = (files, dirs = []) => ({ statSync: (p) => { if (!files.includes(p.toLowerCase())) throw new Error('ENOENT'); return { isFile: () => true }; },
+  accessSync() {}, realpathSync: (p) => p, existsSync: (p) => dirs.includes(p.toLowerCase()) || files.includes(p.toLowerCase()) });
+const reg = (v) => `\r\nHKEY_CURRENT_USER\\Environment\r\n    Path    REG_EXPAND_SZ    ${v}\r\n`;
+
+test('A3 stale window PATH: a stored folder that exists but is missing is a warning; a hidden tool makes it a blocker', () => {
   assert.equal(parseRegPath(reg('%USERPROFILE%\\bin;C:\\x')), '%USERPROFILE%\\bin;C:\\x');
   const env = { USERPROFILE: 'C:\\Profiles\\bob', PATH: 'C:\\Windows;c:\\X\\' };
-  const missing = staleWindowPath({ env, readWinPath: () => ({ user: '%USERPROFILE%\\bin;C:\\x', machine: 'C:\\Windows' }) });
-  assert.deepEqual(missing, ['C:\\Profiles\\bob\\bin']);
-  const r = preflight({ home: tmp(), env, platform: 'win32', readWinPath: () => ({ user: '%USERPROFILE%\\bin', machine: '' }), fsx: noFs });
-  const f = r.findings.find((x) => x.kind === 'stale-path');
-  assert.ok(f && f.blocker);
-  assert.match(formatPreflight(r, { home: 'C:\\h', env }), /restart .*terminal or VS Code/i);
-  const ok = preflight({ home: tmp(), env: { PATH: 'C:\\a' }, platform: 'win32', readWinPath: () => ({ user: 'C:\\a', machine: '' }), fsx: noFs });
+  const stored = { user: '"%USERPROFILE%\\bin";C:\\x;C:\\gone;%UNKNOWN%\\z;C:\\Windows\\', machine: '' };
+  const dirs = ['c:\\profiles\\bob\\bin', 'c:\\x', 'c:\\windows'];
+  assert.deepEqual(staleWindowPath({ env, readWinPath: () => stored, fsx: winFs([], dirs) }), ['C:\\Profiles\\bob\\bin']);
+  const warn = preflight({ home: 'C:\\h', env, platform: 'win32', readWinPath: () => stored, fsx: winFs([], dirs), pm: 'winget' });
+  const f = warn.findings.find((x) => x.kind === 'stale-path');
+  assert.equal(f.blocker, false); assert.equal(warn.ok, true);
+  assert.match(formatPreflight(warn, { home: 'C:\\h', env }), /this window started before PATH changed: C:\\Profiles\\bob\\bin is missing\. Close and reopen the terminal or VS Code, then run --preflight again\./);
+  const hid = preflight({ home: 'C:\\h', env, platform: 'win32', readWinPath: () => stored, fsx: winFs(['c:\\profiles\\bob\\bin\\rtk.exe'], dirs), probe: () => '1.2.0', pm: 'winget' });
+  const g = hid.findings.find((x) => x.kind === 'stale-path');
+  assert.equal(g.blocker, true); assert.deepEqual(g.hidden, ['rtk']); assert.equal(hid.ok, false);
+  const ok = preflight({ home: 'C:\\h', env: { PATH: 'C:\\a' }, platform: 'win32', readWinPath: () => ({ user: 'C:\\a', machine: '' }), fsx: noFs, pm: 'winget' });
   assert.equal(ok.findings.some((x) => x.kind === 'stale-path'), false);
+});
+
+test('A2 Windows: the update command is winget upgrade with the id from the install table', () => {
+  const r = preflight({ home: 'C:\\h', env: { PATH: 'C:\\old' }, platform: 'win32', readWinPath: () => ({ user: '', machine: '' }), fsx: winFs(['c:\\old\\rtk.exe']), probe: () => '0.42.0' });
+  assert.equal(r.findings.find((x) => x.kind === 'below-min').fix, 'winget upgrade --id rtk-ai.rtk');
+});
+
+test('fix lines: npm CLIs use the pinned npm spec; no brew means the release or --update', { skip: win }, () => {
+  const home = tmp(); const d = path.join(home, 'bin');
+  fake(d, 'claude', '1.0.0'); fake(d, 'rtk', '0.42.0');
+  const r = preflight(base(home, [d], { pm: null }));
+  const c = r.findings.find((x) => x.tool === 'claude');
+  assert.equal(c.kind, 'behind-pin'); assert.equal(c.blocker, false);
+  assert.match(c.fix, /^npm install -g @anthropic-ai\/claude-code@\d/);
+  assert.match(r.findings.find((x) => x.tool === 'rtk' && x.kind === 'below-min').fix, /lean-agents --update/);
+});
+
+test('shadowed with equal versions is a warning with the harmless wording', { skip: win }, () => {
+  const home = tmp(); const a = path.join(home, 'a'); const b = path.join(home, 'b');
+  fake(a, 'rtk', '1.2.0'); fake(b, 'rtk', '1.2.0');
+  const r = preflight(base(home, [a, b]));
+  assert.equal(r.ok, true); assert.equal(r.warnings, 1);
+  assert.match(formatPreflight(r, { home, env: {} }), /Older copies later on PATH are harmless\. Remove them if you want a clean PATH\./);
+});
+
+test('relative PATH entries are skipped and reported as a warning', { skip: win }, () => {
+  const home = tmp(); const d = path.join(home, 'rel');
+  fake(d, 'rtk', '1.2.0');
+  const r = preflight({ ...base(home, ['.', 'rel']), env: { PATH: '.:rel' }, pm: null });
+  assert.equal(findCopies('rtk', { path: '.:rel' }).length, 0);
+  assert.ok(r.findings.some((x) => x.kind === 'relative-path' && !x.blocker));
+  assert.equal(r.findings.some((x) => x.tool === 'rtk'), false);
+});
+
+test('exec off probes nothing; the deadline leaves later copies "not checked"', { skip: win }, () => {
+  const home = tmp(); const a = path.join(home, 'a'); const b = path.join(home, 'b');
+  fake(a, 'rtk', '0.42.0'); fake(b, 'rtk', '1.2.0');
+  let probes = 0;
+  const off = preflight({ ...base(home, [a, b]), exec: false, probe: () => { probes++; return '1.0.0'; } });
+  assert.equal(probes, 0);
+  assert.match(formatPreflight(off, { home, env: {} }), /not checked/);
+  let t = 0;
+  const late = preflight({ ...base(home, [a, b]), now: () => (t += 40000), probe: () => '1.0.0' });
+  assert.equal(late.findings.find((x) => x.kind === 'shadowed').copies[1].version, null);
+});
+
+test('cmdInvocation: quotes a path with spaces and refuses cmd metacharacters', () => {
+  const ok = cmdInvocation('C:\\a b\\rtk.cmd', ['--version'], 'cmd.exe');
+  assert.deepEqual(ok, { file: 'cmd.exe', argv: ['/d', '/s', '/c', '""C:\\a b\\rtk.cmd" --version"'] });
+  for (const bad of ['C:\\a&b\\x.cmd', 'C:\\a^b\\x.cmd', 'C:\\a%PATH%\\x.cmd', 'C:\\a"b\\x.cmd', 'C:\\a|b\\x.cmd', 'C:\\a<b\\x.cmd', 'C:\\a>b\\x.cmd']) assert.equal(cmdInvocation(bad, ['--version']), null, bad);
+  assert.equal(cmdInvocation('C:\\a\\x.cmd', ['--version & calc']), null);
+});
+
+test('A5 --json redacts a Windows path whose backslashes JSON would escape', () => {
+  const env = { USERNAME: 'carol', PATH: 'C:\\Profiles\\carol\\a;C:\\Profiles\\carol\\b' };
+  const fsx = winFs(['c:\\profiles\\carol\\a\\rtk.exe', 'c:\\profiles\\carol\\b\\rtk.exe']);
+  const r = preflight({ home: 'C:\\Profiles\\carol', env, platform: 'win32', fsx, probe: (f) => (f.includes('\\a\\') ? '0.42.0' : '1.2.0'), readWinPath: () => ({ user: '', machine: '' }), pm: 'winget' });
+  const out = formatPreflight(r, { home: 'C:\\Profiles\\carol', env, json: true });
+  assert.ok(!/carol/i.test(out), out);
+  assert.match(out, /~\\\\a\\\\rtk\.EXE/);
 });
 
 test('A4 read-only: the HOME tree hash is identical after a preflight run (CLI)', { skip: win }, () => {

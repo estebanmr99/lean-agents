@@ -217,8 +217,9 @@ const HELP = `Usage: lean-agents [options]
                          upgraded agent CLIs alone; use --uninstall-agent for ones lean-agents installed
   --uninstall            Undo everything lean-agents changed
   --doctor               Check the install
-  --preflight            Read-only: every agent CLI and tool on PATH (all copies, which one wins), versions below the minimum, a window PATH
-                         older than the stored one; one fix line each, exit 1 on a blocker (with --json: one JSON object)
+  --preflight            Read-only: old or duplicate copies of each agent CLI and tool on PATH, a copy below its minimum, and a terminal
+                         that started before a PATH change; one fix line each, exit 1 on a blocker (with --json: one JSON object;
+                         with --no-exec no version is probed)
   --summary              Write the summary page (summary.html in the state dir; --uninstall removes it) and ask before opening it.
                          --filed-issue "item=issue url" records an issue you filed; --no-open only prints the path
   --adopt                List what a hand-built machine already has (MCPs, hooks, plugins, skills, npm copies),
@@ -1323,7 +1324,7 @@ async function main() {
   if (o.command === 'help') return console.log(HELP);
   if (o.command === 'version') return console.log(JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version);
   if (o.command === 'preflight') {
-    const report = preflight({ home: o.home });
+    const report = preflight({ home: o.home, exec: o.exec });
     process.stdout.write(`${formatPreflight(report, { home: o.home, json: o.json })}\n`);
     return process.exit(report.ok ? 0 : 1);
   }
