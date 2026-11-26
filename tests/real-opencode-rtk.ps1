@@ -1,9 +1,9 @@
 # RTK on OpenCode 2 (#478), Windows: does OpenCode 2 load the plugins/rtk.ts that `rtk init -g --opencode` writes, without a
 # LoadError, and does its hook rewrite a shell call? Real opencode 2 and real rtk (CI installs the pinned one) in a throwaway
 # USERPROFILE; a local mock LLM (tests/fixtures/mock-llm.mjs) asks for `ls`, so no login and no model.
-# rtk ignores USERPROFILE and writes to the OS profile folder (here the disposable runner's): the file is copied into the
-# throwaway profile before OpenCode starts. The rewrite proof is rtk's own counter: `rtk gain` counts the `rtk ls` the
-# rewritten command ran. Needs `opencode` (2.x) and `rtk` on PATH. PowerShell 5.1 compatible.
+# `rtk init` writes plugins/rtk.ts to the OS profile folder (here the disposable runner's), so the file is copied into the
+# throwaway profile before OpenCode starts. The rewrite proof is rtk's own counter: with the throwaway profile's env,
+# `rtk gain` counts the `rtk ls` that the rewritten command ran (rtk keeps its database under that profile's AppData). Needs `opencode` (2.x) and `rtk` on PATH. PowerShell 5.1 compatible.
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot
 
@@ -19,45 +19,10 @@ function Get-RtkCommandCount {
   if ($text -match 'Total commands:\s+(\d+)') { return [int]$Matches[1] }
   return 0
 }
-$before = Get-RtkCommandCount
-& rtk ls | Out-Null
-Write-Output "counter check: a plain rtk ls moves the count $before -> $(Get-RtkCommandCount)"
-$before = Get-RtkCommandCount
-# Evidence for a failing rewrite: what rtk answers to the plugin's own question.
-Write-Output "rtk hook opencode answers: $(& rtk hook opencode --agent build ls 2>&1 | Out-String) (exit $LASTEXITCODE)"
-Write-Output "rtk rewrite answers: $(& rtk rewrite ls 2>&1 | Out-String) (exit $LASTEXITCODE)"
-
 $caseHome = Join-Path $env:RUNNER_TEMP "rtk-v2-$([guid]::NewGuid())"
 $cfgDir = "$caseHome\.config\opencode"
 New-Item -ItemType Directory -Path "$cfgDir\plugins" -Force | Out-Null
 Copy-Item $plugin "$cfgDir\plugins\rtk.ts"
-# Diagnostic plugin (temporary): does the 2.x hook fire on Windows, and can a plugin spawn rtk the way rtk.ts does?
-$probeLog = "$caseHome\probe.log"
-$probeJs = @"
-import { execFile } from 'node:child_process'
-import { appendFileSync } from 'node:fs'
-const log = (m) => appendFileSync(String.raw``$probeLog``, m + '\n')
-export default {
-  id: 'probe',
-  async setup(ctx) {
-    log('setup PATH has rtk-bin: ' + /rtk-bin/.test(process.env.PATH ?? '') + ' | Path: ' + /rtk-bin/.test(process.env.Path ?? ''))
-    const { existsSync, statSync } = await import('node:fs')
-    const { delimiter, join } = await import('node:path')
-    const exts = (process.env.PATHEXT ?? '.EXE;.CMD;.BAT;.COM').split(';')
-    let found = null
-    for (const dir of (process.env.PATH ?? '').split(delimiter).filter(Boolean)) {
-      for (const ext of exts) { const f = join(dir, 'rtk' + ext); if (!found && existsSync(f) && !statSync(f).isDirectory()) found = f }
-    }
-    log('resolved rtk: ' + found + ' | PATHEXT=' + process.env.PATHEXT)
-    if (found) await new Promise((resolve) => { const t = Date.now(); execFile(found, ['hook', 'opencode', '--help'], { encoding: 'utf8', timeout: 3000, windowsHide: true }, (err) => { log('probe --help: ' + (err ? 'ERR ' + err.message : 'ok') + ' in ' + (Date.now() - t) + 'ms'); resolve() }) })
-    await ctx.tool.hook('execute.before', (e) => {
-      log('hook ' + JSON.stringify({ tool: e.tool, input: e.input, keys: Object.keys(e) }))
-      return new Promise((resolve) => execFile('rtk', ['hook', 'opencode', '--agent', 'build', 'ls'], { encoding: 'utf8', timeout: 5000, windowsHide: true }, (err, out) => { log('spawn rtk: ' + (err ? 'ERR ' + err.message : out)); resolve() }))
-    })
-  },
-}
-"@
-Set-Content -Path "$cfgDir\plugins\probe.js" -Value $probeJs -Encoding UTF8
 
 $probe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
 $probe.Start(); $port = $probe.LocalEndpoint.Port; $probe.Stop()
@@ -86,9 +51,7 @@ try {
   & opencode service set port (Get-Random -Minimum 20000 -Maximum 60000) | Out-Null
   $out = & opencode run --format json --standalone 'list files' 2>"$caseHome\err.txt"
   $exit = $LASTEXITCODE
-  # rtk may honor XDG_DATA_HOME and record the rewritten call in the throwaway profile's own database: count there too.
   $inCase = Get-RtkCommandCount
-  Write-Output "history.db files: $((Get-ChildItem $caseHome -Recurse -Filter history.db -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }) -join ', ') | count with the case env: $inCase"
 } finally {
   & opencode service stop 2>$null | Out-Null
   foreach ($k in $saved.Keys) { Set-Item -Path "Env:$k" -Value $saved[$k] }
@@ -101,10 +64,6 @@ $failed = $false
 if ($exit -ne 0) { Write-Output "FAIL  opencode run exit $exit"; $failed = $true }
 if ($text -match 'LoadError|failed to load plugin') { Write-Output 'FAIL  OpenCode 2 logged a plugin load error for plugins/rtk.ts'; $failed = $true }
 else { Write-Output 'ok    OpenCode 2 loads plugins/rtk.ts (no LoadError)' }
-$after = Get-RtkCommandCount
-Write-Output "--- rtk gain after the turn ---"; & rtk gain 2>&1 | Out-String | Write-Output
-Write-Output '--- probe plugin log ---'; if (Test-Path $probeLog) { Get-Content $probeLog | Write-Output } else { Write-Output 'no probe log: setup never ran' }
-Write-Output '--- plugin warnings in the logs ---'; ($text -split "`n") | Where-Object { $_ -match '\[rtk\]|rtk\.ts|plugin' } | ForEach-Object { $_.Substring(0, [Math]::Min(300, $_.Length)) } | Write-Output
-if ($after -gt $before -or $inCase -gt 0) { Write-Output "ok    the 2.x hook rewrote the shell call: rtk ran it (commands $before -> $after, in the throwaway profile $inCase)" }
-else { Write-Output "FAIL  rtk did not run the shell call (commands $before -> $after)"; $failed = $true }
+if ($inCase -gt 0) { Write-Output "ok    the 2.x hook rewrote the shell call: rtk ran it (rtk gain count $inCase in the throwaway profile)" }
+else { Write-Output 'FAIL  rtk did not run the shell call (rtk gain count 0 in the throwaway profile)'; $failed = $true }
 if ($failed) { Write-Output '--- output ---'; Write-Output $text; exit 1 }
