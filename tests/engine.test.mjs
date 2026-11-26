@@ -240,6 +240,23 @@ test('a failed install command exits 1 and still records state', { skip: process
   assert.ok(fs.existsSync(path.join(home, '.config', 'lean-agents', 'state.json')));
 });
 
+test('--doctor does not flag a file our own commands edited after it was written (#470)', { skip: process.platform === 'win32' }, () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-bin-'));
+  const settings = path.join(home, '.claude', 'settings.json');
+  fs.writeFileSync(path.join(bin, 'rtk'), `#!/bin/sh\n[ "$1" = "--version" ] && echo "rtk 9.0.0" && exit 0\necho '{"hooks":{}}' > "${settings}"\n`, { mode: 0o755 });
+  for (const name of ['claude', 'npx', 'context-mode']) fs.writeFileSync(path.join(bin, name), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  const env = { ...process.env, PATH: bin };
+  const main = path.join(ROOT, 'scripts', 'lean.mjs');
+  const inst = spawnSync(process.execPath, [main, '--home', home, '--yes', '--agents', 'claude', '--tools', 'rtk', '--privacy', 'standard', '--lang', 'en', '--profile', 'none'], { encoding: 'utf8', env });
+  assert.equal(inst.status, 0, inst.stdout + inst.stderr);
+  assert.equal(fs.readFileSync(settings, 'utf8'), '{"hooks":{}}\n');
+  const row = () => spawnSync(process.execPath, [main, '--home', home, '--doctor'], { encoding: 'utf8', env }).stdout.split('\n').find((l) => l.includes('settings.json'));
+  assert.doesNotMatch(row(), /edited since install/);
+  fs.writeFileSync(settings, '{"mine":1}\n');
+  assert.match(row(), /edited since install/);
+});
+
 test('an rtk older than the pinned min skips the rtk steps and says how to update (#467)', { skip: process.platform === 'win32' }, () => {
   const run = (v) => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));

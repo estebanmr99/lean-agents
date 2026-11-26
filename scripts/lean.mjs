@@ -7,7 +7,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import tty from 'node:tty';
 import { fileURLToPath } from 'node:url';
-import { plan, apply, undo, describe, writePrivate, privateDir, dropBackups, renameRetry } from './lib/fsops.mjs';
+import { plan, apply, undo, describe, sha, writePrivate, privateDir, dropBackups, renameRetry } from './lib/fsops.mjs';
 import { loadCore, renderRules, loadProfile, useToolNode } from './lib/render.mjs';
 import { claudeAdapter } from './lib/adapters/claude.mjs';
 import { opencodeV1Adapter } from './lib/adapters/opencode-v1.mjs';
@@ -841,6 +841,8 @@ async function install(o) {
   // Resume stamps only matter for an interrupted run; once everything finished they would hide a later removal.
   let finished = false;
   const save = () => {
+    // Our own commands (rtk init, plugin installs) edit files we just wrote; re-hash those so they count as ours, not as user edits (#470).
+    for (const f of files) { const now = fs.existsSync(f.path) ? fs.readFileSync(f.path, 'utf8') : null; if (now !== null) f.hash = sha(now); }
     const state = {
       version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version,
       installedAt: previous?.installedAt ?? new Date().toISOString(),
