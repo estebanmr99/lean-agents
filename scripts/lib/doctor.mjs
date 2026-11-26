@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sha } from './fsops.mjs';
 import { PINS, npmSpec, behindPins, nodeRange, rtkPin, rtkTooOld } from './pins.mjs';
-import { version, quiet, findAgy, antigravityFootprint } from './system.mjs';
+import { version, quiet, findAgy, antigravityFootprint, wingetAnswer } from './system.mjs';
 import { redactText } from './redact.mjs';
 import { satisfies, compare, nodeSkipLine, minVersion, findNvm, nodeAt, installedNodes, nodeFloorFix } from './node-runtime.mjs';
 import { mcpLaunches, classify, duplicateSkills, skillDirs } from './inventory.mjs';
@@ -271,7 +271,7 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
       }
     }
   }
-  checkAntigravityIde(home, add, fsx);
+  checkAntigravityIde({ home, exec, run, platform, fsx }, add);
   const { nodes, skills } = checkInventory({ home, exec, run, env, platform, fsx, state }, add);
   // #212: config listing a plugin is not proof it loads. Read-only; `probe` holds findings of the opt-in --probe-plugins server run.
   const dcp = dcpRow(home, { fsx, probe, probed });
@@ -294,10 +294,19 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
   return ok;
 }
 
-// Read-only (#216): a row only when the IDE folders or the extension exist.
-function checkAntigravityIde(home, add, fsx) {
+// Read-only (#216, #466): a row only when config folders or the extension exist; the status comes from the app itself, since
+// the folders also belong to the agy CLI. The app is probed only with exec (winget); other platforms: unknown.
+function checkAntigravityIde({ home, exec, run, platform, fsx }, add) {
   const found = antigravityFootprint(home, fsx);
-  if (found.length) add('antigravity ide', 'ok', found.map((f) => f.name).join(', '));
+  if (!found.length) return;
+  const folders = found.map((f) => f.name).join(', ');
+  let app = 'unknown';
+  if (platform === 'darwin') app = ['/Applications', path.join(home, 'Applications')].some((d) => fsx.existsSync(path.join(d, 'Antigravity.app'))) ? 'present' : 'absent';
+  else if (platform === 'win32' && exec) app = wingetAnswer(run(['winget', 'list', '--id', 'Google.Antigravity', '-e'], 20000));
+  if (app === 'present') return add('antigravity ide', 'ok', folders);
+  add('antigravity ide', 'note', app === 'absent'
+    ? `app not installed (config found: ${folders}). lean-agents installs it unless --no-app; or https://antigravity.google/download`
+    : `could not check whether the app is installed (config found: ${folders}); https://antigravity.google/download`);
 }
 
 function checkOpenCode(o, add, q) {

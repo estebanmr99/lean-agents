@@ -36,21 +36,39 @@ test('adopt lists them as user-owned, keep, and writes nothing', async () => {
   assert.equal(tree(), before);
 });
 
-function doctorRows(home) {
+function doctorRows(home, opts = {}) {
   let out = '';
   const write = process.stdout.write;
   process.stdout.write = (s) => { out += s; return true; };
-  try { doctor({ home, state: null, exec: false, json: true, run: () => ({ ok: true, out: '' }) }); } finally { process.stdout.write = write; }
+  try { doctor({ home, state: null, exec: false, json: true, run: () => ({ ok: true, out: '' }), ...opts }); } finally { process.stdout.write = write; }
   return JSON.parse(out).rows;
 }
+const ide = (rows) => rows.find((r) => r.item === 'antigravity ide');
 
-test('doctor: one row when found, none when absent', () => {
+test('doctor: no row without config; config alone is never ok (#466)', () => {
   const home = tmp();
-  assert.equal(doctorRows(home).some((r) => r.item === 'antigravity ide'), false);
+  assert.equal(ide(doctorRows(home)), undefined);
+  fs.mkdirSync(j(home, '.gemini', 'antigravity-cli'), { recursive: true });
+  for (const platform of ['darwin', 'win32', 'linux']) {
+    const row = ide(doctorRows(home, { platform, exec: true, run: () => ({ ok: false, failed: false, status: 0x8A150014 }) }));
+    assert.equal(row.status, 'note');
+    assert.match(row.detail, /antigravity-cli/);
+  }
+  assert.match(ide(doctorRows(home, { platform: 'darwin' })).detail, /not installed.*--no-app/);
+});
+
+test('doctor: ok when the app is installed (macOS app folder, Windows winget)', () => {
+  const home = tmp();
   seed(home);
-  const row = doctorRows(home).find((r) => r.item === 'antigravity ide');
+  assert.equal(ide(doctorRows(home, { platform: 'darwin' })).status, 'note');
+  fs.mkdirSync(j(home, 'Applications', 'Antigravity.app'), { recursive: true });
+  const row = ide(doctorRows(home, { platform: 'darwin' }));
   assert.equal(row.status, 'ok');
   assert.match(row.detail, /antigravity-ide.*Google\.google-antigravity/);
+  const home2 = tmp();
+  seed(home2);
+  assert.equal(ide(doctorRows(home2, { platform: 'win32', exec: true })).status, 'ok');
+  assert.equal(ide(doctorRows(home2, { platform: 'win32', exec: true, run: () => ({ ok: false, failed: true }) })).status, 'note');
 });
 
 test('doctor lists the Antigravity proxy and CA variables as set or not set, never values', () => {
