@@ -144,7 +144,7 @@ export const BREW_AGY_LIMIT = 'Homebrew cannot pin or verify this cask: you get 
 // winget list: exit 0 = installed; only APPINSTALLER_CLI_ERROR_NO_APPLICATIONS_FOUND (0x8A150014, signed or not) = not installed.
 // Anything else (timeout, source error) is no answer: installing then could record an undo for the user's own app.
 const WINGET_NONE = [0x8A150014, 0x8A150014 - 2 ** 32];
-const wingetAnswer = (r) => (r.ok ? 'present' : !r.failed && WINGET_NONE.includes(r.status) ? 'absent' : 'unknown');
+export const wingetAnswer = (r) => (r.ok ? 'present' : !r.failed && WINGET_NONE.includes(r.status) ? 'absent' : 'unknown');
 
 export function antigravityPrereqs(pm, platform, home, app = true, q = quiet) {
   const out = [];

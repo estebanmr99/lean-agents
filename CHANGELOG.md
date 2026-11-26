@@ -5,6 +5,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ## [Unreleased]
 
 ### Fixed
+- `--doctor`: the Antigravity IDE row is `ok` only when the app is installed (macOS app folder, Windows `winget list`); config folders alone give a `note` (#466).
 - An rtk older than v1.2.0 no longer fails the install: the RTK steps are skipped with one line naming the old rtk's path and how to update it, and `--doctor` flags it (#467).
 - README (EN, ES): the Antigravity pilot section no longer says lean-agents skips the IDE; it installs it with Homebrew or winget unless `--no-app`.
 
