@@ -14,12 +14,15 @@ $plugin = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $plugin) { throw "rtk init wrote no plugins/rtk.ts in: $($candidates -join ', ')" }
 Write-Output "ok    rtk init wrote $plugin"
 
-function Get-RtkCommands {
+function Get-RtkCommandCount {
   $text = (& rtk gain 2>&1 | Out-String)
   if ($text -match 'Total commands:\s+(\d+)') { return [int]$Matches[1] }
   return 0
 }
-$before = Get-RtkCommands
+$before = Get-RtkCommandCount
+# Evidence for a failing rewrite: what rtk answers to the plugin's own question.
+Write-Output "rtk hook opencode answers: $(& rtk hook opencode --agent build ls 2>&1 | Out-String) (exit $LASTEXITCODE)"
+Write-Output "rtk rewrite answers: $(& rtk rewrite ls 2>&1 | Out-String) (exit $LASTEXITCODE)"
 
 $caseHome = Join-Path $env:RUNNER_TEMP "rtk-v2-$([guid]::NewGuid())"
 $cfgDir = "$caseHome\.config\opencode"
@@ -65,7 +68,7 @@ $failed = $false
 if ($exit -ne 0) { Write-Output "FAIL  opencode run exit $exit"; $failed = $true }
 if ($text -match 'LoadError|failed to load plugin') { Write-Output 'FAIL  OpenCode 2 logged a plugin load error for plugins/rtk.ts'; $failed = $true }
 else { Write-Output 'ok    OpenCode 2 loads plugins/rtk.ts (no LoadError)' }
-$after = Get-RtkCommands
+$after = Get-RtkCommandCount
 if ($after -gt $before) { Write-Output "ok    the 2.x hook rewrote the shell call: rtk ran it (commands $before -> $after)" }
 else { Write-Output "FAIL  rtk did not run the shell call (commands $before -> $after)"; $failed = $true }
 if ($failed) { Write-Output '--- output ---'; Write-Output $text; exit 1 }
