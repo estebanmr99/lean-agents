@@ -20,6 +20,7 @@ The benchmark consists of several tasks designed to test various agent capabilit
    - **Task 9 (Bug Hunt)**: ~40 generated modules in an import chain, 3 bugs at different depths, ~3,600 lines across files.
    - **Task 10 (Feature)**: A CLI tool with ~15 helpers and documentation, ~1,500 lines total.
    - **Task 11 (Refactoring)**: Extract a duplicated logic block from a legacy script of ~600 lines.
+8. **Task 12 (Splittable)**: Four independent features in four different files, each with its own test file, plus three seeded bugs in those files that the task's own tests do not catch. The multi-agent benchmark splits the four features across workers and records how many hidden bugs each arm fixed. `--task task9` still selects the old task.
 
 ### What "stable" means
 
@@ -68,3 +69,24 @@ In GitHub Actions, these are available in the `bench-savings-results` artifact.
 - **Median In**: The middle value of input tokens used.
 - **IQR In**: The range from the 25th to 75th percentile of input tokens.
 - **Median Time**: Wall-clock execution time in milliseconds.
+
+### Multi-agent benchmark
+
+The multi-agent harness (`tests/bench-multiagent.mjs`) compares one solo session with `workers-1`, `workers-2` and `workers-4`. The coordinator is the harness itself: it splits the task's independent parts across workers, merges their edits, then runs one reviewer. It writes `results.json` and `results.md`.
+
+```bash
+node tests/bench-multiagent.mjs --home "$(mktemp -d)" --run --model <provider/model#variant>
+```
+
+Its table has these columns:
+
+- **Mode**: `solo` (one session) or `workers-N` (N workers plus a reviewer; an empty worker is not started).
+- **Pass Rate**: Percentage of runs where the merged tree passed the task check.
+- **Seeded Bugs**: Bugs fixed out of the seeded total, as a median per run. `(+N review)` counts the bugs only the reviewer fixed. `n/a` means the task has no hidden bug checks. Solo has no reviewer, so bugs caught by review are not comparable between arms; compare the bugs left in the final tree instead.
+- **Median In**, **Median Out**: Median input and output tokens summed across all sessions in a run.
+- **Median Turns**: Median `step-finish` events summed across all sessions in a run.
+- **Median Time**: Wall-clock time, worker phase plus reviewer.
+- **Cost**: Priced cost per session from OpenCode's own step usage, summed across the run. `n/a` when a session reported no cost.
+- **Priced Cost**: Only with `--prices`; same token pricing model as the savings benchmark.
+
+The workflow adds a provider smoke test (one request, `max_tokens: 1`) before the run. `--task` defaults to `task12`; `--task task9` keeps the old three-bug task.

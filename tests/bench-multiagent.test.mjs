@@ -5,8 +5,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { splitBugs, mergeWorkerChanges, collectChanges, parseMaxUsd, isPositiveInt, fitsHeadroom, costVsSolo, sessionsForMode, renderMultiMarkdown, runOpenCode, summarizeSession, summarizeRuns, totalSessionCost, TASK9_BUG_TESTS, budgetSpent } from './bench-multiagent.mjs';
-import { parseTokenUsage } from './bench-savings.mjs';
+import { splitBugs, mergeWorkerChanges, collectChanges, parseMaxUsd, isPositiveInt, fitsHeadroom, costVsSolo, sessionsForMode, renderMultiMarkdown, runOpenCode, summarizeSession, summarizeRuns, totalSessionCost, TASK9_BUG_TESTS, budgetSpent, workerTasks, workerPrompt, reviewerPrompt, isMultiagentTask, DEFAULT_TASK, REVIEWER_PROMPT, TASK12_REVIEWER_PROMPT } from './bench-multiagent.mjs';
+import { parseTokenUsage, TASKS, seededBugReport } from './bench-savings.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SCRIPT = path.join(ROOT, 'tests', 'bench-multiagent.mjs');
@@ -19,11 +19,78 @@ test('round-robin split covers 3 bugs for 1, 2 and 4 workers', () => {
   assert.deepStrictEqual(w4, [['tests/test_c_2.test.mjs'], ['tests/test_b_5.test.mjs'], ['tests/test_a_8.test.mjs'], []]);
   // Every bug is assigned exactly once.
   assert.deepStrictEqual(w4.flat().sort(), [...TASK9_BUG_TESTS].sort());
-  assert.strictEqual(sessionsForMode('solo'), 1);
-  assert.strictEqual(sessionsForMode('workers-1'), 2);
-  assert.strictEqual(sessionsForMode('workers-2'), 3);
+  assert.strictEqual(sessionsForMode('solo', TASK9_BUG_TESTS), 1);
+  assert.strictEqual(sessionsForMode('workers-1', TASK9_BUG_TESTS), 2);
+  assert.strictEqual(sessionsForMode('workers-2', TASK9_BUG_TESTS), 3);
   // The empty fourth worker is not started; only 3 workers plus the reviewer run.
-  assert.strictEqual(sessionsForMode('workers-4'), 4);
+  assert.strictEqual(sessionsForMode('workers-4', TASK9_BUG_TESTS), 4);
+});
+
+test('task12 splits its four independent parts across 1, 2 and 4 workers', () => {
+  const parts = DEFAULT_TASK.parts;
+  assert.strictEqual(parts.length, 4);
+  assert.strictEqual(isMultiagentTask(DEFAULT_TASK), true);
+  assert.deepStrictEqual(workerTasks(DEFAULT_TASK), parts);
+  assert.deepStrictEqual(splitBugs(parts, 1), [parts]);
+  const w2 = splitBugs(parts, 2);
+  assert.deepStrictEqual(w2.map((x) => x.length), [2, 2]);
+  assert.deepStrictEqual(w2.flat().map((p) => p.id).sort(), parts.map((p) => p.id).sort());
+  const w4 = splitBugs(parts, 4);
+  assert.deepStrictEqual(w4.map((x) => x.length), [1, 1, 1, 1]);
+  assert.deepStrictEqual(w4.flat(), parts);
+  assert.strictEqual(sessionsForMode('solo', parts), 1);
+  assert.strictEqual(sessionsForMode('workers-1', parts), 2);
+  assert.strictEqual(sessionsForMode('workers-2', parts), 3);
+  assert.strictEqual(sessionsForMode('workers-4', parts), 5);
+});
+
+test('task9 keeps the origin/main worker and reviewer prompts', () => {
+  const task9 = TASKS.find((t) => t.id === 'task9');
+  assert.strictEqual(REVIEWER_PROMPT, 'Review the changes in this repo (git diff) for mistakes; fix any you find; do not edit test files.');
+  assert.strictEqual(reviewerPrompt(task9), REVIEWER_PROMPT);
+  assert.notStrictEqual(reviewerPrompt(DEFAULT_TASK), REVIEWER_PROMPT);
+  assert.strictEqual(reviewerPrompt(DEFAULT_TASK), TASK12_REVIEWER_PROMPT);
+  const one = splitBugs(TASK9_BUG_TESTS, 1);
+  assert.strictEqual(
+    workerPrompt(task9, one[0]),
+    'Run node --test tests/test_c_2.test.mjs tests/test_b_5.test.mjs tests/test_a_8.test.mjs and fix those failing tests without editing test files.',
+  );
+  const two = splitBugs(TASK9_BUG_TESTS, 2);
+  assert.strictEqual(
+    workerPrompt(task9, two[0]),
+    'Run node --test tests/test_c_2.test.mjs tests/test_a_8.test.mjs and fix those failing tests without editing test files.',
+  );
+  assert.strictEqual(
+    workerPrompt(task9, two[1]),
+    'Run node --test tests/test_b_5.test.mjs and fix those failing tests without editing test files.',
+  );
+});
+
+test('seeded bug detection counts fixed and left bugs, and reviewer fixes', () => {
+  const task = TASKS.find((t) => t.id === 'task12');
+  const dir = tmp('bench-multi-bugs');
+  fs.mkdirSync(dir, { recursive: true });
+  task.setup(dir);
+  const before = seededBugReport(dir, task.bugs);
+  assert.deepStrictEqual({ total: before.total, fixed: before.fixed, left: before.left }, { total: 3, fixed: 0, left: 3 });
+  assert.deepStrictEqual(before.bugs.map((b) => b.fixed), [false, false, false]);
+
+  const strings = path.join(dir, 'lib', 'strings.mjs');
+  fs.writeFileSync(strings, fs.readFileSync(strings, 'utf8').replace('max + 1', 'max'));
+  const after = seededBugReport(dir, task.bugs);
+  assert.deepStrictEqual({ total: after.total, fixed: after.fixed, left: after.left }, { total: 3, fixed: 1, left: 2 });
+
+  const results = [
+    { mode: 'workers-2', pass: true, conflict: false, cost: 0.01, pricedCost: 0.02, inputTokens: 10, outputTokens: 5, turns: 2, wallTime: 100, seededBugs: 3, seededBugsFixed: 1, seededBugsFixedByReviewer: 1 },
+    { mode: 'workers-2', pass: true, conflict: false, cost: 0.01, pricedCost: 0.02, inputTokens: 10, outputTokens: 5, turns: 2, wallTime: 100, seededBugs: 3, seededBugsFixed: 3, seededBugsFixedByReviewer: 0 },
+  ];
+  const summary = summarizeRuns(results, ['workers-2'], null);
+  assert.strictEqual(summary[0].seededBugs, 3);
+  assert.strictEqual(summary[0].seededBugsFixed, 2);
+  assert.strictEqual(summary[0].seededBugsFixedByReviewer, 0.5);
+  const md = renderMultiMarkdown(summary, null);
+  assert.match(md, /\| workers-2 \| 100% \| 2\/3 \(\+0\.5 review\) \|/);
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test('merge copies disjoint worker changes and detects a same-file conflict', () => {
@@ -70,13 +137,24 @@ test('--dry-run prints one session count per mode and spawns nothing', () => {
   });
   assert.strictEqual(res.status, 0, res.stderr);
   assert.match(res.stdout, /Plan:/);
+  assert.match(res.stdout, /TASK:\s+task12 \(4 parts, 3 seeded bugs\)/);
   assert.match(res.stdout, /solo: 1 sessions per repeat/);
   assert.match(res.stdout, /workers-1: 2 sessions per repeat/);
   assert.match(res.stdout, /workers-2: 3 sessions per repeat/);
-  assert.match(res.stdout, /workers-4: 4 sessions per repeat/);
-  assert.match(res.stdout, /ESTIMATED SESSIONS: 10/);
+  assert.match(res.stdout, /workers-4: 5 sessions per repeat/);
+  assert.match(res.stdout, /ESTIMATED SESSIONS: 11/);
   assert.match(res.stdout, /Dry run: exiting 0/);
   assert.strictEqual(fs.existsSync(path.join(home, 'runs')), false);
+
+  // task9 stays selectable and keeps its three-bug split.
+  const task9 = spawnSync(process.execPath, [SCRIPT, '--home', home, '--dry-run', '--task', 'task9', '--repeats', '1'], { encoding: 'utf8' });
+  assert.strictEqual(task9.status, 0, task9.stderr);
+  assert.match(task9.stdout, /TASK:\s+task9 \(3 parts, 0 seeded bugs\)/);
+  assert.match(task9.stdout, /ESTIMATED SESSIONS: 10/);
+
+  const unknown = spawnSync(process.execPath, [SCRIPT, '--home', home, '--dry-run', '--task', 'nope'], { encoding: 'utf8' });
+  assert.strictEqual(unknown.status, 2);
+  assert.match(unknown.stderr, /Unknown task: nope/);
   fs.rmSync(home, { recursive: true, force: true });
 });
 
@@ -173,15 +251,15 @@ test('--prices needs four numbers', () => {
   fs.rmSync(home, { recursive: true, force: true });
 });
 
-test('results.md renders a table and cost vs solo from a hand-made summary', () => {
+test('results.md renders a table, seeded bugs and cost vs solo from a hand-made summary', () => {
   const summary = [
-    { mode: 'solo', passRate: 1, input: { median: 1000 }, output: { median: 100 }, turns: { median: 5 }, time: { median: 2000 }, cost: 0.01, pricedCost: 0.02, costVsSolo: 1 },
-    { mode: 'workers-2', passRate: 0.5, input: { median: 1600 }, output: { median: 180 }, turns: { median: 9 }, time: { median: 1200 }, cost: 0.02, pricedCost: 0.04, costVsSolo: 2 },
+    { mode: 'solo', passRate: 1, seededBugs: 3, seededBugsFixed: 1, seededBugsFixedByReviewer: 1, input: { median: 1000 }, output: { median: 100 }, turns: { median: 5 }, time: { median: 2000 }, cost: 0.01, pricedCost: 0.02, costVsSolo: 1 },
+    { mode: 'workers-2', passRate: 0.5, seededBugs: 3, seededBugsFixed: 2, seededBugsFixedByReviewer: 0, input: { median: 1600 }, output: { median: 180 }, turns: { median: 9 }, time: { median: 1200 }, cost: 0.02, pricedCost: 0.04, costVsSolo: 2 },
   ];
   const md = renderMultiMarkdown(summary, { in: 1, cacheRead: 0.5, cacheWrite: 1, out: 2 });
-  assert.match(md, /\| Mode \| Pass Rate \| Median In \| Median Out \| Median Turns \| Median Time \| Cost \| Priced Cost \|/);
-  assert.match(md, /\| solo \| 100% \| 1000 \| 100 \| 5 \| 2000ms \| \$0.0100 \| \$0.0200 \|/);
-  assert.match(md, /\| workers-2 \| 50% \| 1600 \| 180 \| 9 \| 1200ms \| \$0.0200 \| \$0.0400 \|/);
+  assert.match(md, /\| Mode \| Pass Rate \| Seeded Bugs \| Median In \| Median Out \| Median Turns \| Median Time \| Cost \| Priced Cost \|/);
+  assert.match(md, /\| solo \| 100% \| 1\/3 \(\+1 review\) \| 1000 \| 100 \| 5 \| 2000ms \| \$0.0100 \| \$0.0200 \|/);
+  assert.match(md, /\| workers-2 \| 50% \| 2\/3 \| 1600 \| 180 \| 9 \| 1200ms \| \$0.0200 \| \$0.0400 \|/);
   assert.match(md, /Cost vs solo:\n- solo: 1\.00x\n- workers-2: 2\.00x/);
   const noPrices = renderMultiMarkdown(summary, null);
   assert.doesNotMatch(noPrices, /Priced Cost/);
@@ -209,9 +287,19 @@ test('session cost is summed from the JSON step usage stream, not the key spend'
   assert.ok(summary[0].cost > 0);
   assert.ok(summary[1].cost > 0);
   const md = renderMultiMarkdown(summary, null);
-  assert.match(md, /\| solo \| 100% \| 150 \| 30 \| 2 \| 123ms \| \$0\.0020 \|/);
-  assert.match(md, /\| workers-1 \| 100% \| 300 \| 60 \| 4 \| 100ms \| \$0\.0040 \|/);
+  assert.match(md, /\| solo \| 100% \| n\/a \| 150 \| 30 \| 2 \| 123ms \| \$0\.0020 \|/);
+  assert.match(md, /\| workers-1 \| 100% \| n\/a \| 300 \| 60 \| 4 \| 100ms \| \$0\.0040 \|/);
   assert.match(md, /Cost vs solo:\n- solo: 1\.00x\n- workers-1: 2\.00x/);
+});
+
+test('workflow exposes task input and a 1-token smoke test before the run', () => {
+  const text = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'bench-multiagent.yml'), 'utf8');
+  assert.match(text, /^\s{6}task:\s*$/m);
+  assert.match(text, /default: 'task12'/);
+  assert.match(text, /max_tokens: 1/);
+  assert.ok(text.indexOf('Provider smoke test') > -1);
+  assert.ok(text.indexOf('Provider smoke test') < text.indexOf('Run Benchmark'));
+  assert.ok(text.indexOf('--task "$TASK"') > text.indexOf('Run Benchmark'));
 });
 
 test('every pinned OpenCode install also puts .opencode/bin on GITHUB_PATH', () => {
@@ -250,7 +338,7 @@ test('a session with no usage events costs n/a, not zero', () => {
 
   const results = [{ mode: 'solo', cost: totalSessionCost([empty]), pricedCost: null, pass: false, conflict: false, inputTokens: 0, outputTokens: 0, turns: 0, wallTime: 10 }];
   const md = renderMultiMarkdown(summarizeRuns(results, ['solo'], null), null);
-  assert.match(md, /\| solo \| 0% \| 0 \| 0 \| 0 \| 10ms \| n\/a \|/);
+  assert.match(md, /\| solo \| 0% \| n\/a \| 0 \| 0 \| 0 \| 10ms \| n\/a \|/);
   assert.match(md, /- solo: n\/a/);
   assert.doesNotMatch(md, /\$0\.0000/);
 });

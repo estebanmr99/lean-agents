@@ -46,3 +46,23 @@ while read -r kind number; do
   fi
 done <<<"$issues"
 [ -z "$blocked" ] || { echo "::error::open audit issues:$blocked" >&2; exit 1; }
+
+# Optional app pins lag upstream: a warning, never a failure (the owner decides when to bump).
+node --input-type=module <<'NODE' || echo "::notice::app pin check skipped (node or network unavailable)"
+import fs from 'node:fs';
+import { compareAppVersions } from './scripts/lib/update-plan.mjs';
+const pins = JSON.parse(fs.readFileSync('core/pins.json', 'utf8')).pins;
+const latest = {};
+try {
+  const r = await fetch('https://api.github.com/repos/stablyai/orca/releases/latest', { headers: { accept: 'application/vnd.github+json' } });
+  if (r.ok) latest['orca-app'] = (await r.json()).tag_name;
+} catch { /* offline: no warning */ }
+try {
+  const r = await fetch('https://releases.warp.dev/channel_versions.json');
+  if (r.ok) latest['warp-app'] = (await r.json()).stable?.version;
+} catch { /* offline: no warning */ }
+for (const [key, version] of Object.entries(latest)) {
+  if (!version || compareAppVersions(version, pins[key].version) <= 0) continue;
+  console.log(`::warning::${key} pin ${pins[key].version} lags upstream latest ${version}; bump it before the next release`);
+}
+NODE
