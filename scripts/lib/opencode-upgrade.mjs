@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { backupLayout, listSource, copyVerified, countCopy, sha256File, stamp as stampTs, DB_FILES, DATA_DIRS, OPENCODE_RUNNING } from './opencode-backup.mjs';
+import { backupLayout, listSource, copyVerified, countCopy, sha256File, stamp as stampTs, DB_FILES, DATA_DIRS, opencodeRunningText } from './opencode-backup.mjs';
 import { spawnSync } from 'node:child_process';
 import { layout as layout1, removeOpencode1 } from './opencode1.mjs';
 import { upgradeApply } from './upgrade.mjs';
@@ -124,7 +124,7 @@ export function applyPreflight({ home, stamp, upgrade, exec = true, list, openco
   if (!exec) problems.push('--no-exec: apply installs OpenCode 2 and runs `--version` probes, so it needs commands enabled');
   if (isActive(upgrade)) problems.push(`an upgrade is already ${upgrade.status}: run --upgrade-agent opencode --undo first`);
   if (!stamp) { problems.push('no verified session backup: run --upgrade-agent opencode --backup --yes first (no stamp, no apply)'); return { problems, baseline }; }
-  try { if (opencodeRunning(list())) problems.push(OPENCODE_RUNNING); } catch (e) { problems.push(`cannot list the running processes (${first(e)}): not safe to continue`); }
+  try { if (opencodeRunning(list())) problems.push(opencodeRunningText(process.env)); } catch (e) { problems.push(`cannot list the running processes (${first(e)}): not safe to continue`); }
   const bad = verifyBackup(stamp.dir);
   if (bad.length) problems.push(`the backup no longer matches its manifest (${bad[0]}${bad.length > 1 ? ` and ${bad.length - 1} more` : ''}): not used`);
   else {

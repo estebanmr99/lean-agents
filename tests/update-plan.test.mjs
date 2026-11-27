@@ -200,13 +200,13 @@ test('#488: runningBlocker stops only OpenCode steps while opencode runs', async
   const rtk = { tool: 'rtk', desc: 'RTK plugin for OpenCode', run: [['rtk', 'init', '-g', '--opencode']] };
   const up = { tool: 'opencode-v2', desc: 'upgrade opencode-v2 2.2.5 -> 2.2.7', run: [['npm', 'i', '-g', 'opencode-ai@2.2.7']] };
   const other = { tool: 'caveman', desc: 'Caveman skill', run: [['npx', 'skills', 'add', 'x']] };
-  assert.match(runningBlocker([other, rtk], () => ['bash', 'opencode.exe']), /opencode service stop/);
-  assert.match(runningBlocker([up], () => ['/usr/local/bin/opencode']), /opencode process is running/);
-  assert.equal(runningBlocker([rtk, up], () => ['bash', 'node']), null);
-  assert.equal(runningBlocker([other], () => ['opencode']), null);
-  assert.equal(runningBlocker([up], () => []), null);
-  assert.match(runningBlocker([up], () => { throw new Error('no ps'); }), /cannot list the running processes \(no ps\)/);
-  assert.equal(runningBlocker([other], () => { throw new Error('no ps'); }), null);
+  assert.match(runningBlocker([other, rtk], () => ['bash', 'opencode.exe'], {}), /opencode service stop/);
+  assert.match(runningBlocker([up], () => ['/usr/local/bin/opencode'], {}), /opencode process is running/);
+  assert.equal(runningBlocker([rtk, up], () => ['bash', 'node'], {}), null);
+  assert.equal(runningBlocker([other], () => ['opencode'], {}), null);
+  assert.equal(runningBlocker([up], () => [], {}), null);
+  assert.match(runningBlocker([up], () => { throw new Error('no ps'); }, {}), /cannot list the running processes \(no ps\)/);
+  assert.equal(runningBlocker([other], () => { throw new Error('no ps'); }, {}), null);
 });
 
 // POSIX: a fake `ps` on PATH stands in for a running 2.x service.
@@ -218,7 +218,7 @@ test('#488: --update refuses before any command while opencode runs; --dry-run s
   for (const b of ['rtk', 'npx', 'npm', 'opencode']) fs.writeFileSync(path.join(bin, b), `#!/bin/sh\necho "$0 $*" >> "${mark}"\n`, { mode: 0o755 });
   const env = { PATH: `${bin}:${path.dirname(process.execPath)}:/usr/bin:/bin`, HOME: home, ...(process.env.NVM_DIR && { NVM_DIR: process.env.NVM_DIR }) };
   const lean = (args) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args], { encoding: 'utf8', env, input: '' });
-  assert.equal(lean(['--no-exec', '--yes', '--agents', 'opencode-v2', '--tools', 'rtk', '--lang', 'en', '--profile', 'none']).status, 0);
+  assert.equal(lean(['--no-exec', '--yes', '--agents', 'opencode-v2', '--tools', 'rtk,i-have-adhd', '--lang', 'en', '--profile', 'none']).status, 0);
   const dry = lean(['--update', '--dry-run', '--yes']);
   assert.match(dry.stdout, /opencode process is running/);
   assert.match(dry.stdout, /Dry run: nothing was changed/);

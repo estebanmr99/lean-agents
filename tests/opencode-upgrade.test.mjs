@@ -19,6 +19,9 @@ import { apply, renameRetry } from '../scripts/lib/fsops.mjs';
 import { loadCore } from '../scripts/lib/render.mjs';
 import { seedWorkPc } from './fixtures/handbuilt.mjs';
 
+// Hermetic: a test runner inside an OpenCode session must not change the refusal wording.
+delete process.env.OPENCODE;
+
 const j = path.join;
 const ROOT = path.resolve(import.meta.dirname, '..');
 delete process.env.XDG_DATA_HOME;
