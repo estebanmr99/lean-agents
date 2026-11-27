@@ -2,9 +2,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parse } from 'jsonc-parser';
 import { sha, homeRel, userHash } from './fsops.mjs';
 import { PINS, npmSpec, behindPins, nodeRange, rtkPin, rtkTooOld } from './pins.mjs';
-import { version, quiet, findAgy, antigravityFootprint, wingetAnswer } from './system.mjs';
+import { version, quiet, findAgy, antigravityFootprint, wingetAnswer, configHome } from './system.mjs';
 import { redactText } from './redact.mjs';
 import { satisfies, compare, nodeSkipLine, minVersion, findNvm, nodeAt, installedNodes, nodeFloorFix } from './node-runtime.mjs';
 import { mcpLaunches, classify, duplicateSkills, skillDirs } from './inventory.mjs';
@@ -255,7 +256,7 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
           add(`claude mcp ${s}`, mcp.ok && mcp.out.includes(s) ? 'ok' : 'error', mcp.ok ? '' : (mcp.failed ? 'claude mcp list timed out or did not run (90 s limit)' : `claude mcp list exited ${mcp.status}`));
         }
       }
-      if (o.agents.some((a) => a.startsWith('opencode'))) checkOpenCode(o, add, q);
+      if (o.agents.some((a) => a.startsWith('opencode'))) checkOpenCode(o, add, q, home, fsx);
       if (o.agents.includes('copilot-cli')) checkCopilot(o, add, q, withMcp);
       if (o.agents.includes('antigravity')) checkAntigravity(o, CORE_AGENTS, add, q, withMcp, findAgy(home, platform, env) ?? 'agy');
       // npx may have to download, which takes longer than a local check.
@@ -319,7 +320,29 @@ function checkAntigravityIde({ home, exec, run, platform, fsx }, add) {
   add('antigravity ide', 'note', `app check not available on this OS (config found: ${folders})`);
 }
 
-function checkOpenCode(o, add, q) {
+// 1.x MCP field names that OpenCode 2 ignores (#556). Read from the live file so a field OpenCode drops is still reported.
+export function staleMcpFields(cfg) {
+  const out = [];
+  for (const [name, s] of Object.entries(cfg?.mcp?.servers ?? {})) {
+    if (!s || typeof s !== 'object') continue;
+    if (s.enabled !== undefined) out.push(`mcp.servers.${name}.enabled -> disabled`);
+    if (s.oauth && typeof s.oauth === 'object' && s.oauth.clientId !== undefined) out.push(`mcp.servers.${name}.oauth.clientId -> oauth.client_id`);
+  }
+  return out;
+}
+
+function checkOpenCode(o, add, q, home, fsx) {
+  // A file that already went through the upgrade can still hold 1.x MCP names (#556): OpenCode 2 ignores them.
+  let stale = [];
+  try {
+    for (const f of ['opencode.jsonc', 'opencode.json']) {
+      const p = path.join(configHome(home), 'opencode', f);
+      if (!fsx.existsSync(p)) continue;
+      stale = staleMcpFields(parse(fsx.readFileSync(p, 'utf8'), [], { allowTrailingComma: true }));
+      break;
+    }
+  } catch { /* unreadable config: the debug config check below still runs */ }
+  if (stale.length) add('opencode mcp 1.x keys', 'changed', `${stale.join('; ')}. Fix: rename to the 2.x names (or run lean-agents --upgrade-agent opencode)`);
   const r = q(['opencode', 'debug', 'config']);
   if (!r.ok) return add('opencode resolved config', 'error', '`opencode debug config` failed');
   let cfg;

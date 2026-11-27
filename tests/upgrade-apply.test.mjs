@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { parse } from 'jsonc-parser';
 import { inventory } from '../scripts/lib/adopt.mjs';
-import { upgradeInventory, upgradeApply } from '../scripts/lib/upgrade.mjs';
+import { upgradeInventory, upgradeApply, formatUpgrade } from '../scripts/lib/upgrade.mjs';
 import { undo } from '../scripts/lib/fsops.mjs';
 import { opencodeV2Adapter } from '../scripts/lib/adapters/opencode-v2.mjs';
 import { loadCore } from '../scripts/lib/render.mjs';
@@ -49,6 +49,7 @@ test('translates the team-machine config, keeps user-manual keys, never touches 
   assert.deepEqual(Object.keys(c.mcp), ['servers']);
   assert.ok(c.mcp.servers.issues.environment.ISSUES_TOKEN, 'user MCP env moved intact');
   assert.ok(c.mcp.servers['context-mode'], 'managed MCP rewritten by the adapter');
+  assert.equal(c.mcp.servers['context-mode'].enabled, undefined, '2.x entries use no enabled key (#556)');
   assert.ok(c.plugins.includes('team-npm-plugin@1.2.0') && c.plugins.includes('@scope/other-plugin@2.0.0'));
   assert.ok(c.plugins.includes(npmSpec('ponytail')) && c.plugins.includes(npmSpec('opencode-dcp')));
   assert.equal(c.plugin.length, 1, 'the local .ts plugin stays for the migrate skill');
@@ -150,6 +151,33 @@ test('managed playwright-extension follows the same rule: kept when not selected
   assert.equal(sel.inv.items.find((i) => i.name === 'playwright-extension').upgrade.class, 'managed');
   upgradeApply({ ...sel, stamp: STAMP });
   assert.deepEqual(Object.keys(read(sel.cfg).mcp.servers), ['playwright-extension']);
+});
+
+test('mcp 1.x oauth and enabled keys become 2.x names; an unhandled oauth key stays manual and values never print (#556)', { skip }, async () => {
+  const conf = { mcp: {
+    oauth: { type: 'remote', url: 'https://mcp.example.invalid/oauth', enabled: false, oauth: { clientId: '{env:CLIENT_ID}', clientSecret: '{env:CLIENT_SECRET}', scope: 'read write' } },
+    plain: { type: 'remote', url: 'https://mcp.example.invalid/plain', enabled: true, oauth: false },
+    manual: { type: 'remote', url: 'https://mcp.example.invalid/manual', oauth: { clientId: 'kept-id', redirectUri: 'http://127.0.0.1/callback' } },
+  } };
+  const s = await withPlaywright(['rtk'], conf);
+  const manual = s.inv.items.find((i) => i.kind === 'mcp' && i.name === 'manual');
+  assert.equal(manual.upgrade.class, 'user-manual');
+  assert.match(manual.upgrade.reason, /redirectUri -> oauth\.redirect_uri/);
+  const text = formatUpgrade(s.inv);
+  for (const v of ['{env:CLIENT_ID}', '{env:CLIENT_SECRET}', 'http://127.0.0.1/callback']) assert.ok(!text.includes(v), `${v} leaked`);
+  const original = fs.readFileSync(s.cfg, 'utf8');
+  const r = upgradeApply({ ...s, stamp: STAMP });
+  const c = read(s.cfg);
+  assert.deepEqual(c.mcp.servers.oauth.oauth, { client_id: '{env:CLIENT_ID}', client_secret: '{env:CLIENT_SECRET}', scope: 'read write' });
+  assert.equal(c.mcp.servers.oauth.disabled, true);
+  assert.equal(c.mcp.servers.oauth.enabled, undefined);
+  assert.equal(c.mcp.servers.plain.disabled, undefined);
+  assert.equal(c.mcp.servers.plain.enabled, undefined);
+  assert.equal(c.mcp.servers.plain.oauth, false);
+  assert.equal(c.mcp.servers.manual, undefined);
+  assert.deepEqual(c.mcp.manual.oauth, { clientId: 'kept-id', redirectUri: 'http://127.0.0.1/callback' }, 'the unhandled key is not copied silently');
+  undo(r.entries, [j(s.home, '.config', 'opencode')]);
+  assert.equal(fs.readFileSync(s.cfg, 'utf8'), original);
 });
 
 test('managed plugins: warp is kept (the upgrade adapter has no terminals), context-mode follows its MCP, DCP stays reinstalled', { skip }, async () => {

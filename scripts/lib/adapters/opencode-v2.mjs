@@ -109,9 +109,11 @@ export function dcpTuiActions(dir) {
 // MCP entry edit. `shape` turns a command array into this agent's entry. A server with `legacy` commands in core/mcp.json
 // (Context Mode: other versions, with or without `server`, npx or an nvm Node; `*` is a wildcard) has those entries replaced
 // by a rerun, so the npx and absolute forms flip either way. Anything else the user has is kept.
-export function mcpEdit(path, shape, command, legacy) {
+export function mcpEdit(path, shape, command, legacy, enabledLegacy = false) {
   const value = shape(command);
-  return legacy ? { path, value, mode: 'upgradeIf', legacy: legacy.map(shape) } : { path, value, mode: 'setIfAbsent' };
+  // Older lean-agents wrote `enabled: true` on 2.x; accept it as a legacy match so --update can drop it (#556).
+  const old = legacy?.flatMap((c) => (enabledLegacy ? [shape(c), { ...shape(c), enabled: true }] : [shape(c)]));
+  return legacy ? { path, value, mode: 'upgradeIf', legacy: old } : { path, value, mode: 'setIfAbsent' };
 }
 
 // Windows only, and only when Git Bash is actually found (#124 follow-up, proven in `real-opencode-shell`
@@ -228,7 +230,7 @@ export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
   if (shell) edits.push(shell);
 
   for (const name of ['context-mode', 'serena', 'playwright', 'playwright-extension']) {
-    if (tools.includes(name)) edits.push(mcpEdit(['mcp', 'servers', name], (command) => ({ type: 'local', command, enabled: true }), localServer(core, name).command, core.mcp[name].legacy));
+    if (tools.includes(name)) edits.push(mcpEdit(['mcp', 'servers', name], (command) => ({ type: 'local', command }), localServer(core, name).command, core.mcp[name].legacy, true));
   }
   if (tools.includes('ponytail')) edits.push({ path: ['plugins'], value: npmSpec('ponytail'), mode: 'arrayAdd', legacy: ['@dietrichgebert/ponytail'] });
   if (tools.includes('dcp')) {

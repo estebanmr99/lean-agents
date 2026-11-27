@@ -28,6 +28,40 @@ export const TRANSLATIONS = [
 ];
 const row = (key) => TRANSLATIONS.find((t) => t.key === key);
 
+// MCP OAuth names from the 1.x -> 2.x guide (https://opencode.ai/docs/migrate-v1/, read 2026-11-27): clientId -> client_id,
+// clientSecret -> client_secret, callbackPort -> callback_port, redirectUri -> redirect_uri. Only the client pair and `scope`
+// are converted here; the callback/redirect pair stays user-manual until a real 2.x run proves the value shape.
+const MCP_OAUTH_COPY = { clientId: 'client_id', clientSecret: 'client_secret' };
+const MCP_OAUTH_KEEP = new Set([...Object.keys(MCP_OAUTH_COPY), 'client_id', 'client_secret', 'scope']);
+const MCP_OAUTH_MANUAL = { callbackPort: 'oauth.callback_port', redirectUri: 'oauth.redirect_uri' };
+
+// A 1.x MCP entry -> its 2.x shape: enabled/disabled and the OAuth client names. Unknown OAuth keys never reach here: the entry
+// is user-manual (mcpOauthManual) and stays in the 1.x flat map.
+function mcp2Value(v) {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return v;
+  const out = { ...v };
+  if (out.enabled !== undefined) {
+    if (out.enabled === false) out.disabled = true;
+    delete out.enabled;
+  }
+  if (out.oauth && typeof out.oauth === 'object' && !Array.isArray(out.oauth)) {
+    const o = { ...out.oauth };
+    for (const [from, to] of Object.entries(MCP_OAUTH_COPY)) if (o[from] !== undefined) {
+      if (o[to] === undefined) o[to] = o[from];
+      delete o[from];
+    }
+    out.oauth = o;
+  }
+  return out;
+}
+
+// The 1.x OAuth keys this entry has that are not converted automatically, with the 2.x field to use. Empty when it is clean.
+function mcpOauthManual(v) {
+  if (!v || typeof v !== 'object' || !v.oauth || typeof v.oauth !== 'object' || Array.isArray(v.oauth)) return [];
+  return Object.keys(v.oauth).filter((k) => !MCP_OAUTH_KEEP.has(k))
+    .map((k) => (MCP_OAUTH_MANUAL[k] ? `${k} -> ${MCP_OAUTH_MANUAL[k]}` : `${k} (no verified 2.x field)`));
+}
+
 // Keys with no verified 2.x equivalent, and so no row.
 const MANUAL_KEYS = new Set(['provider']);
 // Keys the docs name but whose value conversion they do not state as a rule (opencode.ai/docs/migrate-v1, permissions, config; 2026-11-13, docs only).
@@ -39,6 +73,15 @@ const SAME = new Set(['instructions', 'default_agent', 'model', 'share', 'shell'
 const HANDLED = new Set(['$schema', 'mcp', 'plugin']); // mcp and plugin come from the adopt items
 
 const readJson = (file, fsx) => { try { return parse(fsx.readFileSync(file, 'utf8'), [], { allowTrailingComma: true }) ?? null; } catch { return null; } };
+
+// The config value an item describes, for the per-entry checks (only mcp needs one today).
+function itemValue(it, home, fsx) {
+  const p = (x) => (x.startsWith('~') ? home + x.slice(1) : x);
+  const cfg = readJson(p(it.file), fsx);
+  let node = cfg;
+  for (const k of it.keyPath ?? []) node = node && typeof node === 'object' ? node[k] : undefined;
+  return node && typeof node === 'object' ? node[it.name] : undefined;
+}
 
 const translate = (t, name, before = t.from.replace('<name>', name)) => ({ class: 'user-translatable', before, after: t.to.replace('<name>', name), reason: 'row in the translation table', source: t.source });
 const verifyRow = (t, before) => ({ class: 'user-manual', before, after: null, reason: `${t.source}: no proven 2.x equivalent`, source: t.source });
@@ -79,7 +122,10 @@ function classifyItem(it, stopgaps, home, fsx, tools, rtk) {
   const gone = it.owner === 'managed' && ((it.kind === 'mcp' && !tools.includes(it.name))
     || (it.kind === 'plugin' && it.keyPath?.length && ((/opencode-warp/.test(it.name)) || (/context-mode/.test(it.name) && !tools.includes('context-mode')))));
   if (it.owner === 'managed' && !gone) return managed(`${it.kind} ${it.name}`, it.kind === 'plugin' ? 'plugins[]' : it.kind === 'mcp' ? `mcp.servers.${it.name}` : it.file);
-  if (it.kind === 'mcp') return translate(row('mcp'), it.name);
+  if (it.kind === 'mcp') {
+    const bad = mcpOauthManual(itemValue(it, home, fsx));
+    return bad.length ? manual(`mcp.${it.name}`, `1.x OAuth key has no automatic 2.x copy: use ${bad.join(', ')} and move it by hand`) : translate(row('mcp'), it.name);
+  }
   if (it.kind === 'skill') { const t = row('skills'); return t.verified ? translate(t, it.name, `skill ${it.name}`) : verifyRow(t, `skill ${it.name}`); }
   if (it.kind === 'plugin' && it.keyPath.length) {
     const tui = /tui\.jsonc?$/.test(it.file);
@@ -194,12 +240,18 @@ export function translateEdits(cfg, items) {
   // A 2.x value already there wins (setIfAbsent), so the 1.x source is dropped only when nothing of it would be lost.
   if (c.agent && Object.entries(c.agent).every(([n, v]) => cls('config', `agent.${n}`) === 'user-translatable' && (c.agents?.[n] === undefined || JSON.stringify(c.agents[n]) === JSON.stringify(v)))) drop(['agent']);
 
-  // Managed MCPs are dropped here: the 2.x adapter writes them again under mcp.servers.
+  // Managed MCPs are dropped here: the 2.x adapter writes them again under mcp.servers. A user-manual entry (an OAuth key with
+  // no automatic 2.x copy) stays in the 1.x flat map, which V2 still accepts, and keeps its own name.
   if (c.mcp && !c.mcp.servers) {
     const servers = {};
-    for (const [n, v] of Object.entries(c.mcp)) if (cls('mcp', n) === 'user-translatable') servers[n] = v;
-    const left = Object.keys(c.mcp).filter((n) => !['user-translatable', 'managed'].includes(cls('mcp', n)));
-    if (!left.length) edits.push({ path: ['mcp'], value: { servers }, mode: 'set' });
+    const left = {};
+    for (const [n, v] of Object.entries(c.mcp)) {
+      const k = cls('mcp', n);
+      if (k === 'user-translatable') servers[n] = mcp2Value(v);
+      else if (k !== 'managed') left[n] = v;
+    }
+    const handled = Object.keys(c.mcp).filter((n) => ['user-translatable', 'managed'].includes(cls('mcp', n)));
+    if (handled.length) edits.push({ path: ['mcp'], value: { ...left, servers }, mode: 'set' });
   }
 
   if (Array.isArray(c.plugin)) {
