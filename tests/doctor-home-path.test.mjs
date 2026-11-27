@@ -14,24 +14,24 @@ function rows(home, files, platform, json = true) {
 }
 
 test('#493: a lowercase drive letter still prints as ~ in doctor --json (Windows)', () => {
-  const items = rows('C:\\Users\\u', [{ path: 'c:\\Users\\u\\.copilot\\x.md', hash: 'h' }], 'win32');
+  const items = rows('D:\\Data\\me', [{ path: 'd:\\Data\\me\\.copilot\\x.md', hash: 'h' }], 'win32');
   assert.ok(items.includes('~\\.copilot\\x.md'), items.join(' | '));
-  assert.ok(!items.some((i) => /Users\\u/i.test(i)));
-  const text = rows('C:\\Users\\u', [{ path: 'c:\\Users\\u\\.copilot\\x.md', hash: 'h' }], 'win32', false);
+  assert.ok(!items.some((i) => /Data\\me/i.test(i)));
+  const text = rows('D:\\Data\\me', [{ path: 'd:\\Data\\me\\.copilot\\x.md', hash: 'h' }], 'win32', false);
   assert.match(text, /~\\\.copilot\\x\.md/);
-  assert.doesNotMatch(text, /Users\\u/i);
+  assert.doesNotMatch(text, /Data\\me/i);
 });
 
 test('#493: homeRel is case-insensitive on Windows only, and stops at a path boundary', () => {
-  assert.equal(homeRel('c:\\USERS\\u\\a', 'C:\\Users\\u', 'win32'), '~\\a');
-  assert.equal(homeRel('C:\\Users\\u2\\a', 'C:\\Users\\u', 'win32'), 'C:\\Users\\u2\\a');
-  assert.equal(homeRel('/Users/U/a', '/Users/u', 'darwin'), '/Users/U/a');
-  assert.equal(homeRel('/home/u/a', '/home/u', 'linux'), '~/a');
-  assert.equal(homeRel('/home/u', '/home/u', 'linux'), '~');
-  assert.equal(homeRel('/home/u/a', '/home/u/', 'linux'), '~/a');
+  assert.equal(homeRel('d:\\DATA\\ME\\a', 'D:\\Data\\me', 'win32'), '~\\a');
+  assert.equal(homeRel('D:\\Data\\me2\\a', 'D:\\Data\\me', 'win32'), 'D:\\Data\\me2\\a');
+  assert.equal(homeRel('/Srv/ME/a', '/Srv/me', 'darwin'), '/Srv/ME/a');
+  assert.equal(homeRel('/srv/me/a', '/srv/me', 'linux'), '~/a');
+  assert.equal(homeRel('/srv/me', '/srv/me', 'linux'), '~');
+  assert.equal(homeRel('/srv/me/a', '/srv/me/', 'linux'), '~/a');
 });
 
 test('#493: tilde in plan and failure lines matches any case on Windows only', () => {
-  assert.equal(tilde('$ x c:\\users\\u\\a C:/Users/u/b', 'C:\\Users\\u', 'win32'), '$ x ~\\a ~/b');
-  assert.equal(tilde('$ x /Users/U/a', '/Users/u', 'darwin'), '$ x /Users/U/a');
+  assert.equal(tilde('$ x d:\\data\\me\\a D:/Data/me/b', 'D:\\Data\\me', 'win32'), '$ x ~\\a ~/b');
+  assert.equal(tilde('$ x /Srv/ME/a', '/Srv/me', 'darwin'), '$ x /Srv/ME/a');
 });
