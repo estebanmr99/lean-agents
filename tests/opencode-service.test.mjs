@@ -1,7 +1,8 @@
 // #548: --update leaves no OpenCode 2 background service behind when its own commands started it.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { serviceStopRow, runningBlocker, OPENCODE_RUNNING } from '../scripts/lib/opencode-backup.mjs';
+import { serviceStopRow, runningBlocker, OPENCODE_RUNNING, OPENCODE_RUNNING_INSIDE } from '../scripts/lib/opencode-backup.mjs';
+import { leanUpdateCommands } from '../scripts/lib/lean-update.mjs';
 
 const stop = ['opencode', 'service', 'stop'];
 
@@ -36,7 +37,26 @@ test('the before list could not be read: nothing is stopped', () => {
 });
 
 test('the refusal names the safe service stop command', () => {
-  const r = runningBlocker([{ desc: 'RTK plugin for OpenCode', run: [['rtk', 'init', '-g', '--opencode']] }], () => ['opencode']);
+  const r = runningBlocker([{ desc: 'RTK plugin for OpenCode', run: [['rtk', 'init', '-g', '--opencode']] }], () => ['opencode'], {});
   assert.equal(r, OPENCODE_RUNNING);
   assert.match(r, /run 'opencode service stop' \(safe: it stops only the background service\) and close OpenCode windows, then run this again/);
+});
+
+// #546: proof run 46050797435: the only planned step was the lean-update skill refresh.
+test('#546: a skill refresh does not block on a running OpenCode service', () => {
+  assert.equal(runningBlocker(leanUpdateCommands(['opencode-v2']), () => ['opencode'], {}), null);
+});
+
+test('#546: the OpenCode CLI upgrade still blocks on a running service', () => {
+  const up = { tool: 'opencode-v2', desc: 'upgrade opencode-v2 2.2.5 -> 2.2.7', run: [['npm', 'i', '-g', 'opencode-ai@2.2.7']] };
+  assert.equal(runningBlocker([up], () => ['opencode'], {}), OPENCODE_RUNNING);
+});
+
+test('#546: inside OpenCode the fix never tells the agent to stop its own service', () => {
+  const up = { tool: 'opencode-v2', desc: 'upgrade opencode-v2 2.2.5 -> 2.2.7', run: [['npm', 'i', '-g', 'opencode-ai@2.2.7']] };
+  const r = runningBlocker([up], () => ['opencode'], { OPENCODE: '1' });
+  assert.equal(r, OPENCODE_RUNNING_INSIDE);
+  assert.match(r, /finish this session/);
+  assert.match(r, /lean-agents --update/);
+  assert.doesNotMatch(r, /run 'opencode service stop'/);
 });

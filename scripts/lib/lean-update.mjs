@@ -21,6 +21,7 @@ const skillCommands = (skill, agents) => [...new Set(agents.map((a) => SKILLS_AG
   optional: true, // the pinned tag may not exist yet (before a release); the rest of the install still stands
   desc: `${skill} skill for ${flag}`,
   run: [['npx', '-y', skillsCli(), 'add', source(), '--skill', skill, '-a', flag, '-g', '-y']],
+  filesOnly: true, // #546: the add and its remove only copy skill files; no running OpenCode to wait for
   // Without -a: `remove -a` keeps ~/.agents/skills while another detected agent may share that folder.
   undo: [['npx', '-y', skillsCli(), 'remove', skill, '-g', '-y']],
 }));

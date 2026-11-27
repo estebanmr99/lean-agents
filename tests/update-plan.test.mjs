@@ -200,13 +200,13 @@ test('#488: runningBlocker stops only OpenCode steps while opencode runs', async
   const rtk = { tool: 'rtk', desc: 'RTK plugin for OpenCode', run: [['rtk', 'init', '-g', '--opencode']] };
   const up = { tool: 'opencode-v2', desc: 'upgrade opencode-v2 2.2.5 -> 2.2.7', run: [['npm', 'i', '-g', 'opencode-ai@2.2.7']] };
   const other = { tool: 'caveman', desc: 'Caveman skill', run: [['npx', 'skills', 'add', 'x']] };
-  assert.match(runningBlocker([other, rtk], () => ['bash', 'opencode.exe']), /opencode service stop/);
-  assert.match(runningBlocker([up], () => ['/usr/local/bin/opencode']), /opencode process is running/);
-  assert.equal(runningBlocker([rtk, up], () => ['bash', 'node']), null);
-  assert.equal(runningBlocker([other], () => ['opencode']), null);
-  assert.equal(runningBlocker([up], () => []), null);
-  assert.match(runningBlocker([up], () => { throw new Error('no ps'); }), /cannot list the running processes \(no ps\)/);
-  assert.equal(runningBlocker([other], () => { throw new Error('no ps'); }), null);
+  assert.match(runningBlocker([other, rtk], () => ['bash', 'opencode.exe'], {}), /opencode service stop/);
+  assert.match(runningBlocker([up], () => ['/usr/local/bin/opencode'], {}), /opencode process is running/);
+  assert.equal(runningBlocker([rtk, up], () => ['bash', 'node'], {}), null);
+  assert.equal(runningBlocker([other], () => ['opencode'], {}), null);
+  assert.equal(runningBlocker([up], () => [], {}), null);
+  assert.match(runningBlocker([up], () => { throw new Error('no ps'); }, {}), /cannot list the running processes \(no ps\)/);
+  assert.equal(runningBlocker([other], () => { throw new Error('no ps'); }, {}), null);
 });
 
 // POSIX: a fake `ps` on PATH stands in for a running 2.x service.
