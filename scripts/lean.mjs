@@ -805,8 +805,8 @@ async function install(o) {
   }
 
   const running = o.command === 'update' && o.exec ? runningBlocker(commands) : null;
-  if (running && !o.dryRun) { p.close(); console.error(`! ${running}`); console.log('nothing changed'); process.exitCode = 1; return; }
-  if (running) console.log(`! blocker: ${running}`);
+  if (running && !o.dryRun) { p.close(); console.error(`! ${running}`); (o.json ? console.error : console.log)('nothing changed'); process.exitCode = 1; return; }
+  if (running) (o.json ? console.error : console.log)(`! blocker: ${running}`); // --json keeps stdout JSON
   const noGit = migration ? null : gitHint(packageManager());
   if (noGit) console.log(noGit);
   if (o.json && o.dryRun) {

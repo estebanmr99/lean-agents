@@ -29,7 +29,7 @@ export const opencodeRunning = (names) => names.some((n) => /^opencode(\.exe)?$/
 export function runningBlocker(commands, list = listProcesses) {
   if (!commands.some((c) => /opencode/i.test([c.desc, ...(c.run ?? []).flat()].join(' ')))) return null;
   let names;
-  try { names = list(); } catch { return null; } // cannot list: the backup and --upgrade-agent still refuse on their own
+  try { names = list(); } catch (e) { return `cannot list the running processes (${String(e.message).split('\n')[0]}): not safe to update OpenCode; close it, then run this again`; }
   return opencodeRunning(names) ? "an opencode process is running (the 1.x app or the 2.x background service): run 'opencode service stop' and close OpenCode windows, then run this again" : null;
 }
 

@@ -153,6 +153,9 @@ test('#488: runningBlocker stops only OpenCode steps while opencode runs', async
   assert.match(runningBlocker([up], () => ['/usr/local/bin/opencode']), /opencode process is running/);
   assert.equal(runningBlocker([rtk, up], () => ['bash', 'node']), null);
   assert.equal(runningBlocker([other], () => ['opencode']), null);
+  assert.equal(runningBlocker([up], () => []), null);
+  assert.match(runningBlocker([up], () => { throw new Error('no ps'); }), /cannot list the running processes \(no ps\)/);
+  assert.equal(runningBlocker([other], () => { throw new Error('no ps'); }), null);
 });
 
 // POSIX: a fake `ps` on PATH stands in for a running 2.x service.
@@ -168,6 +171,9 @@ test('#488: --update refuses before any command while opencode runs; --dry-run s
   const dry = lean(['--update', '--dry-run', '--yes']);
   assert.match(dry.stdout, /opencode process is running/);
   assert.match(dry.stdout, /Dry run: nothing was changed/);
+  const json = lean(['--update', '--dry-run', '--yes', '--json']);
+  assert.doesNotThrow(() => JSON.parse(json.stdout), 'stdout stays JSON');
+  assert.match(json.stderr, /blocker: an opencode process is running/);
   const r = lean(['--update', '--yes']);
   assert.equal(r.status, 1, r.stdout + r.stderr);
   assert.match(`${r.stdout}${r.stderr}`, /opencode service stop/);
