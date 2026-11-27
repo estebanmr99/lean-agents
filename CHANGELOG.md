@@ -4,6 +4,9 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Fixed
+- The Claude Code `context-mode` plugin pin moved from `v2.1.4` to `v2.1.7`, matching the npm CLI that `--update` already installs (#490). A new test fails when the two pins drift apart without a `note` on the plugin pin explaining why.
+
 ## [1.2.3] - 2026-11-26
 
 ### Changed
