@@ -33,7 +33,7 @@ try {
 } catch {}
 let line;
 try {
-  const out = execFileSync('gh', ['api', 'copilot_internal/user'], { timeout: 15000, encoding: 'utf8', windowsHide: true, shell: process.platform === 'win32', stdio: ['ignore', 'pipe', 'ignore'] });
+  const out = execFileSync('gh', ['api', 'copilot_internal/user'], { timeout: 15000, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });
   line = 'Copilot: ' + formatUsage(JSON.parse(out)) + '\\n';
 } catch { line = 'Copilot: ' + formatUsage(null) + '\\n'; }
 // Shared /tmp: never follow a planted symlink; 'wx' (O_EXCL) refuses any existing path.
