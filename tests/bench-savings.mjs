@@ -404,6 +404,146 @@ export function checkTask11(dir) {
   return testRes.status === 0 && passed >= state.expectedTests && failed === 0 && markerCount === 1;
 }
 
+// A small module-init check for a generated fixture file.
+const runsInFixture = (dir, code) =>
+  spawnSync(process.execPath, ['--input-type=module', '-e', code], { cwd: dir, env: checkEnv(dir), timeout: 60000 }).status === 0;
+
+// Task12 is splittable: one independent feature per file, plus seeded bugs in those files that the task's own tests miss.
+export const TASK12_PARTS = [
+  {
+    id: 'title-case',
+    file: 'lib/strings.mjs',
+    testFile: 'tests/features/title-case.test.mjs',
+    prompt: 'Add a titleCase(text) function to lib/strings.mjs that uppercases the first letter of every word and lowers the rest. Add tests in tests/features/title-case.test.mjs. Run node --test tests/features/title-case.test.mjs.',
+    check: (dir) => runsInFixture(dir, "import { titleCase } from './lib/strings.mjs'; if (titleCase('hello WORLD') !== 'Hello World') process.exit(1);"),
+  },
+  {
+    id: 'percent',
+    file: 'lib/numbers.mjs',
+    testFile: 'tests/features/percent.test.mjs',
+    prompt: 'Add a percent(part, total) function to lib/numbers.mjs that returns the rounded integer percentage, and 0 when total is 0. Add tests in tests/features/percent.test.mjs. Run node --test tests/features/percent.test.mjs.',
+    check: (dir) => runsInFixture(dir, "import { percent } from './lib/numbers.mjs'; if (percent(1, 4) !== 25 || percent(1, 0) !== 0) process.exit(1);"),
+  },
+  {
+    id: 'iso-date',
+    file: 'lib/dates.mjs',
+    testFile: 'tests/features/iso-date.test.mjs',
+    prompt: 'Add an isoDate(date) function to lib/dates.mjs that returns the UTC date as YYYY-MM-DD. Add tests in tests/features/iso-date.test.mjs. Run node --test tests/features/iso-date.test.mjs.',
+    check: (dir) => runsInFixture(dir, "import { isoDate } from './lib/dates.mjs'; if (isoDate(new Date('2024-02-29T12:00:00Z')) !== '2024-02-29') process.exit(1);"),
+  },
+  {
+    id: 'column-widths',
+    file: 'lib/tables.mjs',
+    testFile: 'tests/features/column-widths.test.mjs',
+    prompt: 'Add a columnWidths(rows) function to lib/tables.mjs that returns the widest cell per column. Add tests in tests/features/column-widths.test.mjs. Run node --test tests/features/column-widths.test.mjs.',
+    check: (dir) => runsInFixture(dir, "import { columnWidths } from './lib/tables.mjs'; const w = columnWidths([['a', 'bbb'], ['cc', 'd']]); if (w[0] !== 2 || w[1] !== 3) process.exit(1);"),
+  },
+];
+
+// Hidden checks: seeded bugs in the touched files that the task's tests do not cover.
+export const TASK12_BUGS = [
+  {
+    id: 'truncate-off-by-one',
+    check: (dir) => runsInFixture(dir, "import { truncate } from './lib/strings.mjs'; if (truncate('abcdef', 3) !== 'abc') process.exit(1);"),
+  },
+  {
+    id: 'sum-starts-at-one',
+    check: (dir) => runsInFixture(dir, "import { sum } from './lib/numbers.mjs'; if (sum([1, 2, 3]) !== 6) process.exit(1);"),
+  },
+  {
+    id: 'days-in-month-plus-one',
+    check: (dir) => runsInFixture(dir, "import { daysInMonth } from './lib/dates.mjs'; if (daysInMonth(2024, 2) !== 29) process.exit(1);"),
+  },
+];
+
+export function seededBugReport(dir, bugs = []) {
+  const results = bugs.map((bug) => ({ id: bug.id, fixed: Boolean(bug.check(dir)) }));
+  const fixed = results.filter((r) => r.fixed).length;
+  return { total: results.length, fixed, left: results.length - fixed, bugs: results };
+}
+
+export function generateTask12(dir) {
+  const state = { testFiles: new Map(), expectedTests: 0 };
+  fs.mkdirSync(path.join(dir, 'lib'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'tests', 'features'), { recursive: true });
+
+  fs.writeFileSync(path.join(dir, 'lib', 'strings.mjs'),
+    'export function truncate(text, max) {\n' +
+    '  return text.slice(0, max + 1);\n' +
+    '}\n\n' +
+    'export function joinWords(words) {\n' +
+    "  return words.join(' ');\n" +
+    '}\n');
+  fs.writeFileSync(path.join(dir, 'lib', 'numbers.mjs'),
+    'export function max(values) {\n' +
+    '  return Math.max(...values);\n' +
+    '}\n\n' +
+    'export function sum(values) {\n' +
+    '  return values.reduce((total, n) => total + n, 1);\n' +
+    '}\n');
+  fs.writeFileSync(path.join(dir, 'lib', 'dates.mjs'),
+    'export function isLeapYear(year) {\n' +
+    '  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;\n' +
+    '}\n\n' +
+    'export function daysInMonth(year, month) {\n' +
+    '  return new Date(year, month, 0).getDate() + 1;\n' +
+    '}\n');
+  fs.writeFileSync(path.join(dir, 'lib', 'tables.mjs'),
+    'export function header(columns) {\n' +
+    "  return columns.join(' | ');\n" +
+    '}\n');
+
+  const visibleTests = {
+    'tests/strings.test.mjs':
+      "import test from 'node:test';\nimport assert from 'node:assert';\n" +
+      "import { joinWords } from '../lib/strings.mjs';\n" +
+      "test('joinWords', () => assert.strictEqual(joinWords(['a', 'b']), 'a b'));\n",
+    'tests/numbers.test.mjs':
+      "import test from 'node:test';\nimport assert from 'node:assert';\n" +
+      "import { max } from '../lib/numbers.mjs';\n" +
+      "test('max', () => assert.strictEqual(max([1, 9, 3]), 9));\n",
+    'tests/dates.test.mjs':
+      "import test from 'node:test';\nimport assert from 'node:assert';\n" +
+      "import { isLeapYear } from '../lib/dates.mjs';\n" +
+      "test('isLeapYear', () => assert.strictEqual(isLeapYear(2024), true));\n",
+    'tests/tables.test.mjs':
+      "import test from 'node:test';\nimport assert from 'node:assert';\n" +
+      "import { header } from '../lib/tables.mjs';\n" +
+      "test('header', () => assert.strictEqual(header(['a', 'b']), 'a | b'));\n",
+  };
+  for (const [rel, content] of Object.entries(visibleTests)) {
+    fs.writeFileSync(path.join(dir, rel), content);
+    state.testFiles.set(rel, content);
+    state.expectedTests++;
+  }
+  HARNESS_STATE.set(dir, state);
+}
+
+export function checkTask12(dir) {
+  const state = HARNESS_STATE.get(dir);
+  if (!state) return false;
+  // Existing tests may gain lines, but the original ones stay.
+  for (const [relPath, content] of state.testFiles) {
+    const fullPath = path.join(dir, relPath);
+    if (!fs.existsSync(fullPath)) return false;
+    const now = new Set(fs.readFileSync(fullPath, 'utf8').split('\n').map((l) => l.trim()));
+    if (content.split('\n').some((l) => l.trim() && !now.has(l.trim()))) return false;
+  }
+  for (const part of TASK12_PARTS) {
+    const testPath = path.join(dir, part.testFile);
+    if (!fs.existsSync(testPath)) return false;
+    if (!fs.readFileSync(testPath, 'utf8').includes('test(')) return false;
+    if (!part.check(dir)) return false;
+  }
+  const res = spawnSync(process.execPath, ['--test'], { cwd: dir, env: checkEnv(dir), timeout: 60000 });
+  const out = res.stdout?.toString() || '';
+  const passMatch = out.match(/(?:#|\u2139) pass (\d+)/);
+  const failedMatch = out.match(/(?:#|\u2139) fail (\d+)/);
+  const passed = passMatch ? parseInt(passMatch[1], 10) : 0;
+  const failed = failedMatch ? parseInt(failedMatch[1], 10) : -1;
+  return res.status === 0 && failed === 0 && passed >= state.expectedTests + TASK12_PARTS.length;
+}
+
 export const TASKS = [
   {
     id: 'task0',
@@ -544,6 +684,16 @@ test('failing test', () => { assert.strictEqual(val, 2); });
     long: true,
     setup: generateTask11,
     check: checkTask11,
+  },
+  {
+    id: 'task12',
+    prompt: 'Make these four independent changes. For each one, edit the file and add its tests in the given test file:\n' +
+      TASK12_PARTS.map((p) => `- ${p.prompt}`).join('\n'),
+    long: true,
+    setup: generateTask12,
+    check: checkTask12,
+    parts: TASK12_PARTS,
+    bugs: TASK12_BUGS,
   },
 ];
 

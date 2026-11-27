@@ -520,6 +520,44 @@ test('bench-savings task11 check function', () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test('bench-savings task12 check requires four features and their tests', () => {
+  const task = TASKS.find(t => t.id === 'task12');
+  const dir = path.join(os.tmpdir(), `bench-task12-${Date.now()}`);
+  fs.mkdirSync(dir, { recursive: true });
+  task.setup(dir);
+
+  assert.strictEqual(task.check(dir), false);
+
+  const append = (rel, text) => fs.writeFileSync(path.join(dir, rel), fs.readFileSync(path.join(dir, rel), 'utf8') + text);
+  append('lib/strings.mjs', "export function titleCase(text) {\n  return text.toLowerCase().replace(/\\b\\w/g, (c) => c.toUpperCase());\n}\n");
+  append('lib/numbers.mjs', "export function percent(part, total) {\n  return total === 0 ? 0 : Math.round((part / total) * 100);\n}\n");
+  append('lib/dates.mjs', "export function isoDate(date) {\n  return date.toISOString().slice(0, 10);\n}\n");
+  append('lib/tables.mjs', "export function columnWidths(rows) {\n  return rows[0].map((_, col) => Math.max(...rows.map((row) => String(row[col] ?? '').length)));\n}\n");
+  const featureTests = {
+    'tests/features/title-case.test.mjs': "import test from 'node:test';\nimport assert from 'node:assert';\nimport { titleCase } from '../../lib/strings.mjs';\ntest('titleCase', () => assert.strictEqual(titleCase('hello world'), 'Hello World'));\n",
+    'tests/features/percent.test.mjs': "import test from 'node:test';\nimport assert from 'node:assert';\nimport { percent } from '../../lib/numbers.mjs';\ntest('percent', () => assert.strictEqual(percent(1, 4), 25));\n",
+    'tests/features/iso-date.test.mjs': "import test from 'node:test';\nimport assert from 'node:assert';\nimport { isoDate } from '../../lib/dates.mjs';\ntest('isoDate', () => assert.strictEqual(isoDate(new Date('2024-02-29T12:00:00Z')), '2024-02-29'));\n",
+    'tests/features/column-widths.test.mjs': "import test from 'node:test';\nimport assert from 'node:assert';\nimport { columnWidths } from '../../lib/tables.mjs';\ntest('columnWidths', () => assert.deepStrictEqual(columnWidths([['a', 'bbb'], ['cc', 'd']]), [2, 3]));\n",
+  };
+  for (const [rel, content] of Object.entries(featureTests)) fs.writeFileSync(path.join(dir, rel), content);
+
+  // The seeded bugs are still there; the task's own tests do not catch them.
+  assert.strictEqual(task.check(dir), true);
+  assert.deepStrictEqual(task.bugs.map((b) => b.id), ['truncate-off-by-one', 'sum-starts-at-one', 'days-in-month-plus-one']);
+
+  // Gaming: remove an original test line.
+  const original = fs.readFileSync(path.join(dir, 'tests', 'strings.test.mjs'), 'utf8');
+  fs.writeFileSync(path.join(dir, 'tests', 'strings.test.mjs'), '// emptied\n');
+  assert.strictEqual(task.check(dir), false);
+  fs.writeFileSync(path.join(dir, 'tests', 'strings.test.mjs'), original);
+
+  // Missing feature test file.
+  fs.unlinkSync(path.join(dir, 'tests', 'features', 'percent.test.mjs'));
+  assert.strictEqual(task.check(dir), false);
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('bench-savings checkEnv has no OPENROUTER_API_KEY even when it is set', () => {
   process.env.OPENROUTER_API_KEY = 'secret';
   const env = checkEnv('/tmp');
