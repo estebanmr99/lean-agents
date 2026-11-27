@@ -218,7 +218,7 @@ test('#488: --update refuses before any command while opencode runs; --dry-run s
   for (const b of ['rtk', 'npx', 'npm', 'opencode']) fs.writeFileSync(path.join(bin, b), `#!/bin/sh\necho "$0 $*" >> "${mark}"\n`, { mode: 0o755 });
   const env = { PATH: `${bin}:${path.dirname(process.execPath)}:/usr/bin:/bin`, HOME: home, ...(process.env.NVM_DIR && { NVM_DIR: process.env.NVM_DIR }) };
   const lean = (args) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args], { encoding: 'utf8', env, input: '' });
-  assert.equal(lean(['--no-exec', '--yes', '--agents', 'opencode-v2', '--tools', 'rtk', '--lang', 'en', '--profile', 'none']).status, 0);
+  assert.equal(lean(['--no-exec', '--yes', '--agents', 'opencode-v2', '--tools', 'rtk,i-have-adhd', '--lang', 'en', '--profile', 'none']).status, 0);
   const dry = lean(['--update', '--dry-run', '--yes']);
   assert.match(dry.stdout, /opencode process is running/);
   assert.match(dry.stdout, /Dry run: nothing was changed/);

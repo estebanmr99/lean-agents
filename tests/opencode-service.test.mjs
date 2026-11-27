@@ -16,6 +16,8 @@ import { terminalCommands } from '../scripts/lib/terminals.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const skillRun = (argv) => /^npx -y skills@\S+ (add|remove) /.test(argv.join(' '));
+// #546: the RTK OpenCode plugin refresh writes plugins/rtk.ts only (it runs `opencode --version`, no database).
+const rtkOpencodeRun = (argv) => /^rtk init -g --opencode( --uninstall)?$/.test(argv.join(' '));
 
 const stop = ['opencode', 'service', 'stop'];
 
@@ -83,11 +85,22 @@ test('#546: the lean-update skill never tells an agent inside OpenCode to stop t
   assert.match(rules[0], /never run `opencode service stop`/);
 });
 
-// #546: filesOnly skips the running-OpenCode check, so only a Skills CLI add/remove may carry it.
-test('#546: only Skills CLI add/remove commands carry filesOnly', () => {
+// #546: proof run 46052801952: inside OpenCode the RTK plugin refresh is a files-only step.
+test('#546: the RTK OpenCode plugin refresh does not block inside OpenCode', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
   const core = { agents: [], mcp: {} };
-  const opts = { tools: ['caveman'], terminals: ['orca'], network: {}, platform: 'linux', env: {}, shell: 'default' };
+  const opts = { tools: ['rtk'], terminals: [], network: {}, platform: 'linux', env: {}, shell: 'default' };
+  const commands = opencodeV2Adapter({ home, core, profile: null, opts, rulesPath: path.join(home, 'rules.md') }).commands;
+  assert.ok(commands.some((c) => c.desc === 'RTK plugin for OpenCode'), 'the RTK command is planned');
+  assert.equal(runningBlocker(commands, () => ['opencode'], { OPENCODE: '1' }), null);
+  fs.rmSync(home, { recursive: true, force: true });
+});
+
+// #546: filesOnly skips the running-OpenCode check, so only a Skills CLI add/remove or the RTK plugin refresh may carry it.
+test('#546: only Skills CLI add/remove or the RTK OpenCode plugin refresh carry filesOnly', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const core = { agents: [], mcp: {} };
+  const opts = { tools: ['caveman', 'rtk'], terminals: ['orca'], network: {}, platform: 'linux', env: {}, shell: 'default' };
   const commands = [
     ...claudeAdapter({ home, core, profile: null, opts, rulesPath: path.join(home, 'AGENTS.md'), adhdCommand: null }).commands,
     ...copilotAdapter({ home, core, profile: null, opts, rules: '' }).commands,
@@ -100,8 +113,11 @@ test('#546: only Skills CLI add/remove commands carry filesOnly', () => {
   const skills = commands.filter((c) => (c.run ?? []).some(skillRun));
   assert.ok(skills.length >= 7, `every skill refresh was checked (${skills.length})`);
   assert.deepEqual(skills.filter((c) => !c.filesOnly).map((c) => c.desc), [], 'every Skills CLI add/remove is filesOnly');
+  const others = commands.filter((c) => c.filesOnly && !(c.run ?? []).some(skillRun));
+  assert.deepEqual(others.map((c) => c.desc), ['RTK plugin for OpenCode'], 'no other filesOnly command');
   for (const c of commands.filter((x) => x.filesOnly)) {
-    for (const argv of c.run) assert.ok(skillRun(argv), `${c.desc}: ${argv.join(' ')}`);
+    for (const argv of c.run) assert.ok(skillRun(argv) || rtkOpencodeRun(argv), `${c.desc}: ${argv.join(' ')}`);
+    for (const argv of c.undo ?? []) assert.ok(skillRun(argv) || rtkOpencodeRun(argv), `${c.desc} undo: ${argv.join(' ')}`);
   }
   fs.rmSync(home, { recursive: true, force: true });
 });
