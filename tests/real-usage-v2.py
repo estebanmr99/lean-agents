@@ -14,6 +14,7 @@ import sys
 import tempfile
 import termios
 import time
+from pathlib import Path
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 home = tempfile.mkdtemp(prefix="lean-usage-v2-")
@@ -186,6 +187,22 @@ try:
     before = dcp_entries(2)
     if not os.path.exists(os.path.join(cfg_dir, "cli.json")):
         sys.exit("OpenCode 2 did not write cli.json from tui.json")
+    def dcp_config_count():
+        """DCP registrations across the server and TUI config files; the lean-agents side must leave exactly one."""
+        total = 0
+        for name, key in (("opencode.jsonc", "plugins"), ("opencode.json", "plugins"), ("cli.json", "plugins"), ("tui.json", "plugin"), ("tui.jsonc", "plugin")):
+            p = os.path.join(cfg_dir, name)
+            if not os.path.exists(p):
+                continue
+            try:
+                with open(p) as f:
+                    raw = f.read()
+                cfg = json.loads(re.sub(r"^\s*//.*$", "", raw, flags=re.M))
+            except (ValueError, OSError):
+                continue
+            total += sum(1 for x in (cfg.get(key) or []) if x == dcp or x.startswith(dcp + "@"))
+        return total
+
     subprocess.run(["node", os.path.join(ROOT, "scripts", "lean.mjs"), "--home", home2, "--update", "--yes", "--no-exec"],
                    check=True, env=env2, stdout=subprocess.DEVNULL)
     with open(os.path.join(cfg_dir, "cli.json")) as f:
@@ -198,12 +215,103 @@ try:
         stale = json.load(f)
     if any(x == dcp or x.startswith(dcp + "@") for x in stale.get("plugin", [])):
         sys.exit("lean-agents left DCP in tui.json after --update")
+    count = dcp_config_count()
+    if count != 1:
+        sys.exit(f"DCP must be registered exactly once in the config files, found {count}")
     after = dcp_entries(1)
-    print(f"2.x /dcp palette rows before --update: {before}, after: {after}")
+    print(f"2.x /dcp palette rows before --update: {before}, after: {after}; DCP registrations in config: {count}")
     if after < 1:
         sys.exit("DCP panel command missing after --update (opencode.jsonc still lists DCP)")
     # DCP 3.2.0 registers a `dcp` server command and a `dcp` TUI command, so 2.2.7's palette can still show two rows with
     # DCP only in opencode.jsonc. That is upstream (docs/compatibility.md, #558); lean-agents removes the config entries.
-    print("2.x DCP config entries removed, tui.json kept; remaining palette duplicate is upstream: ok")
+    print("2.x DCP config entries removed, tui.json kept; lean-agents side registers DCP once. Remaining palette duplicate is upstream (not a lean-agents bug): ok")
 finally:
     subprocess.run(["opencode", "service", "stop"], env=env2, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+# --- #558: the owner's hand-made #123 meter in cli.json (1.x api.command) is dead on OpenCode 2. `--update --yes` must
+# replace it with the managed copilot-usage tool, then the real TUI shows the sidebar box and lists /copilot-usage.
+home3 = tempfile.mkdtemp(prefix="lean-usage-meter-")
+env3 = {k: v for k, v in os.environ.items() if not k.startswith("XDG_")}
+env3.update(HOME=home3, PATH=bin_dir + os.pathsep + os.environ["PATH"], TERM="xterm-256color")
+with socket.socket() as sock:
+    sock.bind(("127.0.0.1", 0))
+    port3 = sock.getsockname()[1]
+subprocess.run(["opencode", "service", "set", "port", str(port3)], check=True, env=env3)
+subprocess.run(["node", os.path.join(ROOT, "scripts", "lean.mjs"), "--home", home3, "--no-exec", "--yes", "--lang", "en",
+                "--profile", "none", "--agents", "opencode-v2", "--tools", "serena", "--network", "on"],
+               check=True, env=env3, stdout=subprocess.DEVNULL)
+cfg_dir3 = os.path.join(home3, ".config", "opencode")
+meter_file = os.path.join(cfg_dir3, "plugins", "copilot-usage-tui", "tui.js")
+os.makedirs(os.path.dirname(meter_file), exist_ok=True)
+with open(meter_file, "w") as f:
+    f.write("// GitHub Copilot AI-credit allowance in the OpenCode TUI sidebar (lean-agents#123).\n")
+    f.write("export default (api) => { api.command.register({ name: 'copilot-usage' }); }\n")
+with open(os.path.join(cfg_dir3, "cli.json"), "w") as f:
+    json.dump({"plugins": [Path(meter_file).as_uri(), "keep-me"]}, f)
+
+try:
+    subprocess.run(["node", os.path.join(ROOT, "scripts", "lean.mjs"), "--home", home3, "--update", "--yes", "--no-exec"],
+                   check=True, env=env3, stdout=subprocess.DEVNULL)
+    with open(os.path.join(cfg_dir3, "cli.json")) as f:
+        cli3 = json.load(f)
+    if any("copilot-usage-tui" in str(x) for x in cli3.get("plugins", [])):
+        sys.exit("lean-agents left the dead hand-made meter entry in cli.json")
+    if not os.path.exists(os.path.join(cfg_dir3, "plugins", "lean-copilot-usage", "tui.js")):
+        sys.exit("lean-agents did not install the managed copilot-usage meter")
+
+    pid, fd = pty.fork()
+    if pid == 0:
+        os.chdir(home3)
+        os.execvpe("opencode", ["opencode"], env3)
+    fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 50, 160, 0, 0))
+    buf = b""
+
+    def pump3(sec):
+        global buf
+        end = time.time() + sec
+        while time.time() < end:
+            r, _, _ = select.select([fd], [], [], 0.2)
+            if r:
+                try:
+                    buf += os.read(fd, 65536)
+                except OSError:
+                    return
+
+    def txt3():
+        return re.sub(r"\s+", " ", re.sub(r"\x1b\[[0-9;?<>=]*[A-Za-z]|\x1b[\]P_].*?(\x07|\x1b\\)|[\x00-\x08\x0b-\x1f]", "", buf.decode(errors="replace")))
+
+    def wait3(needle, seconds, what):
+        end = time.time() + seconds
+        while time.time() < end:
+            pump3(0.5)
+            if needle in txt3():
+                return
+        print(txt3()[-1500:])
+        sys.exit(f"timed out waiting for {what} ({needle!r})")
+
+    wait3("Ask anything", 40, "the meter home prompt")
+    pump3(3)
+    os.write(fd, b"\x10")
+    pump3(1)
+    os.write(fd, b"copilot-usage")
+    pump3(2)
+    wait3("Copilot usage", 15, "the /copilot-usage palette row")
+    print("2.x /copilot-usage palette row after --update: ok")
+    buf = b""
+    os.write(fd, b"hello")
+    os.write(fd, b"\r")
+    pump3(10)
+    os.write(fd, b"\x10")
+    pump3(1)
+    os.write(fd, b"sidebar")
+    pump3(1.5)
+    os.write(fd, b"\r")
+    for needle in ("Copilot credits", "61.7% left", "Left", "15,441"):
+        wait3(needle, 15, f"the managed meter sidebar text {needle!r}")
+    print("2.x managed meter sidebar box after --update: ok")
+finally:
+    try:
+        os.kill(pid, 9)
+    except (NameError, OSError):
+        pass
+    subprocess.run(["opencode", "service", "stop"], env=env3, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

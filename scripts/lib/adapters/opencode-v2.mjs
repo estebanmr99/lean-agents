@@ -95,13 +95,18 @@ export const legacyTuiShape = (text) => /\bapi\.(command|slots)\b/.test(text);
 // The header of the hand-made #123 meter this repo used to document (core/copilot-usage-tui.js carries it too).
 export const copilotMeterShape = (text) => /lean-agents#123/.test(text);
 
-// File behind a local plugin entry (file:// URL, path or folder with tui.js/index.js/index.ts); null for npm names.
-function pluginFile(dir, spec, fsx, home = process.env.HOME ?? os.homedir()) {
+// Local path behind a plugin entry (file:// URL, path or ~); null for npm names or a bad URL.
+function pluginPath(dir, spec, home = process.env.HOME ?? os.homedir()) {
   const raw = String(spec);
-  let p;
-  if (raw.startsWith('file:')) { try { p = fileURLToPath(raw); } catch { return null; } }
-  else if (/^([./~\\]|[a-zA-Z]:[\\/])/.test(raw)) p = raw.startsWith('~') ? path.join(home, raw.slice(1)) : path.resolve(dir, raw);
-  else return null;
+  if (raw.startsWith('file:')) { try { return fileURLToPath(raw); } catch { return null; } }
+  if (/^([./~\\]|[a-zA-Z]:[\\/])/.test(raw)) return raw.startsWith('~') ? path.join(home, raw.slice(1)) : path.resolve(dir, raw);
+  return null;
+}
+
+// File behind a local plugin entry (a file, or a folder with tui.js/index.js/index.ts); null for npm names.
+function pluginFile(dir, spec, fsx, home = process.env.HOME ?? os.homedir()) {
+  const p = pluginPath(dir, spec, home);
+  if (!p) return null;
   try {
     if (fsx.statSync(p).isDirectory()) {
       const entry = ['tui.js', 'index.js', 'index.ts'].map((n) => path.join(p, n)).find((f) => fsx.existsSync(f));
@@ -126,14 +131,18 @@ export function localPluginFiles(dir, { fsx = fs, home } = {}) {
   return out;
 }
 
-// Hand-made #123 meters in the TUI config: the managed copilot-usage tool replaces the entry (#558).
+// Hand-made #123 meters in the TUI config: the managed copilot-usage tool replaces the entry (#558). The owner's layout
+// names the folder copilot-usage-tui, so that entry is dead even when its target file is missing or unreadable.
 export function copilotMeterEntries(dir, { fsx = fs, home } = {}) {
+  const named = (p) => p && p.split(/[\\/]/).includes('copilot-usage-tui');
   return tuiConfigs(dir, fsx).flatMap((c) => {
     let cfg;
     try { cfg = parse(fsx.readFileSync(c.path, 'utf8')); } catch { return []; }
     return (Array.isArray(cfg?.[c.key]) ? cfg[c.key] : []).flatMap((e) => {
-      const hit = pluginFile(dir, Array.isArray(e) ? e[0] : e, fsx, home);
-      return hit && copilotMeterShape(hit.text) ? [{ config: c.path, key: c.key, entry: Array.isArray(e) ? e[0] : e, file: hit.file }] : [];
+      const raw = Array.isArray(e) ? e[0] : e;
+      const hit = pluginFile(dir, raw, fsx, home);
+      const dead = (hit && copilotMeterShape(hit.text)) || (!hit && named(pluginPath(dir, raw, home)));
+      return dead ? [{ config: c.path, key: c.key, entry: raw, file: hit?.file ?? pluginPath(dir, raw, home) }] : [];
     });
   });
 }

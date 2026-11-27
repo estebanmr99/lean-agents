@@ -151,16 +151,37 @@ test('copilot-usage on 2.x removes the hand-made meter entry only, and undo rest
   assert.deepEqual(list(f.cli, 'plugins').sort(), ['keep-me', entry].sort());
 });
 
-test('--add-tools copilot-usage removes the entry non-interactively; a plain --update --yes leaves it', () => {
+test('--update --yes replaces the hand-made #123 meter with the managed tool and plans it', () => {
   const f = setup({ cli: null, server: [] });
+  lean(f.home, ['--yes', '--no-exec', '--agents', 'opencode-v2', '--tools', 'serena', '--lang', 'en', '--profile', 'none']);
+  const file = path.join(f.dir, 'plugins', 'copilot-usage-tui', 'tui.js');
+  put(file, '// lean-agents#123 hand copy\nexport default (api) => { api.command.register({}); }\n');
+  const entry = pathToFileURL(file).href;
+  put(f.cli, { plugins: ['keep-me', entry] });
+  const r = lean(f.home, ['--update', '--yes', '--no-exec']);
+  assert.deepEqual(list(f.cli, 'plugins'), ['keep-me']);
+  assert.ok(fs.existsSync(path.join(f.dir, 'plugins', 'lean-copilot-usage', 'tui.js')));
+  assert.match(r.stdout, /removes hand-made copilot-usage/);
+});
+
+test('--update --yes treats a copilot-usage-tui entry whose target file is missing as dead', () => {
+  const f = setup({ cli: null, server: [] });
+  lean(f.home, ['--yes', '--no-exec', '--agents', 'opencode-v2', '--tools', 'serena', '--lang', 'en', '--profile', 'none']);
+  // The owner's layout: the folder is named copilot-usage-tui but its tui.js is gone.
+  const entry = pathToFileURL(path.join(f.dir, 'plugins', 'copilot-usage-tui', 'tui.js')).href;
+  put(f.cli, { plugins: ['keep-me', entry] });
+  lean(f.home, ['--update', '--yes', '--no-exec']);
+  assert.deepEqual(list(f.cli, 'plugins'), ['keep-me']);
+  assert.ok(fs.existsSync(path.join(f.dir, 'plugins', 'lean-copilot-usage', 'tui.js')));
+});
+
+test('--add-tools copilot-usage removes the entry too, and undo restores it', () => {
+  const f = setup({ cli: null, server: [] });
+  lean(f.home, ['--yes', '--no-exec', '--agents', 'opencode-v2', '--tools', 'serena', '--lang', 'en', '--profile', 'none']);
   const file = path.join(f.dir, 'plugins', 'copilot-usage-tui', 'tui.js');
   put(file, '// lean-agents#123 hand copy\nexport default (api) => { api.command.register({}); }\n');
   const entry = pathToFileURL(file).href;
   put(f.cli, { plugins: [entry] });
-  lean(f.home, ['--yes', '--no-exec', '--agents', 'opencode-v2', '--tools', 'serena', '--lang', 'en', '--profile', 'none']);
-  assert.deepEqual(list(f.cli, 'plugins'), [entry]);
-  lean(f.home, ['--update', '--yes', '--no-exec']);
-  assert.deepEqual(list(f.cli, 'plugins'), [entry], 'the offer defaults to no under --yes');
   lean(f.home, ['--add-tools', 'copilot-usage', '--yes', '--no-exec']);
   assert.deepEqual(list(f.cli, 'plugins'), []);
   const rows = [];

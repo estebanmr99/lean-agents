@@ -69,3 +69,11 @@ test('mode remove drops the key, records the old value, and undo writes it back'
   assert.equal(r.applied.length, 1, 'a key that is not there is skipped');
   assert.deepEqual(JSON.parse(revertJsonEdits(r.text, r.applied)), JSON.parse(text));
 });
+
+test('revert arrayRemove does not insert a second copy when the value is already back', () => {
+  const text = '{\n  "plugin": ["a", "b"]\n}\n';
+  const r = applyJsonEdits(text, [{ path: ['plugin'], value: 'a', mode: 'arrayRemove' }]);
+  assert.deepEqual(JSON.parse(r.text).plugin, ['b']);
+  const back = '{\n  "plugin": ["b", "a"]\n}\n';
+  assert.deepEqual(JSON.parse(revertJsonEdits(back, r.applied)).plugin, ['b', 'a']);
+});

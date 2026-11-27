@@ -178,6 +178,8 @@ export function revertJsonEdits(text, applied) {
     } else if (e.mode === 'arrayRemove') {
       const list = getAt(text, e.path);
       if (!Array.isArray(list)) continue;
+      // Already back (the user or another edit re-added it): do not insert a second copy.
+      if (list.some((v) => JSON.stringify(v) === JSON.stringify(e.value))) continue;
       const at = Math.min(e.index ?? list.length, list.length);
       text = applyEdits(text, modify(text, [...e.path, at], e.value, { ...FORMAT, isArrayInsertion: true }));
     } else if (e.keepIfChanged && JSON.stringify(getAt(text, e.path)) !== JSON.stringify(e.value)) {
@@ -309,7 +311,9 @@ export function plan(actions, roots = [], prior = []) {
       applied = r.applied;
       keptKeys = r.kept.map((k) => k.path.join('.'));
       const moved = r.applied.filter((e) => e.mode === 'arrayAdd' && /@\d+\.\d+\.\d+$/.test(e.replaced ?? '')).map((e) => `${path.basename(a.path)} ${e.label ?? 'pin'} ${e.replaced.replace(/^.*@/, '')} -> ${e.value.replace(/^.*@/, '')}${e.why ? ` ${e.why}` : ''}`);
-      if (moved.length) note = moved.join('; ');
+      const removed = r.applied.filter((e) => e.mode === 'arrayRemove').map((e) => `${path.basename(a.path)} removes ${e.label ?? 'entry'}${e.why ? ` (${e.why})` : ''}`);
+      if (removed.length) note = removed.join('; ');
+      if (moved.length) note = [note, ...moved].filter(Boolean).join('; ');
       if (r.kept.length) note = `kept your values for: ${r.kept.map((k) => k.path.join('.')).join(', ')}`;
     } else if (a.kind === 'block') {
       after = setBlock(before, a.body, a.toml, a.id);

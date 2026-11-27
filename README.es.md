@@ -306,6 +306,8 @@ En OpenCode, el plugin propio de rtk (`plugins/rtk.ts`, rtk 1.2.0 o más nuevo) 
 
 ✅ soportado · ⚠️ parcial · ➖ no disponible para este agente. Detalles y fechas de verificación: [docs/compatibility.md](docs/compatibility.md).
 
+En OpenCode 2, `--update` reemplaza un medidor Copilot #123 hecho a mano por la herramienta gestionada `copilot-usage` (`--add-tools copilot-usage` hace lo mismo), y la fila `/dcp` duplicada que queda con DCP solo en `opencode.jsonc` es de upstream: DCP 3.2.0 registra un comando de servidor y otro de TUI, y OpenCode 2.2.7 lista ambos (**VERIFY**, CI `real-usage-v2`).
+
 | Función | VS Code Copilot | Cursor (IDE y CLI) | Repo del equipo (`--project`) |
 | --- | --- | --- | --- |
 | Reglas | ⚠️ se escriben, carga sin probar | ➖ solo en ajustes, usa `--project` | ✅ `AGENTS.md` |

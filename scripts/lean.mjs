@@ -360,12 +360,13 @@ async function choose(o, saved) {
     }
   }
   if (o.addTools) o.tools = [...new Set([...o.tools, ...o.addTools])];
-  // #558: a hand copy of the #123 meter is dead on OpenCode 2. The offer defaults to no, so --yes and pipes only take it
-  // with --add-tools copilot-usage.
+  // #558: a hand copy of the #123 meter is dead on OpenCode 2, so --update replaces it with the managed tool by default
+  // (also --yes with no TTY). An interactive "no" still leaves it alone; --add-tools copilot-usage does the same without
+  // the question.
   if (o.agents.includes('opencode-v2') && !o.tools.includes('copilot-usage')) {
     const meters = copilotMeterEntries(path.join(configHome(o.home), 'opencode'), { home: o.home });
     if (meters.length) {
-      const a = await p.ask('A hand-made copilot-usage TUI plugin is not loaded on OpenCode 2. Replace it with the managed copilot-usage tool? (removes that one config entry, backed up; undo with --uninstall) [y/n]', 'n');
+      const a = await p.ask('A hand-made copilot-usage TUI plugin is not loaded on OpenCode 2. Replace it with the managed copilot-usage tool? (removes that one config entry, backed up; undo with --uninstall) [y/n]', 'y');
       if (yesNo(a)) o.tools.push('copilot-usage');
     }
   }
