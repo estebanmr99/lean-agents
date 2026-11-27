@@ -175,7 +175,7 @@ cleanup() {
     hdiutil detach "$MOUNT" -force >/dev/null 2>&1 || true
   fi
   rm -rf "$DIR"
-  if [ -e "${target}" ]; then rm -rf "${target}.new"; fi
+  if [ "\${SWAPPING:-0}" != 1 ]; then rm -rf "${target}.new"; fi
 }
 trap cleanup EXIT
 curl -fsSL ${CURL_RETRY.join(' ')} -o "$DIR/orca.dmg" "${url}"
@@ -186,6 +186,7 @@ mkdir -p "$(dirname "${target}")"
 rm -rf "${target}.new"
 ditto "$MOUNT/Orca.app" "${target}.new"
 rm -rf "${target}"
+SWAPPING=1
 mv "${target}.new" "${target}"
 `;
       commands.push({
