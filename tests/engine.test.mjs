@@ -291,7 +291,7 @@ test('--update replaces a stale settings.json hash from before #470; a user key 
     ponytail: { source: { source: 'github', repo: 'DietrichGebert/ponytail' } },
   };
   fs.writeFileSync(settings, `${JSON.stringify(before, null, 2)}\n`);
-  const row = () => run('--doctor').stdout.split('\n').find((l) => /^(ok|changed|error)\s+\S*\.claude\/settings\.json/.test(l));
+  const row = () => run('--doctor').stdout.split('\n').find((l) => /^(ok|changed|error)\s+\S*\.claude[\\/]settings\.json/.test(l));
   assert.match(row(), /edited since install/, 'the stale hash must show before --update');
 
   const upd = run('--update', '--no-exec', '--yes');
@@ -334,7 +334,7 @@ test('--update refreshes the user hash only when the file is exactly lean-agents
       fs.writeFileSync(settings, `${JSON.stringify(j, null, 2)}\n`);
       return j;
     };
-    const row = () => run('--doctor').stdout.split('\n').find((l) => /^(ok|changed|error)\s+\S*\.claude\/settings\.json/.test(l));
+    const row = () => run('--doctor').stdout.split('\n').find((l) => /^(ok|changed|error)\s+\S*\.claude[\\/]settings\.json/.test(l));
     const update = () => {
       const r = run('--update', '--no-exec', '--yes');
       assert.equal(r.status, 0, r.stdout + r.stderr);
@@ -385,7 +385,7 @@ test('--update ignores plugin keys from an earlier install, even without --termi
   before.enabledPlugins = { 'warp@claude-code-warp': true };
   before.extraKnownMarketplaces = { 'claude-code-warp': { source: { source: 'github', repo: 'warpdotdev/claude-code-warp' } } };
   fs.writeFileSync(settings, `${JSON.stringify(before, null, 2)}\n`);
-  const row = () => run('--doctor').stdout.split('\n').find((l) => /^(ok|changed|error)\s+\S*\.claude\/settings\.json/.test(l));
+  const row = () => run('--doctor').stdout.split('\n').find((l) => /^(ok|changed|error)\s+\S*\.claude[\\/]settings\.json/.test(l));
   assert.match(row(), /edited since install/, 'the stale hash shows before --update');
 
   const upd = run('--update', '--no-exec', '--yes');
