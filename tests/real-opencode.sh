@@ -61,20 +61,24 @@ console.log('top-level keys:', Object.keys(cfg).sort().join(', '));
 if (failed) { console.log('--- config ---'); console.log(out.split('\n').slice(0, 150).join('\n')); console.log('--- agents ---'); console.log(agentsOut.slice(0, 4000)); process.exit(1); }
 JS
 
-# The registered Context Mode command must start an MCP server (#107): run it as written and send `initialize`.
-node --input-type=module - "$HOME/resolved.txt" "$repo" <<'JS'
+# The registered Context Mode command must start an MCP server (#107) and answer a real ctx_execute call (#562): without
+# `--agent opencode`, every ctx_* call fails with "Project source --agent is missing".
+node --input-type=module - "$HOME/resolved.txt" "$repo" "$HOME" <<'JS'
 import fs from 'node:fs';
 const { resolvedOpenCodeConfig } = await import(`${process.argv[3]}/scripts/lib/doctor.mjs`);
-const { probeInitialize } = await import(`${process.argv[3]}/scripts/lib/inventory.mjs`);
+const { probeInitialize, probeToolCall } = await import(`${process.argv[3]}/scripts/lib/inventory.mjs`);
 const { satisfies } = await import(`${process.argv[3]}/scripts/lib/node-runtime.mjs`);
 const { nodeRange } = await import(`${process.argv[3]}/scripts/lib/pins.mjs`);
 if (!satisfies(process.versions.node, nodeRange('context-mode'))) { console.log('skip  context-mode initialize (Node below the pin range)'); process.exit(0); }
 const cfg = resolvedOpenCodeConfig(fs.readFileSync(process.argv[2], 'utf8'));
 const entry = (cfg.mcp?.servers ?? cfg.mcp)?.['context-mode'];
 if (!entry) { console.log('FAIL  context-mode is not registered'); process.exit(1); }
+if (entry.command[entry.command.indexOf('--agent') + 1] !== 'opencode') { console.log(`FAIL  context-mode has no --agent opencode: ${entry.command.join(' ')}`); process.exit(1); }
 const r = await probeInitialize(entry.command, { expect: 'context-mode' });
 console.log(`${r.ok ? 'ok    ' : 'FAIL  '} context-mode initialize serverInfo.name = ${r.name}${r.error ? ` (${r.error})` : ''}`);
-process.exit(r.ok ? 0 : 1);
+const t = await probeToolCall(entry.command, { cwd: process.argv[4], expect: 'ctx-ok' });
+console.log(`${t.ok ? 'ok    ' : 'FAIL  '} context-mode ctx_execute --agent opencode${t.error ? ` (${t.error})` : ''}`);
+process.exit(r.ok && t.ok ? 0 : 1);
 JS
 
 # copilot-usage (fresh HOME, network on: strict skips it). Proves the plugin file lands and no tui.json entry is written

@@ -547,7 +547,7 @@ test('Context Mode v2: Copilot CLI adds only the MCP server (undo: mcp remove), 
   const out = lean(home, ['--yes', '--no-exec', '--dry-run', '--agents', 'copilot-cli,antigravity', '--tools', 'context-mode', '--lang', 'en']);
   assert.match(out, /\$ node .*copilot-context-mode\.mjs/);
   assert.match(out, /context-mode setup --print copilot-cli/);
-  assert.match(out, /no Antigravity setup in v2: skipped/);
+  assert.match(out, /no Antigravity agent id in v2\.1\.7/);
   assert.ok(!/plugin install/.test(out));
 });
 
@@ -621,7 +621,7 @@ test('with nvm, Context Mode is registered with an absolute Node in every agent 
   fs.writeFileSync(cursorFile, JSON.stringify({ mcpServers: { 'context-mode': { command: 'my-own-ctx', args: [] } } }));
   const out = lean(home, args, oldNode(nvm));
   assert.ok(!/needs Node/.test(out));
-  assert.deepEqual(JSON.parse(fs.readFileSync(ocFile, 'utf8')).mcp.servers['context-mode'].command, [node, cli, 'server']);
+  assert.deepEqual(JSON.parse(fs.readFileSync(ocFile, 'utf8')).mcp.servers['context-mode'].command, [node, cli, 'server', '--agent', 'opencode']);
   assert.equal(JSON.parse(fs.readFileSync(cursorFile, 'utf8')).mcpServers['context-mode'].command, 'my-own-ctx');
   // A rerun changes nothing; on a new Node the entry flips back to npx.
   const before = fs.readFileSync(ocFile, 'utf8');
@@ -631,7 +631,7 @@ test('with nvm, Context Mode is registered with an absolute Node in every agent 
   assert.deepEqual(JSON.parse(fs.readFileSync(ocFile, 'utf8')).mcp.servers['context-mode'].command.slice(0, 2), ['npx', '-y']);
   lean(home, args, oldNode(nvm));
   lean(home, ['--uninstall', '--yes'], oldNode(nvm));
-  assert.ok(!fs.readFileSync(ocFile, 'utf8').includes('context-mode'));
+  assert.deepEqual(JSON.parse(fs.readFileSync(ocFile, 'utf8')).mcp.servers['context-mode'].command, ['npx', '-y', 'context-mode@2.1.3', 'server']);
   assert.equal(JSON.parse(fs.readFileSync(cursorFile, 'utf8')).mcpServers['context-mode'].command, 'my-own-ctx');
 });
 
@@ -1166,7 +1166,8 @@ test('Cursor: subagents, MCP, kept user values, no global rules, full uninstall'
   const mcp = JSON.parse(fs.readFileSync(path.join(dir, 'mcp.json'), 'utf8')).mcpServers;
   assert.equal(mcp.serena.command, 'mine');
   assert.equal(mcp.playwright.command, 'npx');
-  assert.equal(mcp['context-mode'].command, 'npx');
+  assert.equal(mcp['context-mode'], undefined, 'Context Mode has no Cursor agent id: no broken entry');
+  assert.match(out, /Context Mode has no Cursor agent id/);
   const agent = fs.readFileSync(path.join(dir, 'agents', 'debug.md'), 'utf8');
   assert.match(agent, /^model: inherit$/m);
   assert.match(agent, /^readonly: false$/m);

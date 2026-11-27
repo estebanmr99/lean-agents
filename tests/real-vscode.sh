@@ -50,6 +50,17 @@ node -e '
   for (const k of ["probe", "serena", "playwright", "playwright-extension", "context-mode"]) if (!s[k]) throw new Error("no " + k + " in user mcp.json");
   if (s.serena.type !== "stdio") throw new Error("serena is not stdio");
 ' "$user/mcp.json"
+# #562: one real ctx_execute call over stdio, not only the entry; answers roots/list so --agent vscode can find the project.
+node --input-type=module - "$user/mcp.json" "$repo" "$HOME" <<'JS'
+import fs from 'node:fs';
+const { probeToolCall } = await import(`${process.argv[3]}/scripts/lib/inventory.mjs`);
+const entry = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')).servers['context-mode'];
+const argv = [entry.command, ...(entry.args ?? [])];
+if (argv[argv.indexOf('--agent') + 1] !== 'vscode') { console.log(`FAIL  context-mode args have no --agent vscode: ${argv.join(' ')}`); process.exit(1); }
+const r = await probeToolCall(argv, { cwd: process.argv[4], expect: 'ctx-ok' });
+console.log(`${r.ok ? 'ok    ' : 'FAIL  '} context-mode ctx_execute --agent vscode${r.error ? ` (${r.error})` : ''}`);
+process.exit(r.ok ? 0 : 1);
+JS
 
 ext="$HOME/vscode-extensions"
 # Copilot Chat ships inside VS Code, so even an empty extensions dir reports it as installed.

@@ -11,6 +11,7 @@ import { configHome } from '../system.mjs';
 import { gitBashPath } from '../terminals.mjs';
 import { PINS, npmSpec, skillSource, skillsCli } from '../pins.mjs';
 import { updaterMode } from '../network.mjs';
+import { contextModeCommand } from '../context-mode.mjs';
 
 const PERMISSIONS = {
   'read-only': ['  edit: deny', '  bash: deny'],
@@ -38,10 +39,12 @@ export function configPath(dir) {
   return path.join(dir, 'opencode.jsonc');
 }
 
-export function localServer(core, name) {
+// `client` names the Context Mode agent id; serena and playwright ignore it.
+export function localServer(core, name, client) {
   const server = core.mcp[name];
-  const command = [...server.command];
+  let command = [...server.command];
   if (name === 'serena') command.splice(command.indexOf('start-mcp-server') + 1, 0, '--context', server.context.default);
+  if (name === 'context-mode') command = contextModeCommand(command, client);
   return { type: 'local', command, enabled: true };
 }
 
@@ -111,7 +114,7 @@ export function dcpTuiActions(dir) {
 // by a rerun, so the npx and absolute forms flip either way. Anything else the user has is kept.
 export function mcpEdit(path, shape, command, legacy) {
   const value = shape(command);
-  return legacy ? { path, value, mode: 'upgradeIf', legacy: legacy.map(shape) } : { path, value, mode: 'setIfAbsent' };
+  return legacy ? { path, value, mode: 'upgradeIf', legacy: legacy.map(shape), restorePrevious: true } : { path, value, mode: 'setIfAbsent' };
 }
 
 // Windows only, and only when Git Bash is actually found (#124 follow-up, proven in `real-opencode-shell`
@@ -228,7 +231,7 @@ export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
   if (shell) edits.push(shell);
 
   for (const name of ['context-mode', 'serena', 'playwright', 'playwright-extension']) {
-    if (tools.includes(name)) edits.push(mcpEdit(['mcp', 'servers', name], (command) => ({ type: 'local', command, enabled: true }), localServer(core, name).command, core.mcp[name].legacy));
+    if (tools.includes(name)) edits.push(mcpEdit(['mcp', 'servers', name], (command) => ({ type: 'local', command, enabled: true }), localServer(core, name, 'opencode').command, core.mcp[name].legacy));
   }
   if (tools.includes('ponytail')) edits.push({ path: ['plugins'], value: npmSpec('ponytail'), mode: 'arrayAdd', legacy: ['@dietrichgebert/ponytail'] });
   if (tools.includes('dcp')) {

@@ -270,9 +270,9 @@ export function plan(actions, roots = [], prior = []) {
         const createdParents = [];
         for (let k = 1; k <= depth; k++) if (absent(e.path.slice(0, k))) createdParents.push(e.path.slice(0, k));
         const previous = before === null ? undefined : getAt(before, e.path);
-        // An upgraded legacy entry has no user value to restore: uninstall removes it.
+        // A legacy entry is ours to move; with `restorePrevious` (MCP entries) --uninstall writes the old args back.
         const upgraded = e.mode === 'upgradeIf' && isLegacy(previous, e.legacy);
-        return { ...e, previous: upgraded ? undefined : previous, upgraded, createdParents };
+        return { ...e, previous: upgraded && !e.restorePrevious ? undefined : previous, upgraded, createdParents };
       });
       const owned = prior.filter((f) => f.path === a.path).flatMap((f) => f.applied ?? []);
       const r = applyJsonEdits(before, edits, owned);

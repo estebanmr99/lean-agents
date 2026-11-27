@@ -23,8 +23,10 @@ export function renderCursorAgent(agent) {
 }
 
 // `mcpServers` entries for a Cursor mcp.json, user or project.
+// Context Mode has no id in its AGENT_IDS for Cursor (2.1.7), and a server without --agent fails every ctx_* call, so it is
+// left out and reported instead of writing a broken entry.
 export function cursorServers(core, tools) {
-  return ['serena', 'playwright', 'playwright-extension', 'context-mode'].filter((t) => tools.includes(t)).map((name) => {
+  return ['serena', 'playwright', 'playwright-extension'].filter((t) => tools.includes(t)).map((name) => {
     return mcpEdit(['mcpServers', name], ([command, ...args]) => ({ command, args }), localServer(core, name).command, core.mcp[name].legacy);
   });
 }
@@ -44,6 +46,9 @@ export function cursorAdapter({ home, core, opts, adhdCommand }) {
   const commands = [];
   const edits = cursorServers(core, tools);
   if (edits.length) actions.push({ kind: 'json', path: path.join(dir, 'mcp.json'), edits });
+  if (tools.includes('context-mode')) {
+    console.log('Context Mode has no Cursor agent id in v2.1.7 (AGENT_IDS: claude-code, codex, gemini, qwen, copilot-cli, vscode, kiro, zcode, pi, opencode): its MCP entry is skipped, not guessed. Use another MCP client for Context Mode.');
+  }
   // Proxies such as Zscaler break the agent's HTTP/2 stream (#25). Only the flag is written, never a proxy value.
   if (hasProxy()) actions.push({ kind: 'json', path: path.join(dir, 'cli-config.json'), edits: [{ path: ['network', 'useHttp1ForAgent'], value: true, mode: 'setIfAbsent' }] });
 

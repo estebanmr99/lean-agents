@@ -101,7 +101,7 @@ test('apply re-registers the managed MCPs, keeps user files, and --undo restores
   const r = lean(s.home, ['--yes', '--keep-backup']);
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const servers = JSON.parse(fs.readFileSync(claude, 'utf8')).mcpServers;
-  assert.match(servers['context-mode'].command, /v24\.15\.0/); assert.deepEqual(servers['context-mode'].args.slice(-1), ['server']);
+  assert.match(servers['context-mode'].command, /v24\.15\.0/); assert.deepEqual(servers['context-mode'].args.slice(-2), ['--agent', 'claude-code']);
   assert.match(servers['ctx-link'].command, /v24\.15\.0/);
   assert.equal(servers.relay.command, 'node'); // the user's own entry
   assert.ok(fs.existsSync(j(s.home, '.agents', 'skills', 'dup-demo')), 'no --confirm-removals: the duplicate skill stays');

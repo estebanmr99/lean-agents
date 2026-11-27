@@ -6,6 +6,7 @@ import { tierFor, modelFor } from '../render.mjs';
 import { privacyOf, updaterMode } from '../network.mjs';
 import { statuslineScript } from '../copilot-usage.mjs';
 import { marketplaceSource, skillSource, skillsCli } from '../pins.mjs';
+import { contextModeCommand } from '../context-mode.mjs';
 
 // Also the key of its record in state.json: removing the entry replaces that record (empty undo), so --uninstall does not remove it twice.
 const CTX_MCP = 'Context Mode MCP server (user scope)';
@@ -92,7 +93,7 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
     commands.push({
       tool: 'context-mode',
       desc: CTX_MCP,
-      run: [['claude', 'mcp', 'add', '--scope', 'user', 'context-mode', '--', ...core.mcp['context-mode'].command]],
+      run: [['claude', 'mcp', 'add', '--scope', 'user', 'context-mode', '--', ...contextModeCommand(core.mcp['context-mode'].command, 'claude-code')]],
       undo: [['claude', 'mcp', 'remove', '--scope', 'user', 'context-mode']],
       skipIfOutput: { cmd: ['claude', 'mcp', 'get', 'context-mode'], ok: true },
     });
