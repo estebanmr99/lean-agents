@@ -391,6 +391,7 @@ jobs:
             --yes-turns "$yes_turns" \
             --source "$SOURCE" \
             --shim-log "$E2E_RAW/shim.log" \
+            --release-dir "$LEAN_AGENTS_RELEASE_DIR" \
             --out "$E2E_RAW/result.json"
 
       - name: Redact the artifacts

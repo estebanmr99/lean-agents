@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { evaluateUpdate, unansweredQuestion, consentDecision, leanUpdateCalled, shimHasUpdateCall, budgetDecision, questionLines } from './e2e-update.mjs';
+import { evaluateUpdate, unansweredQuestion, consentDecision, leanUpdateCalled, shimHasUpdateCall, checkoutUpdateCalled, budgetDecision, questionLines } from './e2e-update.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -54,7 +54,7 @@ test('e2e-update evaluator: every unmet condition is reported', () => {
   assert.ok(bad.failures.some((f) => /marketplace ref v2\.1\.4 is not v2\.1\.7/.test(f)));
   assert.ok(bad.failures.some((f) => /plugin version 2\.1\.4 is not v2\.1\.7/.test(f)));
   assert.ok(bad.failures.some((f) => /lean-update skill was not called/.test(f)));
-  assert.ok(bad.failures.some((f) => /no --update call went through the checkout shim/.test(f)));
+  assert.ok(bad.failures.some((f) => /no --update call ran the checkout code/.test(f)));
   assert.ok(bad.failures.some((f) => /unanswered question/.test(f)));
 });
 
@@ -143,9 +143,34 @@ test('e2e-update evaluator: checkout needs an --update call through the shim, np
   assert.equal(shimHasUpdateCall('lean-agents --update --yes'), true);
   assert.equal(shimHasUpdateCall('npx -y lean-agents@1.2.6 --update --yes'), true);
   assert.equal(shimHasUpdateCall('lean-agents --doctor --json'), false);
-  assert.match(evaluateUpdate({ ...good(), shimLog: '' }).failures.join(' '), /no --update call went through the checkout shim/);
+  assert.match(evaluateUpdate({ ...good(), shimLog: '' }).failures.join(' '), /no --update call ran the checkout code/);
   const npm = evaluateUpdate({ ...good(), source: 'npm', shimLog: '' });
   assert.equal(npm.ok, true, npm.failures.join('; '));
+});
+
+test('e2e-update evaluator: a shell tool that runs --update inside the release dir also passes', () => {
+  const releaseDir = path.join('/opt', 'lean-agents');
+  const command = `cd "${releaseDir}" && node scripts/lean.mjs --update --yes`;
+  const r = evaluateUpdate({
+    ...good(),
+    shimLog: '',
+    releaseDir,
+    transcript: [skillEvent(), toolEvent('bash', { command }), transcript('Done. lean-agents is updated.')].join('\n'),
+  });
+  assert.equal(r.ok, true, r.failures.join('; '));
+  assert.equal(checkoutUpdateCalled(toolEvent('bash', { command: 'cd "$LEAN_AGENTS_RELEASE_DIR" && node scripts/lean.mjs --update --yes' }), releaseDir), true);
+});
+
+test('e2e-update evaluator: a shell tool that only ran --doctor does not pass', () => {
+  const releaseDir = path.join('/opt', 'lean-agents');
+  const r = evaluateUpdate({
+    ...good(),
+    shimLog: '',
+    releaseDir,
+    transcript: [skillEvent(), toolEvent('bash', { command: `cd "${releaseDir}" && node scripts/lean.mjs --doctor --json` }), transcript('Done. lean-agents is updated.')].join('\n'),
+  });
+  assert.equal(r.ok, false);
+  assert.match(r.failures.join(' '), /no --update call ran the checkout code/);
 });
 
 test('budgetDecision: below the cap continues, at or above it kills, an API error is exit 2', () => {

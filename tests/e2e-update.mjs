@@ -73,6 +73,27 @@ export function leanUpdateCalled(transcript) {
 export const shimHasUpdateCall = (log) =>
   String(log ?? '').split('\n').some((line) => /(^|\s)--update(\s|$)/.test(line));
 
+// A shell tool can also run the checkout directly: `cd <release dir> && node scripts/lean.mjs --update`. Accept the
+// literal release dir and the `$LEAN_AGENTS_RELEASE_DIR` reference the workflow exports.
+export function checkoutUpdateCalled(transcript, releaseDir) {
+  if (!transcript) return false;
+  const targets = ['\\$\\{?LEAN_AGENTS_RELEASE_DIR\\}?'];
+  if (releaseDir) targets.unshift(String(releaseDir).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const cd = new RegExp(`(^|\\s)cd\\s+["']?(?:${targets.join('|')})["']?(\\s|$)`);
+  for (const line of transcript.split('\n')) {
+    let ev;
+    try { ev = JSON.parse(line); } catch { continue; }
+    if (ev.type !== 'tool_use' && ev.type !== 'tool') continue;
+    const part = ev.part || ev;
+    const input = part.state?.input || part.input || {};
+    const command = String(input.command ?? input.cmd ?? '');
+    const script = command.search(/scripts[\\/]lean\.mjs/);
+    const into = cd.exec(command);
+    if (script >= 0 && into && into.index < script && /(^|\s)--update(\s|$)/.test(command)) return true;
+  }
+  return false;
+}
+
 // Exit 1 is the spend cap; exit 2 means the budget API could not be read, which is a different failure.
 export function budgetDecision({ used, maxUsd, error } = {}) {
   if (error) return { action: 'error', code: 2, message: `budget check failed (exit 2): ${error}` };
@@ -109,7 +130,7 @@ export function unansweredQuestion(transcript) {
 }
 
 // Pure: doctor JSON + install record (state.json) + `claude plugin list --json` (and the marketplace ref/pin).
-export function evaluateUpdate({ doctor, record, pluginList, pluginRef, pinVersion, currentVersion, exitCode, transcript, firstTurnTranscript = null, yesTurns = 0, source = 'checkout', shimLog = '', pluginId = 'context-mode@context-mode' }) {
+export function evaluateUpdate({ doctor, record, pluginList, pluginRef, pinVersion, currentVersion, exitCode, transcript, firstTurnTranscript = null, yesTurns = 0, source = 'checkout', shimLog = '', releaseDir = null, pluginId = 'context-mode@context-mode' }) {
   const failures = [];
   if (exitCode !== 0) failures.push(`agent exited ${exitCode}`);
   if (doctor?.ok !== true) failures.push('doctor is not ok');
@@ -123,7 +144,7 @@ export function evaluateUpdate({ doctor, record, pluginList, pluginRef, pinVersi
   else if (normal(plugin.version) !== normal(pinVersion)) failures.push(`plugin version ${plugin.version ?? 'missing'} is not ${pinVersion}`);
   if (!leanUpdateCalled(transcript)) failures.push('lean-update skill was not called');
   if (!String(finalText(transcript ?? '')).trim()) failures.push('final assistant message is empty');
-  if (source === 'checkout' && !shimHasUpdateCall(shimLog)) failures.push('no --update call went through the checkout shim');
+  if (source === 'checkout' && !shimHasUpdateCall(shimLog) && !checkoutUpdateCalled(transcript, releaseDir)) failures.push('no --update call ran the checkout code');
 
   const consent = consentDecision(firstTurnTranscript ?? transcript);
   let questions = questionLines(transcript);
@@ -201,6 +222,7 @@ function evaluate() {
     yesTurns: Number(arg('yes-turns') ?? 0),
     source: arg('source') ?? 'checkout',
     shimLog,
+    releaseDir: arg('release-dir'),
   });
   if (arg('out')) fs.writeFileSync(arg('out'), `${JSON.stringify(result, null, 2)}\n`);
   console.log(JSON.stringify(result, null, 2));
@@ -214,7 +236,7 @@ async function main() {
   if (command === 'consent') return consent();
   if (command === 'redact') return redact(), 0;
   if (command === 'evaluate') return evaluate();
-  console.error('usage: e2e-update.mjs spend | budget --start <usd> --max-usd <usd> | consent --transcript <file> | redact --in <file> --out <file> | evaluate --doctor <file> --record <file> --plugin-list <file> --pin-version <v> --current-version <v> --exit-code <n> --transcript <file> [--first-turn <file>] [--yes-turns <n>] [--source checkout|npm] [--shim-log <file>] [--settings <file>] [--out <file>]');
+  console.error('usage: e2e-update.mjs spend | budget --start <usd> --max-usd <usd> | consent --transcript <file> | redact --in <file> --out <file> | evaluate --doctor <file> --record <file> --plugin-list <file> --pin-version <v> --current-version <v> --exit-code <n> --transcript <file> [--first-turn <file>] [--yes-turns <n>] [--source checkout|npm] [--shim-log <file>] [--release-dir <path>] [--settings <file>] [--out <file>]');
   return 2;
 }
 
