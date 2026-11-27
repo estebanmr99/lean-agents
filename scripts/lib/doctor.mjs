@@ -360,16 +360,16 @@ function openCodeTuiRows({ home, state, platform = process.platform, fsx = fs },
       const f = path.join(dir, name);
       if (fsx.existsSync(f)) add(`OpenCode ${name}`, 'changed', `stale: OpenCode 2 reads cli.json, not this file. Fix: delete ${rel(f)} by hand once you need nothing from it; lean-agents never deletes it`);
     }
-    const read = (f) => { try { return parse(fsx.readFileSync(f, 'utf8')); } catch { return null; } };
-    const dcp = '@tarquinen/opencode-dcp';
-    const spec = (v) => typeof v === 'string' && (v === dcp || v.startsWith(`${dcp}@`));
-    const server = read(configPath(dir));
-    const tuiFiles = [['cli.json', read(cli)], ['tui.json', read(path.join(dir, 'tui.json'))], ['tui.jsonc', read(path.join(dir, 'tui.jsonc'))]]
-      .filter(([, cfg]) => (cfg?.plugins ?? cfg?.plugin ?? []).some(spec))
-      .map(([name]) => name);
-    if ((server?.plugins ?? server?.plugin ?? []).some(spec) && tuiFiles.length) {
-      add('DCP /dcp duplicate', 'changed', `DCP is listed in opencode.jsonc and ${tuiFiles.join(' and ')}, so the TUI lists /dcp twice; opencode.jsonc already loads its TUI part. Fix: run lean-agents --update (it removes the duplicate TUI entries, backed up)`);
-    }
+  }
+  const read = (f) => { try { return parse(fsx.readFileSync(f, 'utf8')); } catch { return null; } };
+  const dcp = '@tarquinen/opencode-dcp';
+  const spec = (v) => typeof v === 'string' && (v === dcp || v.startsWith(`${dcp}@`));
+  const server = read(configPath(dir));
+  const tuiFiles = [['cli.json', read(cli)], ['tui.json', read(path.join(dir, 'tui.json'))], ['tui.jsonc', read(path.join(dir, 'tui.jsonc'))]]
+    .filter(([, cfg]) => (cfg?.plugins ?? cfg?.plugin ?? []).some(spec))
+    .map(([name]) => name);
+  if ((server?.plugins ?? server?.plugin ?? []).some(spec) && tuiFiles.length) {
+    add('DCP /dcp duplicate', 'changed', `DCP is listed in opencode.jsonc and ${tuiFiles.join(' and ')}, so the TUI lists /dcp twice; opencode.jsonc already loads its TUI part. Fix: run lean-agents --update (it removes the duplicate TUI entries, backed up)`);
   }
   const seen = new Set();
   for (const p of localPluginFiles(dir, { fsx, home })) {

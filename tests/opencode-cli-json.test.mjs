@@ -138,6 +138,18 @@ test('doctor: DCP in opencode.jsonc and cli.json is one duplicate /dcp warning',
   assert.match(row.detail, /lean-agents --update/);
 });
 
+test('doctor: DCP added to the old tui.json is reported before --update removes it', () => {
+  const f = setup({ server: [PIN], tui: [`${PKG}@3.1.15`] });
+  const rows = [];
+  doctor({ home: f.home, state: { version: '0.0.0', files: [], commands: [], pins: {}, options: { agents: ['opencode-v2'], tools: ['dcp'], privacy: 'standard', network: {} } }, exec: false, collect: rows });
+  const row = rows.find((r) => r.item === 'DCP /dcp duplicate');
+  assert.equal(row.status, 'changed');
+  assert.match(row.detail, /listed in opencode\.jsonc and tui\.json/);
+  assert.match(row.detail, /lean-agents --update/);
+  install(f.home, ['dcp']);
+  assert.deepEqual(list(f.tui, 'plugin'), []);
+});
+
 test('copilot-usage on 2.x removes the hand-made meter entry only, and undo restores it', () => {
   const f = setup({ cli: null, server: [] });
   const file = path.join(f.dir, 'plugins', 'copilot-usage-tui', 'tui.js');
