@@ -1,0 +1,373 @@
+name: E2E update
+
+# #561: one real agent run updates an existing lean-agents install end to end, with no human input.
+# Manual only: it calls a paid model. Dispatch it after #546 and #548 merge.
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: 'checkout runs this branch (packed tarball + shims); npm proves the published release path'
+        default: 'checkout'
+        required: true
+        type: choice
+        options:
+          - checkout
+          - npm
+      model:
+        description: 'Model for the agent (provider/model)'
+        default: 'openrouter/deepseek/deepseek-v4.1-flash-1017'
+        required: true
+        type: string
+      max_usd:
+        description: 'Stop when this job has spent this much on the key (USD, at most 1)'
+        default: '0.5'
+        required: true
+        type: string
+      from_version:
+        description: 'lean-agents release to install first (the old install record)'
+        default: '1.2.4'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # Context Mode 2 needs Node >=24.15 (the real-* jobs use this too).
+          node-version: '24'
+
+      - name: Validate the inputs
+        env:
+          MAX_USD: ${{ inputs.max_usd }}
+          FROM_VERSION: ${{ inputs.from_version }}
+          SOURCE: ${{ inputs.source }}
+        run: |
+          node -e "const m = Number(process.env.MAX_USD); if (!Number.isFinite(m) || m <= 0 || m > 1) { console.error('max_usd must be greater than 0 and at most 1'); process.exit(1); }"
+          node -e "const v = process.env.FROM_VERSION; if (!/^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$/.test(v)) { console.error('from_version must be a semver version like 1.2.4'); process.exit(1); }"
+          case "$SOURCE" in
+            checkout|npm) ;;
+            *) echo "source must be checkout or npm" >&2; exit 1 ;;
+          esac
+
+      - name: Prepare the throwaway home
+        # Everything the tools and lean-agents write stays under RUNNER_TEMP; later steps read the exported values.
+        env:
+          HOME: ${{ runner.temp }}/e2e-home
+          XDG_CONFIG_HOME: ${{ runner.temp }}/e2e-home/.config
+          NPM_CONFIG_PREFIX: ${{ runner.temp }}/e2e-home/npm
+          E2E_RAW: ${{ runner.temp }}/e2e-raw
+          E2E_OUT: ${{ runner.temp }}/e2e-out
+        run: |
+          mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$NPM_CONFIG_PREFIX/bin" "$E2E_RAW" "$E2E_OUT"
+          {
+            echo "HOME=$HOME"
+            echo "XDG_CONFIG_HOME=$XDG_CONFIG_HOME"
+            echo "NPM_CONFIG_PREFIX=$NPM_CONFIG_PREFIX"
+            echo "E2E_RAW=$E2E_RAW"
+            echo "E2E_OUT=$E2E_OUT"
+          } >> "$GITHUB_ENV"
+          {
+            echo "$NPM_CONFIG_PREFIX/bin"
+            echo "$HOME/.local/bin"
+          } >> "$GITHUB_PATH"
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Install the pinned OpenCode 2
+        run: |
+          bash scripts/ci-install-opencode-v2.sh
+          export PATH="$HOME/.opencode/bin:$PATH"
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+          opencode --version
+
+      - name: Install the pinned Claude Code
+        run: |
+          npm install -g "$(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('claude-code')))")"
+          claude --version
+
+      - name: Install lean-agents at the old release
+        env:
+          FROM_VERSION: ${{ inputs.from_version }}
+        run: |
+          npx -y "lean-agents@${FROM_VERSION}" --home "$HOME" --yes \
+            --agents claude,opencode-v2 --tools context-mode --privacy standard --lang en \
+            --profile none --ponytail-mode off --no-bun --no-gh --terminal none
+          node -e "const s = require(process.env.HOME + '/.config/lean-agents/state.json'); if (s.version !== process.env.FROM_VERSION) { console.error('install record is ' + s.version + ', expected ' + process.env.FROM_VERSION); process.exit(1); } console.log('old install record: ' + s.version);"
+          # The agent is told to find this skill, so fail here rather than in the model run if the old release missed it.
+          test -f "$HOME/.agents/skills/lean-update/SKILL.md"
+
+      - name: Serve the checkout to the agent
+        if: inputs.source == 'checkout'
+        # The packed tarball is installed into a private prefix; the shims first on PATH make both `lean-agents` and
+        # `npx -y lean-agents@<any>` run it, and `gh release view` answer with the checkout version. The branch skill
+        # replaces the published copy so LEAN_AGENTS_RELEASE_DIR can serve core/pins.json.
+        run: |
+          set -euo pipefail
+          tarball="$(npm pack --silent | tail -n 1)"
+          test -f "$tarball"
+          npm install -g --prefix "$E2E_RAW/checkout-prefix" "$tarball" >/dev/null
+          bin="$E2E_RAW/checkout-prefix/bin/lean-agents"
+          test -x "$bin"
+          real_npx="$(command -v npx)"
+          real_gh="$(command -v gh || true)"
+          if [ -n "$real_gh" ]; then gh_exec="exec \"$real_gh\" \"\$@\""; else gh_exec=""; fi
+          mkdir -p "$E2E_RAW/shim"
+          cat > "$E2E_RAW/shim/lean-agents" <<EOF
+          #!/usr/bin/env bash
+          echo "lean-agents \$*" >> "$E2E_RAW/shim.log"
+          exec "$bin" "\$@"
+          EOF
+          cat > "$E2E_RAW/shim/npx" <<EOF
+          #!/usr/bin/env bash
+          echo "npx \$*" >> "$E2E_RAW/shim.log"
+          is_lean=0
+          for arg in "\$@"; do
+            case "\$arg" in lean-agents|lean-agents@*) is_lean=1; break ;; esac
+          done
+          if [ "\$is_lean" -eq 1 ]; then
+            seen=0
+            args=()
+            for arg in "\$@"; do
+              if [ "\$seen" -eq 0 ]; then
+                case "\$arg" in
+                  -y|--yes) ;;
+                  lean-agents|lean-agents@*) seen=1 ;;
+                  *) seen=1; args+=("\$arg") ;;
+                esac
+              else
+                args+=("\$arg")
+              fi
+            done
+            exec "$bin" "\${args[@]}"
+          fi
+          exec "$real_npx" "\$@"
+          EOF
+          cat > "$E2E_RAW/shim/gh" <<EOF
+          #!/usr/bin/env bash
+          if [ "\${1:-}" = release ] && [ "\${2:-}" = view ]; then
+            case " \$* " in
+              *" tagName "*) echo "v$(node -p "require('./package.json').version")" ;;
+              *) cat "$GITHUB_WORKSPACE/CHANGELOG.md" ;;
+            esac
+            exit 0
+          fi
+          ${gh_exec}
+          echo "gh shim: no real gh for \$*" >&2
+          exit 1
+          EOF
+          chmod +x "$E2E_RAW/shim/lean-agents" "$E2E_RAW/shim/npx" "$E2E_RAW/shim/gh"
+          # The background service is started later and inherits this PATH and env, so its shell tool sees the shims too.
+          echo "$E2E_RAW/shim" >> "$GITHUB_PATH"
+          echo "LEAN_AGENTS_RELEASE_DIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+          for d in "$HOME/.agents/skills/lean-update" "$HOME/.claude/skills/lean-update"; do
+            if [ -d "$d" ]; then cp -R skills/lean-update/. "$d/"; fi
+          done
+          test -f "$HOME/.agents/skills/lean-update/SKILL.md"
+          grep -q 'LEAN_AGENTS_RELEASE_DIR' "$HOME/.agents/skills/lean-update/SKILL.md"
+
+      - name: Move the Claude context-mode plugin to the old pin
+        # The same old ref as tests/real-claude-plugin-move.sh (#546); the update must move it without losing the plugin.
+        run: |
+          set -euo pipefail
+          old=v2.1.4
+          settings="$HOME/.claude/settings.json"
+          test -f "$settings"
+          claude plugin uninstall context-mode@context-mode >/dev/null 2>&1 || true
+          node -e "const fs = require('fs'), f = process.argv[1], j = JSON.parse(fs.readFileSync(f, 'utf8')); if (j.extraKnownMarketplaces) delete j.extraKnownMarketplaces['context-mode']; fs.writeFileSync(f, JSON.stringify(j, null, 2) + '\n');" "$settings"
+          claude plugin marketplace add "mksglu/context-mode#${old}"
+          claude plugin marketplace update context-mode
+          claude plugin install context-mode@context-mode
+          claude plugin list --json > "$E2E_RAW/plugin-old.json"
+          node -e "const j = JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')); const p = (Array.isArray(j) ? j : j.plugins || []).find((x) => x.id === 'context-mode@context-mode'); if (!p || String(p.version).replace(/^v/, '') !== '2.1.4') { console.error('old plugin pin was not installed: ' + JSON.stringify(p)); process.exit(1); } console.log('old plugin: ' + p.version);" "$E2E_RAW/plugin-old.json"
+
+      - name: Start the OpenCode service
+        env:
+          # The service makes the provider calls, so it needs the key; the run steps only pass it on.
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          set -euo pipefail
+          opencode serve --service > "$E2E_RAW/serve.log" 2>&1 &
+          up=0
+          for _ in $(seq 1 30); do
+            if opencode service status >/dev/null 2>&1; then up=1; break; fi
+            sleep 2
+          done
+          if [ "$up" != 1 ]; then
+            echo "the OpenCode service did not start" >&2
+            cat "$E2E_RAW/serve.log" >&2
+            exit 1
+          fi
+
+      - name: Record the key spend at job start
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: node tests/e2e-update.mjs spend > "$E2E_RAW/spend-before.txt"
+
+      - name: Provider smoke test
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          MODEL: ${{ inputs.model }}
+          MAX_USD: ${{ inputs.max_usd }}
+        run: |
+          set -euo pipefail
+          timeout 180 opencode run --agent build -m "$MODEL" --format json "Reply with the single word OK." > "$E2E_RAW/smoke.jsonl" 2> "$E2E_RAW/smoke.err"
+          node tests/e2e-update.mjs budget --start "$(cat "$E2E_RAW/spend-before.txt")" --max-usd "$MAX_USD"
+
+      - name: Update lean-agents with the agent
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          MODEL: ${{ inputs.model }}
+          MAX_USD: ${{ inputs.max_usd }}
+          SOURCE: ${{ inputs.source }}
+        run: |
+          set -euo pipefail
+          if [ "$SOURCE" = checkout ]; then
+            export PATH="$E2E_RAW/shim:$PATH"
+            export LEAN_AGENTS_RELEASE_DIR="$GITHUB_WORKSPACE"
+          fi
+          printf '0\n' > "$E2E_RAW/yes-turns"
+          # Poll the key spend every 20 s and kill only the opencode run PID it was given. Exit 1 is the cap, exit 2
+          # is an unreadable budget API; both stop the run, with a different message.
+          run_watched() {
+            out="$1"; err="$2"; shift 2
+            start="$(cat "$E2E_RAW/spend-before.txt")"
+            timeout 1800 "$@" > "$out" 2> "$err" &
+            run_pid=$!
+            (
+              while kill -0 "$run_pid" 2>/dev/null; do
+                set +e
+                node tests/e2e-update.mjs budget --start "$start" --max-usd "$MAX_USD" >> "$E2E_RAW/budget.txt" 2>&1
+                status=$?
+                set -e
+                if [ "$status" -eq 1 ] || [ "$status" -eq 2 ]; then
+                  kill "$run_pid" 2>/dev/null || true
+                  opencode service stop >/dev/null 2>&1 || true
+                  if [ "$status" -eq 1 ]; then
+                    echo "cap hit: key spend reached max_usd $MAX_USD; killed opencode run $run_pid" > "$E2E_RAW/cap-hit.txt"
+                  else
+                    echo "budget check failed (exit 2): could not read key spend; killed opencode run $run_pid" > "$E2E_RAW/budget-error.txt"
+                  fi
+                  exit "$status"
+                fi
+                sleep 20
+              done
+            ) &
+            watch_pid=$!
+            set +e
+            wait "$run_pid"
+            code=$?
+            set -e
+            kill "$watch_pid" 2>/dev/null || true
+            wait "$watch_pid" 2>/dev/null || true
+            if [ "$code" -eq 124 ]; then
+              echo "::error::opencode run timed out"
+              echo "opencode run timed out" > "$E2E_RAW/timeout.txt"
+            fi
+            return "$code"
+          }
+          set +e
+          run_watched "$E2E_RAW/transcript-first.jsonl" "$E2E_RAW/transcript-first.err" \
+            opencode run --agent build -m "$MODEL" --format json "update lean-agents"
+          code=$?
+          set -e
+          echo "$code" > "$E2E_RAW/exit-code"
+          cp "$E2E_RAW/transcript-first.jsonl" "$E2E_RAW/transcript.jsonl"
+          cp "$E2E_RAW/transcript-first.err" "$E2E_RAW/transcript.err"
+          if [ -f "$E2E_RAW/cap-hit.txt" ]; then echo "::error::$(cat "$E2E_RAW/cap-hit.txt")"; exit 1; fi
+          if [ -f "$E2E_RAW/budget-error.txt" ]; then echo "::error::$(cat "$E2E_RAW/budget-error.txt")"; exit 1; fi
+          if [ "$code" -eq 124 ]; then exit 1; fi
+          if [ "$code" -eq 0 ]; then
+            decision="$(node tests/e2e-update.mjs consent --transcript "$E2E_RAW/transcript-first.jsonl" || true)"
+            case "$decision" in
+              yes)
+                set +e
+                run_watched "$E2E_RAW/transcript-yes.jsonl" "$E2E_RAW/transcript-yes.err" \
+                  opencode run --continue --agent build -m "$MODEL" --format json "yes"
+                yes_code=$?
+                set -e
+                if [ -f "$E2E_RAW/cap-hit.txt" ]; then echo "::error::$(cat "$E2E_RAW/cap-hit.txt")"; exit 1; fi
+                if [ -f "$E2E_RAW/budget-error.txt" ]; then echo "::error::$(cat "$E2E_RAW/budget-error.txt")"; exit 1; fi
+                printf '1\n' > "$E2E_RAW/yes-turns"
+                cat "$E2E_RAW/transcript-yes.jsonl" >> "$E2E_RAW/transcript.jsonl"
+                cat "$E2E_RAW/transcript-yes.err" >> "$E2E_RAW/transcript.err"
+                if [ "$yes_code" -ne 0 ]; then
+                  echo "$yes_code" > "$E2E_RAW/yes-exit-code"
+                  echo "$yes_code" > "$E2E_RAW/exit-code"
+                fi
+                ;;
+              none) ;;
+              *) echo "::error::the agent stopped on a question: $decision"; exit 1 ;;
+            esac
+          fi
+          set +e
+          node tests/e2e-update.mjs budget --start "$(cat "$E2E_RAW/spend-before.txt")" --max-usd "$MAX_USD" > "$E2E_RAW/budget.txt" 2>&1
+          status=$?
+          set -e
+          if [ "$status" -eq 1 ]; then
+            echo "cap hit: key spend reached max_usd $MAX_USD" > "$E2E_RAW/cap-hit.txt"
+            echo "::error::$(cat "$E2E_RAW/cap-hit.txt")"
+            exit 1
+          elif [ "$status" -eq 2 ]; then
+            echo "budget check failed (exit 2): could not read key spend" > "$E2E_RAW/budget-error.txt"
+            echo "::error::$(cat "$E2E_RAW/budget-error.txt")"
+            exit 1
+          fi
+
+      - name: Collect doctor, record and plugin state
+        if: always()
+        env:
+          SOURCE: ${{ inputs.source }}
+        run: |
+          set -euo pipefail
+          code="$(cat "$E2E_RAW/exit-code" 2>/dev/null || echo 1)"
+          yes_turns="$(cat "$E2E_RAW/yes-turns" 2>/dev/null || echo 0)"
+          opencode service stop >/dev/null 2>&1 || true
+          node scripts/lean.mjs --home "$HOME" --doctor --json --no-exec > "$E2E_RAW/doctor.json" 2> "$E2E_RAW/doctor.err" || true
+          claude plugin list --json > "$E2E_RAW/plugin-list.json" 2> "$E2E_RAW/plugin-list.err" || echo '[]' > "$E2E_RAW/plugin-list.json"
+          opencode --version > "$E2E_RAW/versions.txt"
+          claude --version >> "$E2E_RAW/versions.txt"
+          node --version >> "$E2E_RAW/versions.txt"
+          node tests/e2e-update.mjs evaluate \
+            --doctor "$E2E_RAW/doctor.json" \
+            --record "$HOME/.config/lean-agents/state.json" \
+            --plugin-list "$E2E_RAW/plugin-list.json" \
+            --settings "$HOME/.claude/settings.json" \
+            --pin-version "$(node -p "require('./core/pins.json').pins['context-mode-plugin'].version")" \
+            --current-version "$(node -p "require('./package.json').version")" \
+            --exit-code "$code" \
+            --transcript "$E2E_RAW/transcript.jsonl" \
+            --first-turn "$E2E_RAW/transcript-first.jsonl" \
+            --yes-turns "$yes_turns" \
+            --source "$SOURCE" \
+            --shim-log "$E2E_RAW/shim.log" \
+            --out "$E2E_RAW/result.json"
+
+      - name: Redact the artifacts
+        if: always()
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          set -euo pipefail
+          for name in transcript.jsonl transcript-first.jsonl transcript-first.err transcript-yes.jsonl transcript-yes.err transcript.err doctor.json doctor.err result.json plugin-list.json plugin-list.err plugin-old.json serve.log smoke.jsonl smoke.err exit-code yes-turns yes-exit-code cap-hit.txt budget-error.txt spend-before.txt budget.txt budget-exceeded.txt versions.txt shim.log; do
+            [ -f "$E2E_RAW/$name" ] || continue
+            node tests/e2e-update.mjs redact --in "$E2E_RAW/$name" --out "$E2E_OUT/$name"
+          done
+
+      - name: Upload the redacted transcript and doctor JSON
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-update
+          retention-days: 14
+          path: ${{ runner.temp }}/e2e-out/
