@@ -1472,7 +1472,7 @@ test('Git Bash: marked .bashrc block with the Cursor aliases and loopback NO_PRO
   assert.match(fs.readFileSync(rc, 'utf8'), /export FOO=1/);
   // The NO_PROXY loop appends only what is missing and keeps the user's entries.
   const body = p.after.match(/for h in[\s\S]*export NO_PROXY no_proxy/)[0];
-  const shell = spawnSync('bash', ['-c', `NO_PROXY='corp.invalid,localhost'\n${body}\necho "$NO_PROXY|$no_proxy"`], { encoding: 'utf8' });
+  const shell = spawnSync('bash', ['-c', `NO_PROXY='corp.invalid,localhost'\n${body}\necho "$NO_PROXY|$no_proxy"`], { encoding: 'utf8', env: { PATH: process.env.PATH, NO_PROXY: 'corp.invalid,localhost' } });
   if (!shell.error) assert.equal(shell.stdout.trim(), 'corp.invalid,localhost,127.0.0.1,::1|localhost,127.0.0.1,::1');
   undoActions(entries);
   assert.equal(fs.readFileSync(rc, 'utf8'), mine);
@@ -1549,7 +1549,7 @@ test('Cursor behind a proxy: only useHttp1ForAgent is merged into cli-config.jso
 
 test('Still needed from you: printed after install and by --doctor, Orca hooks found even when PowerShell-encoded', () => {
   const home = userHome();
-  const out = lean(home, ['--yes', '--no-exec', '--agents', 'cursor', '--tools', 'serena', '--terminal', 'orca'], { ...process.env, ...NO_PROXY_ENV });
+  const out = lean(home, ['--yes', '--no-exec', '--agents', 'cursor', '--tools', 'serena', '--terminal', 'orca'], { PATH: process.env.PATH, HOME: home, ...NO_PROXY_ENV });
   assert.match(out, /Still needed from you:/);
   assert.match(out, /agent login/);
   assert.match(out, /User Rules/);
@@ -1562,7 +1562,7 @@ test('Still needed from you: printed after install and by --doctor, Orca hooks f
   assert.equal(checks(home)[0].check(), false);
   fs.writeFileSync(path.join(home, '.cursor', 'hooks.json'), JSON.stringify({ hooks: { beforeShellExecution: [{ command: `powershell -EncodedCommand ${hook}` }] } }));
   assert.equal(checks(home)[0].check(), true);
-  assert.match(lean(home, ['--doctor', '--no-exec'], { ...process.env, ...NO_PROXY_ENV }), /ok\s+still needed\s+Orca: the first launch/);
+  assert.match(lean(home, ['--doctor', '--no-exec'], { PATH: process.env.PATH, HOME: home, ...NO_PROXY_ENV }), /ok\s+still needed\s+Orca: the first launch/);
 });
 
 test('Antigravity app and CLI install only through verified ids, else print the vendor link', () => {

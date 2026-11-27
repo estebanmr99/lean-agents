@@ -46,7 +46,7 @@ Instructions for coding agents (Claude Code, OpenCode, Copilot CLI) that work **
 
 - One branch per session: `session-<n>-<short-name>`. Conventional commits (`feat:`, `fix:`, `docs:`, `ci:`, `chore:`).
 - Commit as the owner (their GitHub no-reply email is already in the clone's git config) and add a `Co-Authored-By:` trailer for the agent.
-- Update `CHANGELOG.md` (Unreleased), the README compatibility tables (EN and ES) and `docs/compatibility.md` in the same PR as the feature.
+- Add `changes/<issue>.md` (see `changes/README.md`); `node scripts/changelog.mjs <version>` folds them into CHANGELOG.md in the release PR. Update the README compatibility tables (EN and ES) and `docs/compatibility.md` in the same PR as the feature.
 - Mark the session `[x]` in `docs/SPEC.md` section 14 when its PR merges.
 
 ## Token efficiency while working here
