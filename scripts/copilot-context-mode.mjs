@@ -15,10 +15,12 @@ if (listed.status === 0 && listed.stdout.includes('"context-mode"')) {
 // The command npm linked is the ground truth for the prefix: a symlink into the package on Unix, a shim next
 // to node_modules on Windows. `npm root -g` is only the fallback, since it recomputes the prefix.
 const candidates = [];
-const bin = process.env.LEAN_CONTEXT_MODE_DIR ? null : which('context-mode');
+const linked = process.env.LEAN_CONTEXT_MODE_DIR ? null : which('context-mode');
+const bin = linked && path.isAbsolute(linked) ? linked : null; // shortcut: dash's `command -v` can answer relative for an empty PATH entry (macOS sh answers absolute, so untested here)
 if (process.env.LEAN_CONTEXT_MODE_DIR) candidates.push(process.env.LEAN_CONTEXT_MODE_DIR); // set by lean-agents: the package lives in the tool Node's own prefix
 if (bin) candidates.push(path.dirname(fs.realpathSync(bin)), path.join(path.dirname(bin), 'node_modules', 'context-mode'));
-if (!process.env.LEAN_CONTEXT_MODE_DIR) candidates.push(path.join((spawnFor(['npm', 'root', '-g'], { encoding: 'utf8' }).stdout ?? '').trim(), 'context-mode'));
+const root = process.env.LEAN_CONTEXT_MODE_DIR ? '' : (spawnFor(['npm', 'root', '-g'], { encoding: 'utf8' }).stdout ?? '').trim();
+if (path.isAbsolute(root)) candidates.push(path.join(root, 'context-mode')); // a failed npm gives '', which would mean ./context-mode
 const dir = candidates.find((d) => fs.existsSync(path.join(d, 'server.mjs')));
 // The prerequisite step skips the install when any context-mode (for example 1.x) is already on PATH.
 if (!dir) {
