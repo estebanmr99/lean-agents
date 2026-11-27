@@ -15,7 +15,7 @@ const SHA = '2be44eb';
 const PASSING_AUDIT = '# Audit 9.9.9\n\n## Summary\n\n- ok\n\n## Findings and issues\n\n- none\n';
 
 // A repo dir with docs/audit-9.9.9.md and a `gh` stub that answers with canned JSON.
-function fixture({ audit = PASSING_AUDIT, runs = [{ conclusion: 'success' }], issues = [] } = {}) {
+function fixture({ audit = PASSING_AUDIT, runs = [{ conclusion: 'success' }], issues = [], expectSha = SHA } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'release-gate-'));
   if (audit !== null) {
     fs.mkdirSync(path.join(dir, 'docs'), { recursive: true });
@@ -25,7 +25,7 @@ function fixture({ audit = PASSING_AUDIT, runs = [{ conclusion: 'success' }], is
   fs.mkdirSync(bin);
   fs.writeFileSync(path.join(dir, 'runs.json'), JSON.stringify(runs));
   fs.writeFileSync(path.join(dir, 'issues.json'), JSON.stringify(issues));
-  fs.writeFileSync(path.join(dir, 'gh-stub.mjs'), stubSource(dir));
+  fs.writeFileSync(path.join(dir, 'gh-stub.mjs'), stubSource(dir, expectSha));
   const gh = path.join(bin, 'gh');
   fs.writeFileSync(gh, `#!/bin/sh\nexec "${process.execPath}" "${path.join(dir, 'gh-stub.mjs')}" "$@"\n`);
   fs.chmodSync(gh, 0o755);
@@ -33,14 +33,23 @@ function fixture({ audit = PASSING_AUDIT, runs = [{ conclusion: 'success' }], is
 }
 
 // The stub prints what gh + the gate's --jq would print for the two calls the gate makes.
-function stubSource(dir) {
+// It fails on a run lookup for any commit other than expectSha or any workflow other than ci.yml.
+function stubSource(dir, expectSha) {
   return `import fs from 'node:fs';
 import path from 'node:path';
 const dir = ${JSON.stringify(dir)};
+const expectSha = ${JSON.stringify(expectSha)};
 const args = process.argv.slice(2);
 const jq = args.includes('--jq') ? args[args.indexOf('--jq') + 1] : null;
+const flag = (name) => args.includes(name) ? args[args.indexOf(name) + 1] : null;
 const read = (f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
 if (args[0] === 'run' && args[1] === 'list') {
+  const commit = flag('--commit');
+  const workflow = flag('--workflow');
+  if (commit !== expectSha || workflow !== 'ci.yml') {
+    console.error('unexpected gh run list: --commit ' + commit + ', --workflow ' + workflow + ' (want ' + expectSha + ', ci.yml)');
+    process.exit(1);
+  }
   const runs = read('runs.json');
   console.log(jq ? String(runs.filter((r) => r.conclusion === 'success').length) : JSON.stringify(runs));
 } else if (args[0] === 'issue' && args[1] === 'list') {
@@ -57,8 +66,8 @@ if (args[0] === 'run' && args[1] === 'list') {
 `;
 }
 
-function gate(dir) {
-  const r = spawnSync('bash', [SCRIPT, '9.9.9', SHA], {
+function gate(dir, sha = SHA) {
+  const r = spawnSync('bash', [SCRIPT, '9.9.9', sha], {
     cwd: dir,
     encoding: 'utf8',
     env: { PATH: `${path.join(dir, 'bin')}${path.delimiter}${process.env.PATH}`, HOME: dir, GH_TOKEN: 'stub', GITHUB_REPOSITORY: 'o/r' },
@@ -87,6 +96,12 @@ test('fails when no successful ci.yml run exists for the SHA', SKIP, () => {
   const r = gate(fixture({ runs: [{ conclusion: 'failure' }] }));
   assert.equal(r.code, 1, r.out);
   assert.match(r.out, new RegExp(`no successful ci\\.yml run for ${SHA}`));
+});
+
+test('fails when the SHA the gate asks about is not the one passed to it', SKIP, () => {
+  const r = gate(fixture(), 'deadbee');
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /unexpected gh run list: --commit deadbee/);
 });
 
 test('fails on an open audit issue, but release-proof issues are exempt', SKIP, () => {
