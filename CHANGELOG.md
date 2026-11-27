@@ -6,6 +6,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 - The Claude Code `context-mode` plugin pin moved from `v2.1.4` to `v2.1.7`, matching the npm CLI that `--update` already installs (#490). A new test fails when the two pins drift apart without a `note` on the plugin pin explaining why.
+- The skipped `real-vscode-others` job no longer shows an unexpanded `real-vscode (${{ matrix.os }})` name in the checks list (#460). It has no custom name now, so a skip should show `real-vscode-others` and a real run still shows one job per OS.
 
 ## [1.2.3] - 2026-11-26
 
