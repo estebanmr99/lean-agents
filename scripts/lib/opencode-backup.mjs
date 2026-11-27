@@ -28,7 +28,7 @@ export const opencodeRunning = (names) => names.some((n) => OPENCODE_RE.test(n.t
 // One text for every refusal that meets a running OpenCode, so all four call sites say the same thing (#548).
 export const OPENCODE_RUNNING = "an opencode process is running (the 1.x app or the 2.x background service): run 'opencode service stop' (safe: it stops only the background service) and close OpenCode windows, then run this again";
 // #546: stopping the service from an agent's own shell kills that agent's session.
-export const OPENCODE_RUNNING_INSIDE = "you are running inside OpenCode: finish this session, then run `lean-agents --update` from a terminal (or ask again after `opencode service stop` from a terminal)";
+export const OPENCODE_RUNNING_INSIDE = "you are running inside OpenCode: close this OpenCode session, then run `lean-agents --update` from a terminal";
 // VERIFY: OpenCode 2 sets OPENCODE for the shells its tools run (docs/compatibility.md).
 export const insideOpenCode = (env = process.env) => Boolean(env?.OPENCODE);
 export const opencodeRunningText = (env = process.env) => (insideOpenCode(env) ? OPENCODE_RUNNING_INSIDE : OPENCODE_RUNNING);
@@ -173,7 +173,7 @@ export function backupOpencode({ home, dryRun = false, log = console.log, now = 
 
   const problems = [];
   try {
-    if (opencodeRunning(list())) problems.push(OPENCODE_RUNNING);
+    if (opencodeRunning(list())) problems.push(opencodeRunningText(process.env));
   } catch (e) { problems.push(`cannot list the running processes (${String(e.message).split('\n')[0]}): not safe to copy`); }
   let src;
   try { src = listSource(L); } catch (e) { return refuse([e.message]); }

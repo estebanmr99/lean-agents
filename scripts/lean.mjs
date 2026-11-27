@@ -28,7 +28,7 @@ import { probePlugins } from './lib/plugin-health.mjs';
 import { adopt, inventory, saveState } from './lib/adopt.mjs';
 import { planPrereqs, pendingPrereqs, everythingAgents, undoArgv, nvmDirExistedBefore } from './lib/prereqs.mjs';
 import { upgradeInventory, formatUpgrade, nextRtkStep } from './lib/upgrade.mjs';
-import { backupOpencode, backupLayout, listProcesses, opencodeRunning, opencodePids, runningBlocker, serviceStopRow, OPENCODE_RUNNING } from './lib/opencode-backup.mjs';
+import { backupOpencode, backupLayout, listProcesses, opencodeRunning, opencodePids, runningBlocker, serviceStopRow, opencodeRunningText } from './lib/opencode-backup.mjs';
 import { readBackupStamp } from './lib/backup-stamp.mjs';
 import { isActive, failAt, applyPreflight, verifyBackup, configDrift, createSteps, makeCtx, runApply, runUndo, restoreData } from './lib/opencode-upgrade.mjs';
 import { planOpencode1, installOpencode1, removeOpencode1, layout as opencode1Layout } from './lib/opencode1.mjs';
@@ -1317,7 +1317,7 @@ async function undoUpgrade(o) {
   console.log(`undo: ${todo.length ? todo.join(', ') : 'no step left to undo'}, then the 1.x data comes back from ${L.frozen} (the 2.x db is moved aside, never deleted)`);
   if (o.dryRun || !o.yes) { console.log('dry run: nothing was changed (--yes does it)'); return true; }
   const problems = [];
-  try { if (opencodeRunning(listProcesses())) problems.push(OPENCODE_RUNNING); } catch (e) { problems.push(`cannot list the running processes (${String(e.message).split('\n')[0]}): not safe to continue`); }
+  try { if (opencodeRunning(listProcesses())) problems.push(opencodeRunningText(process.env)); } catch (e) { problems.push(`cannot list the running processes (${String(e.message).split('\n')[0]}): not safe to continue`); }
   const bad = verifyBackup(stamp.dir);
   if (bad.length) problems.push(`the backup does not match its manifest (${bad[0]}): not used; see ${path.join(stamp.dir, 'RESTORE.md')}`);
   if (!o.exec) problems.push('--no-exec: undo may run the OpenCode 2 uninstall and a `--version` probe');

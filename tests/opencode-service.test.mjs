@@ -1,8 +1,21 @@
 // #548: --update leaves no OpenCode 2 background service behind when its own commands started it.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { serviceStopRow, runningBlocker, OPENCODE_RUNNING, OPENCODE_RUNNING_INSIDE } from '../scripts/lib/opencode-backup.mjs';
 import { leanUpdateCommands } from '../scripts/lib/lean-update.mjs';
+import { claudeAdapter } from '../scripts/lib/adapters/claude.mjs';
+import { copilotAdapter } from '../scripts/lib/adapters/copilot-cli.mjs';
+import { cursorAdapter } from '../scripts/lib/adapters/cursor.mjs';
+import { antigravityAdapter } from '../scripts/lib/adapters/antigravity.mjs';
+import { opencodeV2Adapter } from '../scripts/lib/adapters/opencode-v2.mjs';
+import { terminalCommands } from '../scripts/lib/terminals.mjs';
+
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const skillRun = (argv) => /^npx -y skills@\S+ (add|remove) /.test(argv.join(' '));
 
 const stop = ['opencode', 'service', 'stop'];
 
@@ -56,7 +69,39 @@ test('#546: inside OpenCode the fix never tells the agent to stop its own servic
   const up = { tool: 'opencode-v2', desc: 'upgrade opencode-v2 2.2.5 -> 2.2.7', run: [['npm', 'i', '-g', 'opencode-ai@2.2.7']] };
   const r = runningBlocker([up], () => ['opencode'], { OPENCODE: '1' });
   assert.equal(r, OPENCODE_RUNNING_INSIDE);
-  assert.match(r, /finish this session/);
-  assert.match(r, /lean-agents --update/);
-  assert.doesNotMatch(r, /run 'opencode service stop'/);
+  assert.equal(r, 'you are running inside OpenCode: close this OpenCode session, then run `lean-agents --update` from a terminal');
+  assert.doesNotMatch(r, /service stop/);
+});
+
+// #546: the rule is one bullet: outside OpenCode the service stop stays, inside it is never run.
+test('#546: the lean-update skill never tells an agent inside OpenCode to stop the service', () => {
+  const text = fs.readFileSync(path.join(ROOT, 'skills', 'lean-update', 'SKILL.md'), 'utf8');
+  const rules = text.split('\n').filter((l) => /opencode service stop/.test(l));
+  assert.equal(rules.length, 1, 'one bullet covers both cases');
+  assert.match(rules[0], /outside OpenCode/);
+  assert.match(rules[0], /you are running inside OpenCode/);
+  assert.match(rules[0], /never run `opencode service stop`/);
+});
+
+// #546: filesOnly skips the running-OpenCode check, so only a Skills CLI add/remove may carry it.
+test('#546: only Skills CLI add/remove commands carry filesOnly', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const core = { agents: [], mcp: {} };
+  const opts = { tools: ['caveman'], terminals: ['orca'], network: {}, platform: 'linux', env: {}, shell: 'default' };
+  const commands = [
+    ...claudeAdapter({ home, core, profile: null, opts, rulesPath: path.join(home, 'AGENTS.md'), adhdCommand: null }).commands,
+    ...copilotAdapter({ home, core, profile: null, opts, rules: '' }).commands,
+    ...cursorAdapter({ home, core, opts }).commands,
+    ...antigravityAdapter({ home, core, profile: null, opts, rules: '', adhdCommand: null }).commands,
+    ...opencodeV2Adapter({ home, core, profile: null, opts, rulesPath: path.join(home, 'rules.md') }).commands,
+    ...terminalCommands({ home, terminals: ['orca'], agents: ['claude'], network: {}, env: {}, system: false, platform: 'linux' }),
+    ...leanUpdateCommands(['claude', 'opencode-v2']),
+  ];
+  const skills = commands.filter((c) => (c.run ?? []).some(skillRun));
+  assert.ok(skills.length >= 7, `every skill refresh was checked (${skills.length})`);
+  assert.deepEqual(skills.filter((c) => !c.filesOnly).map((c) => c.desc), [], 'every Skills CLI add/remove is filesOnly');
+  for (const c of commands.filter((x) => x.filesOnly)) {
+    for (const argv of c.run) assert.ok(skillRun(argv), `${c.desc}: ${argv.join(' ')}`);
+  }
+  fs.rmSync(home, { recursive: true, force: true });
 });

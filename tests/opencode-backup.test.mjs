@@ -10,6 +10,8 @@ import { spawnSync } from 'node:child_process';
 import { backupOpencode, opencodeRunning, neededBytes, stamp, sha256File } from '../scripts/lib/opencode-backup.mjs';
 
 const j = path.join;
+// Hermetic: a test runner inside an OpenCode session must not change the refusal wording.
+delete process.env.OPENCODE;
 let sqlite = null;
 try { sqlite = await import('node:sqlite'); } catch { /* the real-count test skips */ }
 const skip = sqlite ? false : 'node:sqlite is not available on this Node';
