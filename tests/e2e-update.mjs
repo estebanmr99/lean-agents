@@ -28,6 +28,10 @@ const CONSENT = /^Update these \d+ [A-Za-z][A-Za-z -]{0,39}(?: \([^?()\n]{1,80}\
 // A second way to ask for the same yes ("Do you want me to run it?") is redundant, not a second decision.
 const RUN_ASK = /^(?:Do you want me to|Shall I|Should I|Want me to|Can I) (?:run|apply|proceed|go ahead|do)(?: it| this| that| the update| the plan)?\?$/i;
 
+// The skill's after-update offers: the summary page (SKILL.md step 6 "Hand-off") and the optional issue draft
+// (step 7). Both come after the work, so leaving one unanswered ends a non-interactive run cleanly.
+export const AFTER_OFFER = /^(?=[^\n]*\bsummary(?: page|\.html)\b)[^?\n]{0,400}\b(?:Do you want me to|Would you like me to|Want me to|Shall I|Should I|Can I) open it\?$|^Draft a redacted issue for lean-agents\?$/i;
+
 export function assistantText(transcript) {
   if (!transcript) return '';
   const order = [];
@@ -174,12 +178,13 @@ export function evaluateUpdate({ doctor, record, pluginList, pluginRef, pinVersi
     if (yesTurns === 1) {
       const i = questions.findIndex((q) => CONSENT.test(q));
       if (i >= 0) questions = questions.filter((q, j) => j > i || (!CONSENT.test(q) && !RUN_ASK.test(q)));
+      if (questions.length && AFTER_OFFER.test(questions[questions.length - 1])) questions = questions.slice(0, -1);
     }
   } else if (consent.action === 'fail') {
     failures.push(`unexpected question: ${consent.question}`);
   }
   if (yesTurns > 1) failures.push(`more than one yes turn: ${yesTurns}`);
-  if (questions.length) failures.push(`unanswered question: ${questions[0]}`);
+  if (questions.length) failures.push(`unanswered question: ${questions[questions.length - 1]}`);
   return { ok: failures.length === 0, failures };
 }
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { evaluateUpdate, unansweredQuestion, consentDecision, leanUpdateCalled, shimHasUpdateCall, checkoutUpdateCalled, budgetDecision, questionLines } from './e2e-update.mjs';
+import { evaluateUpdate, unansweredQuestion, consentDecision, leanUpdateCalled, shimHasUpdateCall, checkoutUpdateCalled, budgetDecision, questionLines, AFTER_OFFER } from './e2e-update.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -165,6 +165,78 @@ test('e2e-update evaluator: one consent question plus one yes turn passes', () =
     yesTurns: 1,
   });
   assert.equal(r.ok, true, r.failures.join('; '));
+});
+
+const SUMMARY_OFFER = 'This release writes a finish-step summary page at `~/.config/lean-agents/summary.html` (what was updated, kept, skipped, and logins still needed). Want me to open it?';
+
+test('e2e-update evaluator: after-update offers are the last question, not an unanswered one', () => {
+  // Run 46065857175 asked the summary page question from SKILL.md step 6 after the one yes turn.
+  const first = transcript('Here is the plan.\n\nUpdate these 3 tools?');
+  const summary = evaluateUpdate({
+    ...good(),
+    transcript: [skillEvent(), first, transcript(`Done. lean-agents is updated.\n\n${SUMMARY_OFFER}`)].join('\n'),
+    firstTurnTranscript: first,
+    yesTurns: 1,
+  });
+  assert.equal(summary.ok, true, summary.failures.join('; '));
+  assert.doesNotMatch(summary.failures.join(' '), /unanswered question/);
+
+  const draft = evaluateUpdate({
+    ...good(),
+    transcript: [skillEvent(), first, transcript('Done. lean-agents is updated.\n\nDraft a redacted issue for lean-agents?')].join('\n'),
+    firstTurnTranscript: first,
+    yesTurns: 1,
+  });
+  assert.equal(draft.ok, true, draft.failures.join('; '));
+});
+
+test('e2e-update evaluator: an offer only counts as last, and only when the text names the summary', () => {
+  const first = transcript('Here is the plan.\n\nUpdate these 3 tools?');
+  const followed = evaluateUpdate({
+    ...good(),
+    transcript: [skillEvent(), first, transcript(`Done.\n\n${SUMMARY_OFFER}\n\nShould I also delete ~/.ssh?`)].join('\n'),
+    firstTurnTranscript: first,
+    yesTurns: 1,
+  });
+  assert.equal(followed.ok, false);
+  assert.match(followed.failures.join(' '), /unanswered question: /);
+  assert.ok(followed.failures.includes('unanswered question: Should I also delete ~/.ssh?'));
+
+  const bare = evaluateUpdate({
+    ...good(),
+    transcript: [skillEvent(), first, transcript('Done.\n\nWant me to open it?')].join('\n'),
+    firstTurnTranscript: first,
+    yesTurns: 1,
+  });
+  assert.equal(bare.ok, false);
+  assert.match(bare.failures.join(' '), /unanswered question: Want me to open it\?/);
+});
+
+test('e2e-update evaluator: any common asker is accepted, but the offer must end the line with "open it?"', () => {
+  const first = transcript('Here is the plan.\n\nUpdate these 3 tools?');
+  const accepted = evaluateUpdate({
+    ...good(),
+    transcript: [skillEvent(), first, transcript('Done. lean-agents is updated.\n\nThe summary page is at ~/.config/lean-agents/summary.html. Would you like me to open it?')].join('\n'),
+    firstTurnTranscript: first,
+    yesTurns: 1,
+  });
+  assert.equal(accepted.ok, true, accepted.failures.join('; '));
+
+  // The asker is there, but the question ends with "open the summary?" and the path sits after it, so the offer
+  // must not match: only a line ending in "open it?" counts.
+  assert.equal(AFTER_OFFER.test('Would you like me to open the summary? It is at ~/.config/lean-agents/summary.html.'), false);
+});
+
+test('e2e-update evaluator: an after-update offer without a yes turn still fails', () => {
+  const first = transcript('Here is the plan.\n\nUpdate these 3 tools?');
+  const r = evaluateUpdate({
+    ...good(),
+    transcript: [skillEvent(), first, transcript(`Done.\n\n${SUMMARY_OFFER}`)].join('\n'),
+    firstTurnTranscript: first,
+    yesTurns: 0,
+  });
+  assert.equal(r.ok, false);
+  assert.match(r.failures.join(' '), /needs exactly one yes turn \(got 0\)/);
 });
 
 test('e2e-update evaluator: an unanswered or repeated consent question fails', () => {
