@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { splitBugs, mergeWorkerChanges, collectChanges, parseMaxUsd, isPositiveInt, fitsHeadroom, costVsSolo, sessionsForMode, renderMultiMarkdown, runOpenCode, summarizeSession, summarizeRuns, totalSessionCost, TASK9_BUG_TESTS, budgetSpent, workerTasks, workerPrompt, reviewerPrompt, isMultiagentTask, DEFAULT_TASK, REVIEWER_PROMPT, TASK12_REVIEWER_PROMPT } from './bench-multiagent.mjs';
+import { splitBugs, mergeWorkerChanges, collectChanges, parseMaxUsd, isPositiveInt, fitsHeadroom, createBudget, costVsSolo, sessionsForMode, renderMultiMarkdown, runOpenCode, summarizeSession, summarizeRuns, totalSessionCost, TASK9_BUG_TESTS, budgetSpent, workerTasks, workerPrompt, reviewerPrompt, isMultiagentTask, DEFAULT_TASK, REVIEWER_PROMPT, TASK12_REVIEWER_PROMPT } from './bench-multiagent.mjs';
 import { parseTokenUsage, TASKS, seededBugReport } from './bench-savings.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -187,6 +187,20 @@ test('headroom refuses a group whose worst case reaches the cap', () => {
   assert.strictEqual(fitsHeadroom(2, 0.7, 4, 5), true);
   // The default 0.5 estimate fits a single solo session.
   assert.strictEqual(fitsHeadroom(0, 0.5, 1, 4), true);
+});
+
+test('requireHeadroom checks the refreshed spend, not an undefined value', async () => {
+  // Offline: the fake fetch answers the key-usage call, no network and no real key.
+  // The second read is 1 USD above the first, as a session's spend lands after init.
+  let usage = 1;
+  const fetchImpl = async () => ({ ok: true, json: async () => ({ data: { usage, byok_usage: 0 } }) });
+  const roomy = createBudget({ key: 'test-key', maxUsd: 5, fetchImpl });
+  await roomy.init();
+  await roomy.requireHeadroom(1); // 1 spent + 1 x 0.5 est < 5 cap.
+  const tight = createBudget({ key: 'test-key', maxUsd: 1, fetchImpl });
+  await tight.init();
+  usage = 2;
+  await assert.rejects(tight.requireHeadroom(1), /Budget headroom/);
 });
 
 test('flag validation rejects non-positive counts and dash-leading models', () => {
