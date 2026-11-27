@@ -4,6 +4,8 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-11-26
+
 ### Changed
 - Quieter output (#491): each install or `--update` step prints one line `[n/N] description ✓` (or `✗` with the last 20 lines and the log path); the commands' own output goes to one log per run in `~/.config/lean-agents/logs/` (removed by `--uninstall`), so a child's stderr no longer shows red in PowerShell on a good run. The plan lists only `create`/`modify`/`remove` files plus one `N unchanged` line, release notes show the first sentence of each entry plus the CHANGELOG link, and command lines print the home as `~`. `--verbose` restores the full output; `--json` is unchanged. Child commands get no stdin, so a tool that asks a question takes its default instead of waiting (#489).
 

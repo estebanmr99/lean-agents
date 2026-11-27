@@ -2,7 +2,7 @@
 
 What comes next, in order. Each step is one build session in `docs/SPEC.md` section 14 and one PR. A step is done when its CI job with real binaries is green and its issues are closed.
 
-Latest release: [`v1.2.2`](https://github.com/estebanmr99/lean-agents/releases/tag/v1.2.2) (2026-11-26, work-PC fixes: RTK on OpenCode 2, upgrade keeps servers, DCP version in step; the owner approves the tag). Earlier: [`v1.2.1`](https://github.com/estebanmr99/lean-agents/releases/tag/v1.2.1) (2026-11-25), [`v1.2.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v1.2.0) (2026-11-24), [`v1.1.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v1.1.0) (2026-11-23), [`v1.0.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v1.0.0) (2026-11-20), [`v0.8.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.8.0) (2026-11-12), [`v0.7.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.7.0) and [`v0.6.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.6.0) (2026-11-06, which raised the minimum Node to 22.20), and [`v0.5.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.5.0) (2026-11-04).
+Latest release: [`v1.2.3`](https://github.com/estebanmr99/lean-agents/releases/tag/v1.2.3) (2026-11-26, `--preflight`, quiet output, safer `--update`, no shell-mode child processes; the owner approves the tag). Earlier: [`v1.2.2`](https://github.com/estebanmr99/lean-agents/releases/tag/v1.2.2) (2026-11-26), [`v1.2.1`](https://github.com/estebanmr99/lean-agents/releases/tag/v1.2.1) (2026-11-25), [`v1.2.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v1.2.0) (2026-11-24), [`v1.1.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v1.1.0) (2026-11-23), [`v1.0.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v1.0.0) (2026-11-20), [`v0.8.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.8.0) (2026-11-12), [`v0.7.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.7.0) and [`v0.6.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.6.0) (2026-11-06, which raised the minimum Node to 22.20), and [`v0.5.0`](https://github.com/estebanmr99/lean-agents/releases/tag/v0.5.0) (2026-11-04).
 
 ## Done in 0.6.0: fixes from real installs (planned as 0.5.1)
 
@@ -97,13 +97,17 @@ Every open issue has a milestone; an issue without one is untriaged. Releases sh
 4. **At most 3 feature or fix PRs open at a time.** Dependabot adds at most one grouped PR per ecosystem per week.
 5. **`owner-step` issues never block a patch.** They are listed in the release notes as pending owner steps.
 
-## 1.2.3 (next patch)
+## 1.2.3 (done)
 
-[Milestone](https://github.com/estebanmr99/lean-agents/milestone/3): [#495](https://github.com/estebanmr99/lean-agents/issues/495) (done), [#488](https://github.com/estebanmr99/lean-agents/issues/488), [#475](https://github.com/estebanmr99/lean-agents/issues/475), [#493](https://github.com/estebanmr99/lean-agents/issues/493), [#476](https://github.com/estebanmr99/lean-agents/issues/476), [#477](https://github.com/estebanmr99/lean-agents/issues/477). Also ships what is already on main: `--preflight`, quiet output with a per-run log, and `--update` asking nothing mid-run.
+[Milestone](https://github.com/estebanmr99/lean-agents/milestone/3), all closed: [#495](https://github.com/estebanmr99/lean-agents/issues/495), [#488](https://github.com/estebanmr99/lean-agents/issues/488), [#475](https://github.com/estebanmr99/lean-agents/issues/475), [#493](https://github.com/estebanmr99/lean-agents/issues/493), [#476](https://github.com/estebanmr99/lean-agents/issues/476), [#477](https://github.com/estebanmr99/lean-agents/issues/477). Audit: [docs/audit-1.2.3.md](audit-1.2.3.md). Also ships what is already on main: `--preflight`, quiet output with a per-run log, and `--update` asking nothing mid-run.
 
-## 1.2.4
+## 1.2.4 (next patch)
 
 [Milestone](https://github.com/estebanmr99/lean-agents/milestone/4): [#492](https://github.com/estebanmr99/lean-agents/issues/492), [#490](https://github.com/estebanmr99/lean-agents/issues/490), [#460](https://github.com/estebanmr99/lean-agents/issues/460), [#465](https://github.com/estebanmr99/lean-agents/issues/465), [#486](https://github.com/estebanmr99/lean-agents/issues/486).
+
+## 1.2.5
+
+[Milestone](https://github.com/estebanmr99/lean-agents/milestone/6): [#505](https://github.com/estebanmr99/lean-agents/issues/505), [#506](https://github.com/estebanmr99/lean-agents/issues/506), [#507](https://github.com/estebanmr99/lean-agents/issues/507), [#508](https://github.com/estebanmr99/lean-agents/issues/508) (follow-ups found while building 1.2.3).
 
 ## Research (no release date)
 
