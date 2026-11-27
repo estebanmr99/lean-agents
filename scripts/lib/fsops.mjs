@@ -250,10 +250,22 @@ export function plan(actions, roots = [], prior = []) {
 }
 
 // Home as `~` inside free text: only a whole folder (home + a separator), never an empty home or `/`.
-export function tilde(text, home) {
+// One path under home as ~: case-insensitive on Windows (a path built with `c:` while home is `C:\...`, #493), and only at a
+// path boundary, so /home/u2 is not shortened against /home/u.
+export function homeRel(p, home, platform = process.platform) {
+  if (!p || !home) return p;
+  const win = platform === 'win32';
+  const head = p.slice(0, home.length);
+  const rest = p.slice(home.length);
+  return (win ? head.toLowerCase() === home.toLowerCase() : head === home) && (!rest || /^[\\/]/.test(rest)) ? `~${rest}` : p;
+}
+
+export function tilde(text, home, platform = process.platform) {
   if (!home || home === '/' || home === path.sep) return text;
   let out = text;
-  for (const h of new Set([home, home.replace(/\\/g, '/')])) out = out.split(`${h}/`).join('~/').split(`${h}\\`).join('~\\');
+  const esc = (h) => h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Windows: any letter case (#493).
+  for (const h of new Set([home, home.replace(/\\/g, '/')])) out = out.replace(new RegExp(`${esc(h)}(?=[\\\\/])`, platform === 'win32' ? 'gi' : 'g'), '~');
   return out;
 }
 
