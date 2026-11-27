@@ -24,7 +24,7 @@ Release audit of lean-agents for 1.3.0 (2026-11-27), planned as 1.2.6 and rename
   - OpenCode 2: MCP OAuth keys translated on upgrade (#556); `cli.json` edited instead of a stale `tui.json`, a duplicate DCP entry and dead 1.x TUI plugins reported or removed (#558).
   - Context Mode MCP entries pass `--agent` (#562).
   - CI and tooling: the `e2e-update` proof job and its evaluator (#561), bench cost per session and a splittable benchmark task (#527, #431), the release-train skill (#518).
-- **Findings:** no HIGH. Two MEDIUM: one fixed before the tag (#555, Orca), one CI-only and tracked (#579). LOW findings accepted or tracked below.
+- **Findings:** no HIGH. Two MEDIUM: one fixed before the tag (#577, Orca), one CI-only and tracked (#579). LOW findings accepted or tracked below.
 - **Owner-only gates:**
   - Tag v1.3.0 (owner pre-approved tagging on 2026-11-27). Tagged on the release commit after `ci.yml` passed on it (SHA and run recorded after the tag).
   - Release run: `release.yml` on the tag (run recorded after publish).

@@ -34,7 +34,6 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - `.claude/skills/release-train` runs one release per session with the same gated steps (#518)
 - README (EN and ES) and `docs/compatibility.md` record the OpenCode 2 `cli.json` migration, the stale `tui.json` warning, the meter replacement and the duplicate `/dcp` cause (#558)
 - `docs/compatibility.md` records the `opencode serve --service` / `opencode run --agent build --format json` and Claude `plugin list --json` / `marketplace update` facts the e2e-update job uses, with the proof runs from #546 and #548; `opencode run --continue` is cited from the pinned 2.2.7 command definition. The e2e-update run link is added after the first dispatch, and its result is posted on #546 (#561)
-- How to run (after merge, never from CI): `gh workflow run e2e-update.yml --ref main -f source=checkout -f model=openrouter/deepseek/deepseek-v4.1-flash-1017 -f max_usd=1 -f from_version=1.2.4`; needs `OPENROUTER_API_KEY`; post the result on #546 (closed issue, a comment is fine) (#561)
 - README (EN and ES) and `docs/compatibility.md` list Context Mode 2.1.7 `AGENT_IDS` and the per-client id (#562)
 
 ### Fixed
@@ -60,7 +59,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - `e2e-update` evaluator no longer counts `--update --dry-run` as an update, in the shim log and in a checkout command alike: a dry run only prints the plan (#561)
 - `e2e-update` service restart reads `svc_state` into a variable with `|| true`, so a non-zero status or a SIGPIPE no longer aborts under `set -euo pipefail`; the startup-failure branch prints `serve.log` through the redactor (#561)
 - `e2e-update` evaluator accepts `cd "$LEAN_AGENTS_RELEASE_DIR"; node scripts/lean.mjs --update` (a semicolon or `&&` after the directory, not only whitespace or the end of the command) (#561)
-- `e2e-update` restarts the OpenCode service with `OPENROUTER_API_KEY` before the smoke test: the service started by the old-release install kept that step's env, so `opencode run` reached it without the key (`provider.no-route` in run 46047101522). It also records `service-ps.txt`, uploads `timeout.txt`, and prints 400 redacted characters of `smoke.jsonl`/`smoke.err` when the smoke test fails (#561)
+- `e2e-update` restarts the OpenCode service with `OPENROUTER_API_KEY` before the smoke test: the service started by the old-release install kept that step's env, so `opencode run` reached it without the key (`provider.no-route`). It also records `service-ps.txt`, uploads `timeout.txt`, and prints 400 redacted characters of `smoke.jsonl`/`smoke.err` when the smoke test fails (#561)
 - Context Mode MCP entries pass `--agent <id>` (VS Code, OpenCode, Copilot CLI, Claude fallback), so every `ctx_*` call works; Cursor and Antigravity are reported and skipped because 2.1.7 has no id for them, `--update` rewrites old entries (the Claude MCP fallback removes and re-adds its own entry, the Copilot CLI helper replaces an old-shaped one), `--uninstall` restores them, and `--doctor` flags an entry without `--agent`; the Cursor row names the entry to remove instead of the `--update` fix (#562)
 
 ### Security

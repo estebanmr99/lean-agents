@@ -24,6 +24,7 @@ Instructions for coding agents (Claude Code, OpenCode, Copilot CLI) that work **
 | Real Antigravity check (needs `agy`, `rtk` and `uvx` on PATH) | `bash tests/real-antigravity.sh` |
 | Behavior diff against a base ref (local, temp HOMEs, `--no-exec`; exit 1 on any change) | `bash scripts/behavior-diff.sh [origin/main]` |
 | Interactive menus in a pseudo-terminal (macOS, Linux; temp HOME, dry run) | `python3 tests/real-interactive.py` |
+| Agent update proof (manual dispatch after merge, never from CI; needs the `OPENROUTER_API_KEY` secret; post the result on #546) | `gh workflow run e2e-update.yml --ref main -f source=checkout -f model=openrouter/deepseek/deepseek-v4.1-flash-1017 -f max_usd=1 -f from_version=<old version>` |
 | Release gate before tagging | `bash scripts/release-gate.sh <version>` |
 
 ## Hard rules
