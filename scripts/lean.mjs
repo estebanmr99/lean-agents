@@ -7,6 +7,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import tty from 'node:tty';
 import { fileURLToPath } from 'node:url';
+import { parse as parseJsonc } from 'jsonc-parser';
 import { plan, apply, undo, describe, tilde, sha, userHash, managedUserHash, writePrivate, privateDir, dropBackups, renameRetry } from './lib/fsops.mjs';
 import { loadCore, renderRules, loadProfile, useToolNode } from './lib/render.mjs';
 import { claudeAdapter } from './lib/adapters/claude.mjs';
@@ -1021,12 +1022,36 @@ async function install(o) {
 // Plan first; the answer (or --yes) runs it. A failed step is reported and the rest still run; --uninstall never does this.
 // It also moves our own extraKnownMarketplaces ref back through the recorded json edit (#546): only that key, so user
 // or `claude plugin` changes made since stay.
+// The current value at a JSON key path, or undefined when the file or key is gone.
+function readPathValue(file, keyPath) {
+  try {
+    let v = parseJsonc(fs.readFileSync(file, 'utf8'), [], { allowTrailingComma: true });
+    for (const k of keyPath) v = v?.[k];
+    return v;
+  } catch { return undefined; }
+}
+
 function marketplaceRestore(S) {
   const entries = (S?.files ?? []).filter((f) => (f.applied ?? []).some((e) => e.marketplace));
-  const edits = entries.flatMap((f) => (f.applied ?? []).filter((e) => e.marketplace));
-  if (!edits.length) return null;
-  const last = edits.at(-1);
-  return { path: entries.at(-1).path, edit: { ...last, previous: edits[0].previous } };
+  if (!entries.length) return [];
+  // One restore per marketplace: across runs the first edit holds the user's original ref and the last holds ours.
+  const byName = new Map();
+  for (const f of entries) {
+    for (const e of f.applied ?? []) {
+      if (!e.marketplace) continue;
+      const g = byName.get(e.marketplace) ?? { path: f.path, edits: [] };
+      g.edits.push(e);
+      byName.set(e.marketplace, g);
+    }
+  }
+  const restores = [];
+  for (const [marketplace, g] of byName) {
+    const edit = { ...g.edits.at(-1), previous: g.edits[0].previous };
+    // Already reverted, or the user changed it since: it is not ours to move back.
+    if (JSON.stringify(readPathValue(g.path, edit.path)) !== JSON.stringify(edit.value)) continue;
+    restores.push({ path: g.path, marketplace, edit });
+  }
+  return restores;
 }
 
 async function undoAgentUpgrades(o) {
@@ -1034,13 +1059,13 @@ async function undoAgentUpgrades(o) {
   const stamps = agentStamps(stateDir(o.home));
   const todo = undoPlan(S?.commands ?? [], stamps);
   const restore = marketplaceRestore(S);
-  if (!todo.length && !restore) { console.log('nothing to undo: no agent CLI upgrade or marketplace pin move by lean-agents is recorded'); return true; }
+  if (!todo.length && !restore.length) { console.log('nothing to undo: no agent CLI upgrade or marketplace pin move by lean-agents is recorded'); return true; }
   console.log('lean-agents --update --undo plan (the oldest saved version per agent):');
   for (const c of todo) {
     console.log(`  - ${agentOf(c)}: back to ${c.from}`);
     for (const argv of [...c.reinstall, ...(c.reinstallAlways ?? [])]) console.log(`      $ ${argv.join(' ')}`);
   }
-  if (restore) console.log(`  - ${tilde(restore.path, o.home)}: marketplace ref ${restore.edit.value} -> ${restore.edit.previous ?? '(none)'}`);
+  for (const r of restore) console.log(`  - ${tilde(r.path, o.home)}: marketplace ref ${r.edit.value} -> ${r.edit.previous ?? '(none)'}`);
   if (o.dryRun) { console.log('Dry run: nothing was changed.'); return true; }
   let ok = true;
   if (todo.length) {
@@ -1056,14 +1081,21 @@ async function undoAgentUpgrades(o) {
     S.updatedAt = new Date().toISOString();
     writePrivate(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(S, null, 2)}\n`);
   }
-  if (restore) {
+  if (restore.length) {
     if (!o.yes && !(process.stdin.isTTY && process.stdout.isTTY)) { console.log('No terminal to ask on: --yes restores the marketplace ref. Not done.'); return false; }
     const p = await prompter(o.yes);
     let go;
     try { go = yesNo(await p.ask('Restore the marketplace ref?', o.yes ? 'y' : 'n')); } finally { p.close(); }
     if (!go) { console.log('Cancelled.'); return ok; }
-    const [what] = undo([{ path: restore.path, kind: 'json', applied: [restore.edit], hash: sha(fs.readFileSync(restore.path, 'utf8')) }], writeRoots(o));
-    console.log(`- ${what} ${tilde(restore.path, o.home)} (${restore.edit.marketplace} marketplace ref ${restore.edit.previous ?? '(none)'})`);
+    // One undo entry per file, carrying every marketplace edit for it.
+    const files = new Map();
+    for (const r of restore) {
+      const g = files.get(r.path) ?? { path: r.path, kind: 'json', applied: [], hash: sha(fs.readFileSync(r.path, 'utf8')) };
+      g.applied.push(r.edit);
+      files.set(r.path, g);
+    }
+    const report = new Map(undo([...files.values()], writeRoots(o)).map(([status, p]) => [p, status]));
+    for (const r of restore) console.log(`- ${report.get(r.path)} ${tilde(r.path, o.home)} (${r.marketplace} marketplace ref ${r.edit.previous ?? '(none)'})`);
   }
   return ok;
 }

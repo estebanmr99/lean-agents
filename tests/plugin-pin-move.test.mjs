@@ -47,6 +47,39 @@ function lean(home, ...args) {
 
 const entry = (settings) => parse(fs.readFileSync(settings, 'utf8')).extraKnownMarketplaces[NAME].source;
 
+// Two Claude plugins pinned by lean-agents, both with an older ref in settings.json (#546).
+const TWO = {
+  context: { name: NAME, id: `${NAME}@${NAME}`, key: PLUGIN, desc: 'Context Mode plugin', old: OLD_REF },
+  ponytail: { name: 'ponytail', id: 'ponytail@ponytail', key: 'ponytail-plugin', desc: 'Ponytail plugin', old: 'v5.2.0' },
+};
+function seedTwo() {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-plugin-move-two-'));
+  const settings = path.join(home, '.claude', 'settings.json');
+  fs.mkdirSync(path.dirname(settings), { recursive: true });
+  const marketplaces = {};
+  const pins = {};
+  const commands = [];
+  for (const p of Object.values(TWO)) {
+    const repo = PINS[p.key].source;
+    marketplaces[p.name] = { source: { source: 'github', repo, ref: p.old } };
+    pins[p.key] = p.old;
+    commands.push({ tool: p.name, desc: p.desc, ok: true, run: [['claude', 'plugin', 'marketplace', 'add', `${repo}#${p.old}`], ['claude', 'plugin', 'install', p.id]], undo: [['claude', 'plugin', 'uninstall', p.id]] });
+  }
+  fs.writeFileSync(settings, `${JSON.stringify({ extraKnownMarketplaces: marketplaces }, null, 2)}\n`);
+  const dir = path.join(home, '.config', 'lean-agents');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'state.json'), `${JSON.stringify({
+    version: '1.2.5',
+    installedAt: new Date().toISOString(),
+    pins,
+    options: { agents: ['claude'], tools: [NAME, 'ponytail'], privacy: 'standard', network: {}, keepUpdater: false, gh: false, terminals: [], installTerminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: 'lite', bun: false, shell: 'default' },
+    files: [],
+    commands,
+  }, null, 2)}\n`);
+  return { home, settings };
+}
+const refOf = (settings, name) => parse(fs.readFileSync(settings, 'utf8')).extraKnownMarketplaces[name].source.ref;
+
 test('--update --undo: no --yes and no terminal leaves the moved ref alone', () => {
   const { home, settings } = seed();
   lean(home, '--update', '--yes', '--no-exec');
@@ -121,6 +154,41 @@ test('two --update runs, then --update --undo restores the original old ref', ()
   assert.equal(entry(settings).ref, NEW_REF);
   lean(home, '--update', '--undo', '--yes');
   assert.equal(entry(settings).ref, OLD_REF);
+});
+
+test('two moved marketplaces in one --update: --update --undo restores each to its own old ref', () => {
+  const { home, settings } = seedTwo();
+  lean(home, '--update', '--yes', '--no-exec');
+  assert.equal(refOf(settings, TWO.context.name), PINS[TWO.context.key].version);
+  assert.equal(refOf(settings, TWO.ponytail.name), PINS[TWO.ponytail.key].version);
+  const dry = lean(home, '--update', '--undo', '--dry-run');
+  assert.match(dry, new RegExp(`marketplace ref ${PINS[TWO.context.key].version} -> ${TWO.context.old}`));
+  assert.match(dry, new RegExp(`marketplace ref ${PINS[TWO.ponytail.key].version} -> ${TWO.ponytail.old}`));
+  lean(home, '--update', '--undo', '--yes');
+  assert.equal(refOf(settings, TWO.context.name), TWO.context.old);
+  assert.equal(refOf(settings, TWO.ponytail.name), TWO.ponytail.old);
+});
+
+test('two moved marketplaces across two --update runs restore each to its own old ref', () => {
+  const { home, settings } = seedTwo();
+  lean(home, '--update', '--yes', '--no-exec', '--tools', NAME);
+  assert.equal(refOf(settings, TWO.context.name), PINS[TWO.context.key].version);
+  assert.equal(refOf(settings, TWO.ponytail.name), TWO.ponytail.old);
+  lean(home, '--update', '--yes', '--no-exec', '--tools', `${NAME},ponytail`);
+  assert.equal(refOf(settings, TWO.ponytail.name), PINS[TWO.ponytail.key].version);
+  lean(home, '--update', '--undo', '--yes');
+  assert.equal(refOf(settings, TWO.context.name), TWO.context.old);
+  assert.equal(refOf(settings, TWO.ponytail.name), TWO.ponytail.old);
+});
+
+test('a second --update --undo plans nothing for an already restored marketplace', () => {
+  const { home, settings } = seed();
+  lean(home, '--update', '--yes', '--no-exec');
+  lean(home, '--update', '--undo', '--yes');
+  assert.equal(entry(settings).ref, OLD_REF);
+  const out = lean(home, '--update', '--undo', '--dry-run');
+  assert.doesNotMatch(out, /marketplace ref/);
+  assert.match(out, /nothing to undo/);
 });
 
 test('a fresh install records the marketplace entry and --uninstall removes it', () => {
