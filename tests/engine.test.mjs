@@ -1472,7 +1472,7 @@ test('Git Bash: marked .bashrc block with the Cursor aliases and loopback NO_PRO
   assert.match(fs.readFileSync(rc, 'utf8'), /export FOO=1/);
   // The NO_PROXY loop appends only what is missing and keeps the user's entries.
   const body = p.after.match(/for h in[\s\S]*export NO_PROXY no_proxy/)[0];
-  const shell = spawnSync('bash', ['-c', `NO_PROXY='corp.invalid,localhost'\n${body}\necho "$NO_PROXY|$no_proxy"`], { encoding: 'utf8' });
+  const shell = spawnSync('bash', ['-c', `NO_PROXY='corp.invalid,localhost'\n${body}\necho "$NO_PROXY|$no_proxy"`], { encoding: 'utf8', env: { PATH: process.env.PATH, NO_PROXY: 'corp.invalid,localhost' } });
   if (!shell.error) assert.equal(shell.stdout.trim(), 'corp.invalid,localhost,127.0.0.1,::1|localhost,127.0.0.1,::1');
   undoActions(entries);
   assert.equal(fs.readFileSync(rc, 'utf8'), mine);
@@ -1562,7 +1562,9 @@ test('Still needed from you: printed after install and by --doctor, Orca hooks f
   assert.equal(checks(home)[0].check(), false);
   fs.writeFileSync(path.join(home, '.cursor', 'hooks.json'), JSON.stringify({ hooks: { beforeShellExecution: [{ command: `powershell -EncodedCommand ${hook}` }] } }));
   assert.equal(checks(home)[0].check(), true);
-  assert.match(lean(home, ['--doctor', '--no-exec'], { ...process.env, ...NO_PROXY_ENV }), /ok\s+still needed\s+Orca: the first launch/);
+  // Below Node 24 --doctor also exits 1 for the context-mode npx entry (it needs Node 24.15+); the Orca line is the target.
+  const doctor = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, '--doctor', '--no-exec'], { encoding: 'utf8', env: { ...process.env, ...NO_PROXY_ENV } });
+  assert.match(doctor.stdout, /ok\s+still needed\s+Orca: the first launch/);
 });
 
 test('Antigravity app and CLI install only through verified ids, else print the vendor link', () => {
