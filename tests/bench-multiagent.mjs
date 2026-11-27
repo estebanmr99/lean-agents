@@ -24,7 +24,9 @@ export const TASK9_BUG_TESTS = ['tests/test_c_2.test.mjs', 'tests/test_b_5.test.
 export const DEFAULT_TASK_ID = 'task12';
 export const DEFAULT_TASK = TASKS.find((t) => t.id === DEFAULT_TASK_ID);
 export const DEFAULT_MODES = ['solo', 'workers-1', 'workers-2', 'workers-4'];
-export const REVIEWER_PROMPT = 'Review the changes in this repo (git diff) and the files they touch for mistakes, including bugs the tests do not cover; fix any you find; do not edit test files.';
+// task9 keeps the origin/main prompt so old and new runs stay comparable.
+export const REVIEWER_PROMPT = 'Review the changes in this repo (git diff) for mistakes; fix any you find; do not edit test files.';
+export const TASK12_REVIEWER_PROMPT = 'Review the changes in this repo (git diff) and the files they touch for mistakes, including bugs the tests do not cover; fix any you find; do not edit test files.';
 
 // Deterministic harness split: no model coordinator, worker i gets item i, i+n, i+2n...
 export function splitBugs(bugFiles, n) {
@@ -44,6 +46,18 @@ export function workerTasks(task) {
     }));
   }
   return [];
+}
+
+// task9 keeps its origin/main one-line-per-worker prompt so old and new runs stay comparable.
+export function workerPrompt(task, items) {
+  if (task.id === 'task9') {
+    return `Run node --test ${items.map((item) => item.file || item).join(' ')} and fix those failing tests without editing test files.`;
+  }
+  return items.map((item) => item.prompt).join('\n\n');
+}
+
+export function reviewerPrompt(task) {
+  return task.id === 'task9' ? REVIEWER_PROMPT : TASK12_REVIEWER_PROMPT;
 }
 
 export function isMultiagentTask(task) {
@@ -541,7 +555,7 @@ async function main() {
             initGit(workdir);
             return {
               name: `worker-${i}`, workdir, home: path.join(runRoot, `home-worker-${i}`),
-              prompt: items.map((item) => item.prompt).join('\n\n'),
+              prompt: workerPrompt(TASK, items),
             };
           });
           const workerResults = await runGroup(workerSpecs, opts, budget);
@@ -558,7 +572,7 @@ async function main() {
           if (!merge.conflict) {
             bugsBeforeReview = seededBugReport(finalDir, TASK.bugs || []);
             const [reviewer] = await runGroup([{
-              name: 'reviewer', workdir: finalDir, home: path.join(runRoot, 'home-reviewer'), prompt: REVIEWER_PROMPT,
+              name: 'reviewer', workdir: finalDir, home: path.join(runRoot, 'home-reviewer'), prompt: reviewerPrompt(TASK),
             }], opts, budget);
             rawSessions.push(reviewer);
             record.sessions.push(summarizeSession(reviewer, parsedPrices));

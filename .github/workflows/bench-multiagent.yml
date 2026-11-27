@@ -70,7 +70,8 @@ jobs:
         run: |
           # One token, one request: a bad key or model fails here, before any paid session.
           node --input-type=module -e '
-            const model = process.env.MODEL.replace(/^openrouter\//, "");
+            const model = process.env.MODEL.replace(/^openrouter\//, "").replace(/#.*$/, "");
+            const redact = (text) => process.env.OPENROUTER_API_KEY ? text.split(process.env.OPENROUTER_API_KEY).join("[redacted]") : text;
             const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
               method: "POST",
               headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
@@ -78,11 +79,11 @@ jobs:
             });
             const body = await res.text();
             if (!res.ok) {
-              console.error(`smoke test failed (HTTP ${res.status}): ${body}`);
+              console.error(redact(`smoke test failed (HTTP ${res.status}): ${body}`));
               process.exit(1);
             }
             if (!JSON.parse(body).choices?.length) {
-              console.error(`smoke test returned no choice: ${body}`);
+              console.error(redact(`smoke test returned no choice: ${body}`));
               process.exit(1);
             }
           '

@@ -82,7 +82,7 @@ Its table has these columns:
 
 - **Mode**: `solo` (one session) or `workers-N` (N workers plus a reviewer; an empty worker is not started).
 - **Pass Rate**: Percentage of runs where the merged tree passed the task check.
-- **Seeded Bugs**: Bugs fixed out of the seeded total, as a median per run. `(+N review)` counts the bugs only the reviewer fixed. `n/a` means the task has no hidden bug checks.
+- **Seeded Bugs**: Bugs fixed out of the seeded total, as a median per run. `(+N review)` counts the bugs only the reviewer fixed. `n/a` means the task has no hidden bug checks. Solo has no reviewer, so bugs caught by review are not comparable between arms; compare the bugs left in the final tree instead.
 - **Median In**, **Median Out**: Median input and output tokens summed across all sessions in a run.
 - **Median Turns**: Median `step-finish` events summed across all sessions in a run.
 - **Median Time**: Wall-clock time, worker phase plus reviewer.

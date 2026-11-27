@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { splitBugs, mergeWorkerChanges, collectChanges, parseMaxUsd, isPositiveInt, fitsHeadroom, costVsSolo, sessionsForMode, renderMultiMarkdown, runOpenCode, summarizeSession, summarizeRuns, totalSessionCost, TASK9_BUG_TESTS, budgetSpent, workerTasks, isMultiagentTask, DEFAULT_TASK } from './bench-multiagent.mjs';
+import { splitBugs, mergeWorkerChanges, collectChanges, parseMaxUsd, isPositiveInt, fitsHeadroom, costVsSolo, sessionsForMode, renderMultiMarkdown, runOpenCode, summarizeSession, summarizeRuns, totalSessionCost, TASK9_BUG_TESTS, budgetSpent, workerTasks, workerPrompt, reviewerPrompt, isMultiagentTask, DEFAULT_TASK, REVIEWER_PROMPT, TASK12_REVIEWER_PROMPT } from './bench-multiagent.mjs';
 import { parseTokenUsage, TASKS, seededBugReport } from './bench-savings.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -42,6 +42,28 @@ test('task12 splits its four independent parts across 1, 2 and 4 workers', () =>
   assert.strictEqual(sessionsForMode('workers-1', parts), 2);
   assert.strictEqual(sessionsForMode('workers-2', parts), 3);
   assert.strictEqual(sessionsForMode('workers-4', parts), 5);
+});
+
+test('task9 keeps the origin/main worker and reviewer prompts', () => {
+  const task9 = TASKS.find((t) => t.id === 'task9');
+  assert.strictEqual(REVIEWER_PROMPT, 'Review the changes in this repo (git diff) for mistakes; fix any you find; do not edit test files.');
+  assert.strictEqual(reviewerPrompt(task9), REVIEWER_PROMPT);
+  assert.notStrictEqual(reviewerPrompt(DEFAULT_TASK), REVIEWER_PROMPT);
+  assert.strictEqual(reviewerPrompt(DEFAULT_TASK), TASK12_REVIEWER_PROMPT);
+  const one = splitBugs(TASK9_BUG_TESTS, 1);
+  assert.strictEqual(
+    workerPrompt(task9, one[0]),
+    'Run node --test tests/test_c_2.test.mjs tests/test_b_5.test.mjs tests/test_a_8.test.mjs and fix those failing tests without editing test files.',
+  );
+  const two = splitBugs(TASK9_BUG_TESTS, 2);
+  assert.strictEqual(
+    workerPrompt(task9, two[0]),
+    'Run node --test tests/test_c_2.test.mjs tests/test_a_8.test.mjs and fix those failing tests without editing test files.',
+  );
+  assert.strictEqual(
+    workerPrompt(task9, two[1]),
+    'Run node --test tests/test_b_5.test.mjs and fix those failing tests without editing test files.',
+  );
 });
 
 test('seeded bug detection counts fixed and left bugs, and reviewer fixes', () => {
