@@ -1,6 +1,8 @@
 // Claude Code adapter. Files only under ~/.claude; MCP servers and plugins go through
 // the `claude` CLI so ~/.claude.json (which holds auth) is never edited directly.
+import fs from 'node:fs';
 import path from 'node:path';
+import { parse } from 'jsonc-parser';
 import { OWNED_MARK } from '../fsops.mjs';
 import { tierFor, modelFor } from '../render.mjs';
 import { privacyOf, updaterMode } from '../network.mjs';
@@ -39,15 +41,31 @@ const pluginKeys = (id, repo) => [
   { path: ['enabledPlugins', id], value: true },
   { path: ['extraKnownMarketplaces', id.split('@')[1]], repo: repo.replace(/#.*$/, '') },
 ];
-const plugin = (repo, id) => ({
-  run: [['claude', 'plugin', 'marketplace', 'add', repo], ['claude', 'plugin', 'install', id]],
-  undo: [['claude', 'plugin', 'uninstall', id]],
-});
+const pluginRepo = (repo) => repo.replace(/#.*$/, '');
+// The ref of our own marketplace entry when the pin moves (#546): `claude plugin marketplace add` refuses a repo whose
+// extraKnownMarketplaces entry names another ref. Only an entry with our repo is touched; another repo is the user's.
+function marketplaceMove(dir, name, repo) {
+  const file = path.join(dir, 'settings.json');
+  let src;
+  try {
+    src = parse(fs.readFileSync(file, 'utf8'), [], { allowTrailingComma: true })?.extraKnownMarketplaces?.[name]?.source;
+  } catch { return {}; }
+  if (!src || typeof src !== 'object') return {};
+  const shown = src.repo ?? src.url;
+  if (shown !== pluginRepo(repo)) {
+    return { warning: `! ${name} marketplace entry in ${file} points at ${shown ?? 'another source'}, not ${pluginRepo(repo)}: left as it is; change it or remove it by hand.` };
+  }
+  const ref = repo.slice(repo.indexOf('#') + 1);
+  // Only a recorded ref moves (a marketplace add without a ref, or a user's own edit, keeps its shape).
+  if (typeof src.ref !== 'string' || src.ref === ref) return {};
+  return { edit: { path: ['extraKnownMarketplaces', name, 'source', 'ref'], value: ref, mode: 'set', marketplace: name } };
+}
 
 export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdCommand }) {
   const dir = path.join(home, '.claude');
   const actions = [];
   const commands = [];
+  const warnings = [];
   const tools = opts.tools;
 
   actions.push({ kind: 'block', path: path.join(dir, 'CLAUDE.md'), body: `@${rulesPath}` });
@@ -84,6 +102,19 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
   const settingsAction = { kind: 'json', path: path.join(dir, 'settings.json'), edits };
   actions.push(settingsAction);
 
+  // Before `marketplace add`: move our own entry to the new pin, then refresh the marketplace and the plugin (#546).
+  const addPlugin = (tool, desc, repo, id) => {
+    const name = id.split('@')[1];
+    const move = marketplaceMove(dir, name, repo);
+    if (move.edit) settingsAction.edits.push(move.edit);
+    if (move.warning) warnings.push(move.warning);
+    const installed = (opts.prior ?? []).some((c) => (c.run ?? []).some((a) => a[0] === 'claude' && a[1] === 'plugin' && a[2] === 'install' && a[3] === id));
+    const run = [['claude', 'plugin', 'marketplace', 'add', repo]];
+    if (installed) run.push(['claude', 'plugin', 'marketplace', 'update', name], ['claude', 'plugin', 'update', id]);
+    else run.push(['claude', 'plugin', 'install', id]);
+    commands.push({ tool, desc, run, undo: [['claude', 'plugin', 'uninstall', id]] });
+  };
+
   if (tools.includes('rtk')) {
     commands.push({ tool: 'rtk', desc: 'RTK hook for Claude Code', run: [['rtk', 'init', '-g', '--auto-patch']], undo: [['rtk', 'init', '-g', '--uninstall']] });
   }
@@ -102,17 +133,18 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
       commands.push({ tool: 'context-mode', desc: CTX_MCP, run: [['claude', 'mcp', 'remove', '--scope', 'user', 'context-mode']], undo: [] });
     }
     const repo = marketplaceSource('context-mode-plugin');
-    commands.push({ tool: 'context-mode', desc: 'Context Mode plugin', ...plugin(repo, 'context-mode@context-mode') });
+    addPlugin('context-mode', 'Context Mode plugin', repo, 'context-mode@context-mode');
     pluginWrites.push(...pluginKeys('context-mode@context-mode', repo));
   }
   if (tools.includes('ponytail')) {
     const repo = marketplaceSource('ponytail-plugin');
-    commands.push({ tool: 'ponytail', desc: 'Ponytail plugin', ...plugin(repo, 'ponytail@ponytail') });
+    addPlugin('ponytail', 'Ponytail plugin', repo, 'ponytail@ponytail');
     pluginWrites.push(...pluginKeys('ponytail@ponytail', repo));
   }
   if (tools.includes('i-have-adhd')) {
     const repo = marketplaceSource('i-have-adhd');
-    commands.push({ tool: 'i-have-adhd', desc: 'i-have-adhd plugin', ...plugin(repo, 'i-have-adhd@i-have-adhd') }, adhdCommand);
+    addPlugin('i-have-adhd', 'i-have-adhd plugin', repo, 'i-have-adhd@i-have-adhd');
+    commands.push(adhdCommand);
     pluginWrites.push(...pluginKeys('i-have-adhd@i-have-adhd', repo));
     if (opts.adhdAlways) actions.push({ kind: 'file', path: path.join(dir, '.i-have-adhd-always'), content: '' , force: true });
   }
@@ -146,5 +178,5 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
   }
   const uniqueWrites = [...new Map(pluginWrites.map((e) => [JSON.stringify(e), e])).values()];
   if (uniqueWrites.length) settingsAction.ignore = uniqueWrites;
-  return { actions, commands };
+  return { actions, commands, warnings };
 }
