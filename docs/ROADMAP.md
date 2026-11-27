@@ -91,10 +91,10 @@ Details in `CHANGELOG.md` and [`audit-1.2.0.md`](audit-1.2.0.md).
 
 Every open issue has a milestone; an issue without one is untriaged. Releases ship small and often:
 
-1. **Patch milestones hold at most 5 issues.** A patch ships when they are all closed, `docs/audit-<version>.md` is written and CI is green on the tagged SHA. The owner approves each tag.
+1. **Patch milestones hold at most 5 open issues.** A patch ships when all but `owner-step` issues are closed, `docs/audit-<version>.md` is written and CI is green on the tagged SHA. The owner approves each tag.
 2. **New bugs go to the next patch milestone.** Only a p1 joins the current one.
 3. **Spikes end in one PR with a verdict.** The spike issue closes and its follow-ups open as `agent-ready` issues in a milestone.
-4. **At most 3 PRs open at a time.** Dependabot groups its updates into one PR per ecosystem per week.
+4. **At most 3 feature or fix PRs open at a time.** Dependabot adds at most one grouped PR per ecosystem per week.
 5. **`owner-step` issues never block a patch.** They are listed in the release notes as pending owner steps.
 
 ## 1.2.3 (next patch)
