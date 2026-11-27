@@ -847,6 +847,9 @@ jobs:
           if grep -q statusLine "$HOME/.claude/settings.json"; then exit 1; fi
           test ! -e "$HOME/.claude/lean-copilot-usage-statusline.mjs"
           test ! -e "$HOME/.claude/skills/caveman"
+      # A moved plugin pin: install with the old pin, --update with the current one, keep the plugin data (#546).
+      - name: A moved Claude plugin pin moves its settings.json ref (#546)
+        run: bash tests/real-claude-plugin-move.sh
       # Last: the native installer may replace the npm-installed claude the steps above use.
       - name: --install-agent and --uninstall-agent (installer script)
         run: node tests/real-agent-lifecycle.mjs claude

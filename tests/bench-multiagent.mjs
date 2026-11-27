@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { parseTokenUsage, priceUsage, keySpend, redactKey, getStats, failureReason, writeArtifacts, TASKS, setupVariant, sessionCost, totalSessionCost } from './bench-savings.mjs';
+import { parseTokenUsage, priceUsage, keySpend, redactKey, getStats, failureReason, writeArtifacts, TASKS, setupVariant, sessionCost, totalSessionCost, seededBugReport } from './bench-savings.mjs';
 
 // Both harnesses share the null-cost handling; keep them importable from here for the tests.
 export { sessionCost, totalSessionCost };
@@ -19,17 +19,49 @@ const arg = (name) => {
   return null;
 };
 
-const TASK9 = TASKS.find((t) => t.id === 'task9');
 // The three independent bugs in task9: src/c/modc2.mjs, src/b/modb5.mjs, src/a/moda8.mjs.
 export const TASK9_BUG_TESTS = ['tests/test_c_2.test.mjs', 'tests/test_b_5.test.mjs', 'tests/test_a_8.test.mjs'];
+export const DEFAULT_TASK_ID = 'task12';
+export const DEFAULT_TASK = TASKS.find((t) => t.id === DEFAULT_TASK_ID);
 export const DEFAULT_MODES = ['solo', 'workers-1', 'workers-2', 'workers-4'];
+// task9 keeps the origin/main prompt so old and new runs stay comparable.
 export const REVIEWER_PROMPT = 'Review the changes in this repo (git diff) for mistakes; fix any you find; do not edit test files.';
+export const TASK12_REVIEWER_PROMPT = 'Review the changes in this repo (git diff) and the files they touch for mistakes, including bugs the tests do not cover; fix any you find; do not edit test files.';
 
-// Deterministic harness split: no model coordinator, worker i gets bug i, i+n, i+2n...
+// Deterministic harness split: no model coordinator, worker i gets item i, i+n, i+2n...
 export function splitBugs(bugFiles, n) {
   const out = Array.from({ length: n }, () => []);
   bugFiles.forEach((file, i) => out[i % n].push(file));
   return out;
+}
+
+// A splittable task lists its independent parts. task9 keeps its three failing-test bugs.
+export function workerTasks(task) {
+  if (task.parts) return task.parts;
+  if (task.id === 'task9') {
+    return TASK9_BUG_TESTS.map((file) => ({
+      id: file,
+      file,
+      prompt: `Run node --test ${file} and fix that failing test without editing test files.`,
+    }));
+  }
+  return [];
+}
+
+// task9 keeps its origin/main one-line-per-worker prompt so old and new runs stay comparable.
+export function workerPrompt(task, items) {
+  if (task.id === 'task9') {
+    return `Run node --test ${items.map((item) => item.file || item).join(' ')} and fix those failing tests without editing test files.`;
+  }
+  return items.map((item) => item.prompt).join('\n\n');
+}
+
+export function reviewerPrompt(task) {
+  return task.id === 'task9' ? REVIEWER_PROMPT : TASK12_REVIEWER_PROMPT;
+}
+
+export function isMultiagentTask(task) {
+  return Boolean(task) && (task.id === 'task9' || (Array.isArray(task.parts) && task.parts.length > 0));
 }
 
 // Owner budget cap: never more than USD 5 for one run. Non-numeric input falls back to 4.
@@ -95,11 +127,11 @@ export function installCleanupHandlers() {
   }
 }
 
-export function sessionsForMode(mode) {
+export function sessionsForMode(mode, parts = workerTasks(DEFAULT_TASK)) {
   if (mode === 'solo') return 1;
   const n = parseInt(String(mode).split('-')[1], 10);
-  // A worker with no bug to fix is not started, so it costs no session.
-  return splitBugs(TASK9_BUG_TESTS, n).filter((files) => files.length > 0).length + 1;
+  // A worker with no item to do is not started, so it costs no session.
+  return splitBugs(parts, n).filter((items) => items.length > 0).length + 1;
 }
 
 function walk(dir, base, out = new Map()) {
@@ -113,13 +145,13 @@ function walk(dir, base, out = new Map()) {
   return out;
 }
 
-// Changed non-test files in a worker copy, compared with the pristine fixture.
+// Changed non-test files in a worker copy, plus new test files. Edits to existing tests never merge.
 export function collectChanges(baseDir, workerDir) {
   const baseFiles = walk(baseDir, baseDir);
   const workerFiles = walk(workerDir, workerDir);
   const changes = new Map();
   for (const [rel, content] of workerFiles) {
-    if (rel.startsWith('tests/')) continue;
+    if (rel.startsWith('tests/') && baseFiles.has(rel)) continue;
     if (baseFiles.get(rel) !== content) changes.set(rel, content);
   }
   for (const rel of baseFiles.keys()) {
@@ -330,6 +362,9 @@ export function summarizeRuns(results, modes, prices) {
       runs: rs.length,
       passRate: rs.filter((r) => r.pass).length / rs.length,
       conflicts: rs.filter((r) => r.conflict).length,
+      seededBugs: rs[0]?.seededBugs || 0,
+      seededBugsFixed: getStats(rs.map((r) => r.seededBugsFixed || 0)).median,
+      seededBugsFixedByReviewer: getStats(rs.map((r) => r.seededBugsFixedByReviewer || 0)).median,
       input: getStats(rs.map((r) => r.inputTokens)),
       output: getStats(rs.map((r) => r.outputTokens)),
       turns: getStats(rs.map((r) => r.turns)),
@@ -344,13 +379,17 @@ export function summarizeRuns(results, modes, prices) {
 
 export function renderMultiMarkdown(summary, prices) {
   let md = prices
-    ? '| Mode | Pass Rate | Median In | Median Out | Median Turns | Median Time | Cost | Priced Cost |\n'
-    : '| Mode | Pass Rate | Median In | Median Out | Median Turns | Median Time | Cost |\n';
-  md += prices ? '|---|---|---|---|---|---|---|---|\n' : '|---|---|---|---|---|---|---|\n';
+    ? '| Mode | Pass Rate | Seeded Bugs | Median In | Median Out | Median Turns | Median Time | Cost | Priced Cost |\n'
+    : '| Mode | Pass Rate | Seeded Bugs | Median In | Median Out | Median Turns | Median Time | Cost |\n';
+  md += prices ? '|---|---|---|---|---|---|---|---|---|\n' : '|---|---|---|---|---|---|---|---|\n';
   for (const s of summary) {
+    const bugsCell = s.seededBugs
+      ? `${s.seededBugsFixed}/${s.seededBugs}${s.seededBugsFixedByReviewer ? ` (+${s.seededBugsFixedByReviewer} review)` : ''}`
+      : 'n/a';
     const cells = [
       s.mode,
       `${(s.passRate * 100).toFixed(0)}%`,
+      bugsCell,
       s.input.median.toFixed(0),
       s.output.median.toFixed(0),
       s.turns.median.toFixed(0),
@@ -389,6 +428,17 @@ async function main() {
   const VARIANT = arg('variant') || 'lean';
   const TIMEOUT = rawTimeout === null ? 900000 : parseInt(rawTimeout, 10);
   const MODES = (arg('modes') || process.env.MODES || DEFAULT_MODES.join(',')).split(',').map((s) => s.trim()).filter(Boolean);
+  const TASK_ID = arg('task') || process.env.TASK || DEFAULT_TASK_ID;
+  const TASK = TASKS.find((t) => t.id === TASK_ID);
+  if (!TASK) {
+    console.error(`Unknown task: ${TASK_ID}`);
+    process.exit(2);
+  }
+  if (!isMultiagentTask(TASK)) {
+    console.error(`bench-multiagent: task ${TASK_ID} is not splittable (use task9 or task12)`);
+    process.exit(2);
+  }
+  const PARTS = workerTasks(TASK);
 
   if (MODEL && MODEL.startsWith('-')) {
     console.error(`bench-multiagent: --model must not start with '-': ${MODEL}`);
@@ -430,16 +480,17 @@ async function main() {
   fs.mkdirSync(HOME, { recursive: true });
   if (OUT) fs.mkdirSync(OUT, { recursive: true });
 
-  const sessionsPerRepeat = MODES.reduce((sum, mode) => sum + sessionsForMode(mode), 0);
+  const sessionsPerRepeat = MODES.reduce((sum, mode) => sum + sessionsForMode(mode, PARTS), 0);
   const totalSessions = sessionsPerRepeat * REPEATS;
   console.log('Plan:');
   console.log(`  HOME:             ${HOME}`);
   console.log(`  MODEL:            ${MODEL || '(none)'}`);
   console.log(`  OUT:              ${OUT}`);
+  console.log(`  TASK:             ${TASK_ID} (${PARTS.length} parts, ${(TASK.bugs || []).length} seeded bugs)`);
   console.log(`  REPEATS:          ${REPEATS}`);
   console.log(`  VARIANT:          ${VARIANT}`);
   console.log(`  MODES:            ${MODES.join(',')}`);
-  for (const mode of MODES) console.log(`    ${mode}: ${sessionsForMode(mode)} sessions per repeat`);
+  for (const mode of MODES) console.log(`    ${mode}: ${sessionsForMode(mode, PARTS)} sessions per repeat`);
   console.log(`  SESSIONS/REPEAT:  ${sessionsPerRepeat}`);
   console.log(`  ESTIMATED SESSIONS: ${totalSessions}`);
   console.log(`  MAX RUNS:         ${MAX_RUNS}`);
@@ -474,36 +525,37 @@ async function main() {
         fs.mkdirSync(runRoot, { recursive: true });
         const baseDir = path.join(runRoot, 'base');
         fs.mkdirSync(baseDir, { recursive: true });
-        TASK9.setup(baseDir);
+        TASK.setup(baseDir);
         const runLabel = `${mode}-${n}`;
-        console.log(`\nRunning ${mode} repeat ${n}/${REPEATS}...`);
+        console.log(`\nRunning ${TASK_ID} ${mode} repeat ${n}/${REPEATS}...`);
 
         const record = { mode, repeat: n, pass: false, conflict: false, sessions: [], wallTime: 0 };
         const rawSessions = [];
         const opts = { model: MODEL, timeout: TIMEOUT, variant: VARIANT, outDir: OUT, key: KEY, runLabel, maxUsd: MAX_USD };
         const costBefore = await budget.refresh();
         let finalDir;
+        let bugsBeforeReview = null;
 
         if (mode === 'solo') {
           finalDir = path.join(runRoot, 'workspace');
-          TASK9.setup(finalDir);
+          TASK.setup(finalDir);
           initGit(finalDir);
           const [res] = await runGroup([{
-            name: 'solo', workdir: finalDir, home: path.join(runRoot, 'home-solo'), prompt: TASK9.prompt,
+            name: 'solo', workdir: finalDir, home: path.join(runRoot, 'home-solo'), prompt: TASK.prompt,
           }], opts, budget);
           rawSessions.push(res);
           record.sessions.push(summarizeSession(res, parsedPrices));
           record.wallTime = res.wallTime;
         } else {
           const workerCount = parseInt(mode.split('-')[1], 10);
-          const split = splitBugs(TASK9_BUG_TESTS, workerCount).filter((files) => files.length > 0);
-          const workerSpecs = split.map((files, i) => {
+          const split = splitBugs(PARTS, workerCount).filter((items) => items.length > 0);
+          const workerSpecs = split.map((items, i) => {
             const workdir = path.join(runRoot, `worker-${i}`);
-            TASK9.setup(workdir);
+            TASK.setup(workdir);
             initGit(workdir);
             return {
               name: `worker-${i}`, workdir, home: path.join(runRoot, `home-worker-${i}`),
-              prompt: `Run node --test ${files.join(' ')} and fix those failing tests without editing test files.`,
+              prompt: workerPrompt(TASK, items),
             };
           });
           const workerResults = await runGroup(workerSpecs, opts, budget);
@@ -511,15 +563,16 @@ async function main() {
           workerResults.forEach((res) => record.sessions.push(summarizeSession(res, parsedPrices)));
 
           finalDir = path.join(runRoot, 'merged');
-          TASK9.setup(finalDir);
+          TASK.setup(finalDir);
           initGit(finalDir);
           const changes = workerResults.map((res) => collectChanges(baseDir, res.workdir));
           const merge = mergeWorkerChanges(finalDir, changes);
           record.conflict = merge.conflict;
           const maxWorkerTime = Math.max(...workerResults.map((res) => res.wallTime), 0);
           if (!merge.conflict) {
+            bugsBeforeReview = seededBugReport(finalDir, TASK.bugs || []);
             const [reviewer] = await runGroup([{
-              name: 'reviewer', workdir: finalDir, home: path.join(runRoot, 'home-reviewer'), prompt: REVIEWER_PROMPT,
+              name: 'reviewer', workdir: finalDir, home: path.join(runRoot, 'home-reviewer'), prompt: reviewerPrompt(TASK),
             }], opts, budget);
             rawSessions.push(reviewer);
             record.sessions.push(summarizeSession(reviewer, parsedPrices));
@@ -530,7 +583,12 @@ async function main() {
           }
         }
 
-        record.pass = !record.conflict && TASK9.check(finalDir);
+        record.pass = !record.conflict && TASK.check(finalDir);
+        const bugReport = seededBugReport(finalDir, TASK.bugs || []);
+        record.seededBugs = bugReport.total;
+        record.seededBugsFixed = bugReport.fixed;
+        record.seededBugsLeft = bugReport.left;
+        record.seededBugsFixedByReviewer = bugsBeforeReview ? Math.max(0, bugReport.fixed - bugsBeforeReview.fixed) : 0;
         record.inputTokens = record.sessions.reduce((s, x) => s + x.inputTokens, 0);
         record.outputTokens = record.sessions.reduce((s, x) => s + x.outputTokens, 0);
         record.turns = record.sessions.reduce((s, x) => s + x.turns, 0);
@@ -543,7 +601,7 @@ async function main() {
         if (!record.pass) {
           const last = rawSessions[rawSessions.length - 1] || {};
           record.failure = failureReason({
-            check: record.conflict ? null : 'task9 check',
+            check: record.conflict ? null : `${TASK_ID} check`,
             conflict: record.conflict,
             timedOut: last.timedOut,
             exit: last.status,
@@ -552,7 +610,7 @@ async function main() {
           }, KEY);
         }
         const shownCost = record.cost == null ? 'n/a' : `$${record.cost.toFixed(4)}`;
-        console.log(`  Pass: ${record.pass}, Conflict: ${record.conflict}, Sessions: ${record.sessions.length}, In: ${record.inputTokens}, Out: ${record.outputTokens}, Cost: ${shownCost}, Time: ${record.wallTime}ms`);
+        console.log(`  Pass: ${record.pass}, Conflict: ${record.conflict}, Seeded bugs fixed: ${record.seededBugsFixed}/${record.seededBugs} (${record.seededBugsFixedByReviewer} by review), Sessions: ${record.sessions.length}, In: ${record.inputTokens}, Out: ${record.outputTokens}, Cost: ${shownCost}, Time: ${record.wallTime}ms`);
         results.push(record);
       }
     }
@@ -576,6 +634,7 @@ async function main() {
     const resultsJson = {
       date: new Date().toISOString().split('T')[0],
       model: MODEL,
+      task: TASK_ID,
       variant: VARIANT,
       opencodeVersion,
       leanCommit,

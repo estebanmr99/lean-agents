@@ -109,12 +109,46 @@ export function dcpTuiActions(dir) {
   return actions;
 }
 
+// Leftover 1.x names in an already-2.x `mcp.servers` entry (#556). Rename in place; a snake_case target that already
+// exists wins (the stale key is skipped and reported, never overwritten). Values are copied, never printed.
+const STALE_OAUTH = { clientId: 'client_id', clientSecret: 'client_secret', callbackPort: 'callback_port', redirectUri: 'redirect_uri' };
+export function staleMcpEdits(cfg) {
+  const edits = [];
+  const skipped = [];
+  for (const [name, s] of Object.entries(cfg?.mcp?.servers ?? {})) {
+    if (!s || typeof s !== 'object' || Array.isArray(s)) continue;
+    const base = ['mcp', 'servers', name];
+    if (s.enabled === false) {
+      if (s.disabled === undefined) {
+        edits.push({ path: [...base, 'disabled'], value: true, mode: 'setIfAbsent' });
+        edits.push({ path: [...base, 'enabled'], mode: 'remove' });
+      } else skipped.push(`mcp.servers.${name}.enabled (disabled already set)`);
+    } else if (s.enabled !== undefined) {
+      edits.push({ path: [...base, 'enabled'], mode: 'remove' });
+    }
+    if (!s.oauth || typeof s.oauth !== 'object' || Array.isArray(s.oauth)) continue;
+    for (const [from, to] of Object.entries(STALE_OAUTH)) {
+      if (s.oauth[from] === undefined) continue;
+      if (s.oauth[to] !== undefined) { skipped.push(`mcp.servers.${name}.oauth.${from} (oauth.${to} already set)`); continue; }
+      edits.push({ path: [...base, 'oauth', to], value: s.oauth[from], mode: 'setIfAbsent' });
+      edits.push({ path: [...base, 'oauth', from], mode: 'remove' });
+    }
+  }
+  return { edits, skipped };
+}
+
+function existingConfig(dir) {
+  try { return parse(fs.readFileSync(configPath(dir), 'utf8'), [], { allowTrailingComma: true }) ?? null; } catch { return null; }
+}
+
 // MCP entry edit. `shape` turns a command array into this agent's entry. A server with `legacy` commands in core/mcp.json
 // (Context Mode: other versions, with or without `server`, npx or an nvm Node; `*` is a wildcard) has those entries replaced
 // by a rerun, so the npx and absolute forms flip either way. Anything else the user has is kept.
-export function mcpEdit(path, shape, command, legacy) {
+export function mcpEdit(path, shape, command, legacy, enabledLegacy = false) {
   const value = shape(command);
-  return legacy ? { path, value, mode: 'upgradeIf', legacy: legacy.map(shape), restorePrevious: true } : { path, value, mode: 'setIfAbsent' };
+  // Older lean-agents wrote `enabled: true` on 2.x; accept it as a legacy match so --update can drop it (#556).
+  const old = legacy?.flatMap((c) => (enabledLegacy ? [shape(c), { ...shape(c), enabled: true }] : [shape(c)]));
+  return legacy ? { path, value, mode: 'upgradeIf', legacy: old, restorePrevious: true } : { path, value, mode: 'setIfAbsent' };
 }
 
 // Windows only, and only when Git Bash is actually found (#124 follow-up, proven in `real-opencode-shell`
@@ -231,7 +265,7 @@ export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
   if (shell) edits.push(shell);
 
   for (const name of ['context-mode', 'serena', 'playwright', 'playwright-extension']) {
-    if (tools.includes(name)) edits.push(mcpEdit(['mcp', 'servers', name], (command) => ({ type: 'local', command, enabled: true }), localServer(core, name, 'opencode').command, core.mcp[name].legacy));
+if (tools.includes(name)) edits.push(mcpEdit(['mcp', 'servers', name], (command) => ({ type: 'local', command }), localServer(core, name, 'opencode').command, core.mcp[name].legacy, true));
   }
   if (tools.includes('ponytail')) edits.push({ path: ['plugins'], value: npmSpec('ponytail'), mode: 'arrayAdd', legacy: ['@dietrichgebert/ponytail'] });
   if (tools.includes('dcp')) {
@@ -247,6 +281,8 @@ export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
       edits.push({ path: ['policies'], value: { effect: 'deny', action: 'provider.use', resource: 'opencode' }, mode: 'arrayAdd' });
     }
   }
-  actions.push({ kind: 'json', path: configPath(dir), edits });
+  const stale = staleMcpEdits(existingConfig(dir));
+  edits.push(...stale.edits);
+  actions.push({ kind: 'json', path: configPath(dir), edits, ...(stale.skipped.length && { note: `left stale keys alone: ${stale.skipped.join(', ')}` }) });
   return { actions, commands };
 }
