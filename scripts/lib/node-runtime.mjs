@@ -29,6 +29,7 @@ export function meetsEngines(version, range) {
   const v = String(version).replace(/^v/, '');
   const clause = (text) => {
     let unknown = false;
+    let ok = true;
     for (const part of text.trim().replace(/([<>=^~])\s+/g, '$1').split(/\s+/).filter(Boolean)) {
       if (/^[xX*]$/.test(part)) continue;
       const m = /^(>=|<=|>|<|=|\^|~)?v?(\d+)(?:\.(\d+|[xX*]))?(?:\.(\d+|[xX*]))?$/.exec(part);
@@ -37,23 +38,23 @@ export function meetsEngines(version, range) {
       const n = m.slice(2).map((x) => (x === undefined || /^[xX*]$/.test(x) ? null : Number(x)));
       const lo = [n[0], n[1] ?? 0, n[2] ?? 0];
       const d = compare(v, lo);
-      let ok;
-      if (op === '>=') ok = d >= 0;
-      else if (op === '>') ok = d > 0;
-      else if (op === '<=') ok = d <= 0;
-      else if (op === '<') ok = d < 0;
-      else if (op === '=') ok = d === 0;
+      let pass;
+      if (op === '>=') pass = d >= 0;
+      else if (op === '>') pass = d > 0;
+      else if (op === '<=') pass = n[1] === null ? compare(v, [n[0] + 1, 0, 0]) < 0 : n[2] === null ? compare(v, [n[0], n[1] + 1, 0]) < 0 : d <= 0;
+      else if (op === '<') pass = d < 0;
+      else if (op === '=') pass = d === 0;
       else if (op === '^' || op === '~') {
         const hi = op === '~'
           ? (n[1] === null ? [n[0] + 1, 0, 0] : [n[0], n[1] + 1, 0])
           : n[0] > 0 ? [n[0] + 1, 0, 0] : n[1] !== null && n[1] > 0 ? [0, n[1] + 1, 0] : n[2] !== null ? [0, 0, n[2] + 1] : [1, 0, 0];
-        ok = d >= 0 && compare(v, hi) < 0;
-      } else if (n[1] === null) ok = n[0] === Number(v.split('.')[0]);
-      else if (n[2] === null) ok = compare(v, [n[0], n[1], 0]) >= 0 && compare(v, [n[0], n[1] + 1, 0]) < 0;
-      else ok = d === 0;
-      if (!ok) return false;
+        pass = d >= 0 && compare(v, hi) < 0;
+      } else if (n[1] === null) pass = n[0] === Number(v.split('.')[0]);
+      else if (n[2] === null) pass = compare(v, [n[0], n[1], 0]) >= 0 && compare(v, [n[0], n[1] + 1, 0]) < 0;
+      else pass = d === 0;
+      if (!pass) ok = false;
     }
-    return unknown ? null : true;
+    return unknown ? null : ok;
   };
   let unknown = false;
   for (const text of String(range).split('||')) {

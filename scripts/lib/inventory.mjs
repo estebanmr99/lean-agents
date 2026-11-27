@@ -144,6 +144,8 @@ export function activeNodeVersion(nvm, { env = process.env, fsx = fs } = {}) {
 
 // npm and corepack ship inside a Node install; they are not globals the user installed.
 const BUNDLED = new Set(['npm', 'corepack']);
+const NPM_NAME = /^(@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/;
+export const isNpmName = (name) => NPM_NAME.test(name);
 
 // Every global npm package under every nvm Node (#465): { name, version, node, dir, engines, active, status }. Read-only.
 // status: `not-active` (only under a Node that is not the default one), `version-differs` (the same name elsewhere at another
@@ -184,7 +186,7 @@ export function npmGlobals(nvm, { env = process.env, fsx = fs } = {}) {
     active,
     nodes: nodes.map((n) => ({ version: n.version, dir: n.dir, active: n.version === active })),
     packages,
-    cleanup: packages.filter((p) => p.status.includes('not-active')).map((p) => ({ name: p.name, node: p.node, dir: p.dir })),
+    cleanup: packages.filter((p) => p.status.includes('not-active') && isNpmName(p.name)).map((p) => ({ name: p.name, node: p.node, dir: p.dir })),
   };
 }
 

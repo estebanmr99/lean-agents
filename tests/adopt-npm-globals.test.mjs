@@ -31,7 +31,13 @@ function seeded() {
     if (!win) fs.chmodSync(node, 0o755);
     for (const [name, meta] of Object.entries(pkgs)) put(j(dir, win ? 'node_modules' : j('lib', 'node_modules'), ...name.split('/'), 'package.json'), JSON.stringify({ name, ...meta }));
   };
-  add('22.20.0', { 'legacy-cli': { version: '0.9.1' }, '@scope/tool': { version: '1.0.0' } });
+  add('22.20.0', {
+    'legacy-cli': { version: '0.9.1' },
+    '@scope/tool': { version: '1.0.0' },
+    'bad-cli': { name: 'bad;name', version: '1.0.0' },
+  });
+  // A folder whose package.json is unreadable keeps its folder name and a null version.
+  put(j(nodesDir, 'v22.20.0', win ? 'node_modules' : j('lib', 'node_modules'), 'broken-pkg', 'package.json'), '{ not json');
   add('24.15.0', {
     '@scope/tool': { version: '2.0.0' },
     'fresh-cli': { version: '1.2.0', engines: { node: '>=22' } },
@@ -75,17 +81,24 @@ test('npmGlobals lists every package under every Node, marks the active one and 
   const sorted = g.packages.map((p) => [p.node, p.name, p.version]);
   assert.deepEqual(sorted, [
     ['22.20.0', '@scope/tool', '1.0.0'],
+    ['22.20.0', 'bad;name', '1.0.0'],
+    ['22.20.0', 'broken-pkg', null],
     ['22.20.0', 'legacy-cli', '0.9.1'],
     ['24.15.0', '@scope/tool', '2.0.0'],
     ['24.15.0', 'fresh-cli', '1.2.0'],
     ['24.15.0', 'needs-newer', '3.0.0'],
   ]);
   assert.deepEqual(byName(g, 'legacy-cli')[0].status, ['not-active']);
+  assert.deepEqual(byName(g, 'broken-pkg')[0].status, ['not-active']);
+  assert.deepEqual(byName(g, 'bad;name')[0].status, ['not-active']);
   assert.deepEqual(byName(g, '@scope/tool').map((p) => p.status), [['version-differs'], ['version-differs']]);
   assert.deepEqual(byName(g, 'needs-newer')[0].status, ['engines-unmet']);
   assert.deepEqual(byName(g, 'fresh-cli')[0].status, []);
   assert.equal(g.packages.some((p) => p.name === 'npm'), false); // bundled with Node, not a user global
-  assert.deepEqual(g.cleanup, [{ name: 'legacy-cli', node: '22.20.0', dir: s.oldDir }]);
+  assert.deepEqual(g.cleanup, [
+    { name: 'broken-pkg', node: '22.20.0', dir: s.oldDir },
+    { name: 'legacy-cli', node: '22.20.0', dir: s.oldDir },
+  ]); // a name with a shell metacharacter gets no cleanup line
 });
 
 test('inventory puts npmGlobals in the report with ~ paths and adds no plan step', async () => {
@@ -93,7 +106,10 @@ test('inventory puts npmGlobals in the report with ~ paths and adds no plan step
   const r = await inventory({ home: s.home, env: s.env, platform: process.platform, realHome: '/nowhere' });
   assert.deepEqual(r.npmGlobals.nodes.map((n) => [n.version, n.active]), [['22.20.0', false], ['24.15.0', true]]);
   assert.equal(r.npmGlobals.nodes[0].dir, `~${s.oldDir.slice(s.home.length)}`);
-  assert.deepEqual(r.npmGlobals.cleanup, [`npm uninstall -g legacy-cli --prefix ~${s.oldDir.slice(s.home.length)}`]);
+  assert.deepEqual(r.npmGlobals.cleanup, [
+    `npm uninstall -g broken-pkg --prefix ~${s.oldDir.slice(s.home.length)}`,
+    `npm uninstall -g legacy-cli --prefix ~${s.oldDir.slice(s.home.length)}`,
+  ]);
   assert.deepEqual(r.plan.filter((l) => /legacy-cli|fresh-cli|needs-newer/.test(l)), []); // --yes never touches them
 });
 
@@ -107,13 +123,17 @@ test('--adopt and --adopt --json print the globals and write nothing', () => {
   assert.equal(g.active, '24.15.0');
   assert.deepEqual(g.packages.filter((p) => p.name === 'legacy-cli').map((p) => p.status), [['not-active']]);
   assert.deepEqual(g.packages.filter((p) => p.name === 'needs-newer').map((p) => p.status), [['engines-unmet']]);
+  assert.equal(g.packages.find((p) => p.name === 'broken-pkg').version, null);
+  assert.equal(g.packages.find((p) => p.name === 'bad;name').version, '1.0.0');
+  assert.equal(g.cleanup.some((l) => l.includes('bad;name')), false);
 
   const text = spawnSync(process.execPath, [LEAN, '--home', s.home, '--no-exec', '--adopt'], { encoding: 'utf8', env: s.env });
   assert.equal(text.status, 0, text.stderr);
   assert.match(text.stdout, /Global npm packages under nvm \(active Node: 24\.15\.0\):/);
-  for (const line of ['* 24.15.0   fresh-cli@1.2.0', 'legacy-cli@0.9.1  [not-active]', 'needs-newer@3.0.0  [engines-unmet]']) assert.ok(text.stdout.includes(line), line);
+  for (const line of ['* 24.15.0   fresh-cli@1.2.0', 'legacy-cli@0.9.1  [not-active]', 'needs-newer@3.0.0  [engines-unmet]', 'broken-pkg@unknown', 'bad;name@1.0.0']) assert.ok(text.stdout.includes(line), line);
   assert.match(text.stdout, /Cleanup \(listed only, nothing runs automatically\):/);
   assert.ok(text.stdout.includes(`- npm uninstall -g legacy-cli --prefix ~${s.oldDir.slice(s.home.length)}`));
+  assert.equal(text.stdout.includes('npm uninstall -g bad;name'), false);
 
   assert.equal(treeHash(s.home), before);
   assert.ok(fs.existsSync(j(s.oldDir, process.platform === 'win32' ? 'node_modules' : j('lib', 'node_modules'), 'legacy-cli', 'package.json')));
