@@ -4,19 +4,22 @@ import assert from 'node:assert/strict';
 import { doctor } from '../scripts/lib/doctor.mjs';
 import { homeRel, tilde } from '../scripts/lib/fsops.mjs';
 
-function rows(home, files, platform) {
+function rows(home, files, platform, json = true) {
   const state = { version: '0', commands: [], files, options: { agents: ['copilot-cli'], tools: [], privacy: 'standard', network: {} } };
   let out = '';
   const write = process.stdout.write;
   process.stdout.write = (s) => { out += s; return true; };
-  try { doctor({ home, state, exec: false, json: true, platform, run: () => ({ ok: true, out: '' }) }); } finally { process.stdout.write = write; }
-  return JSON.parse(out).rows.map((r) => r.item);
+  try { doctor({ home, state, exec: false, json, platform, run: () => ({ ok: true, out: '' }) }); } finally { process.stdout.write = write; }
+  return json ? JSON.parse(out).rows.map((r) => r.item) : out;
 }
 
 test('#493: a lowercase drive letter still prints as ~ in doctor --json (Windows)', () => {
   const items = rows('C:\\Users\\u', [{ path: 'c:\\Users\\u\\.copilot\\x.md', hash: 'h' }], 'win32');
   assert.ok(items.includes('~\\.copilot\\x.md'), items.join(' | '));
   assert.ok(!items.some((i) => /Users\\u/i.test(i)));
+  const text = rows('C:\\Users\\u', [{ path: 'c:\\Users\\u\\.copilot\\x.md', hash: 'h' }], 'win32', false);
+  assert.match(text, /~\\\.copilot\\x\.md/);
+  assert.doesNotMatch(text, /Users\\u/i);
 });
 
 test('#493: homeRel is case-insensitive on Windows only, and stops at a path boundary', () => {
@@ -25,6 +28,7 @@ test('#493: homeRel is case-insensitive on Windows only, and stops at a path bou
   assert.equal(homeRel('/Users/U/a', '/Users/u', 'darwin'), '/Users/U/a');
   assert.equal(homeRel('/home/u/a', '/home/u', 'linux'), '~/a');
   assert.equal(homeRel('/home/u', '/home/u', 'linux'), '~');
+  assert.equal(homeRel('/home/u/a', '/home/u/', 'linux'), '~/a');
 });
 
 test('#493: tilde in plan and failure lines matches any case on Windows only', () => {

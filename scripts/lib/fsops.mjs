@@ -254,6 +254,7 @@ export function plan(actions, roots = [], prior = []) {
 // path boundary, so /home/u2 is not shortened against /home/u.
 export function homeRel(p, home, platform = process.platform) {
   if (!p || !home) return p;
+  if (home.length > 1) home = home.replace(/[\\/]+$/, '');
   const win = platform === 'win32';
   const head = p.slice(0, home.length);
   const rest = p.slice(home.length);

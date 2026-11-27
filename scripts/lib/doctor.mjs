@@ -141,7 +141,8 @@ export function projectNode({ cwd, home, nodeVersion, fsx = fs }) {
       let range;
       try { range = JSON.parse(fsx.readFileSync(pkg, 'utf8')).engines?.node; } catch { return null; }
       if (typeof range !== 'string' || !range.trim()) return null;
-      const rel = pkg.startsWith(home) ? `~${pkg.slice(home.length).replaceAll('\\', '/')}` : pkg;
+      const short = homeRel(pkg, home);
+      const rel = short === pkg ? pkg : short.replaceAll('\\', '/');
       const gui = '; VS Code or Cursor started outside this shell can resolve another Node';
       // shortcut: only an exact version and >=a.b.c are checked; ^, ~, x and || ranges get a note, add a parser when a real project needs one.
       let fits;
