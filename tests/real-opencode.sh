@@ -31,14 +31,26 @@ opencode_processes() {
   [ -n "$pids" ] || return 1
   ps -o pid,lstart,command -p "$pids"
 }
+# PIDs that appeared during the run; one that was already there belongs to the user or the test setup.
+new_pids() {
+  awk -v before=",$1," -v after="$2" 'BEGIN {
+    n = split(after, a, ",");
+    for (i = 1; i <= n; i++) if (a[i] != "" && index(before, "," a[i] ",") == 0) { printf "%s%s", (out ? "," : ""), a[i]; out = 1 }
+  }'
+}
 lean_run() {
+  local before after new rc=0
+  before="$(opencode_pids)"
   echo "== $(date -u +%T) before: lean-agents $*"
   opencode_processes || true
-  local rc=0
   bash "$repo/install.sh" "$@" || rc=$?
+  after="$(opencode_pids)"
   echo "== $(date -u +%T) after: lean-agents $*"
-  if opencode_processes; then
+  opencode_processes || true
+  new="$(new_pids "$before" "$after")"
+  if [ -n "$new" ]; then
     echo "FAIL  an opencode process is left after: lean-agents $*" >&2
+    ps -o pid,lstart,command -p "$new" >&2 || true
     exit 1
   fi
   return "$rc"
