@@ -97,6 +97,14 @@ case "$commands" in
   *) bad "GET /api/command has no dcp-compress: $commands"; tail -n 20 "$T/serve.out"; exit 1 ;;
 esac
 
+# #495: doctor's DCP row must find the copy this OpenCode just cached (2.2.7: <cache>/npm/<pkg>@<spec>/<id>/node_modules).
+dcp_row="$(cd "$repo" && node --input-type=module -e "import('./scripts/lib/plugin-health.mjs').then((m) => { const r = m.dcpRow(process.argv[1]); console.log(r.status + ' ' + r.detail); })" "$HOME")"
+want="${dcp_spec##*@}"
+case "$dcp_row" in
+  "ok "*"resolved: $want ;"*) ok "doctor DCP row: $dcp_row" ;;
+  *) bad "doctor DCP row is not ok with resolved $want: $dcp_row"; find "$HOME/.cache/opencode" -maxdepth 5 -type d -name '*opencode-dcp*' ;;
+esac
+
 # A turn that does not finish in 2 minutes is a failure, not a hang.
 run_turn() { # run_turn <name> <opencode run flags and message...>
   local name="$1" i=0; shift
