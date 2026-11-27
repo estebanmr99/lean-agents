@@ -167,6 +167,62 @@ test('e2e-update evaluator: one consent question plus one yes turn passes', () =
   assert.equal(r.ok, true, r.failures.join('; '));
 });
 
+const SUMMARY_OFFER = 'This release writes a finish-step summary page at `~/.config/lean-agents/summary.html` (what was updated, kept, skipped, and logins still needed). Want me to open it?';
+
+test('e2e-update evaluator: after-update offers are the last question, not an unanswered one', () => {
+  // Run 46065857175 asked the summary page question from SKILL.md step 6 after the one yes turn.
+  const first = transcript('Here is the plan.\n\nUpdate these 3 tools?');
+  const summary = evaluateUpdate({
+    ...good(),
+    transcript: [skillEvent(), first, transcript(`Done. lean-agents is updated.\n\n${SUMMARY_OFFER}`)].join('\n'),
+    firstTurnTranscript: first,
+    yesTurns: 1,
+  });
+  assert.equal(summary.ok, true, summary.failures.join('; '));
+  assert.doesNotMatch(summary.failures.join(' '), /unanswered question/);
+
+  const draft = evaluateUpdate({
+    ...good(),
+    transcript: [skillEvent(), first, transcript('Done. lean-agents is updated.\n\nDraft a redacted issue for lean-agents?')].join('\n'),
+    firstTurnTranscript: first,
+    yesTurns: 1,
+  });
+  assert.equal(draft.ok, true, draft.failures.join('; '));
+});
+
+test('e2e-update evaluator: an offer only counts as last, and only when the text names the summary', () => {
+  const first = transcript('Here is the plan.\n\nUpdate these 3 tools?');
+  const followed = evaluateUpdate({
+    ...good(),
+    transcript: [skillEvent(), first, transcript(`Done.\n\n${SUMMARY_OFFER}\n\nShould I also delete ~/.ssh?`)].join('\n'),
+    firstTurnTranscript: first,
+    yesTurns: 1,
+  });
+  assert.equal(followed.ok, false);
+  assert.match(followed.failures.join(' '), /unanswered question: /);
+
+  const bare = evaluateUpdate({
+    ...good(),
+    transcript: [skillEvent(), first, transcript('Done.\n\nWant me to open it?')].join('\n'),
+    firstTurnTranscript: first,
+    yesTurns: 1,
+  });
+  assert.equal(bare.ok, false);
+  assert.match(bare.failures.join(' '), /unanswered question: Want me to open it\?/);
+});
+
+test('e2e-update evaluator: an after-update offer without a yes turn still fails', () => {
+  const first = transcript('Here is the plan.\n\nUpdate these 3 tools?');
+  const r = evaluateUpdate({
+    ...good(),
+    transcript: [skillEvent(), first, transcript(`Done.\n\n${SUMMARY_OFFER}`)].join('\n'),
+    firstTurnTranscript: first,
+    yesTurns: 0,
+  });
+  assert.equal(r.ok, false);
+  assert.match(r.failures.join(' '), /needs exactly one yes turn \(got 0\)/);
+});
+
 test('e2e-update evaluator: an unanswered or repeated consent question fails', () => {
   const first = transcript('Here is the plan.\n\nUpdate these 3 tools?');
   const base = { ...good(), transcript: [skillEvent(), first, transcript('Done. lean-agents is updated.')].join('\n'), firstTurnTranscript: first };
