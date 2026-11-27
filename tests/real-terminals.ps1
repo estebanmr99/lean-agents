@@ -86,7 +86,7 @@ try {
   $env:LOCALAPPDATA = "$appdir\AppData\Local"
   $orcaPin = (Get-Content "$repo\core\pins.json" -Raw | ConvertFrom-Json).pins.'orca-app'.version
   # One release behind the pin: enough for --update to move it.
-  $oldOrca = '1.4.263'
+  $oldOrca = '1.4.257'
   $oldExe = "$dir\orca-old.exe"
   Invoke-WebRequest -Uri "https://github.com/stablyai/orca/releases/download/v$oldOrca/orca-windows-setup.exe" -OutFile $oldExe -UseBasicParsing
   Start-Process -FilePath $oldExe -ArgumentList '/currentuser', '/S' -Wait

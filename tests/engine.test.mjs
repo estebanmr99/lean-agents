@@ -1441,6 +1441,88 @@ test('terminals: all-off network prints the Warp and Orca privacy switches', () 
 
 const NO_PROXY_ENV = { HTTP_PROXY: '', HTTPS_PROXY: '', ALL_PROXY: '', NO_PROXY: '', http_proxy: '', https_proxy: '', all_proxy: '', no_proxy: '' };
 
+test('--update apps: adoption, hint (not JSON), no dry-run prompt, newer never downgraded, uninstall keeps an adopted app', () => {
+  const home = userHome();
+  const orcaApp = path.join(home, 'Applications', 'Orca.app');
+  fs.mkdirSync(orcaApp, { recursive: true });
+  const base = ['--yes', '--no-exec', '--agents', 'claude', '--no-tools', '--network', 'off', '--lang', 'en', '--profile', 'none'];
+  const childEnv = (versions) => ({
+    PATH: process.env.PATH,
+    HOME: home,
+    NVM_DIR: process.env.NVM_DIR ?? path.join(home, '.nvm'),
+    ...(versions && { LEAN_AGENTS_APP_VERSIONS: JSON.stringify(versions) }),
+  });
+  const run = (args, versions) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args], { encoding: 'utf8', env: childEnv(versions) });
+  const ok = (args, versions) => { const r = run(args, versions); assert.equal(r.status, 0, r.stderr || r.stdout); return r; };
+
+  ok(base);
+  // Non-interactive without the flag: one hint through the normal update-note channel.
+  const dry = ok(['--update', '--yes', '--no-exec', '--dry-run'], { orca: '1.4.257' }).stdout;
+  assert.match(dry, /Orca app 1\.4\.257 -> 1\.4\.258 is not managed: run --update --install-terminal orca to update it/);
+  // --json stdout stays one JSON object; the hint goes to stderr.
+  const json = ok(['--update', '--yes', '--no-exec', '--dry-run', '--json'], { orca: '1.4.257' });
+  assert.match(json.stderr, /is not managed: run --update --install-terminal orca/);
+  assert.doesNotMatch(json.stdout, /not managed/);
+  assert.doesNotThrow(() => JSON.parse(json.stdout));
+  // A dry run without --yes plans and never waits for an answer.
+  const planned = ok(['--update', '--no-exec', '--dry-run'], { orca: '1.4.257' }).stdout;
+  assert.match(planned, /Dry run: nothing was changed/);
+  assert.match(planned, /is not managed: run --update --install-terminal orca/);
+  // Newer than the pin: no row and no downgrade.
+  const newer = ok(['--update', '--install-terminal', 'orca', '--yes', '--no-exec', '--dry-run'], { orca: '1.4.300' }).stdout;
+  assert.doesNotMatch(newer, /orca app 1\.4\.300/);
+  assert.doesNotMatch(newer, /-> 1\.4\.258/);
+
+  // --install-terminal adopts it: state remembers it as adopted and managed.
+  ok(['--update', '--install-terminal', 'orca', '--yes', '--no-exec'], { orca: '1.4.257' });
+  const state = JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'state.json'), 'utf8'));
+  assert.ok(state.options.installTerminals.includes('orca'));
+  assert.ok(state.options.adoptedTerminals.includes('orca'));
+  assert.ok(fs.existsSync(orcaApp));
+
+  // Undo never removes an adopted app: no Orca undo command is planned.
+  const undo = ok(['--uninstall', '--yes', '--no-exec', '--dry-run']).stdout;
+  assert.doesNotMatch(undo, /Orca\.app/);
+  assert.ok(fs.existsSync(orcaApp), 'the adopted app stays on disk');
+});
+
+test('--update apps: an answered "no" is remembered, not asked again, and --install-terminal overrides it', () => {
+  const home = userHome();
+  fs.mkdirSync(path.join(home, 'Applications', 'Orca.app'), { recursive: true });
+  const base = ['--yes', '--no-exec', '--agents', 'claude', '--no-tools', '--network', 'off', '--lang', 'en', '--profile', 'none'];
+  const askEnv = (answer) => ({
+    PATH: process.env.PATH,
+    HOME: home,
+    NVM_DIR: process.env.NVM_DIR ?? path.join(home, '.nvm'),
+    LEAN_AGENTS_APP_VERSIONS: JSON.stringify({ orca: '1.4.257' }),
+    LEAN_AGENTS_TEST: '1',
+    LEAN_AGENTS_TEST_FORCE_ASK: '1',
+    LEAN_AGENTS_TEST_APP_ANSWERS: answer,
+  });
+  const run = (args, answer) => {
+    const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args], { encoding: 'utf8', env: askEnv(answer) });
+    assert.equal(r.status, 0, r.stderr || r.stdout);
+    return r.stdout;
+  };
+  const state = () => JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'state.json'), 'utf8')).options;
+  run(base, '');
+
+  const first = run(['--update', '--yes', '--no-exec'], 'n');
+  assert.match(first, /is not managed: run --update --install-terminal orca/);
+  assert.ok(state().declinedTerminals.includes('orca'));
+  assert.ok(!state().adoptedTerminals.includes('orca'));
+
+  // A later --update does not ask again: a "yes" left waiting must not adopt it.
+  run(['--update', '--yes', '--no-exec'], 'y');
+  assert.ok(state().declinedTerminals.includes('orca'));
+  assert.ok(!state().adoptedTerminals.includes('orca'));
+
+  // The explicit flag overrides the remembered no.
+  run(['--update', '--install-terminal', 'orca', '--yes', '--no-exec'], '');
+  assert.ok(state().adoptedTerminals.includes('orca'));
+  assert.ok(!state().declinedTerminals.includes('orca'));
+});
+
 test('Orca on Windows: skill for Cursor and VS Code Copilot, telemetry and NO_PROXY commands only for the real home', () => {
   const win = { terminals: ['orca'], agents: ['cursor', 'vscode-copilot'], platform: 'win32' };
   const skill = terminalCommands({ ...win, network: {}, env: {} }).find((c) => c.desc === 'Orca skill orca-cli');

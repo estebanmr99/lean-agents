@@ -39,14 +39,49 @@ export function detectTerminals(home, { platform = process.platform, env = proce
   return found;
 }
 
+// The absolute .app path an optional app was found at; null when absent (macOS only).
+export function installedAppPath({ home, app, platform = process.platform, system = true, exists = fs.existsSync } = {}) {
+  if (platform !== 'darwin' || !APP_INFO[app]) return null;
+  const apps = [path.join(home, 'Applications', APP_INFO[app].mac), ...(system ? [path.join('/Applications', APP_INFO[app].mac)] : [])];
+  return apps.find(exists) ?? null;
+}
+
+// Where an Orca update must write, and why it cannot happen now. A /Applications copy needs no sudo to replace;
+// when it does, and when Orca is running, the caller shows a plan row instead of a command.
+export function appUpdateTarget({ home, app, platform = process.platform, system = true, exists = fs.existsSync, writable = (d) => { try { fs.accessSync(d, fs.constants.W_OK); return true; } catch { return false; } }, running = false } = {}) {
+  if (app !== 'orca') return {};
+  if (running) return { blocked: 'Orca is running: quit Orca, then run --update again' };
+  if (platform !== 'darwin') return {};
+  const found = installedAppPath({ home, app, platform, system, exists });
+  if (!found) return {};
+  if (path.dirname(found) === path.join(path.sep, 'Applications') && !writable(path.dirname(found))) {
+    return { path: found, blocked: `${found} is in /Applications, which needs sudo: move Orca to ~/Applications or update it yourself` };
+  }
+  return { path: found };
+}
+
+// Whether the app is running, so an update never replaces it underneath the user.
+export function appRunning({ app, platform = process.platform, run = quiet } = {}) {
+  if (!APP_INFO[app]) return false;
+  const name = APP_INFO[app].win;
+  if (platform === 'darwin') return run(['pgrep', '-x', name]).ok;
+  if (platform === 'win32') return run(ps(`if (Get-Process -Name ${name} -ErrorAction SilentlyContinue) { exit 0 }; exit 1`)).ok;
+  return false;
+}
+
 // Installed optional app versions ({ warp, orca }), read from the platform. `system` is false for a run with --home:
 // it never reads the real machine's registry. Null when absent or unreadable.
-export function installedAppVersions({ home, platform = process.platform, system = true, run = quiet, exists = fs.existsSync } = {}) {
+export function installedAppVersions({ home, platform = process.platform, system = true, run = quiet, exists = fs.existsSync, env = process.env } = {}) {
   const out = {};
   if (platform !== 'darwin' && platform !== 'win32') return out;
+  // Test-only: a fake probe keeps engine tests on --no-exec while they exercise the update flow.
+  let fake = null;
+  try { fake = env.LEAN_AGENTS_APP_VERSIONS ? JSON.parse(env.LEAN_AGENTS_APP_VERSIONS) : null; } catch { fake = null; }
   for (const [app, info] of Object.entries(APP_INFO)) {
     let version = null;
-    if (platform === 'darwin') {
+    if (fake && Object.hasOwn(fake, app)) {
+      version = String(fake[app]);
+    } else if (platform === 'darwin') {
       const apps = [path.join(home, 'Applications', info.mac), ...(system ? [path.join('/Applications', info.mac)] : [])];
       const found = apps.find(exists);
       if (found) {
@@ -74,7 +109,7 @@ export function parseTerminal(v) {
 // Commands only: OpenCode plugin entries go into the OpenCode adapter's own json edit, because two
 // json actions on one file would each start from the unedited text.
 // `system` is false for --home runs: Windows user env changes are real-machine only.
-export function terminalCommands({ home, terminals = [], installTerminals = [], updateApps = [], adoptedTerminals = [], agents = [], network = {}, platform = process.platform, env = process.env, system = true, readEnv = readWindowsEnv }) {
+export function terminalCommands({ home, terminals = [], installTerminals = [], updateApps = [], adoptedTerminals = [], appPaths = {}, agents = [], network = {}, platform = process.platform, env = process.env, system = true, readEnv = readWindowsEnv }) {
   const commands = [];
   
   const arch = platform === 'darwin' ? process.arch : 'x64';
@@ -88,9 +123,12 @@ export function terminalCommands({ home, terminals = [], installTerminals = [], 
     if (platform === 'darwin') {
       commands.push({
         tool: 'warp',
-        desc: 'Install Warp app',
+        desc: updating ? 'Update Warp app (Homebrew cask)' : 'Install Warp app',
         skipIfExists: updating ? undefined : [path.join(home, 'Applications', 'Warp.app'), '/Applications/Warp.app'],
-        run: [['bash', '-c', 'if command -v brew >/dev/null 2>&1; then brew install --cask warp; else echo "Error: Homebrew is required to install Warp on macOS. Please install Warp manually from https://warp.dev" >&2; exit 1; fi']],
+        // The cask follows upstream, not the Windows pin: `brew install` is a no-op when Warp is already there.
+        run: [['bash', '-c', updating
+          ? 'if command -v brew >/dev/null 2>&1; then brew upgrade --cask warp; else echo "Error: Homebrew is required to update Warp on macOS. Please update Warp manually from https://warp.dev" >&2; exit 1; fi'
+          : 'if command -v brew >/dev/null 2>&1; then brew install --cask warp; else echo "Error: Homebrew is required to install Warp on macOS. Please install Warp manually from https://warp.dev" >&2; exit 1; fi']],
         undo: adopted ? [] : [['bash', '-c', 'if command -v brew >/dev/null 2>&1; then brew uninstall --cask warp; fi']],
       });
     } else if (platform === 'win32') {
@@ -123,8 +161,11 @@ export function terminalCommands({ home, terminals = [], installTerminals = [], 
       const key = arch === 'arm64' ? 'darwin-arm64' : 'darwin-x64';
       const url = orcaPin.url[key];
       const sha = orcaPin.sha256[key];
+      // Update in place: a stale /Applications copy must not stay next to a new ~/Applications one.
+      const target = updating ? (appPaths.orca ?? path.join(home, 'Applications', 'Orca.app')) : path.join(home, 'Applications', 'Orca.app');
+      const guard = updating ? 'if pgrep -x Orca >/dev/null 2>&1; then echo "Orca is running: quit Orca, then run --update again" >&2; exit 1; fi\n' : '';
       const script = `set -e
-DIR=$(mktemp -d)
+${guard}DIR=$(mktemp -d)
 MOUNT="$DIR/mount"
 MOUNTED=0
 cleanup() {
@@ -138,28 +179,31 @@ curl -fsSL ${CURL_RETRY.join(' ')} -o "$DIR/orca.dmg" "${url}"
 node "${VERIFY}" "$DIR/orca.dmg" "${sha}"
 hdiutil attach -nobrowse -readonly -mountpoint "$MOUNT" "$DIR/orca.dmg"
 MOUNTED=1
-mkdir -p "${home}/Applications"
-ditto "$MOUNT/Orca.app" "${home}/Applications/Orca.app"
+mkdir -p "$(dirname "${target}")"
+rm -rf "${target}"
+ditto "$MOUNT/Orca.app" "${target}"
 `;
       commands.push({
         tool: 'orca',
-        desc: 'Install Orca app',
+        desc: updating ? 'Update Orca app in place' : 'Install Orca app',
         skipIfExists: updating ? undefined : [path.join(home, 'Applications', 'Orca.app'), '/Applications/Orca.app'],
         run: [
           ['bash', '-c', script]
         ],
-        undo: adopted ? [] : [['rm', '-rf', path.join(home, 'Applications', 'Orca.app')]],
+        undo: adopted ? [] : [['rm', '-rf', target]],
       });
     } else if (platform === 'win32') {
       const url = orcaPin.url['windows-x64'];
       const sha = orcaPin.sha256['windows-x64'];
       const exe = path.join(os.tmpdir(), 'orca-installer.exe');
       const local = env.LOCALAPPDATA;
+      const guard = updating ? [ps(`if (Get-Process -Name Orca -ErrorAction SilentlyContinue) { Write-Error 'Orca is running: quit Orca, then run --update again'; exit 1 }`)] : [];
       commands.push({
         tool: 'orca',
-        desc: 'Install Orca app',
+        desc: updating ? 'Update Orca app' : 'Install Orca app',
         skipIfExists: updating ? undefined : [`${local}\\Programs\\Orca`],
         run: [
+          ...guard,
           ['curl', '-fsSL', '-o', exe, ...CURL_RETRY, url],
           ['node', VERIFY, exe, sha],
           [exe, '/currentuser', '/S']

@@ -18,25 +18,35 @@ export function compareAppVersions(a, b) {
 }
 
 const APP_LABEL = { orca: 'Orca', warp: 'Warp' };
+// Where an app update goes: Warp on macOS follows the Homebrew cask, not the Windows pin.
+const appTarget = (row) => (row.via === 'homebrew cask' ? 'the latest Homebrew cask (not the pin)' : row.pinned);
+
 // Optional terminal apps: a managed app behind its pin is an update row; a user-installed one is left alone.
-export function appUpdateRows({ pins, installed = {}, managed = [] }) {
+export function appUpdateRows({ pins, installed = {}, managed = [], platform = process.platform }) {
   const rows = [];
   for (const [app, label] of Object.entries(APP_LABEL)) {
     const have = installed[app];
     const pinned = pins[`${app}-app`]?.version;
     if (!have || !pinned || compareAppVersions(have, pinned) >= 0) continue;
     const isManaged = managed.includes(app);
+    const via = app === 'warp' && platform === 'darwin' ? 'homebrew cask' : null;
     rows.push({
       tool: `${app}-app`, app, label, installed: have, pinned,
       action: isManaged ? 'update' : 'own',
       reason: isManaged ? null : 'installed by you, left alone',
+      ...(via && { via }),
     });
   }
   return rows;
 }
 
-export const appAdoptQuestion = (row) => `${row.label} ${row.installed} was not installed by lean-agents. Update it to ${row.pinned} and manage it?`;
-export const appAdoptHint = (row) => `! ${row.label} app ${row.installed} -> ${row.pinned} is not managed: run --update --install-terminal ${row.app} to update it`;
+export const appAdoptQuestion = (row) => `${row.label} ${row.installed} was not installed by lean-agents. Update it to ${appTarget(row)} and manage it?`;
+export const appAdoptHint = (row) => `! ${row.label} app ${row.installed} -> ${appTarget(row)} is not managed: run --update --install-terminal ${row.app} to update it`;
+export const appAdoptAction = ({ row, requested = [], declined = [], canAsk = true }) => {
+  if (requested.includes(row.app)) return 'adopt';
+  if (declined.includes(row.app) || !canAsk) return 'hint';
+  return 'ask';
+};
 
 // action: update (will move to the pin), held (never moved), major (pin is another major), own (not installed by lean-agents).
 // `installed`: versions of the binaries on PATH ({ claude, opencode, copilot }, null when absent). `owned`: agents.json `agents` keys.
@@ -89,7 +99,7 @@ const briefBody = (body) => body.split('\n').filter((l) => /^\s*- /.test(l)).map
 // `brief`: one line per release-note entry (its first sentence), then the CHANGELOG link (#491).
 export function formatUpdatePlan(rows, notes, brief = false) {
   const out = [];
-  const line = (r) => (r.app ? `${r.app} app ${r.installed} -> ${r.pinned}` : `${r.tool}: ${r.installed}${r.pinned && r.pinned !== r.installed ? ` -> ${r.pinned}` : ''}`);
+  const line = (r) => (r.app ? `${r.app} app ${r.installed} -> ${appTarget(r)}` : `${r.tool}: ${r.installed}${r.pinned && r.pinned !== r.installed ? ` -> ${r.pinned}` : ''}`);
   const moves = rows.filter((r) => r.action === 'update');
   const rest = rows.filter((r) => r.action !== 'update');
   if (moves.length) out.push('Pins that will change (old -> new):', ...moves.map(line));

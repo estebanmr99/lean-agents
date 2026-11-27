@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { planUpdate, appUpdateRows, appAdoptQuestion, appAdoptHint, changelogNotes, formatUpdatePlan, compareAppVersions } from '../scripts/lib/update-plan.mjs';
+import { planUpdate, appUpdateRows, appAdoptQuestion, appAdoptHint, appAdoptAction, changelogNotes, formatUpdatePlan, compareAppVersions } from '../scripts/lib/update-plan.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pins = {
@@ -73,24 +73,37 @@ test('app versions compare every numeric part, not only x.y.z', () => {
 });
 
 test('app rows: managed behind the pin updates, user-installed behind the pin is left alone, equal or newer is skipped', () => {
-  const rows = appUpdateRows({ pins, installed: { orca: '1.4.264', warp: '0.2026.11.04.08.17.stable_01' }, managed: ['orca'] });
+  const rows = appUpdateRows({ pins, platform: 'win32', installed: { orca: '1.4.264', warp: '0.2026.11.04.08.17.stable_01' }, managed: ['orca'] });
   assert.deepEqual(rows.map(({ tool, app, installed, pinned, action }) => ({ tool, app, installed, pinned, action })), [
     { tool: 'orca-app', app: 'orca', installed: '1.4.264', pinned: '1.4.280', action: 'update' },
     { tool: 'warp-app', app: 'warp', installed: '0.2026.11.04.08.17.stable_01', pinned: '0.2026.11.18.08.17.stable_06', action: 'own' },
   ]);
-  assert.deepEqual(appUpdateRows({ pins, installed: { orca: '1.4.280' }, managed: ['orca'] }), []);
-  assert.deepEqual(appUpdateRows({ pins, installed: { orca: '1.4.300' }, managed: ['orca'] }), []);
+  assert.deepEqual(appUpdateRows({ pins, platform: 'win32', installed: { orca: '1.4.280' }, managed: ['orca'] }), []);
+  assert.deepEqual(appUpdateRows({ pins, platform: 'win32', installed: { orca: '1.4.300' }, managed: ['orca'] }), []);
+});
+
+test('macOS Warp rows follow the Homebrew cask, and a remembered no is not asked again', () => {
+  const [warp] = appUpdateRows({ pins, platform: 'darwin', installed: { warp: '0.2026.11.04.08.17.stable_01' }, managed: ['warp'] });
+  assert.equal(warp.via, 'homebrew cask');
+  assert.match(formatUpdatePlan([warp], []), /warp app 0\.2026\.11\.04\.08\.17\.stable_01 -> the latest Homebrew cask \(not the pin\)/);
+  assert.match(appAdoptQuestion(warp), /latest Homebrew cask/);
+
+  const row = { app: 'orca', label: 'Orca', installed: '1.4.264', pinned: '1.4.280' };
+  assert.equal(appAdoptAction({ row, canAsk: true }), 'ask');
+  assert.equal(appAdoptAction({ row, canAsk: true, declined: ['orca'] }), 'hint', 'a remembered no is not asked again');
+  assert.equal(appAdoptAction({ row, canAsk: true, declined: ['orca'], requested: ['orca'] }), 'adopt', '--install-terminal overrides the no');
+  assert.equal(appAdoptAction({ row, canAsk: false }), 'hint');
 });
 
 test('app plan lines: dry run shows the app old -> pin, and the user-installed row names why it is left alone', () => {
-  const rows = appUpdateRows({ pins, installed: { orca: '1.4.264', warp: '0.2026.11.04.08.17.stable_01' }, managed: ['orca'] });
+  const rows = appUpdateRows({ pins, platform: 'win32', installed: { orca: '1.4.264', warp: '0.2026.11.04.08.17.stable_01' }, managed: ['orca'] });
   const text = formatUpdatePlan(rows, []);
   assert.match(text, /orca app 1\.4\.264 -> 1\.4\.280/);
   assert.match(text, /warp app 0\.2026\.11\.04\.08\.17\.stable_01 -> 0\.2026\.11\.18\.08\.17\.stable_06 \(installed by you, left alone\)/);
 });
 
 test('app adopt prompt and non-interactive hint name the app, versions and the exact flag', () => {
-  const [orca] = appUpdateRows({ pins, installed: { orca: '1.4.264' }, managed: [] });
+  const [orca] = appUpdateRows({ pins, platform: 'win32', installed: { orca: '1.4.264' }, managed: [] });
   assert.equal(appAdoptQuestion(orca), 'Orca 1.4.264 was not installed by lean-agents. Update it to 1.4.280 and manage it?');
   assert.equal(appAdoptHint(orca), '! Orca app 1.4.264 -> 1.4.280 is not managed: run --update --install-terminal orca to update it');
 });
