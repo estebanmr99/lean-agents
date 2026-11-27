@@ -143,3 +143,34 @@ test('#489: an older saved state with OpenCode but no profile key is reused as n
   assert.doesNotMatch(`${r.stdout}${r.stderr}`, /OpenCode model profile/);
   assert.match(r.stdout, /profile: none/);
 });
+
+test('#488: runningBlocker stops only OpenCode steps while opencode runs', async () => {
+  const { runningBlocker } = await import('../scripts/lib/opencode-backup.mjs');
+  const rtk = { tool: 'rtk', desc: 'RTK plugin for OpenCode', run: [['rtk', 'init', '-g', '--opencode']] };
+  const up = { tool: 'opencode-v2', desc: 'upgrade opencode-v2 2.2.5 -> 2.2.7', run: [['npm', 'i', '-g', 'opencode-ai@2.2.7']] };
+  const other = { tool: 'caveman', desc: 'Caveman skill', run: [['npx', 'skills', 'add', 'x']] };
+  assert.match(runningBlocker([other, rtk], () => ['bash', 'opencode.exe']), /opencode service stop/);
+  assert.match(runningBlocker([up], () => ['/usr/local/bin/opencode']), /opencode process is running/);
+  assert.equal(runningBlocker([rtk, up], () => ['bash', 'node']), null);
+  assert.equal(runningBlocker([other], () => ['opencode']), null);
+});
+
+// POSIX: a fake `ps` on PATH stands in for a running 2.x service.
+test('#488: --update refuses before any command while opencode runs; --dry-run shows the blocker', { skip: process.platform === 'win32' }, () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-bin-'));
+  const mark = path.join(bin, 'ran');
+  fs.writeFileSync(path.join(bin, 'ps'), '#!/bin/sh\nprintf "bash\\nopencode\\n"\n', { mode: 0o755 });
+  for (const b of ['rtk', 'npx', 'npm', 'opencode']) fs.writeFileSync(path.join(bin, b), `#!/bin/sh\necho "$0 $*" >> "${mark}"\n`, { mode: 0o755 });
+  const env = { PATH: `${bin}:${path.dirname(process.execPath)}:/usr/bin:/bin`, HOME: home, ...(process.env.NVM_DIR && { NVM_DIR: process.env.NVM_DIR }) };
+  const lean = (args) => spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, ...args], { encoding: 'utf8', env, input: '' });
+  assert.equal(lean(['--no-exec', '--yes', '--agents', 'opencode-v2', '--tools', 'rtk', '--lang', 'en', '--profile', 'none']).status, 0);
+  const dry = lean(['--update', '--dry-run', '--yes']);
+  assert.match(dry.stdout, /opencode process is running/);
+  assert.match(dry.stdout, /Dry run: nothing was changed/);
+  const r = lean(['--update', '--yes']);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(`${r.stdout}${r.stderr}`, /opencode service stop/);
+  const ran = fs.existsSync(mark) ? fs.readFileSync(mark, 'utf8').split('\n').filter((l) => l && !l.endsWith(' --version')) : [];
+  assert.deepEqual(ran, [], 'only version probes ran');
+});

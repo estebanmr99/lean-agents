@@ -12,6 +12,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Fixed
 - `--doctor`'s DCP row reads OpenCode 2.2.7's plugin cache (`~/.cache/opencode/npm/<pkg>@<spec>/<id>/`), so it no longer shows an old `resolved` version and a false "changed" while the pinned DCP loads fine (#495). `--doctor --probe-plugins` copies only what the probe needs (not the config's `node_modules` or wrappers of specs the config no longer asks for), so it no longer stops at the size cap on a long-used cache.
+- `--update` stops before any step that touches OpenCode (the CLI upgrade, `rtk init --opencode`, GSD) while an `opencode` process runs, the 1.x app or the 2.x background service, and says to run `opencode service stop` first (#488). `--dry-run` shows it as a blocker. On Windows a running `opencode.exe` can block the binary swap.
 - `--update` no longer asks mid-run (#489): a saved OpenCode profile `none` is reused instead of showing the profile menu again, and `rtk init` runs without a terminal like every other step, so it no longer waits for an answer and its output goes to the run log. Checked with rtk 1.2.1: "Patch existing settings.json?" takes No; the "Delegate oversize reads...?" question was not seen in that run.
 
 ## [1.2.2] - 2026-11-26
