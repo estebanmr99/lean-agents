@@ -72,8 +72,9 @@ Do this in the 2.x files only (`~/.config/opencode/opencode.jsonc`, `cli.json`).
 | flat `mcp.<name>` | `mcp.servers.<name>` |
 | `disabled_providers` | `policies` |
 | `compaction.reserved` | `compaction.buffer` |
-| `tui.json` | `cli.json` (**VERIFY**) |
+| `tui.json` | `cli.json` (the first 2.x start migrates it and leaves `tui.json` in place) |
 
-- **DCP:** the apply step adds it for 2.x.
+- **DCP:** the apply step adds it to `opencode.jsonc` for 2.x. Do not copy it into `cli.json`: the CLI already loads its TUI part from the server config, and a second entry lists `/dcp` twice (#558).
+- **Stale `tui.json`:** after the migration it is no longer read. `--doctor` warns; lean-agents never deletes it.
 - **Context Mode:** keep it as MCP under `mcp.servers.context-mode`, not as a plugin. Never keep both.
 - **Check:** `opencode debug config` must show your keys.

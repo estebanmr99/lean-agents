@@ -82,19 +82,92 @@ function serverDcpSpecs(dir) {
   return [];
 }
 
-// tui.json(c) edit, only for a file that already exists and already lists DCP (shared by 1.x and 2.x). tui follows the server
+// TUI config a 2.x client reads: cli.json once it exists (the terminal client writes it on first start); tui.json(c)
+// before that (#558). lean-agents never creates a TUI file; it only edits one that is already there.
+export function tuiConfigs(dir, fsx = fs) {
+  const cli = path.join(dir, 'cli.json');
+  if (fsx.existsSync(cli)) return [{ path: cli, key: 'plugins', cli: true }];
+  return ['tui.json', 'tui.jsonc'].map((f) => path.join(dir, f)).filter((p) => fsx.existsSync(p)).map((p) => ({ path: p, key: 'plugin', cli: false }));
+}
+
+// A 1.x TUI plugin uses api.command/api.slots; 2.x plugins export a default definition with setup(context) (#558).
+export const legacyTuiShape = (text) => /\bapi\.(command|slots)\b/.test(text);
+// The header of the hand-made #123 meter this repo used to document (core/copilot-usage-tui.js carries it too).
+export const copilotMeterShape = (text) => /lean-agents#123/.test(text);
+
+// File behind a local plugin entry (file:// URL, path or folder with tui.js/index.js/index.ts); null for npm names.
+function pluginFile(dir, spec, fsx, home = process.env.HOME ?? os.homedir()) {
+  const raw = String(spec);
+  let p;
+  if (raw.startsWith('file:')) { try { p = fileURLToPath(raw); } catch { return null; } }
+  else if (/^([./~\\]|[a-zA-Z]:[\\/])/.test(raw)) p = raw.startsWith('~') ? path.join(home, raw.slice(1)) : path.resolve(dir, raw);
+  else return null;
+  try {
+    if (fsx.statSync(p).isDirectory()) {
+      const entry = ['tui.js', 'index.js', 'index.ts'].map((n) => path.join(p, n)).find((f) => fsx.existsSync(f));
+      return entry ? { file: entry, text: fsx.readFileSync(entry, 'utf8') } : null;
+    }
+    return { file: p, text: fsx.readFileSync(p, 'utf8') };
+  } catch { return null; }
+}
+
+// Local plugin files a 2.x machine has configured (server `plugins` and the TUI file), with their source text. Read-only.
+export function localPluginFiles(dir, { fsx = fs, home } = {}) {
+  const out = [];
+  const cfgs = [{ path: configPath(dir), keys: ['plugins', 'plugin'] }, ...tuiConfigs(dir, fsx).map((c) => ({ path: c.path, keys: [c.key] }))];
+  for (const c of cfgs) {
+    let cfg;
+    try { cfg = parse(fsx.readFileSync(c.path, 'utf8')); } catch { continue; }
+    for (const k of c.keys) for (const e of Array.isArray(cfg?.[k]) ? cfg[k] : []) {
+      const hit = pluginFile(dir, Array.isArray(e) ? e[0] : e, fsx, home);
+      if (hit) out.push({ config: c.path, key: k, entry: Array.isArray(e) ? e[0] : e, ...hit });
+    }
+  }
+  return out;
+}
+
+// Hand-made #123 meters in the TUI config: the managed copilot-usage tool replaces the entry (#558).
+export function copilotMeterEntries(dir, { fsx = fs, home } = {}) {
+  return tuiConfigs(dir, fsx).flatMap((c) => {
+    let cfg;
+    try { cfg = parse(fsx.readFileSync(c.path, 'utf8')); } catch { return []; }
+    return (Array.isArray(cfg?.[c.key]) ? cfg[c.key] : []).flatMap((e) => {
+      const hit = pluginFile(dir, Array.isArray(e) ? e[0] : e, fsx, home);
+      return hit && copilotMeterShape(hit.text) ? [{ config: c.path, key: c.key, entry: Array.isArray(e) ? e[0] : e, file: hit.file }] : [];
+    });
+  });
+}
+
+// DCP TUI entry (shared by 1.x and 2.x). 1.x: tui.json(c), only for a file that already exists and already lists DCP. tui follows the server
 // config (#479): when the server ends up with our pin (none yet, the pin, a bare name or `@latest`), an exact other version in
 // tui moves to it too; a server pin the user chose leaves tui alone. Ranges and pre-releases are never moved.
-export function dcpTuiActions(dir) {
+// 2.x: opencode.json(c) already loads DCP's TUI part, so no TUI entry is added and one the migration copied into cli.json
+// is dropped (#558, opencode.ai/docs/cli/plugins, 2026-11-27).
+export function dcpTuiActions(dir, { v2 = false, fsx = fs } = {}) {
   const pkg = PINS['opencode-dcp'].source;
   const pin = npmSpec('opencode-dcp');
-  const ours = serverDcpSpecs(dir).every(x => x === pin || x === pkg || x === `${pkg}@latest`);
   const actions = [];
+  if (v2) {
+    // The server entry already loads DCP's TUI part (opencode.ai/docs/cli/plugins, 2026-11-27), so no config is added
+    // before cli.json exists, and an entry the 1.x->2.x migration copied there is dropped.
+    if (!fsx.existsSync(path.join(dir, 'cli.json')) || !serverDcpSpecs(dir).length) return actions;
+    try {
+      const plugins = parse(fsx.readFileSync(path.join(dir, 'cli.json'), 'utf8'))?.plugins;
+      const mine = (Array.isArray(plugins) ? plugins : []).filter((x) => typeof x === 'string' && (x === pkg || x.startsWith(`${pkg}@`)));
+      if (mine.length) {
+        actions.push({ kind: 'json', path: path.join(dir, 'cli.json'), edits: mine.map((value) => ({ path: ['plugins'], value, mode: 'arrayRemove', label: 'DCP', why: 'opencode.jsonc already loads its TUI part' })) });
+      }
+    } catch (e) {
+      // unreadable file: leave it alone
+    }
+    return actions;
+  }
+  const ours = serverDcpSpecs(dir).every(x => x === pin || x === pkg || x === `${pkg}@latest`);
   for (const file of ['tui.json', 'tui.jsonc']) {
     const p = path.join(dir, file);
-    if (!fs.existsSync(p)) continue;
+    if (!fsx.existsSync(p)) continue;
     try {
-      const plugins = parse(fs.readFileSync(p, 'utf8'))?.plugin;
+      const plugins = parse(fsx.readFileSync(p, 'utf8'))?.plugin;
       if (!Array.isArray(plugins) || !plugins.some(x => typeof x === 'string' && (x === pkg || x.startsWith(`${pkg}@`)))) continue;
       const edit = dcpPluginEdit('plugin');
       if (ours) edit.legacy = [...edit.legacy, ...plugins.filter(x => typeof x === 'string' && x.startsWith(`${pkg}@`) && /^\d+\.\d+\.\d+$/.test(x.slice(pkg.length + 1)))];
@@ -173,6 +246,12 @@ export function opencodeShared({ home, dir, core, profile, opts, v2 = false }) {
     const source = fs.readFileSync(fileURLToPath(new URL('../../../core/copilot-usage-tui.js', import.meta.url)), 'utf8');
     actions.push({ kind: 'file', path: file, content: `// ${OWNED_MARK}\n${source}` });
     if (!v2) actions.push({ kind: 'json', path: path.join(dir, 'tui.json'), edits: [{ path: ['plugin'], value: pathToFileURL(file).href, mode: 'arrayAdd' }] });
+    else {
+      // A hand copy of the #123 meter is dead on OpenCode 2: the managed tool replaces its one config entry (#558).
+      for (const hit of copilotMeterEntries(dir, { home })) {
+        actions.push({ kind: 'json', path: hit.config, edits: [{ path: [hit.key], value: hit.entry, mode: 'arrayRemove', label: 'hand-made copilot-usage', why: 'replaced by the managed tool' }] });
+      }
+    }
   }
   for (const agent of core.agents) {
     actions.push({ kind: 'file', path: path.join(dir, 'agents', `${agent.name}.md`), content: renderOpenCodeAgent(agent, profile) });
@@ -233,8 +312,10 @@ export function opencodeV2Adapter({ home, core, profile, opts, rulesPath }) {
   if (tools.includes('ponytail')) edits.push({ path: ['plugins'], value: npmSpec('ponytail'), mode: 'arrayAdd', legacy: ['@dietrichgebert/ponytail'] });
   if (tools.includes('dcp')) {
     edits.push(dcpPluginEdit('plugins'));
-    actions.push(dcpConfigAction(dir, profile), ...dcpTuiActions(dir));
+    actions.push(dcpConfigAction(dir, profile));
   }
+  // Also repairs a duplicate /dcp on every run: DCP stays in opencode.jsonc, the migrated cli.json entry goes (#558).
+  actions.push(...dcpTuiActions(dir, { v2: true }));
   if (opts.terminals?.includes('warp')) edits.push({ path: ['plugins'], value: npmSpec('warp-opencode'), mode: 'arrayAdd', legacy: ['@warp-dot-dev/opencode-warp'] });
   if (opts.network.outbound === 'off') edits.push({ path: ['share'], value: 'disabled', mode: 'set' });
   // Managed installs update through --update: off unless the user already set `update` (network off forces it).

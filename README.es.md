@@ -298,6 +298,7 @@ curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/i
 | Solo tus skills propias al deshacer; `agy` fuera de PATH | ➖ | ➖ | ➖ | ➖ | ✅ conserva tu skill del mismo nombre |
 | Comprobación del mínimo Node 22.20 (motor, no por agente) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Compactación de contexto | ✅ auto 80% | ✅ nativa | ✅ nativa, DCP opcional | ➖ | ➖ |
+| Configuración de la TUI | ➖ | ✅ `cli.json` en cuanto OpenCode lo escribe; avisa de un `tui.json` obsoleto | ✅ `tui.json` | ➖ | ➖ |
 | Presets de red (telemetría, updates, salidas) | ✅ | ✅ updates, compartir | ✅ | ⚠️ updates; telemetría es un recordatorio | ⚠️ solo recordatorios |
 | Proxy en cada comando de instalación | ✅ | ✅ | ✅ | ✅ | ⚠️ probado en CI, sin docs upstream |
 

@@ -23,10 +23,15 @@ const readJson = (file, fsx) => { try { return parse(fsx.readFileSync(file, 'utf
 const cacheDir = (home) => path.join(envDir(home, 'XDG_CACHE_HOME', path.join(home, '.cache')), 'opencode');
 
 // npm plugin specs per config file: `plugin` / `plugins` entries, string or [spec, options]. Local paths are not packages.
+// On OpenCode 2 the TUI reads cli.json once the client has written it, so a tui.json next to it is stale and ignored (#558).
 export function readSpecs(home, fsx = fs) {
   const dir = path.join(configHome(home), 'opencode');
+  const cli = path.join(dir, 'cli.json');
+  const tui = fsx.existsSync(cli)
+    ? [[cli, ['plugins']]]
+    : [[path.join(dir, 'tui.json'), ['plugin']], [path.join(dir, 'tui.jsonc'), ['plugin']]];
   const out = [];
-  for (const [file, keys] of [[configPath(dir), ['plugin', 'plugins']], [path.join(dir, 'tui.json'), ['plugin']], [path.join(dir, 'tui.jsonc'), ['plugin']]]) {
+  for (const [file, keys] of [[configPath(dir), ['plugin', 'plugins']], ...tui]) {
     const cfg = readJson(file, fsx);
     for (const k of keys) for (const e of Array.isArray(cfg?.[k]) ? cfg[k] : []) {
       const spec = String(Array.isArray(e) ? e[0] : e);
@@ -37,7 +42,7 @@ export function readSpecs(home, fsx = fs) {
   return out;
 }
 
-// Same package with different version specs in the server config and tui.json. Each process reads its own file, so neither spec "wins".
+// Same package with different version specs in the server config and the TUI config (tui.json, or cli.json on 2.x).
 export function reconcileSpecs(entries, pins = {}) {
   const byName = new Map();
   for (const e of entries) byName.set(e.name, [...(byName.get(e.name) ?? []), e]);
@@ -128,8 +133,9 @@ export function dcpRow(home, { fsx = fs, probe = [], probed = false } = {}) {
   const name = '@tarquinen/opencode-dcp';
   const specs = readSpecs(home, fsx).filter((e) => e.name === name);
   if (!specs.length) return null;
-  const server = specs.find((e) => e.file !== 'tui.json' && e.file !== 'tui.jsonc');
-  const tui = specs.find((e) => e.file === 'tui.json' || e.file === 'tui.jsonc');
+  const tuiFiles = ['cli.json', 'tui.json', 'tui.jsonc'];
+  const server = specs.find((e) => !tuiFiles.includes(e.file));
+  const tui = specs.find((e) => tuiFiles.includes(e.file));
   const root = cacheDir(home);
   const versions = [...wrapperDirs(root, name, fsx).map((w) => path.join(w.dir, 'node_modules')), path.join(root, 'node_modules')]
     .map((nm) => readJson(path.join(nm, ...name.split('/'), 'package.json'), fsx)?.version).filter(Boolean);
