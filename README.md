@@ -299,12 +299,15 @@ curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/i
 | Own skills only on undo; `agy` found outside PATH | ➖ | ➖ | ➖ | ➖ | ✅ keeps your same-name skill |
 | Node 22.20 floor check (engine, not per agent) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Context compaction | ✅ auto 80% | ✅ native | ✅ native, optional DCP | ➖ | ➖ |
+| TUI config | ➖ | ✅ `cli.json` once OpenCode writes it; a stale `tui.json` is warned about | ✅ `tui.json` | ➖ | ➖ |
 | Network presets (telemetry, updates, outbound) | ✅ | ✅ updates, sharing | ✅ | ⚠️ updates; telemetry is a reminder | ⚠️ reminders only |
 | Proxy passed to every install command | ✅ | ✅ | ✅ | ✅ | ⚠️ checked in CI, undocumented upstream |
 
 On OpenCode, rtk's own plugin (`plugins/rtk.ts`, rtk 1.2.0 or newer) passes every shell command through `rtk hook opencode`; `--update` regenerates an older one.
 
 ✅ supported · ⚠️ partial · ➖ not available for this agent. Details and verification dates: [docs/compatibility.md](docs/compatibility.md).
+
+On OpenCode 2, `--update` replaces a hand-made #123 Copilot meter entry with the managed `copilot-usage` tool (`--add-tools copilot-usage` does the same), and the duplicate `/dcp` palette row that remains with DCP only in `opencode.jsonc` is upstream: DCP 3.2.0 registers a server command and a TUI command, and OpenCode 2.2.7 lists both (**VERIFY**, CI `real-usage-v2`).
 
 | Feature | VS Code Copilot | Cursor (IDE and CLI) | Team repo (`--project`) |
 | --- | --- | --- | --- |

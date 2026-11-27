@@ -90,6 +90,22 @@ export function isLegacy(current, legacy = []) {
 // Package name of an npm plugin spec: 'pkg@1.2.3' and '@scope/pkg@1.2.3' lose the version.
 const pkgName = (v) => (typeof v === 'string' ? v.replace(/(?!^)@[^@/]*$/, '') : v);
 
+// Removes one array element with a text splice so the rest keeps its layout (jsonc-parser's modify leaves broken text
+// when it drops the last element). Returns null when the value is not there.
+function removeArrayValue(text, keyPath, value) {
+  const tree = parseTree(text);
+  const array = tree && findNodeAtLocation(tree, keyPath);
+  if (array?.type !== 'array') return null;
+  const kids = array.children ?? [];
+  const index = kids.findIndex((n) => JSON.stringify(parse(text.slice(n.offset, n.offset + n.length))) === JSON.stringify(value));
+  if (index < 0) return null;
+  const node = kids[index];
+  if (kids.length === 1) return { text: text.slice(0, node.offset) + text.slice(node.offset + node.length), index };
+  if (index < kids.length - 1) return { text: text.slice(0, node.offset) + text.slice(kids[index + 1].offset), index };
+  const prev = kids[index - 1];
+  return { text: text.slice(0, prev.offset + prev.length) + text.slice(node.offset + node.length), index };
+}
+
 // Returns { text, applied: [edit], kept: [{path, value}] }.
 // `owned`: arrayAdd edits an earlier run recorded in state.json for this file, so a past pin counts as ours.
 export function applyJsonEdits(original, edits, owned = []) {
@@ -123,6 +139,14 @@ export function applyJsonEdits(original, edits, owned = []) {
       applied.push(e);
       continue;
     }
+    if (e.mode === 'arrayRemove') {
+      // Drops one array value; `index` lets undo put it back where it was.
+      const removed = removeArrayValue(text, e.path, e.value);
+      if (!removed) continue;
+      text = removed.text;
+      applied.push({ ...e, index: removed.index });
+      continue;
+    }
     if (e.mode === 'remove') {
       // Drops the key; `previous` (recorded by plan) lets undo write it back.
       if (current === undefined) continue;
@@ -151,6 +175,13 @@ export function revertJsonEdits(text, applied) {
       if (!Array.isArray(list)) continue;
       const i = list.findIndex((v) => JSON.stringify(v) === JSON.stringify(e.value));
       if (i >= 0) text = applyEdits(text, modify(text, [...e.path, i], e.replaced, FORMAT));
+    } else if (e.mode === 'arrayRemove') {
+      const list = getAt(text, e.path);
+      if (!Array.isArray(list)) continue;
+      // Already back (the user or another edit re-added it): do not insert a second copy.
+      if (list.some((v) => JSON.stringify(v) === JSON.stringify(e.value))) continue;
+      const at = Math.min(e.index ?? list.length, list.length);
+      text = applyEdits(text, modify(text, [...e.path, at], e.value, { ...FORMAT, isArrayInsertion: true }));
     } else if (e.keepIfChanged && JSON.stringify(getAt(text, e.path)) !== JSON.stringify(e.value)) {
       // The user changed our value after install: it is theirs now.
       continue;
@@ -280,8 +311,9 @@ export function plan(actions, roots = [], prior = []) {
       applied = r.applied;
       keptKeys = r.kept.map((k) => k.path.join('.'));
       const moved = r.applied.filter((e) => e.mode === 'arrayAdd' && /@\d+\.\d+\.\d+$/.test(e.replaced ?? '')).map((e) => `${path.basename(a.path)} ${e.label ?? 'pin'} ${e.replaced.replace(/^.*@/, '')} -> ${e.value.replace(/^.*@/, '')}${e.why ? ` ${e.why}` : ''}`);
+      const removed = r.applied.filter((e) => e.mode === 'arrayRemove').map((e) => `${path.basename(a.path)} removes ${e.label ?? 'entry'}${e.why ? ` (${e.why})` : ''}`);
       const refMoves = r.applied.filter((e) => e.mode === 'set' && e.marketplace).map((e) => `${e.marketplace} marketplace ref ${e.previous ?? '(none)'} -> ${e.value} (settings.json entry moved, plugin data kept)`);
-      if (moved.length || refMoves.length) note = [a.note, ...moved, ...refMoves].filter(Boolean).join('; ');
+      if (removed.length || moved.length || refMoves.length) note = [a.note, ...removed, ...moved, ...refMoves].filter(Boolean).join('; ');
       if (r.kept.length) note = [a.note, `kept your values for: ${r.kept.map((k) => k.path.join('.')).join(', ')}`].filter(Boolean).join('; ');
     } else if (a.kind === 'block') {
       after = setBlock(before, a.body, a.toml, a.id);

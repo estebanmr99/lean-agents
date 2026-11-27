@@ -12,7 +12,7 @@ import { plan, apply, undo, describe, tilde, sha, userHash, managedUserHash, wri
 import { loadCore, renderRules, loadProfile, useToolNode } from './lib/render.mjs';
 import { claudeAdapter } from './lib/adapters/claude.mjs';
 import { opencodeV1Adapter } from './lib/adapters/opencode-v1.mjs';
-import { opencodeV2Adapter } from './lib/adapters/opencode-v2.mjs';
+import { opencodeV2Adapter, copilotMeterEntries } from './lib/adapters/opencode-v2.mjs';
 import { copilotAdapter } from './lib/adapters/copilot-cli.mjs';
 import { antigravityAdapter } from './lib/adapters/antigravity.mjs';
 import { vscodeCopilotAdapter } from './lib/adapters/vscode-copilot.mjs';
@@ -375,6 +375,16 @@ async function choose(o, saved) {
     }
   }
   if (o.addTools) o.tools = [...new Set([...o.tools, ...o.addTools])];
+  // #558: a hand copy of the #123 meter is dead on OpenCode 2, so --update replaces it with the managed tool by default
+  // (also --yes with no TTY). An interactive "no" still leaves it alone; --add-tools copilot-usage does the same without
+  // the question.
+  if (o.agents.includes('opencode-v2') && !o.tools.includes('copilot-usage')) {
+    const meters = copilotMeterEntries(path.join(configHome(o.home), 'opencode'), { home: o.home });
+    if (meters.length) {
+      const a = await p.ask('A hand-made copilot-usage TUI plugin is not loaded on OpenCode 2. Replace it with the managed copilot-usage tool? (removes that one config entry, backed up; undo with --uninstall) [y/n]', 'y');
+      if (yesNo(a)) o.tools.push('copilot-usage');
+    }
+  }
   if (!o.core) o.tools = o.tools.filter((t) => !MINIMAL_TOOLS.includes(t));
   const known = [...MINIMAL_TOOLS, ...OPTIONAL_TOOLS, ...OPT_IN_TOOLS];
   const unknown = o.tools.filter((t) => !known.includes(t));

@@ -289,9 +289,9 @@ for (const overwrite of [true, false]) {
     const cfg = fs.readFileSync(j(m.f.home, '.config', 'opencode', 'opencode.jsonc'), 'utf8');
     assert.match(cfg, /opencode-dcp/);
     assert.ok(fs.existsSync(j(m.f.home, '.config', 'opencode', 'dcp.jsonc')));
+    // 2.x no longer reads tui.json: the apply leaves it exactly as it was and DCP goes only to opencode.jsonc (#558).
     const tui = fs.readFileSync(j(m.f.home, '.config', 'opencode', 'tui.json'), 'utf8');
-    assert.match(tui, /opencode-dcp@\d+\.\d+\.\d+",/);
-    assert.doesNotMatch(tui, /@latest/);
+    assert.match(tui, /@tarquinen\/opencode-dcp@latest/);
     assert.match(tui, /\/\/ my comment/);
     assert.ok(m.S.opencode1.binary, 'opencode1 is recorded');
     assert.equal(liveDiffers(m.f.L, r.stamp.dir), null, 'apply never touches the live data');

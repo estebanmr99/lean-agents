@@ -14,6 +14,7 @@ import { adhdSkillFiles } from './adhd.mjs';
 import { proxyReport, childEnv, fromPrivacy } from './network.mjs';
 import { leftovers } from './parallel.mjs';
 import { pluginHealth, dcpRow, codeModeRow } from './plugin-health.mjs';
+import { configPath, localPluginFiles, legacyTuiShape, copilotMeterShape } from './adapters/opencode-v2.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const CORE_AGENTS = ['debug', 'explore', 'planner', 'research', 'review'];
@@ -293,6 +294,7 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
   // #212: config listing a plugin is not proof it loads. Read-only; `probe` holds findings of the opt-in --probe-plugins server run.
   const dcp = dcpRow(home, { fsx, probe, probed });
   if (dcp) add('DCP', dcp.status, dcp.detail);
+  openCodeTuiRows({ home, state, platform, fsx }, add);
   const cm = codeModeRow(home, { fsx });
   if (cm) add('OpenCode Code Mode', cm.status, cm.detail);
   if (state?.options.agents.some((a) => a.startsWith('opencode'))) {
@@ -381,6 +383,42 @@ function checkOpenCode(o, add, q, home, fsx) {
   if (plugins.some((p) => p.includes('oh-my-openagent'))) add('oh-my-openagent', 'error', 'present; lean-agents does not support it');
   const instr = (cfg.instructions ?? []).some((i) => String(i).includes('lean-agents'));
   add('opencode rules loaded', instr ? 'ok' : 'error', instr ? '' : 'instructions entry missing');
+}
+
+// #558: OpenCode 2's TUI reads cli.json (not tui.json), a stale tui.json is only reported, and a local plugin written for
+// the 1.x TUI API is named by path as not loaded. Read-only; never prints plugin file contents.
+function openCodeTuiRows({ home, state, platform = process.platform, fsx = fs }, add) {
+  const dir = path.join(configHome(home), 'opencode');
+  const cli = path.join(dir, 'cli.json');
+  const hasCli = fsx.existsSync(cli);
+  const v2 = hasCli || state?.options?.agents?.includes('opencode-v2');
+  if (!v2) return;
+  const rel = (p) => homeRel(p, home, platform);
+  if (hasCli) {
+    for (const name of ['tui.json', 'tui.jsonc']) {
+      const f = path.join(dir, name);
+      if (fsx.existsSync(f)) add(`OpenCode ${name}`, 'changed', `stale: OpenCode 2 reads cli.json, not this file. Fix: delete ${rel(f)} by hand once you need nothing from it; lean-agents never deletes it`);
+    }
+  }
+  const read = (f) => { try { return parse(fsx.readFileSync(f, 'utf8')); } catch { return null; } };
+  const dcp = '@tarquinen/opencode-dcp';
+  const spec = (v) => typeof v === 'string' && (v === dcp || v.startsWith(`${dcp}@`));
+  const server = read(configPath(dir));
+  const tuiFiles = [['cli.json', read(cli)], ['tui.json', read(path.join(dir, 'tui.json'))], ['tui.jsonc', read(path.join(dir, 'tui.jsonc'))]]
+    .filter(([, cfg]) => (cfg?.plugins ?? cfg?.plugin ?? []).some(spec))
+    .map(([name]) => name);
+  if ((server?.plugins ?? server?.plugin ?? []).some(spec) && tuiFiles.length) {
+    add('DCP /dcp duplicate', 'changed', `DCP is listed in opencode.jsonc and ${tuiFiles.join(' and ')}, so the TUI lists /dcp twice; opencode.jsonc already loads its TUI part. Fix: run lean-agents --update (it removes the duplicate TUI entries, backed up)`);
+  }
+  const seen = new Set();
+  for (const p of localPluginFiles(dir, { fsx, home })) {
+    if (seen.has(p.file) || !legacyTuiShape(p.text)) continue;
+    seen.add(p.file);
+    const where = rel(p.file);
+    add(`plugin ${path.basename(p.file)}`, 'changed', copilotMeterShape(p.text)
+      ? `hand-made copilot-usage meter, not loaded on OpenCode 2. Fix: replace it with the managed tool: lean-agents --add-tools copilot-usage (removes this one entry, backed up; undo with --uninstall). File: ${where}`
+      : `not loaded on OpenCode 2: uses the 1.x TUI API (api.command/api.slots). Fix: port it to the 2.x plugin API or remove its entry; lean-agents leaves the file alone. File: ${where}`);
+  }
 }
 
 function print(rows) {
