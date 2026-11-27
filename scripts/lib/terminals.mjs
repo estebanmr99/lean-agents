@@ -175,6 +175,7 @@ cleanup() {
     hdiutil detach "$MOUNT" -force >/dev/null 2>&1 || true
   fi
   rm -rf "$DIR"
+  if [ -e "${target}" ]; then rm -rf "${target}.new"; fi
 }
 trap cleanup EXIT
 curl -fsSL ${CURL_RETRY.join(' ')} -o "$DIR/orca.dmg" "${url}"
@@ -182,8 +183,10 @@ node "${VERIFY}" "$DIR/orca.dmg" "${sha}"
 hdiutil attach -nobrowse -readonly -mountpoint "$MOUNT" "$DIR/orca.dmg"
 MOUNTED=1
 mkdir -p "$(dirname "${target}")"
+rm -rf "${target}.new"
+ditto "$MOUNT/Orca.app" "${target}.new"
 rm -rf "${target}"
-ditto "$MOUNT/Orca.app" "${target}"
+mv "${target}.new" "${target}"
 `;
       commands.push({
         tool: 'orca',
