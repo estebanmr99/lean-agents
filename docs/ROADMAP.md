@@ -87,6 +87,28 @@ Details in `CHANGELOG.md` and [`audit-1.2.0.md`](audit-1.2.0.md).
 - Repo cleanup and archive: finished audits, checkpoints and sessions stay in `docs/archive/`.
 - Community basics: [Code of Conduct](../CODE_OF_CONDUCT.md) ([#429](https://github.com/estebanmr99/lean-agents/issues/429)); the social preview image is an owner step ([#442](https://github.com/estebanmr99/lean-agents/issues/442)).
 
+## How the backlog empties
+
+Every open issue has a milestone; an issue without one is untriaged. Releases ship small and often:
+
+1. **Patch milestones hold at most 5 open issues.** A patch ships when all but `owner-step` issues are closed, `docs/audit-<version>.md` is written and CI is green on the tagged SHA. The owner approves each tag.
+2. **New bugs go to the next patch milestone.** Only a p1 joins the current one.
+3. **Spikes end in one PR with a verdict.** The spike issue closes and its follow-ups open as `agent-ready` issues in a milestone.
+4. **At most 3 feature or fix PRs open at a time.** Dependabot adds at most one grouped PR per ecosystem per week.
+5. **`owner-step` issues never block a patch.** They are listed in the release notes as pending owner steps.
+
+## 1.2.3 (next patch)
+
+[Milestone](https://github.com/estebanmr99/lean-agents/milestone/3): [#495](https://github.com/estebanmr99/lean-agents/issues/495) (done), [#488](https://github.com/estebanmr99/lean-agents/issues/488), [#475](https://github.com/estebanmr99/lean-agents/issues/475), [#493](https://github.com/estebanmr99/lean-agents/issues/493), [#476](https://github.com/estebanmr99/lean-agents/issues/476), [#477](https://github.com/estebanmr99/lean-agents/issues/477). Also ships what is already on main: `--preflight`, quiet output with a per-run log, and `--update` asking nothing mid-run.
+
+## 1.2.4
+
+[Milestone](https://github.com/estebanmr99/lean-agents/milestone/4): [#492](https://github.com/estebanmr99/lean-agents/issues/492), [#490](https://github.com/estebanmr99/lean-agents/issues/490), [#460](https://github.com/estebanmr99/lean-agents/issues/460), [#465](https://github.com/estebanmr99/lean-agents/issues/465), [#486](https://github.com/estebanmr99/lean-agents/issues/486).
+
+## Research (no release date)
+
+[Milestone](https://github.com/estebanmr99/lean-agents/milestone/5): [#494](https://github.com/estebanmr99/lean-agents/issues/494), [#422](https://github.com/estebanmr99/lean-agents/issues/422), [#420](https://github.com/estebanmr99/lean-agents/issues/420), [#190](https://github.com/estebanmr99/lean-agents/issues/190).
+
 ## 1.3.0
 
 - Benchmark v2 and publish: [prove the savings](https://github.com/estebanmr99/lean-agents/issues/404), [publish the result](https://github.com/estebanmr99/lean-agents/issues/430), [multi-agent vs solo](https://github.com/estebanmr99/lean-agents/issues/431), [harness benchmark](https://github.com/estebanmr99/lean-agents/issues/103).
@@ -94,7 +116,7 @@ Details in `CHANGELOG.md` and [`audit-1.2.0.md`](audit-1.2.0.md).
 - Code Mode proxy PRs 2 to 5 ([#407](https://github.com/estebanmr99/lean-agents/issues/407)): measurement, `--tools code-mode-proxy` in the installer, real-CLI checks, comparison with the native Code Modes.
 - Codex CLI adapter, after the spike's VERIFY rows are proven ([#432](https://github.com/estebanmr99/lean-agents/issues/432)). Gemini CLI: no-go ([#433](https://github.com/estebanmr99/lean-agents/issues/433)); upstream made it enterprise-only on 2026-06-18 and Antigravity CLI covers individual accounts.
 - [Launch](https://github.com/estebanmr99/lean-agents/issues/434) and [demo GIFs](https://github.com/estebanmr99/lean-agents/issues/435).
-- Handy and T3 investigations ([#420](https://github.com/estebanmr99/lean-agents/issues/420), [#422](https://github.com/estebanmr99/lean-agents/issues/422)).
+- Copilot CLI and Antigravity CLI as headless workers ([#469](https://github.com/estebanmr99/lean-agents/issues/469)).
 
 ## After 1.0.0
 
