@@ -197,6 +197,18 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           set -euo pipefail
+          ps -eo pid,lstart,args | grep '[o]pencode' > "$E2E_RAW/service-ps.txt" 2>&1 || true
+          # An earlier step started the service without the key; a running service keeps that env, so restart it.
+          opencode service stop >/dev/null 2>&1 || true
+          down=0
+          for _ in $(seq 1 20); do
+            if ! opencode service status >/dev/null 2>&1; then down=1; break; fi
+            sleep 1
+          done
+          if [ "$down" != 1 ]; then
+            echo "the old OpenCode service did not stop" >&2
+            exit 1
+          fi
           opencode serve --service > "$E2E_RAW/serve.log" 2>&1 &
           up=0
           for _ in $(seq 1 30); do
@@ -208,6 +220,7 @@ jobs:
             cat "$E2E_RAW/serve.log" >&2
             exit 1
           fi
+          ps -eo pid,lstart,args | grep '[o]pencode' >> "$E2E_RAW/service-ps.txt" 2>&1 || true
 
       - name: Record the key spend at job start
         env:
@@ -221,7 +234,14 @@ jobs:
           MAX_USD: ${{ inputs.max_usd }}
         run: |
           set -euo pipefail
-          timeout 180 opencode run --agent build -m "$MODEL" --format json "Reply with the single word OK." > "$E2E_RAW/smoke.jsonl" 2> "$E2E_RAW/smoke.err"
+          if ! timeout 180 opencode run --agent build -m "$MODEL" --format json "Reply with the single word OK." > "$E2E_RAW/smoke.jsonl" 2> "$E2E_RAW/smoke.err"; then
+            for name in smoke.jsonl smoke.err; do
+              echo "--- $name (first 400 chars, redacted) ---" >&2
+              node tests/e2e-update.mjs redact --in "$E2E_RAW/$name" 2>/dev/null | head -c 400 >&2 || true
+              echo >&2
+            done
+            exit 1
+          fi
           node tests/e2e-update.mjs budget --start "$(cat "$E2E_RAW/spend-before.txt")" --max-usd "$MAX_USD"
 
       - name: Update lean-agents with the agent
@@ -359,7 +379,7 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           set -euo pipefail
-          for name in transcript.jsonl transcript-first.jsonl transcript-first.err transcript-yes.jsonl transcript-yes.err transcript.err doctor.json doctor.err result.json plugin-list.json plugin-list.err plugin-old.json serve.log smoke.jsonl smoke.err exit-code yes-turns yes-exit-code cap-hit.txt budget-error.txt spend-before.txt budget.txt budget-exceeded.txt versions.txt shim.log; do
+          for name in transcript.jsonl transcript-first.jsonl transcript-first.err transcript-yes.jsonl transcript-yes.err transcript.err doctor.json doctor.err result.json plugin-list.json plugin-list.err plugin-old.json serve.log service-ps.txt smoke.jsonl smoke.err timeout.txt exit-code yes-turns yes-exit-code cap-hit.txt budget-error.txt spend-before.txt budget.txt budget-exceeded.txt versions.txt shim.log; do
             [ -f "$E2E_RAW/$name" ] || continue
             node tests/e2e-update.mjs redact --in "$E2E_RAW/$name" --out "$E2E_OUT/$name"
           done
