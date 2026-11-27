@@ -122,6 +122,25 @@ test('terminalCommands: an Orca update replaces the app where it was found and r
   assert.deepEqual(update.undo, [['rm', '-rf', found]]);
 });
 
+test('terminalCommands: an Orca update copies to .new before removing the old app', () => {
+  const home = '/opt/x';
+  const target = path.join(home, 'Applications', 'Orca.app');
+  const script = terminalCommands({ home, terminals: [], installTerminals: ['orca'], updateApps: ['orca'], agents: [], platform: 'darwin', system: true }).find((c) => c.tool === 'orca').run[0].at(-1);
+
+  const removeNew = script.indexOf(`rm -rf "${target}.new"`);
+  const copy = script.indexOf(`ditto "$MOUNT/Orca.app" "${target}.new"`);
+  const removeTarget = script.indexOf(`rm -rf "${target}"`);
+  const move = script.indexOf(`mv "${target}.new" "${target}"`);
+
+  assert.ok(copy >= 0, 'ditto copies into .new');
+  assert.ok(removeNew >= 0 && removeNew < copy, 'a stale .new is removed before the copy');
+  assert.ok(copy < removeTarget, 'the old app is removed only after the new copy is complete');
+  assert.ok(removeTarget < move, 'the new copy replaces the old app after the removal');
+
+  const cleanup = script.slice(script.indexOf('cleanup()'), script.indexOf('trap cleanup'));
+  assert.ok(cleanup.includes(`rm -rf "${target}.new"`), 'the cleanup trap removes a leftover .new');
+});
+
 test('appUpdateTarget: home app updates in place, /Applications needs write access, running Orca is refused', () => {
   const local = path.join('/opt/x', 'Applications', 'Orca.app');
   assert.deepEqual(appUpdateTarget({ home: '/opt/x', app: 'orca', platform: 'darwin', system: false, exists: (p) => p === local }), { path: local });
