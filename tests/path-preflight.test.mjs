@@ -73,7 +73,7 @@ test('A2 below min: one row with version, min and update command', { skip: win }
   assert.equal(rows.length, 1);
   assert.equal(rows[0].blocker, true);
   const text = formatPreflight(r, { home, env: {} });
-  assert.match(text, /0\.42\.0/); assert.match(text, /1\.2\.0/); assert.match(text, /brew upgrade rtk/);
+  assert.match(text, /0\.42\.0/); assert.match(text, /minimum 1\.2\.0\n/); assert.match(text, /brew upgrade rtk/);
   assert.match(text, /1 blocker, 0 warnings\. Nothing was changed\./);
 });
 
