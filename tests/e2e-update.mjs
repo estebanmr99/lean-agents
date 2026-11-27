@@ -25,6 +25,9 @@ const normal = (v) => String(v ?? '').replace(/^v/, '');
 // question, punctuation, or anything else still fails.
 const CONSENT = /^Update these \d+ [A-Za-z][A-Za-z -]{0,39}(?: \([^?()\n]{1,80}\))?\?$/i;
 
+// A second way to ask for the same yes ("Do you want me to run it?") is redundant, not a second decision.
+const RUN_ASK = /^(?:Do you want me to|Shall I|Should I|Want me to|Can I) (?:run|apply|proceed|go ahead|do)(?: it| this| that| the update| the plan)?\?$/i;
+
 export function assistantText(transcript) {
   if (!transcript) return '';
   const order = [];
@@ -55,7 +58,12 @@ export function questionLines(transcript) {
 export function consentDecision(transcript) {
   const questions = questionLines(transcript);
   if (!questions.length) return { action: 'none', question: null };
-  if (questions.length === 1 && CONSENT.test(questions[0])) return { action: 'yes', question: questions[0] };
+  const last = questions[questions.length - 1];
+  if (CONSENT.test(last)) {
+    const other = questions.slice(0, -1).find((q) => !RUN_ASK.test(q));
+    if (!other) return { action: 'yes', question: last };
+    return { action: 'fail', question: other };
+  }
   return { action: 'fail', question: questions[0] };
 }
 
@@ -119,7 +127,8 @@ const pluginRows = (list) => {
 
 // A non-interactive run cannot answer a question. Any assistant message whose last line is a question means the update
 // stopped to ask; the skill's own prompts are caught even when the model adds text after them. Plain text works too.
-export function unansweredQuestion(transcript) {
+// Once the one yes turn answered the consent, a redundant run-it ask in the same first-turn text is not unanswered.
+export function unansweredQuestion(transcript, { consentAnswered = false } = {}) {
   if (!transcript) return null;
   const blocks = [];
   for (const line of transcript.split('\n')) {
@@ -129,8 +138,14 @@ export function unansweredQuestion(transcript) {
   for (const block of blocks.length ? blocks : [transcript]) {
     const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
     const last = lines[lines.length - 1];
-    if (last && /\?\s*$/.test(last)) return last;
+    if (!last || !/\?\s*$/.test(last)) continue;
+    if (consentAnswered && CONSENT.test(last)) {
+      const earlier = lines.slice(0, -1).filter((l) => /\?\s*$/.test(l));
+      if (earlier.every((q) => RUN_ASK.test(q))) continue;
+    }
+    return last;
   }
+  if (consentAnswered) return null;
   const asked = assistant.match(/(?:^|\n)\s*(?:Update these \d+ [A-Za-z][A-Za-z -]{0,39}(?: \([^?()\n]{1,80}\))?\?|Draft a redacted issue for lean-agents\?)\s*(?:\n|$)/i);
   return asked ? asked[0].trim() : null;
 }
@@ -158,7 +173,7 @@ export function evaluateUpdate({ doctor, record, pluginList, pluginRef, pinVersi
     if (yesTurns !== 1) failures.push(`consent question needs exactly one yes turn (got ${yesTurns})`);
     if (yesTurns === 1) {
       const i = questions.findIndex((q) => CONSENT.test(q));
-      if (i >= 0) questions = questions.filter((_, j) => j !== i);
+      if (i >= 0) questions = questions.filter((q, j) => j > i || (!CONSENT.test(q) && !RUN_ASK.test(q)));
     }
   } else if (consent.action === 'fail') {
     failures.push(`unexpected question: ${consent.question}`);
