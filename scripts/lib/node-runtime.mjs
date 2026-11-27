@@ -21,6 +21,49 @@ export function compare(a, b) {
 // True when `version` ("22.20.0" or "v22.20.0") meets `range`; a missing range accepts every Node.
 export const satisfies = (version, range) => !range || compare(version, minVersion(range)) >= 0;
 
+// True/false for a package's `engines.node`; null when a form is not understood (a pre-release, a URL, `node`), so callers
+// never flag a package on a range they cannot read. Covers the forms npm packages use: `>=a[.b[.c]]`, `>`, `<=`, `<`, `=`,
+// `^`, `~`, `a.x` wildcards and `||`. Anything else in a clause makes that clause unknown. (#465)
+export function meetsEngines(version, range) {
+  if (!range) return null;
+  const v = String(version).replace(/^v/, '');
+  const clause = (text) => {
+    let unknown = false;
+    for (const part of text.trim().replace(/([<>=^~])\s+/g, '$1').split(/\s+/).filter(Boolean)) {
+      if (/^[xX*]$/.test(part)) continue;
+      const m = /^(>=|<=|>|<|=|\^|~)?v?(\d+)(?:\.(\d+|[xX*]))?(?:\.(\d+|[xX*]))?$/.exec(part);
+      if (!m) { unknown = true; continue; }
+      const op = m[1] ?? '';
+      const n = m.slice(2).map((x) => (x === undefined || /^[xX*]$/.test(x) ? null : Number(x)));
+      const lo = [n[0], n[1] ?? 0, n[2] ?? 0];
+      const d = compare(v, lo);
+      let ok;
+      if (op === '>=') ok = d >= 0;
+      else if (op === '>') ok = d > 0;
+      else if (op === '<=') ok = d <= 0;
+      else if (op === '<') ok = d < 0;
+      else if (op === '=') ok = d === 0;
+      else if (op === '^' || op === '~') {
+        const hi = op === '~'
+          ? (n[1] === null ? [n[0] + 1, 0, 0] : [n[0], n[1] + 1, 0])
+          : n[0] > 0 ? [n[0] + 1, 0, 0] : n[1] !== null && n[1] > 0 ? [0, n[1] + 1, 0] : n[2] !== null ? [0, 0, n[2] + 1] : [1, 0, 0];
+        ok = d >= 0 && compare(v, hi) < 0;
+      } else if (n[1] === null) ok = n[0] === Number(v.split('.')[0]);
+      else if (n[2] === null) ok = compare(v, [n[0], n[1], 0]) >= 0 && compare(v, [n[0], n[1] + 1, 0]) < 0;
+      else ok = d === 0;
+      if (!ok) return false;
+    }
+    return unknown ? null : true;
+  };
+  let unknown = false;
+  for (const text of String(range).split('||')) {
+    const r = clause(text);
+    if (r === true) return true;
+    if (r === null) unknown = true;
+  }
+  return unknown ? null : false;
+}
+
 // nvm (macOS, Linux) or nvm-windows. `env`/`home` are passed in so tests and --home never read the real machine.
 // POSIX: NVM_DIR counts only when it lies inside the target home or the target is the real home; a dev run with --home <temp>
 // must never `nvm install` into the owner's nvm, so it uses <home>/.nvm. nvm-windows is only scanned (never installed into), so NVM_HOME is always used.
