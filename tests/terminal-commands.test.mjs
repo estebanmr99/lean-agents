@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { terminalCommands, installedAppVersions, appUpdateTarget } from '../scripts/lib/terminals.mjs';
 
 test('terminalCommands: installTerminals with system false gives no install commands', () => {
@@ -127,7 +130,7 @@ test('terminalCommands: an Orca update copies to .new before removing the old ap
   const target = path.join(home, 'Applications', 'Orca.app');
   const script = terminalCommands({ home, terminals: [], installTerminals: ['orca'], updateApps: ['orca'], agents: [], platform: 'darwin', system: true }).find((c) => c.tool === 'orca').run[0].at(-1);
 
-  const removeNew = script.indexOf(`rm -rf "${target}.new"`);
+  const removeNew = script.indexOf(`rm -rf "${target}.new"`, script.indexOf('MOUNTED=1'));
   const copy = script.indexOf(`ditto "$MOUNT/Orca.app" "${target}.new"`);
   const removeTarget = script.indexOf(`rm -rf "${target}"`);
   const move = script.indexOf(`mv "${target}.new" "${target}"`);
@@ -139,6 +142,37 @@ test('terminalCommands: an Orca update copies to .new before removing the old ap
 
   const cleanup = script.slice(script.indexOf('cleanup()'), script.indexOf('trap cleanup'));
   assert.ok(cleanup.includes(`rm -rf "${target}.new"`), 'the cleanup trap removes a leftover .new');
+});
+
+test('terminalCommands: the Orca update script keeps the old app when the copy fails and swaps it when it works', { skip: process.platform === 'win32' }, () => {
+  const run = (ditto) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-agents-orca-'));
+    const bin = path.join(root, 'bin');
+    fs.mkdirSync(bin);
+    const target = path.join(root, 'Applications', 'Orca.app');
+    fs.mkdirSync(target, { recursive: true });
+    fs.writeFileSync(path.join(target, 'marker'), 'old');
+    const stub = (name, body) => fs.writeFileSync(path.join(bin, name), `#!/bin/bash\n${body}\n`, { mode: 0o755 });
+    stub('curl', 'while [ $# -gt 0 ]; do if [ "$1" = "-o" ]; then shift; echo dmg > "$1"; fi; shift; done');
+    stub('node', 'exit 0');
+    stub('pgrep', 'exit 1');
+    stub('hdiutil', 'while [ $# -gt 0 ]; do if [ "$1" = "-mountpoint" ]; then shift; mkdir -p "$1/Orca.app"; echo new > "$1/Orca.app/marker"; fi; shift; done');
+    stub('ditto', ditto);
+    const script = terminalCommands({ home: root, terminals: [], installTerminals: ['orca'], updateApps: ['orca'], agents: [], platform: 'darwin', system: true }).find((c) => c.tool === 'orca').run[0].at(-1);
+    const result = spawnSync('bash', ['-c', script], { cwd: root, env: { PATH: `${bin}:${process.env.PATH}`, HOME: root }, encoding: 'utf8' });
+    return { root, target, result };
+  };
+
+  const failed = run('exit 1');
+  assert.notEqual(failed.result.status, 0, 'a failed copy fails the script');
+  assert.ok(fs.existsSync(path.join(failed.target, 'marker')), 'the old app is still there');
+  assert.equal(fs.readFileSync(path.join(failed.target, 'marker'), 'utf8').trim(), 'old');
+  assert.ok(!fs.existsSync(`${failed.target}.new`), 'no partial .new is left behind');
+
+  const copied = run('cp -R "$1" "$2"');
+  assert.equal(copied.result.status, 0, copied.result.stderr);
+  assert.equal(fs.readFileSync(path.join(copied.target, 'marker'), 'utf8').trim(), 'new', 'the new app replaces the old one');
+  assert.ok(!fs.existsSync(`${copied.target}.new`), 'no .new is left after the swap');
 });
 
 test('appUpdateTarget: home app updates in place, /Applications needs write access, running Orca is refused', () => {

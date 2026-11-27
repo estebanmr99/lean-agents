@@ -175,7 +175,7 @@ cleanup() {
     hdiutil detach "$MOUNT" -force >/dev/null 2>&1 || true
   fi
   rm -rf "$DIR"
-  rm -rf "${target}.new"
+  if [ -e "${target}" ]; then rm -rf "${target}.new"; fi
 }
 trap cleanup EXIT
 curl -fsSL ${CURL_RETRY.join(' ')} -o "$DIR/orca.dmg" "${url}"
