@@ -25,7 +25,7 @@ export function useToolNode(core, toolNode, nvm) {
     const v = nvm.win ? path.join(nvm.dir, 'v{semver}') : path.join(nvm.dir, 'versions', 'node', 'v{semver}');
     const node = nvm.win ? path.join(v, 'node.exe') : path.join(v, 'bin', 'node');
     const cli = path.join(nvm.win ? path.join(v, 'node_modules') : path.join(v, 'lib', 'node_modules'), 'context-mode', 'cli.mjs');
-    s.legacy = [...(s.legacy ?? []), [node, cli, 'server']];
+    s.legacy = [...(s.legacy ?? []), [node, cli, 'server'], [node, cli, 'server', '--agent', '*']];
   }
   if (!toolNode || !s?.node_command) return core;
   s.command = s.node_command.map((a) => a.replace('{node}', toolNode.node).replace(/^\{modules\}\/(.*)$/, (_, rest) => path.join(toolNode.modules, rest)));

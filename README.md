@@ -181,6 +181,7 @@ Always start with `--dry-run`: it shows every file and command before anything c
 - `--install-agent a,b` / `--uninstall-agent a,b` (opt-in): install an agent CLI (`claude`, `opencode-v2`, `copilot-cli`, `cursor`, `antigravity`) from its pinned installer (SHA256-checked before it runs; Linux and macOS, plus Copilot CLI, Antigravity CLI and Cursor CLI on Windows) or remove it again. It shows the plan first (`--dry-run` stops there; `--yes` skips the question). Install records the files the installer created with their SHA256; uninstall deletes only those that still match, or runs `npm uninstall -g`, never the agent's own uninstaller, and leaves your config and data alone. An agent you installed yourself is reported as "not installed by lean-agents" and left alone. OpenCode 1.x is never installed or removed.
 - In PowerShell the common flags are PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`. Any other flag is passed as it is, for example `-DryRun --network off`.
 - Context Mode 2 needs Node.js 24.15 and GSD Core needs Node.js 24 (`engines.node` in `core/pins.json`). On an older active Node, lean-agents runs them on an nvm Node 24 without changing your default (nvm-windows: one already installed) and registers it with its absolute path; on Claude Code that means an MCP server instead of the Context Mode plugin, so its hooks and skills are not installed. Without nvm it skips them with one line. Everything else works on Node.js 22.20 or newer.
+- Context Mode MCP entries carry `--agent <id>` (VS Code `vscode`, OpenCode `opencode`, Copilot CLI `copilot-cli`, Claude MCP fallback `claude-code`); without it every `ctx_*` call fails with `Project source --agent is missing`. Cursor and Antigravity are skipped and reported because Context Mode 2.1.7 has no id for them.
 - With Context Mode, the installer also sets up Bun by default (faster `ctx_execute`); add `--no-bun` (`-NoBun` in PowerShell) to skip it. With Antigravity, `--no-app` (`-NoApp`) skips installing the app. With Cursor, `--cursor-app` (`-CursorApp`) also installs the Cursor app with brew or winget when missing, recorded and removed by `--uninstall` (Linux: download it yourself). See the Bun row in [Install tiers](#install-tiers).
 
 ### All flags
@@ -310,7 +311,7 @@ On OpenCode, rtk's own plugin (`plugins/rtk.ts`, rtk 1.2.0 or newer) passes ever
 | Rules | ⚠️ written, load unproven | ➖ settings UI only, use `--project` | ✅ `AGENTS.md` |
 | Subagents | ⚠️ written, load unproven | ⚠️ written, load unproven | ✅ `.github/agents`; ⚠️ `.cursor/agents` (Cursor CLI loading unverified) |
 | RTK | ⚠️ through Copilot CLI only | ✅ | ➖ per user |
-| Context Mode, Serena, Playwright | ✅ MCP | ✅ MCP | ✅ `.vscode/mcp.json`, `.cursor/mcp.json` |
+| Context Mode, Serena, Playwright | ✅ MCP (`--agent vscode`) | ✅ MCP | ✅ `.vscode/mcp.json` (`--agent vscode`), `.cursor/mcp.json` (Context Mode skipped: no Cursor id) |
 | Signed-in browser (opt-in) | ✅ opt-in | ✅ opt-in | ➖ per user |
 | Caveman, i-have-adhd skills | ⚠️ written, load unproven | ⚠️ written, load unproven | ➖ per user |
 
@@ -386,7 +387,7 @@ Puts the shared setup into one repository, so everyone on the team gets it with 
 | `AGENTS.md` | The rules, in a marked block; your own text stays |
 | `.github/copilot-instructions.md`, `.cursor/rules/lean-agents.mdc` | One line pointing to `AGENTS.md`, so rules load once |
 | `.github/agents/*.agent.md`, `.cursor/agents/*.md` | Tiered subagents for VS Code Copilot and Cursor |
-| `.vscode/mcp.json`, `.cursor/mcp.json` | Context Mode, plus Serena and Playwright if you pick them |
+| `.vscode/mcp.json`, `.cursor/mcp.json` | Context Mode on VS Code (`--agent vscode`) and Serena/Playwright; Cursor gets Serena/Playwright only, because Context Mode 2.1.7 has no Cursor id |
 
 Run it from the repository root, check the plan, apply, and commit:
 

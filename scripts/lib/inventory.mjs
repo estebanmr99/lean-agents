@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 import { PINS } from './pins.mjs';
 import { configHome, envDir } from './system.mjs';
 import { configPath } from './adapters/opencode-v2.mjs';
@@ -85,7 +86,7 @@ export function classify(launch, pinKey) {
   return { status, range, fragile: FRAGILE.has(launch.style) };
 }
 
-// Every registered MCP command that runs a pinned npm tool: { client, name, file, pin, launch, ...classify }. Args and env are never returned.
+// Every registered MCP command that runs a pinned npm tool: { client, name, file, pin, launch, hasAgent, ...classify }. Args and env are never returned.
 export function mcpLaunches(home, opts = {}) {
   const seen = new Set();
   const out = [];
@@ -96,7 +97,7 @@ export function mcpLaunches(home, opts = {}) {
       if (!pin || seen.has(id)) continue;
       seen.add(id);
       const launch = launchOf(s.command, opts);
-      out.push({ client, name: s.name, file, pin, launch, ...classify(launch, pin) });
+      out.push({ client, name: s.name, file, pin, launch, hasAgent: s.command.includes('--agent'), ...classify(launch, pin) });
     }
   }
   return out;
@@ -265,5 +266,46 @@ export function probeInitialize(argv, { env = process.env, expect, timeoutMs = 1
     });
     child.stdin.on('error', () => {});
     child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'lean-agents-ci', version: '0' } } })}\n`);
+  });
+}
+
+// Runs one real Context Mode tool call over stdio, not just `initialize` (#562). The VS Code server asks for a
+// workspace through roots/list, so this answers it with `cwd`; `expect` must appear in the tool's text output.
+export function probeToolCall(argv, { env = process.env, cwd = process.cwd(), expect = 'ctx-ok', timeoutMs = 120000, stderr = 'inherit' } = {}) {
+  return new Promise((resolve) => {
+    const [cmd, ...args] = argv;
+    let done = false;
+    let buf = '';
+    let called = false;
+    const child = spawn(cmd, args, { stdio: ['pipe', 'pipe', stderr], env, cwd, windowsHide: true });
+    const send = (msg) => { try { child.stdin.write(`${JSON.stringify(msg)}\n`); } catch { /* the exit handler reports it */ } };
+    const end = (r) => { if (done) return; done = true; clearTimeout(timer); child.removeAllListeners('exit'); child.kill(); resolve(r); };
+    const timer = setTimeout(() => end({ ok: false, error: `no tool reply in ${timeoutMs / 1000}s` }), timeoutMs);
+    child.on('error', (e) => end({ ok: false, error: e.message }));
+    child.on('exit', (code) => end({ ok: false, error: `exited (${code}) before replying to the tool call` }));
+    child.stdout.on('data', (d) => {
+      buf += d;
+      for (let i = buf.indexOf('\n'); i >= 0; i = buf.indexOf('\n')) {
+        const line = buf.slice(0, i);
+        buf = buf.slice(i + 1);
+        let msg; try { msg = JSON.parse(line); } catch { continue; }
+        if (msg?.method === 'roots/list' && msg.id != null) {
+          send({ jsonrpc: '2.0', id: msg.id, result: { roots: [{ uri: pathToFileURL(cwd).href, name: 'lean-agents-ci' }] } });
+          continue;
+        }
+        if (msg?.id === 1 && !called) {
+          called = true;
+          send({ jsonrpc: '2.0', method: 'notifications/initialized' });
+          send({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'ctx_execute', arguments: { language: 'javascript', code: `console.log(${JSON.stringify(expect)})` } } });
+          continue;
+        }
+        if (msg?.id === 2) {
+          const text = (msg.result?.content ?? []).map((c) => c.text ?? '').join('\n');
+          end({ ok: !msg.result?.isError && text.includes(expect), text, error: msg.error?.message ?? (msg.result?.isError ? text : null) });
+        }
+      }
+    });
+    child.stdin.on('error', () => {});
+    send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: { roots: { listChanged: false } }, clientInfo: { name: 'lean-agents-ci', version: '0' } } });
   });
 }

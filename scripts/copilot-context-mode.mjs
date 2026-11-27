@@ -5,11 +5,34 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { which, spawnFor } from './lib/system.mjs';
 
-// shortcut: any "context-mode" entry counts as ours, so a hand-made one is kept; the undo (`copilot mcp remove`) still removes it. Compare paths if that ever matters.
 const listed = spawnFor(['copilot', 'mcp', 'list', '--json'], { encoding: 'utf8' });
+// An entry lean-agents wrote (absolute Node plus the package's server.mjs, or an old npx form) without --agent is
+// replaced. Anything else is the user's own entry and stays.
+const ours = (argv) => {
+  const [cmd, ...args] = argv;
+  if (/(^|[\\/])(node|node\.exe)$/i.test(cmd ?? '') && /[\\/]context-mode[\\/]server\.mjs$/.test(args[0] ?? '')) return true;
+  return /(^|[\\/])npx(\.cmd)?$/i.test(cmd ?? '') && args.includes('server') && args.some((a) => /^context-mode(@\d+\.\d+\.\d+)?$/.test(a));
+};
 if (listed.status === 0 && listed.stdout.includes('"context-mode"')) {
-  console.log('context-mode is already registered with Copilot CLI, left alone');
-  process.exit(0);
+  let entry;
+  try { entry = JSON.parse(listed.stdout).mcpServers?.['context-mode']; } catch { /* unparseable: keep the old safe default */ }
+  if (entry) {
+    const argv = [entry.command, ...(Array.isArray(entry.args) ? entry.args : [])].filter((a) => a != null).map(String);
+    if (argv.includes('--agent')) {
+      console.log('context-mode is already registered with Copilot CLI, left alone');
+      process.exit(0);
+    }
+    if (ours(argv)) {
+      const removed = spawnFor(['copilot', 'mcp', 'remove', 'context-mode'], { stdio: 'inherit' });
+      if (removed.status !== 0) process.exit(removed.status ?? 1);
+    } else {
+      console.log('Kept your existing Context Mode entry: it has different args. Add --agent copilot-cli to it, or remove it and run lean-agents --update.');
+      process.exit(0);
+    }
+  } else {
+    console.log('context-mode is already registered with Copilot CLI, left alone');
+    process.exit(0);
+  }
 }
 
 // The command npm linked is the ground truth for the prefix: a symlink into the package on Unix, a shim next

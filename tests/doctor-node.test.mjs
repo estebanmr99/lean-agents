@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { doctor, npxFailDetail, projectNode } from '../scripts/lib/doctor.mjs';
 import { nodeFloorFix, nodeAt } from '../scripts/lib/node-runtime.mjs';
 import { preset } from '../scripts/lib/network.mjs';
+import { vscodeUserDir } from '../scripts/lib/adapters/vscode-copilot.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fsx = (files = [], links = {}) => ({ existsSync: (p) => files.includes(p) || p in links, realpathSync: (p) => links[p] ?? p });
@@ -31,11 +32,11 @@ const OS = {
     platform: 'linux',
     env: { PATH: `${POSIX}/v22.20.0/bin`, NVM_DIR: '/h/.nvm' },
     fs: fsx([`${POSIX}/v22.20.0/bin/node`], { '/h/.nvm/current/bin/node': `${POSIX}/v22.20.0/bin/node`, '/h/.nvm/alias/n24/bin/node': `${POSIX}/v24.15.0/bin/node` }),
-    absolute24: { command: `${POSIX}/v24.15.0/bin/node`, args: [`${POSIX}/v24.15.0/lib/node_modules/context-mode/cli.mjs`, 'server'] },
-    absolute22: { command: `${POSIX}/v22.20.0/bin/node`, args: [`${POSIX}/v22.20.0/lib/node_modules/context-mode/cli.mjs`, 'server'] },
-    symlink22: { command: '/h/.nvm/current/bin/node', args: ['/x/node_modules/context-mode/cli.mjs', 'server'] },
-    symlink24: { command: '/h/.nvm/alias/n24/bin/node', args: ['/x/node_modules/context-mode/cli.mjs', 'server'] },
-    npxAbsolute: { command: `${POSIX}/v24.15.0/bin/npx`, args: ['-y', 'context-mode@2.1.4', 'server'] },
+    absolute24: { command: `${POSIX}/v24.15.0/bin/node`, args: [`${POSIX}/v24.15.0/lib/node_modules/context-mode/cli.mjs`, 'server', '--agent', 'claude-code'] },
+    absolute22: { command: `${POSIX}/v22.20.0/bin/node`, args: [`${POSIX}/v22.20.0/lib/node_modules/context-mode/cli.mjs`, 'server', '--agent', 'claude-code'] },
+    symlink22: { command: '/h/.nvm/current/bin/node', args: ['/x/node_modules/context-mode/cli.mjs', 'server', '--agent', 'claude-code'] },
+    symlink24: { command: '/h/.nvm/alias/n24/bin/node', args: ['/x/node_modules/context-mode/cli.mjs', 'server', '--agent', 'claude-code'] },
+    npxAbsolute: { command: `${POSIX}/v24.15.0/bin/npx`, args: ['-y', 'context-mode@2.1.4', 'server', '--agent', 'claude-code'] },
     npxAbsoluteNode: '22.20.0',
     playwrightSymlink: { command: '/h/.nvm/current/bin/npx', args: ['-y', '@playwright/mcp@0.0.83'] },
   },
@@ -43,11 +44,11 @@ const OS = {
     platform: 'win32',
     env: { Path: `${WIN}\\v22.20.0`, NVM_SYMLINK: 'C:\\nodejs' },
     fs: fsx([`${WIN}\\v22.20.0\\node.exe`, `${WIN}\\v24.15.0\\node.exe`], { 'C:\\nodejs\\node.exe': `${WIN}\\v22.20.0\\node.exe` }),
-    absolute24: { command: `${WIN}\\v24.15.0\\node.exe`, args: [`${WIN}\\v24.15.0\\node_modules\\context-mode\\cli.mjs`, 'server'] },
-    absolute22: { command: `${WIN}\\v22.20.0\\node.exe`, args: [`${WIN}\\v22.20.0\\node_modules\\context-mode\\cli.mjs`, 'server'] },
-    symlink22: { command: 'C:\\nodejs\\node.exe', args: ['C:\\x\\node_modules\\context-mode\\cli.mjs', 'server'] },
+    absolute24: { command: `${WIN}\\v24.15.0\\node.exe`, args: [`${WIN}\\v24.15.0\\node_modules\\context-mode\\cli.mjs`, 'server', '--agent', 'claude-code'] },
+    absolute22: { command: `${WIN}\\v22.20.0\\node.exe`, args: [`${WIN}\\v22.20.0\\node_modules\\context-mode\\cli.mjs`, 'server', '--agent', 'claude-code'] },
+    symlink22: { command: 'C:\\nodejs\\node.exe', args: ['C:\\x\\node_modules\\context-mode\\cli.mjs', 'server', '--agent', 'claude-code'] },
     symlink24: null,
-    npxAbsolute: { command: `${WIN}\\v24.15.0\\npx.cmd`, args: ['-y', 'context-mode@2.1.4', 'server'] },
+    npxAbsolute: { command: `${WIN}\\v24.15.0\\npx.cmd`, args: ['-y', 'context-mode@2.1.4', 'server', '--agent', 'claude-code'] },
     npxAbsoluteNode: '24.15.0',
     playwrightSymlink: { command: 'C:\\nodejs\\npx.cmd', args: ['-y', '@playwright/mcp@0.0.83'] },
   },
@@ -96,6 +97,47 @@ for (const [name, c] of Object.entries(OS)) {
     assert.deepEqual(r.nodes, []);
   });
 }
+
+test('a context-mode MCP entry without --agent is an error with the fix line (#562)', () => {
+  const h = tmp();
+  const { args } = OS.linux.absolute24;
+  claudeServers(h, { 'context-mode': { command: OS.linux.absolute24.command, args: args.slice(0, -2) } });
+  const r = run(h, OS.linux);
+  const row = r.rows.find((x) => x.item === 'context-mode agent for claude mcp context-mode');
+  assert.equal(row.status, 'error');
+  assert.match(row.detail, /--agent <id>/);
+  assert.match(row.detail, /Fix: run lean-agents --update/);
+  assert.equal(r.ok, false);
+});
+
+test('the context-mode agent fix names only the clients --update rewrites; Cursor gets its entry path', () => {
+  const entry = { 'context-mode': { command: 'npx', args: ['-y', 'context-mode@2.1.4', 'server'] } };
+  const files = [
+    [(h) => path.join(h, '.claude.json'), { mcpServers: entry }, 'claude'],
+    [(h) => path.join(h, '.cursor', 'mcp.json'), { mcpServers: entry }, 'cursor'],
+    [(h) => path.join(h, '.config', 'opencode', 'opencode.json'), { mcp: { servers: entry } }, 'opencode'],
+    [(h) => path.join(h, '.copilot', 'mcp-config.json'), { mcpServers: entry }, 'copilot-cli'],
+    [(h) => path.join(vscodeUserDir(h), 'mcp.json'), { servers: entry }, 'vscode'],
+    [(h) => path.join(vscodeUserDir(h, 'Code - Insiders'), 'mcp.json'), { servers: entry }, 'vscode-insiders'],
+  ];
+  for (const [atOf, data, client] of files) {
+    const h = tmp();
+    const at = atOf(h);
+    fs.mkdirSync(path.dirname(at), { recursive: true });
+    fs.writeFileSync(at, JSON.stringify(data));
+    const r = run(h, { fs });
+    const row = r.rows.find((x) => x.item === `context-mode agent for ${client} mcp context-mode`);
+    assert.ok(row, `${client} row`);
+    assert.equal(row.status, 'error');
+    if (client === 'cursor') {
+      assert.match(row.detail, /remove the context-mode entry from Cursor's mcp\.json \(lean-agents no longer manages it\)/);
+      assert.match(row.detail, /~[\\/]\.cursor[\\/]mcp\.json/);
+      assert.doesNotMatch(row.detail, /--update/);
+    } else {
+      assert.match(row.detail, /Fix: run lean-agents --update/, client);
+    }
+  }
+});
 
 test('linux: a symlink that points at Node 24 is ok but marked as able to change', () => {
   const h = tmp();

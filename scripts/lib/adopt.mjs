@@ -19,6 +19,7 @@ import { doctor, ownSkills } from './doctor.mjs';
 import { pluginHealth, probePlugins } from './plugin-health.mjs';
 import { orcaHooksFound } from './terminals.mjs';
 import { clients, launchOf, pinOf, classify, npmCopies, npmGlobals, skillDirs, duplicateSkills, treeSha, probeInitialize, isNpmName } from './inventory.mjs';
+import { agentFor } from './context-mode.mjs';
 
 const j = path.join;
 const MANAGED_SKILLS = new Set(Object.entries(PINS).filter(([, p]) => p.kind === 'skill').map(([k]) => k));
@@ -412,10 +413,12 @@ export function adoptPlan(r, { home, env, platform, realHome, state, fsx = fs })
     if (!tn) { out.notes.push(`${it.client} ${it.name}: no installed Node meets ${r.toolNode.range}; install one with nvm, then run --adopt again`); continue; }
     const entry = walk(readJson(file), [...it.keyPath, it.name]);
     const base = [...it.keyPath, it.name];
-    if (Array.isArray(entry?.command)) addEdit(file, { path: [...base, 'command'], mode: 'set', value: [tn.node, cli, 'server'] });
-    else if (typeof entry?.command === 'string') { addEdit(file, { path: [...base, 'command'], mode: 'set', value: tn.node }); addEdit(file, { path: [...base, 'args'], mode: 'set', value: [cli, 'server'] }); }
+    const agent = agentFor(it.client);
+    const argv = agent ? [tn.node, cli, 'server', '--agent', agent] : [tn.node, cli, 'server'];
+    if (Array.isArray(entry?.command)) addEdit(file, { path: [...base, 'command'], mode: 'set', value: argv });
+    else if (typeof entry?.command === 'string') { addEdit(file, { path: [...base, 'command'], mode: 'set', value: tn.node }); addEdit(file, { path: [...base, 'args'], mode: 'set', value: argv.slice(1) }); }
     else continue;
-    out.rewritten.push({ client: it.client, name: it.name, file, path: base, argv: [tn.node, cli, 'server'] });
+    out.rewritten.push({ client: it.client, name: it.name, file, path: base, argv });
   }
   // Stale keys of ours (a managed MCP whose command is gone, an enabledPlugins entry of ours without its plugin): removed, the old value recorded. A user's own stale key is only listed.
   for (const it of r.items) {

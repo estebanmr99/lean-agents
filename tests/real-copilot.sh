@@ -44,6 +44,17 @@ grep -q i-have-adhd "$HOME/skills.txt"
 grep -q '"context-mode"' "$HOME/mcp.txt"
 # The registered server file must exist, or Copilot would list a server that cannot start.
 node -e 'const fs = require("fs"); const s = JSON.parse(fs.readFileSync(process.argv[1], "utf8")).mcpServers["context-mode"]; process.exit(fs.existsSync(s.args.find((a) => a.endsWith("server.mjs"))) ? 0 : 1)' "$HOME/mcp.txt"
+# #562: one real ctx_execute call over stdio, not only initialize; without --agent it fails with "Project source --agent is missing".
+node --input-type=module - "$HOME/mcp.txt" "$repo" "$HOME" <<'JS'
+import fs from 'node:fs';
+const { probeToolCall } = await import(`${process.argv[3]}/scripts/lib/inventory.mjs`);
+const entry = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')).mcpServers['context-mode'];
+const argv = [entry.command, ...(entry.args ?? [])];
+if (argv[argv.indexOf('--agent') + 1] !== 'copilot-cli') { console.log(`FAIL  context-mode args have no --agent copilot-cli: ${argv.join(' ')}`); process.exit(1); }
+const r = await probeToolCall(argv, { cwd: process.argv[4], expect: 'ctx-ok' });
+console.log(`${r.ok ? 'ok    ' : 'FAIL  '} context-mode ctx_execute --agent copilot-cli${r.error ? ` (${r.error})` : ''}`);
+process.exit(r.ok ? 0 : 1);
+JS
 
 node "$repo/scripts/lean.mjs" --doctor </dev/null
 

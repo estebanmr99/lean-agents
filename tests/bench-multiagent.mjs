@@ -266,13 +266,13 @@ export function budgetSpent(keyDelta, sessionCostSum) {
   return Math.max(keyDelta || 0, sessionCostSum || 0);
 }
 
-function createBudget({ key, maxUsd }) {
+export function createBudget({ key, maxUsd, fetchImpl = (u, o) => fetch(u, { ...o, signal: AbortSignal.timeout(10000) }) }) {
   let startSpend = 0;
   let keyDelta = 0;
   let sessionSpent = 0;
   let est = START_EST_USD;
   // A hung usage request must not stall the cap check: fail after 10 s so the stop-and-kill path runs.
-  const spend = () => keySpend(key, (u, o) => fetch(u, { ...o, signal: AbortSignal.timeout(10000) }));
+  const spend = () => keySpend(key, fetchImpl);
   return {
     async init() { startSpend = await spend(); keyDelta = 0; sessionSpent = 0; },
     async refresh() {
@@ -289,7 +289,7 @@ function createBudget({ key, maxUsd }) {
       if (sessions > 0) est = Math.max(est, cost / sessions);
     },
     async requireHeadroom(sessions) {
-      await this.refresh();
+      const spent = await this.refresh();
       if (!fitsHeadroom(spent, est, sessions, maxUsd)) {
         throw new Error(`Budget headroom: $${spent.toFixed(4)} spent + ${sessions} x $${est.toFixed(4)} est >= $${maxUsd} cap. Stopping.`);
       }

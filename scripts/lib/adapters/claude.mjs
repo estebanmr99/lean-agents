@@ -3,11 +3,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parse } from 'jsonc-parser';
-import { OWNED_MARK } from '../fsops.mjs';
+import { OWNED_MARK, isLegacy } from '../fsops.mjs';
 import { tierFor, modelFor } from '../render.mjs';
 import { privacyOf, updaterMode } from '../network.mjs';
 import { statuslineScript } from '../copilot-usage.mjs';
 import { marketplaceSource, skillSource, skillsCli } from '../pins.mjs';
+import { contextModeCommand } from '../context-mode.mjs';
+import { mcpServers } from '../migrate.mjs';
 
 // Also the key of its record in state.json: removing the entry replaces that record (empty undo), so --uninstall does not remove it twice.
 const CTX_MCP = 'Context Mode MCP server (user scope)';
@@ -123,13 +125,19 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
   }
   if (tools.includes('context-mode') && opts.toolNode) {
     // The plugin starts its server with the first `node` on PATH, so on an old Node it registers the absolute server instead (hooks and skills are lost).
-    commands.push({
-      tool: 'context-mode',
-      desc: CTX_MCP,
-      run: [['claude', 'mcp', 'add', '--scope', 'user', 'context-mode', '--', ...core.mcp['context-mode'].command]],
-      undo: [['claude', 'mcp', 'remove', '--scope', 'user', 'context-mode']],
-      skipIfOutput: { cmd: ['claude', 'mcp', 'get', 'context-mode'], ok: true },
-    });
+    const add = ['claude', 'mcp', 'add', '--scope', 'user', 'context-mode', '--', ...contextModeCommand(core.mcp['context-mode'].command, 'claude-code')];
+    const remove = ['claude', 'mcp', 'remove', '--scope', 'user', 'context-mode'];
+    const entry = mcpServers(path.join(home, '.claude.json'), ['mcpServers']).find((s) => s.name === 'context-mode');
+    if (!entry) {
+      commands.push({ tool: 'context-mode', desc: CTX_MCP, run: [add], undo: [remove], skipIfOutput: { cmd: ['claude', 'mcp', 'get', 'context-mode'], ok: true } });
+    } else if (entry.command.includes('--agent')) {
+      // Already rewritten by this version: nothing to plan.
+    } else if (isLegacy(entry.command, core.mcp['context-mode'].legacy)) {
+      // An entry lean-agents wrote before --agent existed: replace it so ctx_* calls resolve the project.
+      commands.push({ tool: 'context-mode', desc: CTX_MCP, run: [remove, add], undo: [remove] });
+    } else {
+      console.log('Kept your existing Context Mode MCP entry: it has different args. Add --agent claude-code to it, or remove it and run lean-agents --update.');
+    }
   } else if (tools.includes('context-mode')) {
     // An earlier run on an old Node registered the absolute MCP server; the plugin runs its own, so lean-agents removes the one it added.
     if ((opts.prior ?? []).some((c) => c.desc === CTX_MCP && c.undo?.length)) {
