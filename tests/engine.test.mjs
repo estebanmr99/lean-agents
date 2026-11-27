@@ -1027,13 +1027,9 @@ test('gh installs at user scope with brew or winget, only when asked for', () =>
   assert.equal(prereqFor('gh', null).install, null);
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-gh-'));
   const f = path.join(home, '.config', 'lean-agents', 'state.json');
-  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-gh-bin-'));
-  fs.writeFileSync(path.join(bin, 'gh'), '#!/bin/sh\n', { mode: 0o755 });
-  fs.writeFileSync(path.join(bin, 'gh.cmd'), '@echo off\r\n'); // where.exe finds the shim on Windows
-  const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` }; // gh present whatever the host PATH holds
-  lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--no-tools', '--lang', 'en'], env);
+  lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--no-tools', '--lang', 'en']);
   assert.equal(JSON.parse(fs.readFileSync(f, 'utf8')).options.gh, false);
-  const out = lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--no-tools', '--lang', 'en', '--gh'], env);
+  const out = lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--no-tools', '--lang', 'en', '--gh']);
   assert.match(out, /gh auth login/);
   assert.equal(JSON.parse(fs.readFileSync(f, 'utf8')).options.gh, true);
 });
