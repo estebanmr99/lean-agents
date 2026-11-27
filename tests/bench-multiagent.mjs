@@ -230,10 +230,12 @@ function createBudget({ key, maxUsd }) {
   let startSpend = 0;
   let spent = 0;
   let est = START_EST_USD;
+  // A hung usage request must not stall the cap check: fail after 10 s so the stop-and-kill path runs.
+  const spend = () => keySpend(key, (u, o) => fetch(u, { ...o, signal: AbortSignal.timeout(10000) }));
   return {
-    async init() { startSpend = await keySpend(key); spent = 0; },
+    async init() { startSpend = await spend(); spent = 0; },
     async refresh() {
-      const now = await keySpend(key);
+      const now = await spend();
       spent = Math.max(spent, now - startSpend);
       return spent;
     },
@@ -502,6 +504,7 @@ async function main() {
     stopped = true;
     console.error(`\nStopping: ${e.message}`);
   }
+  await budget.refresh().catch(() => {}); // record spend after children were killed
   const totalCost = budget.spent;
 
   if (OUT) {
