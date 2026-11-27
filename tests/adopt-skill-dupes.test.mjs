@@ -82,3 +82,32 @@ test('--adopt --yes --confirm-removals never deletes a link target', { skip }, (
   assert.ok(fs.existsSync(j(h, '.agents', 'skills', 'demo-skill', 'SKILL.md')));
   assert.ok(fs.existsSync(j(h, '.claude', 'skills', 'demo-skill', 'SKILL.md')));
 });
+
+// #477: identical copies the Skills CLI wrote for lean-agents (one per agent folder) are not duplicates, as in doctor.
+const owned = (h, name = 'demo-skill') => put(j(h, '.config', 'lean-agents', 'state.json'), JSON.stringify({ commands: [{ ok: true, undo: [['npx', '-y', 'skills@1.7.4', 'remove', name, '-g', '-y']] }] }));
+
+test('#477: identical copies lean-agents installed are not flagged', { skip }, async () => {
+  const h = home(['.agents', '.claude', '.cursor']); owned(h);
+  const rows = skillRows(await run(h));
+  assert.equal(rows.length, 3);
+  assert.ok(rows.every((r) => !r.status.includes('duplicate') && r.action === 'keep'));
+});
+
+test('#477: copies that differ, or a failed install, are still flagged', { skip }, async () => {
+  const h = home(['.agents', '.claude'], 'copy', { '.claude': 'edited\n' }); owned(h);
+  assert.ok(skillRows(await run(h)).every((r) => r.status.includes('duplicate')));
+  const f = home(['.agents', '.claude']);
+  put(j(f, '.config', 'lean-agents', 'state.json'), JSON.stringify({ commands: [{ ok: false, undo: [['npx', '-y', 'skills@1.7.4', 'remove', 'demo-skill', '-g', '-y']] }] }));
+  assert.ok(skillRows(await run(f)).every((r) => r.status.includes('duplicate')));
+});
+
+test('#477: lean-update in ~/.agents and ~/.copilot (VS Code Copilot) is not flagged; a corrupt state.json flags it again', { skip }, async () => {
+  const h = fs.realpathSync(fs.mkdtempSync(j(os.tmpdir(), 'dupes-')));
+  for (const d of ['.agents', '.copilot']) put(j(h, d, 'skills', 'lean-update', 'SKILL.md'), 'lean\n');
+  owned(h, 'lean-update');
+  const rows = (await run(h)).items.filter((i) => i.kind === 'skill' && i.name === 'lean-update');
+  assert.equal(rows.length, 2);
+  assert.ok(rows.every((r) => !r.status.includes('duplicate')));
+  put(j(h, '.config', 'lean-agents', 'state.json'), '{ not json');
+  assert.ok((await run(h)).items.filter((i) => i.kind === 'skill' && i.name === 'lean-update').every((r) => r.status.includes('duplicate')));
+});

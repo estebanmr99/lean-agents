@@ -15,7 +15,7 @@ import { configPath } from './adapters/opencode-v2.mjs';
 import { mcpServers } from './migrate.mjs';
 import { findNvm, resolveToolNodes, minVersion, compare, satisfies, installedNodes, toolEnv } from './node-runtime.mjs';
 import { run } from './system.mjs';
-import { doctor } from './doctor.mjs';
+import { doctor, ownSkills } from './doctor.mjs';
 import { pluginHealth, probePlugins } from './plugin-health.mjs';
 import { orcaHooksFound } from './terminals.mjs';
 import { clients, launchOf, pinOf, classify, npmCopies, skillDirs, duplicateSkills, treeSha, probeInitialize } from './inventory.mjs';
@@ -110,7 +110,7 @@ export async function opencodeInfo(home, env, fsx = fs, { toolNode = null, sqlit
   return out;
 }
 
-export async function inventory({ home, env = process.env, platform = process.platform, realHome = os.homedir(), fsx = fs }) {
+export async function inventory({ home, env = process.env, platform = process.platform, realHome = os.homedir(), fsx = fs, stateDir = j(home, '.config', 'lean-agents'), state = readState(stateDir) }) {
   const rel = (p) => (p && p.startsWith(home) ? `~${p.slice(home.length)}` : p);
   const items = [];
   const add = (it) => items.push({ client: it.client, kind: it.kind, name: it.name, file: rel(it.file), keyPath: it.keyPath ?? [], launch: it.launch ?? null, owner: it.owner, status: it.status ?? [], pin: it.pin ?? null, wanted: it.wanted ?? null, action: 'keep', ...(it.extra ?? {}) });
@@ -240,11 +240,13 @@ export async function inventory({ home, env = process.env, platform = process.pl
       }
     }
   }
+  const own = ownSkills(state); // identical copies the Skills CLI wrote for lean-agents are not duplicates, as in doctor (#477)
   for (const d of dirs) {
     let list = [];
     try { list = fsx.readdirSync(d).filter((n) => fsx.existsSync(j(d, n, 'SKILL.md'))); } catch { continue; }
     for (const name of list) {
-      const dup = dupRows.get(`${d}\0${name}`);
+      const found = dupRows.get(`${d}\0${name}`);
+      const dup = found && (found.differs || !own.has(name)) ? found : null; // an unreadable copy counts as differing
       const fix = dup && `keep one folder (e.g. ~/.agents/skills) and delete the other copy after a backup${dup.linked ? '; the copies are links, so remove the extra link, not the folder it points to' : ''}${Object.keys(dup.copies).includes('~/.claude/skills') ? '; Claude Code reads only ~/.claude/skills' : ''}`;
       add({ client: 'skills', kind: 'skill', name, file: j(d, name), owner: MANAGED_SKILLS.has(name) ? 'managed' : 'user', status: dup ? ['duplicate'] : [], extra: dup ? { copies: Object.keys(dup.copies), hashes: dup.copies, clients: dup.clients.sort(), differs: dup.differs, linked: dup.linked, fix } : {} });
     }
