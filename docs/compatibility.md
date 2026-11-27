@@ -71,7 +71,12 @@ Installs: Optional `--install-terminal` user installs (no admin). **VERIFY**: Wa
 
 Updates: `--update` reinstalls a managed app when its installed version is older than the pin, and leaves it alone at or above the pin. A present app the user installed is offered once interactively; non-interactively (`--yes`, agents, `/lean-update`) it is adopted only with `--install-terminal orca|warp|both`. An adopted app is never deleted by `--uninstall` or `--update --undo` (checked 2026-11-27).
 
-Installed app version sources (**VERIFY** until the `real-terminals-windows` app run proves them): macOS `defaults read <app>/Contents/Info.plist CFBundleShortVersionString` ([`defaults(1)`](https://developer.apple.com/library/archive/documentation/Darwin/Reference/ManPages/man1/defaults.1.html), checked 2026-11-27); Windows `DisplayVersion` from the uninstall registry key `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\*` (and the machine + WOW6432Node keys) ([Uninstall Registry Key](https://learn.microsoft.com/en-us/windows/win32/msi/uninstall-registry-key), checked 2026-11-27).
+Installed app version sources (**VERIFY** until the `real-terminals-windows` app run proves them):
+
+| Platform | Read | Minimum | Source (checked 2026-11-27) |
+| --- | --- | --- | --- |
+| macOS | `defaults read <app>/Contents/Info.plist CFBundleShortVersionString` | `defaults` ships with macOS (no minimum) | [`defaults(1)`](https://developer.apple.com/library/archive/documentation/Darwin/Reference/ManPages/man1/defaults.1.html) |
+| Windows | `Get-ItemProperty` on the uninstall registry (`DisplayVersion`), user + machine + WOW6432Node keys | Windows PowerShell 5.1 (built into Windows 10+) | [Uninstall Registry Key](https://learn.microsoft.com/en-us/windows/win32/msi/uninstall-registry-key) |
 
 **VERIFY:** `orca agent hooks on|off|status --json` (needs a running app? lean-agents does not run it, so `--uninstall` never turns off hooks you enabled yourself); Orca OpenCode plugin route; whether the Warp plugins are no-ops outside Warp; minimum Warp version; whether `TERM_PROGRAM=WarpTerminal` is set inside Warp; Orca `orchestration` and `computer-use` skills (only `orca-cli` is installed); Warp notifications and Orca status in the running GUI (not testable in CI).
 
