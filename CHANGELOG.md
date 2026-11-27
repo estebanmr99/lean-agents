@@ -6,6 +6,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ### Added
 - `--adopt` (and `--adopt --json`) now lists every global npm package under every Node nvm knows, not only the npm packages lean-agents pins (#465). The active/default Node is marked, and a package is flagged when it exists only under another Node (`not-active`), sits under several Nodes at different versions (`version-differs`) or does not meet its own `engines.node` on the Node it lives under (`engines-unmet`). Cleanup is one `npm uninstall -g <pkg> --prefix <Node dir>` line per package only on a non-active Node: printed, never run, and not part of the `--yes` plan. The `--adopt --json` shape is in `docs/adopt-json.md`. nvm-windows stays **VERIFY**. Not done yet: flagging MCP/hook entries on a non-active Node and listing Node installs outside nvm on PATH.
+- Multi-agent benchmark harness (#404): `tests/bench-multiagent.mjs` runs task9 solo or split across 1, 2 or 4 workers plus one reviewer, records per-session tokens and wall time, and reports priced cost and cost versus solo. It has a `--dry-run` plan, a hard USD cap, and a manual-only workflow.
 
 ### Fixed
 - The Claude Code `context-mode` plugin pin moved from `v2.1.4` to `v2.1.7`, matching the npm CLI that `--update` already installs (#490). A new test fails when the two pins drift apart without a `note` on the plugin pin explaining why.

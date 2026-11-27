@@ -133,6 +133,18 @@ export function priceUsage(usage, prices) {
 
 export const HARNESS_STATE = new Map(); // dir -> { testFiles: Map<filename, content>, expectedTests: number }
 
+// The same setup path for every mode: baseline installs nothing, rules/lean run the installer.
+// multiagent reuses this so both harnesses stay identical.
+export function setupVariant({ root, home, variant, env }) {
+  if (variant === 'baseline') return { ok: true, status: 0, output: '', args: [] };
+  const leanTools = variant === 'rules' ? '--no-tools' : '--tools';
+  const leanToolsVal = variant === 'rules' ? [] : ['rtk,context-mode'];
+  const leanArgs = ['scripts/lean.mjs', '--home', home, '--yes', '--agents', 'opencode-v2', leanTools, ...leanToolsVal];
+  const { OPENROUTER_API_KEY: _k, ...setupEnv } = env;
+  const res = spawnSync(process.execPath, [path.join(root, leanArgs[0]), ...leanArgs.slice(1)], { env: setupEnv, encoding: 'utf8' });
+  return { ok: res.status === 0, status: res.status, output: `${res.stdout || ''}\n${res.stderr || ''}`, args: leanArgs };
+}
+
 export function generateTask9(dir) {
   const state = { testFiles: new Map(), expectedTests: 0 };
   fs.mkdirSync(path.join(dir, 'src', 'a'), { recursive: true });
@@ -662,15 +674,10 @@ async function main() {
         }
 
         if (mode !== 'baseline') {
-          const leanTools = mode === 'rules' ? '--no-tools' : '--tools';
-          const leanToolsVal = mode === 'rules' ? [] : ['rtk,context-mode'];
-          const leanArgs = ['scripts/lean.mjs', '--home', runHome, '--yes', '--agents', 'opencode-v2', leanTools, ...leanToolsVal];
-          console.log(`  Setup: node ${leanArgs.join(' ')}`);
-          // Setup needs no model key.
-          const { OPENROUTER_API_KEY: _k, ...setupEnv } = childEnv;
-          const leanRes = spawnSync(process.execPath, [path.join(ROOT, leanArgs[0]), ...leanArgs.slice(1)], { env: setupEnv, encoding: 'utf8' });
-          if (leanRes.status !== 0) {
-            console.error(`  Lean setup failed with exit code ${leanRes.status}:\n${(() => { const lines = redactKey(`${leanRes.stdout || ''}\n${leanRes.stderr || ''}`, KEY).split('\n'); return [...lines.filter((l) => /^\s*! /.test(l)), '...', ...lines.slice(-40)].join('\n'); })()}`);
+          const setup = setupVariant({ root: ROOT, home: runHome, variant: mode, env: childEnv });
+          console.log(`  Setup: node ${setup.args.join(' ')}`);
+          if (!setup.ok) {
+            console.error(`  Lean setup failed with exit code ${setup.status}:\n${(() => { const lines = redactKey(setup.output, KEY).split('\n'); return [...lines.filter((l) => /^\s*! /.test(l)), '...', ...lines.slice(-40)].join('\n'); })()}`);
             process.exit(1);
           }
         }
