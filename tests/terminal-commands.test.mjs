@@ -58,3 +58,36 @@ test('terminalCommands: installTerminals with system true on linux gives no inst
 
   assert.deepEqual(commands, []);
 });
+
+test('terminalCommands: a managed app behind its pin reinstalls even when present', () => {
+  const commands = terminalCommands({
+    home: '/tmp/x',
+    terminals: [],
+    installTerminals: ['orca'],
+    updateApps: ['orca'],
+    agents: [],
+    platform: 'win32',
+    system: true,
+    env: { LOCALAPPDATA: 'D:\\localappdata', TEMP: 'D:\\temp' },
+  });
+
+  const orca = commands.find((c) => c.tool === 'orca');
+  assert.equal(orca.skipIfExists, undefined);
+});
+
+test('terminalCommands: an adopted app keeps its install command but has no undo', () => {
+  const commands = terminalCommands({
+    home: '/tmp/x',
+    terminals: [],
+    installTerminals: ['orca'],
+    updateApps: ['orca'],
+    adoptedTerminals: ['orca'],
+    agents: [],
+    platform: 'win32',
+    system: true,
+    env: { LOCALAPPDATA: 'D:\\localappdata', TEMP: 'D:\\temp' },
+  });
+
+  const orca = commands.find((c) => c.tool === 'orca');
+  assert.deepEqual(orca.undo, []);
+});

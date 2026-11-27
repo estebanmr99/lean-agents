@@ -333,6 +333,7 @@ Si ya usas [Warp](https://www.warp.dev) u [Orca](https://github.com/stablyai/orc
 - **Windows:** con el preset de red todo apagado pone `DO_NOT_TRACK=1` y `ORCA_TELEMETRY_DISABLED=1` en tu entorno de usuario (solo si no existen), y detrás de un proxy añade `localhost`, `127.0.0.1` y `::1` a `NO_PROXY` para que los hooks de estado de Orca lleguen a la app. Con Git Bash añade un bloque marcado en `~/.bashrc` (los alias de `agent` de Cursor y las mismas entradas de `NO_PROXY`). `--uninstall` quita solo lo que añadió.
 - Tras instalar imprime una lista «Todavía necesitas hacer tú» (login de Cursor, User Rules, **Install CLI & Skills** de Orca y el primer arranque); `--doctor` muestra la misma lista con lo ya hecho.
 - `--uninstall` quita lo que añadió. Con el preset de red todo apagado imprime los interruptores de telemetría (Warp `telemetry_enabled = false`, Orca `DO_NOT_TRACK=1`) y nunca edita los ajustes de las apps.
+- `--update` pone al día una app Warp u Orca gestionada hasta su pin. Si la app la instalaste tú y es más antigua que el pin, se ofrece una vez; sin interacción solo se adopta con `--install-terminal orca|warp|both`, y `--uninstall` nunca borra una app adoptada.
 
 Fuentes y datos de GUI sin verificar: [docs/compatibility.md](docs/compatibility.md#terminals).
 

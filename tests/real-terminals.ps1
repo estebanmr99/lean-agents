@@ -1,6 +1,7 @@
 # Orca user-env writes on Windows with the real engine, throwaway USERPROFILE: telemetry env and loopback NO_PROXY
 # go to the runner's real user env, so every touched variable is restored in `finally`. `npx` is stubbed
-# (no network); the point is the env write and its undo. Used by CI.
+# (no network); the point is the env write and its undo. The optional Orca app is installed from one older
+# release, then --update must adopt it, move it to the pin, and --uninstall must leave it alone. Used by CI.
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot
 
@@ -16,6 +17,14 @@ $saved = @{}
 foreach ($n in $names) { $saved[$n] = Get-UserEnv $n }
 $machineNoProxy = [Environment]::GetEnvironmentVariable('NO_PROXY', 'Machine')
 $saveProfile = $env:USERPROFILE
+$saveLocalAppData = $env:LOCALAPPDATA
+
+function Get-OrcaVersion {
+  $keys = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
+    'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
+    'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+  (Get-ItemProperty $keys -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq 'Orca' } | Select-Object -First 1).DisplayVersion
+}
 
 function Invoke-Lean($rest) {
   node "$repo\scripts\lean.mjs" @rest
@@ -65,7 +74,36 @@ try {
     Assert-Eq 'NO_PROXY removed' (Get-UserEnv 'NO_PROXY') $null
     Assert-Eq 'ORCA_TELEMETRY_DISABLED removed' (Get-UserEnv 'ORCA_TELEMETRY_DISABLED') $null
   }
+
+  # 3. Optional Orca app: an older release is adopted by --update and moved to the pin; --uninstall leaves it alone.
+  $appdir = Join-Path $dir 'app'
+  New-Item -ItemType Directory -Path "$appdir\AppData\Local" -Force | Out-Null
+  $env:USERPROFILE = $appdir
+  $env:HOME = $appdir
+  $env:APPDATA = "$appdir\AppData\Roaming"
+  $env:LOCALAPPDATA = "$appdir\AppData\Local"
+  $orcaPin = (Get-Content "$repo\core\pins.json" -Raw | ConvertFrom-Json).pins.'orca-app'.version
+  # One release behind the pin: enough for --update to move it.
+  $oldOrca = '1.4.263'
+  $oldExe = "$dir\orca-old.exe"
+  Invoke-WebRequest -Uri "https://github.com/stablyai/orca/releases/download/v$oldOrca/orca-windows-setup.exe" -OutFile $oldExe -UseBasicParsing
+  Start-Process -FilePath $oldExe -ArgumentList '/currentuser', '/S' -Wait
+  for ($i = 0; $i -lt 30 -and -not (Get-OrcaVersion); $i++) { Start-Sleep 2 }
+  Assert-Eq 'seeded Orca version' (Get-OrcaVersion) $oldOrca
+
+  Invoke-Lean '--yes', '--agents', 'cursor', '--no-tools', '--terminal', 'orca', '--network', 'standard', '--lang', 'en'
+  Invoke-Lean '--update', '--install-terminal', 'orca', '--yes'
+  Assert-Eq 'Orca after --update' (Get-OrcaVersion) $orcaPin
+  Invoke-Lean '--uninstall', '--yes'
+  Assert-Eq 'adopted Orca kept by --uninstall' (Get-OrcaVersion) $orcaPin
+
+  $uninstallOrca = "$env:LOCALAPPDATA\Programs\Orca\Uninstall Orca.exe"
+  if (Test-Path $uninstallOrca) {
+    Start-Process -FilePath $uninstallOrca -ArgumentList '/S' -Wait
+    for ($i = 0; $i -lt 60 -and (Test-Path $uninstallOrca); $i++) { Start-Sleep 2 }
+  }
 } finally {
   foreach ($n in $names) { Write-UserEnv $n $saved[$n] }
   $env:USERPROFILE = $saveProfile
+  $env:LOCALAPPDATA = $saveLocalAppData
 }

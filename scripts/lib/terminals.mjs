@@ -12,6 +12,11 @@ import { fileURLToPath } from 'node:url';
 const VERIFY = fileURLToPath(new URL('./verify-sha256.mjs', import.meta.url));
 
 export const TERMINALS = ['warp', 'orca'];
+// Optional apps lean-agents can install and update, and where the installed version is read from.
+const APP_INFO = {
+  warp: { label: 'Warp', mac: 'Warp.app', win: 'Warp' },
+  orca: { label: 'Orca', mac: 'Orca.app', win: 'Orca' },
+};
 // Skills CLI agent ids; VS Code Copilot reads ~/.copilot/skills like Copilot CLI.
 const ORCA_SKILL_AGENT = { claude: 'claude-code', 'opencode-v1': 'opencode', 'opencode-v2': 'opencode', 'copilot-cli': 'github-copilot', 'vscode-copilot': 'github-copilot', cursor: 'cursor', antigravity: 'antigravity-cli' };
 // Orca's hooks POST status to 127.0.0.1; Windows curl sends loopback to the proxy unless NO_PROXY lists it.
@@ -34,6 +39,30 @@ export function detectTerminals(home, { platform = process.platform, env = proce
   return found;
 }
 
+// Installed optional app versions ({ warp, orca }), read from the platform. `system` is false for a run with --home:
+// it never reads the real machine's registry. Null when absent or unreadable.
+export function installedAppVersions({ home, platform = process.platform, system = true, run = quiet, exists = fs.existsSync } = {}) {
+  const out = {};
+  if (platform !== 'darwin' && platform !== 'win32') return out;
+  for (const [app, info] of Object.entries(APP_INFO)) {
+    let version = null;
+    if (platform === 'darwin') {
+      const apps = [path.join(home, 'Applications', info.mac), ...(system ? [path.join('/Applications', info.mac)] : [])];
+      const found = apps.find(exists);
+      if (found) {
+        const r = run(['defaults', 'read', path.join(found, 'Contents', 'Info.plist'), 'CFBundleShortVersionString']);
+        if (r.ok && r.out.trim()) version = r.out.trim();
+      }
+    } else if (system) {
+      const script = `$p = Get-ItemProperty 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*','HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*','HKLM:\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*' -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq '${info.win}' } | Select-Object -First 1; if ($p) { [Console]::Out.Write($p.DisplayVersion) }`;
+      const r = run(ps(script));
+      if (r.ok && r.out.trim()) version = r.out.trim();
+    }
+    if (version) out[app] = version;
+  }
+  return out;
+}
+
 // --terminal value to a list; "both" and "none" are shorthands.
 export function parseTerminal(v) {
   if (v === 'both') return [...TERMINALS];
@@ -45,7 +74,7 @@ export function parseTerminal(v) {
 // Commands only: OpenCode plugin entries go into the OpenCode adapter's own json edit, because two
 // json actions on one file would each start from the unedited text.
 // `system` is false for --home runs: Windows user env changes are real-machine only.
-export function terminalCommands({ home, terminals = [], installTerminals = [], agents = [], network = {}, platform = process.platform, env = process.env, system = true, readEnv = readWindowsEnv }) {
+export function terminalCommands({ home, terminals = [], installTerminals = [], updateApps = [], adoptedTerminals = [], agents = [], network = {}, platform = process.platform, env = process.env, system = true, readEnv = readWindowsEnv }) {
   const commands = [];
   
   const arch = platform === 'darwin' ? process.arch : 'x64';
@@ -54,13 +83,15 @@ export function terminalCommands({ home, terminals = [], installTerminals = [], 
   const canInstall = system && (platform === 'darwin' || platform === 'win32');
 
   if (canInstall && installTerminals.includes('warp')) {
+    const updating = updateApps.includes('warp');
+    const adopted = adoptedTerminals.includes('warp');
     if (platform === 'darwin') {
       commands.push({
         tool: 'warp',
         desc: 'Install Warp app',
-        skipIfExists: [path.join(home, 'Applications', 'Warp.app'), '/Applications/Warp.app'],
+        skipIfExists: updating ? undefined : [path.join(home, 'Applications', 'Warp.app'), '/Applications/Warp.app'],
         run: [['bash', '-c', 'if command -v brew >/dev/null 2>&1; then brew install --cask warp; else echo "Error: Homebrew is required to install Warp on macOS. Please install Warp manually from https://warp.dev" >&2; exit 1; fi']],
-        undo: [['bash', '-c', 'if command -v brew >/dev/null 2>&1; then brew uninstall --cask warp; fi']],
+        undo: adopted ? [] : [['bash', '-c', 'if command -v brew >/dev/null 2>&1; then brew uninstall --cask warp; fi']],
       });
     } else if (platform === 'win32') {
       const url = warpPin.url['windows-x64'];
@@ -70,7 +101,7 @@ export function terminalCommands({ home, terminals = [], installTerminals = [], 
       commands.push({
         tool: 'warp',
         desc: 'Install Warp app',
-        skipIfExists: [`${local}\\Programs\\Warp`],
+        skipIfExists: updating ? undefined : [`${local}\\Programs\\Warp`],
         run: [
           ['curl', '-fsSL', '-o', exe, ...CURL_RETRY, url],
           ['node', VERIFY, exe, sha],
@@ -80,12 +111,14 @@ export function terminalCommands({ home, terminals = [], installTerminals = [], 
           ps(`if (Test-Path "${exe}") { Remove-Item "${exe}" }`)
         ],
         // Inno Setup cancels silently while Warp runs and relaunches from %TEMP%; refuse, then wait for it.
-        undo: [ps(`$u = "$env:LOCALAPPDATA\\Programs\\Warp\\unins000.exe"; if (-not (Test-Path $u)) { exit 0 }; if (Get-Process -Name warp -ErrorAction SilentlyContinue) { Write-Error 'Warp is running: close it, then run --uninstall again'; exit 1 }; $p = Start-Process -FilePath $u -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru; for ($i = 0; $i -lt 30 -and (Test-Path $u); $i++) { Start-Sleep 2 }; if (Test-Path $u) { Write-Error "Warp uninstaller exit code $($p.ExitCode)"; exit 1 }`)],
+        undo: adopted ? [] : [ps(`$u = "$env:LOCALAPPDATA\\Programs\\Warp\\unins000.exe"; if (-not (Test-Path $u)) { exit 0 }; if (Get-Process -Name warp -ErrorAction SilentlyContinue) { Write-Error 'Warp is running: close it, then run --uninstall again'; exit 1 }; $p = Start-Process -FilePath $u -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru; for ($i = 0; $i -lt 30 -and (Test-Path $u); $i++) { Start-Sleep 2 }; if (Test-Path $u) { Write-Error "Warp uninstaller exit code $($p.ExitCode)"; exit 1 }`)],
       });
     }
   }
 
   if (canInstall && installTerminals.includes('orca')) {
+    const updating = updateApps.includes('orca');
+    const adopted = adoptedTerminals.includes('orca');
     if (platform === 'darwin') {
       const key = arch === 'arm64' ? 'darwin-arm64' : 'darwin-x64';
       const url = orcaPin.url[key];
@@ -111,11 +144,11 @@ ditto "$MOUNT/Orca.app" "${home}/Applications/Orca.app"
       commands.push({
         tool: 'orca',
         desc: 'Install Orca app',
-        skipIfExists: [path.join(home, 'Applications', 'Orca.app'), '/Applications/Orca.app'],
+        skipIfExists: updating ? undefined : [path.join(home, 'Applications', 'Orca.app'), '/Applications/Orca.app'],
         run: [
           ['bash', '-c', script]
         ],
-        undo: [['rm', '-rf', path.join(home, 'Applications', 'Orca.app')]],
+        undo: adopted ? [] : [['rm', '-rf', path.join(home, 'Applications', 'Orca.app')]],
       });
     } else if (platform === 'win32') {
       const url = orcaPin.url['windows-x64'];
@@ -125,7 +158,7 @@ ditto "$MOUNT/Orca.app" "${home}/Applications/Orca.app"
       commands.push({
         tool: 'orca',
         desc: 'Install Orca app',
-        skipIfExists: [`${local}\\Programs\\Orca`],
+        skipIfExists: updating ? undefined : [`${local}\\Programs\\Orca`],
         run: [
           ['curl', '-fsSL', '-o', exe, ...CURL_RETRY, url],
           ['node', VERIFY, exe, sha],
@@ -135,7 +168,7 @@ ditto "$MOUNT/Orca.app" "${home}/Applications/Orca.app"
           ps(`if (Test-Path "${exe}") { Remove-Item "${exe}" }`)
         ],
         // The NSIS uninstaller relaunches itself from %TEMP% and returns at once: wait until it has removed itself.
-        undo: [ps(`$u = "$env:LOCALAPPDATA\\Programs\\Orca\\Uninstall Orca.exe"; if (-not (Test-Path $u)) { exit 0 }; Start-Process -FilePath $u -ArgumentList '/S' -Wait; for ($i = 0; $i -lt 60 -and (Test-Path $u); $i++) { Start-Sleep 2 }; if (Test-Path $u) { Write-Error 'Orca uninstaller did not finish in 120 s'; exit 1 }`)],
+        undo: adopted ? [] : [ps(`$u = "$env:LOCALAPPDATA\\Programs\\Orca\\Uninstall Orca.exe"; if (-not (Test-Path $u)) { exit 0 }; Start-Process -FilePath $u -ArgumentList '/S' -Wait; for ($i = 0; $i -lt 60 -and (Test-Path $u); $i++) { Start-Sleep 2 }; if (Test-Path $u) { Write-Error 'Orca uninstaller did not finish in 120 s'; exit 1 }`)],
       });
     }
   }

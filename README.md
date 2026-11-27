@@ -333,6 +333,7 @@ If you already use [Warp](https://www.warp.dev) or [Orca](https://github.com/sta
 - **Windows:** with the all-off preset it sets `DO_NOT_TRACK=1` and `ORCA_TELEMETRY_DISABLED=1` in your user env (only if unset), and behind a proxy it adds `localhost`, `127.0.0.1` and `::1` to `NO_PROXY` so Orca's status hooks reach the app. With Git Bash it adds a marked `~/.bashrc` block (the Cursor `agent` aliases, and the same `NO_PROXY` entries). `--uninstall` removes only what it added.
 - After an install it prints a "Still needed from you" list (Cursor login, User Rules, Orca's **Install CLI & Skills** and first launch); `--doctor` shows the same list with what is done.
 - `--uninstall` removes what it added. With the all-off network preset it prints the telemetry switches (Warp `telemetry_enabled = false`, Orca `DO_NOT_TRACK=1`) and never edits the apps' settings.
+- `--update` brings a managed Warp or Orca app up to its pin. An app you installed yourself and that is older than the pin is offered once; non-interactively it is adopted only with `--install-terminal orca|warp|both`, and an adopted app is never deleted by `--uninstall`.
 
 Sources and unverified GUI facts: [docs/compatibility.md](docs/compatibility.md#terminals).
 

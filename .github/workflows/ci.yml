@@ -1474,12 +1474,12 @@ jobs:
           if (([Environment]::GetEnvironmentVariable('Path', 'User') -split ';') -contains $dir) { throw 'PATH entry was not removed' }
 
   real-terminals-windows:
-    # Orca user-env writes (telemetry, loopback NO_PROXY) and their undo, throwaway USERPROFILE.
+    # Orca app update/adopt and user-env writes (telemetry, loopback NO_PROXY) and their undo, throwaway USERPROFILE.
     # The variables live in the runner's real user env, so the script restores them. npx is stubbed.
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
