@@ -1549,7 +1549,7 @@ test('Cursor behind a proxy: only useHttp1ForAgent is merged into cli-config.jso
 
 test('Still needed from you: printed after install and by --doctor, Orca hooks found even when PowerShell-encoded', () => {
   const home = userHome();
-  const out = lean(home, ['--yes', '--no-exec', '--agents', 'cursor', '--tools', 'serena', '--terminal', 'orca'], { ...process.env, ...NO_PROXY_ENV });
+  const out = lean(home, ['--yes', '--no-exec', '--agents', 'cursor', '--tools', 'serena', '--terminal', 'orca'], { PATH: process.env.PATH, HOME: home, ...NO_PROXY_ENV });
   assert.match(out, /Still needed from you:/);
   assert.match(out, /agent login/);
   assert.match(out, /User Rules/);
@@ -1562,11 +1562,7 @@ test('Still needed from you: printed after install and by --doctor, Orca hooks f
   assert.equal(checks(home)[0].check(), false);
   fs.writeFileSync(path.join(home, '.cursor', 'hooks.json'), JSON.stringify({ hooks: { beforeShellExecution: [{ command: `powershell -EncodedCommand ${hook}` }] } }));
   assert.equal(checks(home)[0].check(), true);
-  // Below Node 24.15 --doctor also exits 1 for the context-mode npx entry (it needs Node 24.15+); the Orca line is the target.
-  const doctor = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'lean.mjs'), '--home', home, '--doctor', '--no-exec'], { encoding: 'utf8', env: { ...process.env, ...NO_PROXY_ENV } });
-  assert.match(doctor.stdout, /ok\s+still needed\s+Orca: the first launch/);
-  const [major, minor] = process.versions.node.split('.').map(Number);
-  assert.equal(doctor.status, major > 24 || (major === 24 && minor >= 15) ? 0 : 1);
+  assert.match(lean(home, ['--doctor', '--no-exec'], { PATH: process.env.PATH, HOME: home, ...NO_PROXY_ENV }), /ok\s+still needed\s+Orca: the first launch/);
 });
 
 test('Antigravity app and CLI install only through verified ids, else print the vendor link', () => {
