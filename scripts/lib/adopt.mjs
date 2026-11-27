@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { parse } from 'jsonc-parser';
-import { hasMark, plan as planFiles, revertJsonEdits, sha, writePrivate, privateDir, dropBackups, unsafe } from './fsops.mjs';
+import { hasMark, plan as planFiles, revertJsonEdits, sha, writePrivate, privateDir, dropBackups, unsafe, homeRel } from './fsops.mjs';
 import { PINS, npmSpec, pinVersions } from './pins.mjs';
 import { configHome, envDir, antigravityFootprint } from './system.mjs';
 import { configPath } from './adapters/opencode-v2.mjs';
@@ -111,7 +111,7 @@ export async function opencodeInfo(home, env, fsx = fs, { toolNode = null, sqlit
 }
 
 export async function inventory({ home, env = process.env, platform = process.platform, realHome = os.homedir(), fsx = fs, stateDir = j(home, '.config', 'lean-agents'), state = readState(stateDir) }) {
-  const rel = (p) => (p && p.startsWith(home) ? `~${p.slice(home.length)}` : p);
+  const rel = (p) => homeRel(p, home, platform);
   const items = [];
   const add = (it) => items.push({ client: it.client, kind: it.kind, name: it.name, file: rel(it.file), keyPath: it.keyPath ?? [], launch: it.launch ?? null, owner: it.owner, status: it.status ?? [], pin: it.pin ?? null, wanted: it.wanted ?? null, action: 'keep', ...(it.extra ?? {}) });
   const shape = (l) => ({ style: l.style, node: rel(l.node), nodeVersion: l.nodeVersion });
@@ -321,7 +321,7 @@ export async function adopt(o) {
   if (o.probePlugins) r.health.push(...await probePlugins(o.home)); // opt-in: starts a short-lived opencode serve
   // What --yes does (the apply plan, not only the inventory rows): the pin's target Node and the removals, which need a yes (#179 PC run).
   const ap = adoptPlan(r, { home: o.home, env: o.env ?? process.env, platform: o.platform ?? process.platform, realHome: o.realHome ?? os.homedir(), state: readState(o.stateDir ?? j(o.home, '.config', 'lean-agents')) });
-  r.apply = applyLines(ap, o.home);
+  r.apply = applyLines(ap, o.home, o.platform ?? process.platform);
   if (o.json) { process.stdout.write(`${JSON.stringify(r, null, 2)}\n`); return true; }
   const by = {};
   for (const i of r.items) by[`${i.kind}`] = (by[`${i.kind}`] ?? 0) + 1;
@@ -349,8 +349,8 @@ export async function adopt(o) {
 }
 
 // One line per action adoptApply takes, in its order.
-function applyLines(p, home) {
-  const rel = (f) => (f.startsWith(home) ? `~${f.slice(home.length)}` : f);
+export function applyLines(p, home, platform = process.platform) {
+  const rel = (f) => homeRel(f, home, platform);
   const yes = ' (needs a yes, or --confirm-removals)';
   return [
     ...(p.install ? [`install ${PINS['context-mode'].source}@${PINS['context-mode'].version} into Node ${p.install.node.version}${p.install.have ? ` (now ${p.install.have})` : ''}`] : []),

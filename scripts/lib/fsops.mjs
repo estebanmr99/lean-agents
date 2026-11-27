@@ -309,8 +309,8 @@ export function tilde(text, home, platform = process.platform) {
   if (!home || home === '/' || home === path.sep) return text;
   let out = text;
   const esc = (h) => h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  // Windows: any letter case (#493).
-  for (const h of new Set([home, home.replace(/\\/g, '/')])) out = out.replace(new RegExp(`${esc(h)}(?=[\\\\/])`, platform === 'win32' ? 'gi' : 'g'), '~');
+  // Windows: any letter case (#493). Only at the start of a path: /opt/x/home/me is not /home/me (#506).
+  for (const h of new Set([home, home.replace(/\\/g, '/')])) out = out.replace(new RegExp(`(?<![\\\\/\\w.-])${esc(h)}(?=[\\\\/])`, platform === 'win32' ? 'gi' : 'g'), '~');
   return out;
 }
 
