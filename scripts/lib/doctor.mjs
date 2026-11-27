@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sha, homeRel } from './fsops.mjs';
+import { sha, homeRel, userHash } from './fsops.mjs';
 import { PINS, npmSpec, behindPins, nodeRange, rtkPin, rtkTooOld } from './pins.mjs';
 import { version, quiet, findAgy, antigravityFootprint, wingetAnswer } from './system.mjs';
 import { redactText } from './redact.mjs';
@@ -205,7 +205,9 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
     for (const f of latest) {
       const rel = homeRel(f.path, home, platform);
       if (!fs.existsSync(f.path)) { add(rel, 'error', 'missing. Fix: run lean-agents again to restore it'); continue; }
-      const same = sha(fs.readFileSync(f.path, 'utf8')) === f.hash;
+      const text = fs.readFileSync(f.path, 'utf8');
+      const usableIgnore = Array.isArray(f.ignore) && f.ignore.every((e) => e && Array.isArray(e.path) && e.path.length && e.path.every((k) => typeof k === 'string'));
+      const same = f.userHash && usableIgnore ? userHash(text, f.ignore) === f.userHash : sha(text) === f.hash;
       add(rel, same ? 'ok' : 'changed', same ? '' : 'edited since install (fine if on purpose)');
     }
     // Drift: the installer pinned other versions than core/pins.json lists now (a newer lean-agents, or an edited pin).

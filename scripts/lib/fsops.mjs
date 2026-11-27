@@ -170,6 +170,50 @@ export function revertJsonEdits(text, applied) {
   return text;
 }
 
+// Hash of a JSON file without the key paths lean-agents' own commands write (plugin installs, rtk hooks), so the doctor
+// tells the user's edits from ours even when the stored whole-file hash predates those commands (#492).
+// Each ignore entry is `{ path, value }` or `{ path, repo }`: the key is dropped only while its value still matches.
+export function userHash(text, ignore = []) {
+  const data = parse(text, [], { allowTrailingComma: true });
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  for (const entry of ignore) {
+    const keyPath = entry.path;
+    let o = data;
+    for (const k of keyPath.slice(0, -1)) o = o && typeof o === 'object' ? o[k] : undefined;
+    if (!o || typeof o !== 'object' || !keyPath.length) continue;
+    const value = o[keyPath.at(-1)];
+    const src = value && typeof value === 'object' ? value.source : undefined;
+    const match = entry.repo !== undefined ? src && (src.repo === entry.repo || src.url === entry.repo) : value === entry.value;
+    if (match) delete o[keyPath.at(-1)];
+  }
+  return sha(JSON.stringify(data));
+}
+
+const samePath = (a, b) => a.length === b.length && a.every((k, i) => k === b[i]);
+const underPath = (path, parent) => path.length > parent.length && parent.every((k, i) => k === path[i]);
+
+function pruneToManaged(node, prefix, ignore, managed) {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return node;
+  const out = {};
+  for (const [k, v] of Object.entries(node)) {
+    const keyPath = [...prefix, k];
+    if (ignore.some((p) => samePath(p, keyPath))) continue;
+    if (managed.some((p) => samePath(p, keyPath))) out[k] = v;
+    else if (managed.some((p) => underPath(p, keyPath))) out[k] = pruneToManaged(v, keyPath, ignore, managed);
+    else if (ignore.some((p) => underPath(p, keyPath))) out[k] = pruneToManaged(v, keyPath, ignore, managed);
+  }
+  return out;
+}
+
+// Hash of what lean-agents itself manages in a planned JSON file: every managed key, with all ignored command-written
+// keys removed (whatever their value). A user key outside `managed`, or an ignored key with another value, changes this
+// hash, so --update never blesses it (#492).
+export function managedUserHash(text, ignore = [], managed = []) {
+  const data = parse(text, [], { allowTrailingComma: true });
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  return sha(JSON.stringify(pruneToManaged(data, [], ignore.map((e) => e.path), managed)));
+}
+
 const idMarks = (id) => [`# lean-agents:${id}:start`, `# lean-agents:${id}:end`];
 
 export function setBlock(original, body, toml = false, id = undefined) {
@@ -245,7 +289,7 @@ export function plan(actions, roots = [], prior = []) {
     // A file lean-agents created and nobody edited since holds nothing of the user's: a rerun needs no backup of it.
     const mine = prior.filter((f) => f.path === a.path);
     const noBackup = before !== null && mine.some((f) => f.created) && sha(before) === mine.at(-1).hash;
-    return { ...a, before, after, applied, status, note, keptKeys, noBackup };
+    return { ...a, before, after, applied, status, note, keptKeys, noBackup, ...(a.ignore?.length && { userHash: userHash(after, a.ignore) }) };
   });
 }
 
@@ -298,7 +342,7 @@ export function apply(planned, backupDir, home, roots = [home], entries = []) {
     const dirs = [];
     for (let d = path.dirname(p.path); !fs.existsSync(d); d = path.dirname(d)) dirs.push(d);
     fs.mkdirSync(path.dirname(p.path), { recursive: true });
-    entries.push({ path: p.path, kind: p.kind, created: p.before === null, backup, hash: sha(p.after), applied: p.applied, noRestore: p.applied?.some((e) => e.upgraded), keepEmpty: p.keepEmpty, ...(p.id && { id: p.id }), ...(dirs.length && { dirs }) });
+    entries.push({ path: p.path, kind: p.kind, created: p.before === null, backup, hash: sha(p.after), applied: p.applied, noRestore: p.applied?.some((e) => e.upgraded), keepEmpty: p.keepEmpty, ...(p.userHash && { userHash: p.userHash, ignore: p.ignore }), ...(p.id && { id: p.id }), ...(dirs.length && { dirs }) });
     fs.writeFileSync(p.path, p.after);
   }
   return entries;
