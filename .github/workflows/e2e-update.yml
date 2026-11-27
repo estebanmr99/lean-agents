@@ -204,7 +204,8 @@ jobs:
           opencode service stop >/dev/null 2>&1 || true
           down=0
           for _ in $(seq 1 20); do
-            if [ "$(svc_state)" = stopped ]; then down=1; break; fi
+            state="$(svc_state)" || true
+            if [ "$state" = stopped ]; then down=1; break; fi
             sleep 1
           done
           if [ "$down" != 1 ]; then
@@ -215,7 +216,8 @@ jobs:
               kill $pids 2>/dev/null || true
             fi
             for _ in $(seq 1 20); do
-              if [ "$(svc_state)" = stopped ]; then down=1; break; fi
+              state="$(svc_state)" || true
+              if [ "$state" = stopped ]; then down=1; break; fi
               sleep 1
             done
           fi
@@ -226,13 +228,13 @@ jobs:
           opencode serve --service > "$E2E_RAW/serve.log" 2>&1 &
           up=0
           for _ in $(seq 1 30); do
-            state="$(svc_state)"
+            state="$(svc_state)" || true
             if [ -n "$state" ] && [ "$state" != stopped ]; then up=1; break; fi
             sleep 2
           done
           if [ "$up" != 1 ]; then
             echo "the OpenCode service did not start" >&2
-            cat "$E2E_RAW/serve.log" >&2
+            node tests/e2e-update.mjs redact --in "$E2E_RAW/serve.log" >&2 || true
             exit 1
           fi
           {

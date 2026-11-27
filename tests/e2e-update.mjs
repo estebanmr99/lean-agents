@@ -70,8 +70,11 @@ export function leanUpdateCalled(transcript) {
   return false;
 }
 
+// `--update --dry-run` only prints the plan, so it does not count as an update anywhere below.
+const hasDryRun = (command) => /(^|\s)--dry-run(\s|$)/.test(command);
+
 export const shimHasUpdateCall = (log) =>
-  String(log ?? '').split('\n').some((line) => /(^|\s)--update(\s|$)/.test(line));
+  String(log ?? '').split('\n').some((line) => /(^|\s)--update(\s|$)/.test(line) && !hasDryRun(line));
 
 // A shell tool can also run the checkout directly: `cd <release dir> && node scripts/lean.mjs --update`. Accept the
 // literal release dir and the `$LEAN_AGENTS_RELEASE_DIR` reference the workflow exports.
@@ -89,7 +92,7 @@ export function checkoutUpdateCalled(transcript, releaseDir) {
     const command = String(input.command ?? input.cmd ?? '');
     const script = command.search(/scripts[\\/]lean\.mjs/);
     const into = cd.exec(command);
-    if (script >= 0 && into && into.index < script && /(^|\s)--update(\s|$)/.test(command)) return true;
+    if (script >= 0 && into && into.index < script && /(^|\s)--update(\s|$)/.test(command) && !hasDryRun(command)) return true;
   }
   return false;
 }

@@ -173,6 +173,27 @@ test('e2e-update evaluator: a shell tool that only ran --doctor does not pass', 
   assert.match(r.failures.join(' '), /no --update call ran the checkout code/);
 });
 
+test('e2e-update evaluator: a shim --update --dry-run is not an update', () => {
+  assert.equal(shimHasUpdateCall('lean-agents --update --dry-run --yes'), false);
+  assert.equal(shimHasUpdateCall('npx -y lean-agents@1.2.6 --update --dry-run'), false);
+  assert.equal(shimHasUpdateCall('lean-agents --dry-run --update --yes'), false);
+  assert.equal(shimHasUpdateCall('lean-agents --update --yes'), true);
+});
+
+test('e2e-update evaluator: a shell tool that only ran --update --dry-run does not pass', () => {
+  const releaseDir = path.join('/opt', 'lean-agents');
+  const command = `cd "${releaseDir}" && node scripts/lean.mjs --update --dry-run`;
+  assert.equal(checkoutUpdateCalled(toolEvent('bash', { command }), releaseDir), false);
+  const r = evaluateUpdate({
+    ...good(),
+    shimLog: '',
+    releaseDir,
+    transcript: [skillEvent(), toolEvent('bash', { command }), transcript('Done. lean-agents is updated.')].join('\n'),
+  });
+  assert.equal(r.ok, false);
+  assert.match(r.failures.join(' '), /no --update call ran the checkout code/);
+});
+
 test('budgetDecision: below the cap continues, at or above it kills, an API error is exit 2', () => {
   assert.equal(budgetDecision({ used: 0.25, maxUsd: 0.5 }).code, 0);
   assert.equal(budgetDecision({ used: 0.5, maxUsd: 0.5 }).code, 1);
@@ -213,13 +234,17 @@ test('e2e-update workflow: manual only, read-only token, capped budget and pinne
 test('e2e-update workflow: the service state comes from status output, not its exit code', () => {
   const text = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'e2e-update.yml'), 'utf8');
   assert.match(text, /svc_state\(\) \{ opencode service status 2>\/dev\/null \| head -1; \}/);
-  assert.match(text, /\[ "\$\(svc_state\)" = stopped \]/);
+  assert.equal((text.match(/state="\$\(svc_state\)" \|\| true/g) || []).length, 3);
+  assert.match(text, /\[ "\$state" = stopped \]/);
   assert.match(text, /\[ "\$state" != stopped \]/);
+  assert.doesNotMatch(text, /\[ "\$\(svc_state\)" = stopped \]/);
   assert.doesNotMatch(text, /if ! opencode service status/);
   assert.match(text, /ps -eo pid,args \| awk '\/\[o\]pencode serve --service\/\{print \$1\}'/);
   assert.match(text, /kill \$pids/);
   assert.doesNotMatch(text, /pkill|killall/);
   assert.match(text, /--- service status ---[\s\S]*?service-ps\.txt/);
+  assert.match(text, /node tests\/e2e-update\.mjs redact --in "\$E2E_RAW\/serve\.log"/);
+  assert.doesNotMatch(text, /cat "\$E2E_RAW\/serve\.log"/);
 });
 
 test('e2e-update workflow: every agent run has a per-run timeout that fails the run', () => {
