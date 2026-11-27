@@ -85,7 +85,7 @@ case "$(node -p process.version)" in v22.*) ;; *) fail "PATH Node changed" ;; es
 [ "$os" != linux ] || [ "$(default_alias)" = "$default_before" ] || fail "nvm's default alias changed"
 # The seeded legacy npx entry must now be the absolute Node 24 server (the user's own Cursor entry stays below).
 oc_cmd="$(cd "$repo" && node -e "const { parse } = require('jsonc-parser'); const e = parse(require('fs').readFileSync(process.argv[1], 'utf8')).mcp.servers['context-mode']; console.log(e ? e.command.join(' ') : 'none')" "$oc")"
-case "$oc_cmd" in *v24.*cli.mjs\ server) ;; *) fail "the OpenCode entry is not the absolute Node 24 server: $oc_cmd" ;; esac
+case "$oc_cmd" in *v24.*cli.mjs\ server\ --agent\ opencode) ;; *) fail "the OpenCode entry is not the absolute Node 24 server with --agent opencode: $oc_cmd" ;; esac
 grep -q 'my-own-ctx' "$cursor" || fail "the hand-edited Cursor entry was not kept"
 [ -e "$n24/lib/node_modules/context-mode/cli.mjs" ] || [ -e "$n24/node_modules/context-mode/cli.mjs" ] || fail "context-mode is not installed in Node 24's prefix"
 claude mcp get context-mode | tee "$T/claude-get.txt"
