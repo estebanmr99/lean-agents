@@ -12,7 +12,7 @@ if [ -z "$version" ]; then
   exit 2
 fi
 # The release ships its own skill, so the pin must be the tag being released (#547).
-pin="$(node -e "process.stdout.write(String(JSON.parse(require('fs').readFileSync('core/pins.json','utf8')).pins['lean-update'].version))")"
+pin="$(node -e "process.stdout.write(String(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).pins['lean-update'].version))" "$(dirname "$0")/../core/pins.json")"
 if [ "$pin" != "v$version" ]; then
   echo "::error::core/pins.json lean-update pin is $pin; the release must ship its own skill (set it to v$version)" >&2
   exit 1

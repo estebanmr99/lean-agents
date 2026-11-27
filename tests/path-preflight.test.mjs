@@ -73,7 +73,7 @@ test('A2 below min: one row with version, min and update command', { skip: win }
   assert.equal(rows.length, 1);
   assert.equal(rows[0].blocker, true);
   const text = formatPreflight(r, { home, env: {} });
-  assert.match(text, /0\.42\.0/); assert.match(text, /minimum 1\.2\.0/); assert.match(text, /not managed by winget\/brew here/);
+  assert.match(text, /0\.42\.0/); assert.match(text, /1\.2\.0/); assert.match(text, /brew upgrade rtk/);
   assert.match(text, /1 blocker, 0 warnings\. Nothing was changed\./);
 });
 
@@ -99,8 +99,8 @@ test('A3 stale window PATH: a stored folder that exists but is missing is a warn
   assert.equal(ok.findings.some((x) => x.kind === 'stale-path'), false);
 });
 
-test('A2 Windows: a WinGet copy gets winget upgrade with the id from the install table', () => {
-  const r = preflight({ home: 'C:\\h', env: { PATH: 'C:\\tools\\WinGet\\Links' }, platform: 'win32', readWinPath: () => ({ user: '', machine: '' }), fsx: winFs(['c:\\tools\\winget\\links\\rtk.exe']), probe: () => '0.42.0' });
+test('A2 Windows: the update command is winget upgrade with the id from the install table', () => {
+  const r = preflight({ home: 'C:\\h', env: { PATH: 'C:\\old' }, platform: 'win32', readWinPath: () => ({ user: '', machine: '' }), fsx: winFs(['c:\\old\\rtk.exe']), probe: () => '0.42.0' });
   assert.equal(r.findings.find((x) => x.kind === 'below-min').fix, 'winget upgrade --id rtk-ai.rtk');
 });
 
@@ -111,7 +111,7 @@ test('fix lines: npm CLIs use the pinned npm spec; no brew means the release or 
   const c = r.findings.find((x) => x.tool === 'claude');
   assert.equal(c.kind, 'behind-pin'); assert.equal(c.blocker, false);
   assert.match(c.fix, /^npm install -g @anthropic-ai\/claude-code@\d/);
-  assert.match(r.findings.find((x) => x.tool === 'rtk' && x.kind === 'below-min').fix, /not managed by winget\/brew here/);
+  assert.match(r.findings.find((x) => x.tool === 'rtk' && x.kind === 'below-min').fix, /lean-agents --update/);
 });
 
 test('shadowed with equal versions is a warning with the harmless wording', { skip: win }, () => {
@@ -284,7 +284,7 @@ test('#488 a running opencode (blocker with 1.x data, else warning) has a stop l
   assert.equal(preflight(base(home, [], { list: () => ['C:\\x\\opencode.exe'] })).findings.find((x) => x.kind === 'opencode-running').blocker, true);
 });
 
-// #547: the hint must name the installer that owns the copy found, not the preferred package manager.
+// #547: only a copy under a Chocolatey folder changes the hint; every other copy keeps the route-based one.
 function probeTool({ platform, tool, file, version, pm = null }) {
   const p = platform === 'win32' ? path.win32 : path.posix;
   const home = platform === 'win32' ? 'D:\\tools\\home' : '/tmp/lean-preflight-home';
@@ -303,17 +303,14 @@ test('#547 a gh under WinGet Links gets winget upgrade', () => {
   assert.equal(r.findings.find((x) => x.tool === 'gh' && x.kind === 'below-min').fix, 'winget upgrade --id GitHub.cli');
 });
 
-test('#547 a copy under a Homebrew prefix gets brew upgrade', () => {
-  const r = probeTool({ platform: 'linux', tool: 'jq', file: '/opt/homebrew/bin/jq', version: '1.6.0', pm: 'winget' });
+test('#547 /usr/local/bin/jq on brew gets brew upgrade jq', () => {
+  const r = probeTool({ platform: 'linux', tool: 'jq', file: '/usr/local/bin/jq', version: '1.6.0', pm: 'brew' });
   assert.equal(r.findings.find((x) => x.tool === 'jq' && x.kind === 'below-min').fix, 'brew upgrade jq');
-  const cellar = probeTool({ platform: 'linux', tool: 'rtk', file: '/usr/local/Cellar/rtk/1.0.0/bin/rtk', version: '0.42.0' });
-  assert.equal(cellar.findings.find((x) => x.tool === 'rtk' && x.kind === 'below-min').fix, 'brew upgrade rtk');
 });
 
-test('#547 an unknown installer gets the generic hint with the copy path', () => {
-  const r = probeTool({ platform: 'win32', tool: 'jq', file: 'D:\\tools\\bin\\jq.EXE', version: '1.6.0' });
-  assert.equal(r.findings.find((x) => x.tool === 'jq' && x.kind === 'below-min').fix,
-    'not managed by winget/brew here: upgrade it with the tool that installed it (D:\\tools\\bin\\jq.EXE), or install 1.8.2 or newer from https://github.com/jqlang/jq/releases');
+test('#547 gh in its own install folder on win32 still gets winget upgrade', () => {
+  const r = probeTool({ platform: 'win32', tool: 'gh', file: 'C:\\Program Files\\GitHub CLI\\gh.EXE', version: '2.100.0' });
+  assert.equal(r.findings.find((x) => x.tool === 'gh' && x.kind === 'below-min').fix, 'winget upgrade --id GitHub.cli');
 });
 
 test('#547 the gh minimum prints without a leading v', () => {
@@ -322,6 +319,20 @@ test('#547 the gh minimum prints without a leading v', () => {
   assert.match(text, /minimum 2\.103\.3/);
   assert.doesNotMatch(text, /minimum v2\.103\.3/);
   assert.doesNotMatch(r.findings.find((x) => x.tool === 'gh' && x.kind === 'below-min').fix, /v2\.103\.3/);
+});
+
+test('jq fix line on win32 is winget (pure logic)', () => {
+  const env = { PATH: 'C:\\b' };
+  const fsx = { statSync: () => ({ isFile: () => true }), accessSync() {}, realpathSync: (p) => p, existsSync: () => false };
+  const r = preflight({ home: 'C:\\h', env, platform: 'win32', fsx, probe: () => '1.6.0', readWinPath: () => ({ user: '', machine: '' }), pm: 'winget', list: () => [], statfs: () => ({ bavail: 1e9, bsize: 4096 }) });
+  assert.equal(r.findings.find((x) => x.tool === 'jq' && x.kind === 'below-min').fix, 'winget upgrade --id jqlang.jq');
+});
+
+test('jq below its minimum gets a package-manager fix line', { skip: win }, () => {
+  const home = tmp(); const d = path.join(home, 'bin'); fake(d, 'jq', '1.6.0');
+  const fix = (pm) => preflight(base(home, [d], { pm })).findings.find((x) => x.tool === 'jq' && x.kind === 'below-min').fix;
+  assert.equal(fix('brew'), 'brew upgrade jq');
+  assert.match(fix(null), /^install .* or newer from https:\/\/github\.com\/jqlang\/jq/);
 });
 
 test('A4/A5 the new findings are read-only and redacted through the CLI', { skip: win }, () => {

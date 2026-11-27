@@ -17,6 +17,9 @@ const PASSING_AUDIT = '# Audit 9.9.9\n\n## Summary\n\n- ok\n\n## Findings and is
 // A repo dir with docs/audit-9.9.9.md and a `gh` stub that answers with canned JSON.
 function fixture({ audit = PASSING_AUDIT, runs = [{ conclusion: 'success' }], issues = [], expectSha = SHA, pin = 'v9.9.9' } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'release-gate-'));
+  // The gate reads core/pins.json next to itself, so the fixture carries a copy of the script.
+  fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
+  fs.copyFileSync(SCRIPT, scriptIn(dir));
   if (audit !== null) {
     fs.mkdirSync(path.join(dir, 'docs'), { recursive: true });
     fs.writeFileSync(path.join(dir, 'docs', 'audit-9.9.9.md'), audit);
@@ -70,8 +73,10 @@ if (args[0] === 'run' && args[1] === 'list') {
 `;
 }
 
+const scriptIn = (dir) => path.join(dir, 'scripts', 'release-gate.sh');
+
 function gate(dir, sha = SHA) {
-  const r = spawnSync('bash', [SCRIPT, '9.9.9', sha], {
+  const r = spawnSync('bash', [scriptIn(dir), '9.9.9', sha], {
     cwd: dir,
     encoding: 'utf8',
     env: { PATH: `${path.join(dir, 'bin')}${path.delimiter}${process.env.PATH}`, HOME: dir, GH_TOKEN: 'stub', GITHUB_REPOSITORY: 'o/r' },
@@ -81,7 +86,7 @@ function gate(dir, sha = SHA) {
 
 // #547: the pin check alone, offline: no gh, no audit file, no git.
 function pinsGate(dir, version) {
-  const r = spawnSync('bash', [SCRIPT, '--pins-only', version], {
+  const r = spawnSync('bash', [scriptIn(dir), '--pins-only', version], {
     cwd: dir, encoding: 'utf8', env: { PATH: process.env.PATH, HOME: dir },
   });
   return { code: r.status, out: `${r.stdout}${r.stderr}` };

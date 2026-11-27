@@ -23,6 +23,8 @@ const TOOLS = [['claude', 'claude-code'], ['opencode', 'opencode-v2'], ['copilot
 const BEHIND_PIN = new Set(['claude-code', 'copilot-cli', 'context-mode']);
 // tool -> the prereqFor() key whose install row has the package-manager ids.
 const PREREQ = { rtk: 'rtk', uv: 'serena', gh: 'gh' };
+// Chocolatey ids, only for tools with a known package; any other copy keeps the route-based hint.
+const CHOCO = { jq: 'jq', gh: 'gh' };
 // Below `min` blocks only where lean-agents skips or fails its steps (rtk, #467); for the rest `min` is just the verified release.
 const BLOCKING_MIN = new Set(['rtk']);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -97,20 +99,21 @@ export function staleWindowPath({ env, readWinPath = readWinPathFromRegistry, fs
 // A version as printed: one format everywhere, no leading `v` (pins keep theirs).
 const plain = (v) => (typeof v === 'string' ? v.replace(/^v(?=\d)/i, '') : v);
 
-// How to update a tool, from the pins, the install table in system.mjs and the copy found: the copy's folder names
-// the installer that owns it. No ids of its own beyond jq, which has no prereqFor row.
+// How to update a tool, from the pins and the install table in system.mjs. Only a copy under a Chocolatey folder
+// changes the hint; every other copy keeps the route the install table gives, as before #547.
 function updateFix(pinKey, platform, pm, copyPath = '') {
   const p = PINS[pinKey];
   const ver = plain(p.min ?? p.version);
   const release = `https://github.com/${p.source}/releases`;
   if (p.kind === 'npm') return `npm install -g ${npmSpec(pinKey)}`;
+  const choco = CHOCO[pinKey];
+  if (choco && /[\\/]chocolatey[\\/]/i.test(String(copyPath ?? ''))) return `choco upgrade ${choco}`;
+  // jq has no prereqFor row; these ids are the ones prereqs.mjs installs it with.
+  if (pinKey === 'jq') return platform === 'win32' ? 'winget upgrade --id jqlang.jq' : pm === 'brew' ? 'brew upgrade jq' : `install ${ver} or newer from ${release}, or run lean-agents --update`;
   const inst = PREREQ[pinKey] && prereqFor(PREREQ[pinKey], platform === 'win32' ? 'winget' : pm)?.install?.[0];
-  const wingetId = pinKey === 'jq' ? 'jqlang.jq' : inst?.[0] === 'winget' ? inst[inst.indexOf('--id') + 1] : null;
-  const copy = String(copyPath ?? '');
-  if (/[\\/]chocolatey[\\/]/i.test(copy)) return `choco upgrade ${pinKey}`;
-  if (/[\\/](?:winget|winget links)[\\/]/i.test(copy) && wingetId) return `winget upgrade --id ${wingetId}`;
-  if (/^(?:\/opt\/homebrew|\/usr\/local\/Cellar|\/home\/linuxbrew)(?:[\\/]|$)/.test(copy)) return `brew upgrade ${pinKey}`;
-  return `not managed by winget/brew here: upgrade it with the tool that installed it (${copy}), or install ${ver} or newer from ${release}`;
+  if (inst?.[0] === 'winget') return `winget upgrade --id ${inst[inst.indexOf('--id') + 1]}`;
+  if (inst?.[0] === 'brew') return `brew upgrade ${inst.at(-1)}`;
+  return `install ${ver} or newer from ${release}, or run lean-agents --update`;
 }
 
 // Several nvm Nodes with the same pinned npm tool in more than one, or only in a Node that is not the active one (#465).
