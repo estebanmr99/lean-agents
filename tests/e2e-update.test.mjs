@@ -185,6 +185,18 @@ test('e2e-update workflow: manual only, read-only token, capped budget and pinne
   assert.doesNotMatch(text, /^    env:$/m);
 });
 
+test('e2e-update workflow: the service state comes from status output, not its exit code', () => {
+  const text = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'e2e-update.yml'), 'utf8');
+  assert.match(text, /svc_state\(\) \{ opencode service status 2>\/dev\/null \| head -1; \}/);
+  assert.match(text, /\[ "\$\(svc_state\)" = stopped \]/);
+  assert.match(text, /\[ "\$state" != stopped \]/);
+  assert.doesNotMatch(text, /if ! opencode service status/);
+  assert.match(text, /ps -eo pid,args \| awk '\/\[o\]pencode serve --service\/\{print \$1\}'/);
+  assert.match(text, /kill \$pids/);
+  assert.doesNotMatch(text, /pkill|killall/);
+  assert.match(text, /--- service status ---[\s\S]*?service-ps\.txt/);
+});
+
 test('e2e-update workflow: every agent run has a per-run timeout that fails the run', () => {
   const text = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'e2e-update.yml'), 'utf8');
   assert.match(text, /timeout 1800 "\$@"/);

@@ -197,14 +197,28 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           set -euo pipefail
+          # `opencode service status` exits 0 even when nothing runs, so read its output: "stopped" means down.
+          svc_state() { opencode service status 2>/dev/null | head -1; }
           ps -eo pid,lstart,args | grep '[o]pencode' > "$E2E_RAW/service-ps.txt" 2>&1 || true
           # An earlier step started the service without the key; a running service keeps that env, so restart it.
           opencode service stop >/dev/null 2>&1 || true
           down=0
           for _ in $(seq 1 20); do
-            if ! opencode service status >/dev/null 2>&1; then down=1; break; fi
+            if [ "$(svc_state)" = stopped ]; then down=1; break; fi
             sleep 1
           done
+          if [ "$down" != 1 ]; then
+            # Stop ignores the old service; kill only its own process, never every opencode command.
+            pids="$(ps -eo pid,args | awk '/[o]pencode serve --service/{print $1}')"
+            if [ -n "$pids" ]; then
+              # shellcheck disable=SC2086  # one PID per word is intended
+              kill $pids 2>/dev/null || true
+            fi
+            for _ in $(seq 1 20); do
+              if [ "$(svc_state)" = stopped ]; then down=1; break; fi
+              sleep 1
+            done
+          fi
           if [ "$down" != 1 ]; then
             echo "the old OpenCode service did not stop" >&2
             exit 1
@@ -212,7 +226,8 @@ jobs:
           opencode serve --service > "$E2E_RAW/serve.log" 2>&1 &
           up=0
           for _ in $(seq 1 30); do
-            if opencode service status >/dev/null 2>&1; then up=1; break; fi
+            state="$(svc_state)"
+            if [ -n "$state" ] && [ "$state" != stopped ]; then up=1; break; fi
             sleep 2
           done
           if [ "$up" != 1 ]; then
@@ -220,7 +235,12 @@ jobs:
             cat "$E2E_RAW/serve.log" >&2
             exit 1
           fi
-          ps -eo pid,lstart,args | grep '[o]pencode' >> "$E2E_RAW/service-ps.txt" 2>&1 || true
+          {
+            echo '--- service status ---'
+            opencode service status 2>&1 || true
+            echo '--- ps ---'
+            ps -eo pid,lstart,args | grep '[o]pencode' || true
+          } >> "$E2E_RAW/service-ps.txt"
 
       - name: Record the key spend at job start
         env:
