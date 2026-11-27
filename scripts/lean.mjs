@@ -27,7 +27,7 @@ import { probePlugins } from './lib/plugin-health.mjs';
 import { adopt, inventory, saveState } from './lib/adopt.mjs';
 import { planPrereqs, pendingPrereqs, everythingAgents, undoArgv, nvmDirExistedBefore } from './lib/prereqs.mjs';
 import { upgradeInventory, formatUpgrade, nextRtkStep } from './lib/upgrade.mjs';
-import { backupOpencode, backupLayout, listProcesses, opencodeRunning } from './lib/opencode-backup.mjs';
+import { backupOpencode, backupLayout, listProcesses, opencodeRunning, runningBlocker } from './lib/opencode-backup.mjs';
 import { readBackupStamp } from './lib/backup-stamp.mjs';
 import { isActive, failAt, applyPreflight, verifyBackup, configDrift, createSteps, makeCtx, runApply, runUndo, restoreData } from './lib/opencode-upgrade.mjs';
 import { planOpencode1, installOpencode1, removeOpencode1, layout as opencode1Layout } from './lib/opencode1.mjs';
@@ -804,6 +804,9 @@ async function install(o) {
     else console.log(warn);
   }
 
+  const running = o.command === 'update' && o.exec ? runningBlocker(commands) : null;
+  if (running && !o.dryRun) { p.close(); console.error(`! ${running}`); (o.json ? console.error : console.log)('nothing changed'); process.exitCode = 1; return; }
+  if (running) (o.json ? console.error : console.log)(`! blocker: ${running}`); // --json keeps stdout JSON
   const noGit = migration ? null : gitHint(packageManager());
   if (noGit) console.log(noGit);
   if (o.json && o.dryRun) {
