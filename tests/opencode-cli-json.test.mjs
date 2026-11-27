@@ -200,3 +200,21 @@ test('--add-tools copilot-usage removes the entry too, and undo restores it', ()
   doctor({ home: f.home, state: null, exec: false, collect: rows });
   assert.ok(!rows.some((r) => r.item === 'plugin tui.js' && /hand-made copilot-usage/.test(r.detail)));
 });
+test('--update --add-tools copilot-usage with the hand meter and DCP in cli.json AND tui.json clears both, and undo restores both byte for byte (#591)', () => {
+  const f = setup({ cli: null });
+  const file = path.join(f.dir, 'plugins', 'copilot-usage-tui', 'tui.js');
+  put(file, '// lean-agents#123 hand copy\nexport default (api) => { api.command.register({}); }\n');
+  const entry = pathToFileURL(file).href;
+  put(f.cli, `{\n  "plugins": ${JSON.stringify(['keep-me', entry, `${PKG}@3.1.15`])}\n}\n`);
+  put(f.tui, `{\n  "plugin": ${JSON.stringify(['keep-me', entry, `${PKG}@3.1.15`])}\n}\n`);
+  const before = [f.cli, f.tui, f.server].map((p) => fs.readFileSync(p, 'utf8'));
+  const one = install(f.home, ['dcp', 'copilot-usage']);
+  assert.deepEqual(list(f.cli, 'plugins'), ['keep-me']);
+  assert.deepEqual(list(f.tui, 'plugin'), ['keep-me']);
+  assert.ok(fs.existsSync(path.join(f.dir, 'plugins', 'lean-copilot-usage', 'tui.js')));
+  const rows = [];
+  doctor({ home: f.home, state: null, exec: false, collect: rows });
+  assert.ok(!rows.some((r) => /hand-made copilot-usage/.test(r.detail ?? '')));
+  undo(one, [f.home]);
+  assert.deepEqual([f.cli, f.tui, f.server].map((p) => fs.readFileSync(p, 'utf8')), before);
+});
