@@ -151,4 +151,6 @@ test('installedAppVersions: reads CFBundleShortVersionString, and a missing app 
   assert.deepEqual(installedAppVersions({ home, platform: 'win32', system: false, run: () => assert.fail('no registry read') }), {});
   // system:false skips /Applications too.
   assert.deepEqual(installedAppVersions({ home, platform: 'darwin', system: false, exists: (p) => p === path.join('/Applications', 'Orca.app'), run: () => assert.fail('no /Applications read') }), {});
+  // The CI fake probe works on every platform, including the Linux runner.
+  assert.deepEqual(installedAppVersions({ home, platform: 'linux', env: { LEAN_AGENTS_APP_VERSIONS: '{"orca":"1.4.257"}' } }), { orca: '1.4.257' });
 });

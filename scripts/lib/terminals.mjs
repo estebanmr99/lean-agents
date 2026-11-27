@@ -73,15 +73,17 @@ export function appRunning({ app, platform = process.platform, run = quiet } = {
 // it never reads the real machine's registry. Null when absent or unreadable.
 export function installedAppVersions({ home, platform = process.platform, system = true, run = quiet, exists = fs.existsSync, env = process.env } = {}) {
   const out = {};
-  if (platform !== 'darwin' && platform !== 'win32') return out;
   // Test-only: a fake probe keeps engine tests on --no-exec while they exercise the update flow.
   let fake = null;
   try { fake = env.LEAN_AGENTS_APP_VERSIONS ? JSON.parse(env.LEAN_AGENTS_APP_VERSIONS) : null; } catch { fake = null; }
+  if (fake) {
+    for (const app of Object.keys(APP_INFO)) if (Object.hasOwn(fake, app)) out[app] = String(fake[app]);
+    return out;
+  }
+  if (platform !== 'darwin' && platform !== 'win32') return out;
   for (const [app, info] of Object.entries(APP_INFO)) {
     let version = null;
-    if (fake && Object.hasOwn(fake, app)) {
-      version = String(fake[app]);
-    } else if (platform === 'darwin') {
+    if (platform === 'darwin') {
       const apps = [path.join(home, 'Applications', info.mac), ...(system ? [path.join('/Applications', info.mac)] : [])];
       const found = apps.find(exists);
       if (found) {
