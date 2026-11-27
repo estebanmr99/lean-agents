@@ -19,7 +19,7 @@ Release audit of lean-agents for 1.2.4 (2026-11-27). Range: v1.2.3..d3fbf3c (mai
     - no unexpanded name on the skipped `real-vscode-others` job (#460, #520)
 - **Findings:** no HIGH, no MEDIUM. Six LOW findings, all accepted, with follow-ups in #525, #526 and #527.
 - **Owner-only gates:**
-  - Tag v1.2.4 (needs the owner's approval)
+  - Tag v1.2.4 (approved by the owner on 2026-11-27)
   - Release run green on the tagged SHA
   - OIDC publish proof
 
@@ -69,6 +69,6 @@ Release audit of lean-agents for 1.2.4 (2026-11-27). Range: v1.2.3..d3fbf3c (mai
 
 ## Owner-only gates
 
-1. **Tag v1.2.4:** needs the owner's approval.
-2. **Release run green:** `release.yml` on the tagged SHA.
-3. **OIDC publish proof:** npm shows 1.2.4 as `latest`, with SLSA provenance.
+1. **Tag v1.2.4:** approved by the owner on 2026-11-27. Tagged on 2be44eb after `ci.yml` run 45951974829 passed on it.
+2. **Release run green:** `release.yml` run 45952759053 passed on the tag (2026-11-27).
+3. **OIDC publish proof:** npm shows 1.2.4 as `latest`, with SLSA provenance (checked 2026-11-27).
