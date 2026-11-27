@@ -237,6 +237,7 @@ mv "${target}.new" "${target}"
         tool: 'orca',
         desc: 'Orca skill orca-cli',
         run: [['npx', '-y', skillsCli(), 'add', skillSource('orca-cli'), '--skill', 'orca-cli', '-a', ...as, '-g', '-y']],
+        filesOnly: true, // #546: the add and its remove only copy skill files; no running OpenCode to wait for
         undo: [['npx', '-y', skillsCli(), 'remove', 'orca-cli', '-g', '-y']],
       });
     }

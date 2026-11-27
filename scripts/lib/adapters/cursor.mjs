@@ -35,6 +35,7 @@ const skills = (tool, desc, repo, names) => ({
   tool,
   desc,
   run: [['npx', '-y', skillsCli(), 'add', repo, '--skill', ...names, '-a', 'cursor', '-g', '-y']],
+  filesOnly: true, // #546: the add and its remove only copy skill files; no running OpenCode to wait for
   // Without -a: `remove -a` keeps ~/.agents/skills while another detected agent may share that folder.
   undo: [['npx', '-y', skillsCli(), 'remove', ...names, '-g', '-y']],
 });

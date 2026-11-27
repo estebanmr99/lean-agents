@@ -14,7 +14,7 @@ import { versionFull, prereqFor, packageManager } from './system.mjs';
 import { redactText } from './redact.mjs';
 import { clients, npmCopies } from './inventory.mjs';
 import { mcpServers } from './migrate.mjs';
-import { backupLayout, listSource, neededBytes, nearest, gb, stamp, opencodeRunning, listProcesses, OPENCODE_RUNNING } from './opencode-backup.mjs';
+import { backupLayout, listSource, neededBytes, nearest, gb, stamp, opencodeRunning, listProcesses, opencodeRunningText } from './opencode-backup.mjs';
 
 // [executable name, pin key]. The pin gives `min`, the pinned version and the update source.
 const TOOLS = [['claude', 'claude-code'], ['opencode', 'opencode-v2'], ['copilot', 'copilot-cli'], ['agy', 'antigravity-cask'], ['context-mode', 'context-mode'],
@@ -204,7 +204,7 @@ export function preflight({ home, env = process.env, platform = process.platform
     try { running = opencodeRunning(list()); } catch { /* cannot list: stay silent, the backup step refuses on its own */ }
     // A blocker only with 1.x data: the upgrade backup refuses to copy a live db. Without it, a warning.
     const has1x = fs.existsSync(path.join(backupLayout(home, stamp()).live, 'opencode.db'));
-    if (running) add({ tool: 'opencode', kind: 'opencode-running', blocker: has1x, fix: OPENCODE_RUNNING });
+    if (running) add({ tool: 'opencode', kind: 'opencode-running', blocker: has1x, fix: opencodeRunningText(env) });
   }
   const blockers = findings.filter((f) => f.blocker).length;
   return { ok: blockers === 0, blockers, warnings: findings.length - blockers, findings, shape: configShape(home) };

@@ -306,7 +306,13 @@ export function opencodeShared({ home, dir, core, profile, opts, v2 = false }) {
   // rtk 1.2.0's plugin has both entries (1.x server(), 2.x setup(ctx)), so 1.x and 2.x share this command (#478); an rtk below
   // the pin min is skipped by lean.mjs (rtkTooOld), which also covers the 1.x-only templates that OpenCode 2 rejected (#179).
   if (tools.includes('rtk')) {
-    commands.push({ tool: 'rtk', desc: 'RTK plugin for OpenCode', run: [['rtk', 'init', '-g', '--opencode']], undo: [['rtk', 'init', '-g', '--opencode', '--uninstall']] });
+    commands.push({
+      tool: 'rtk',
+      desc: 'RTK plugin for OpenCode',
+      run: [['rtk', 'init', '-g', '--opencode']],
+      filesOnly: true, // #546: writes the plugin file only; runs `opencode --version`, no database
+      undo: [['rtk', 'init', '-g', '--opencode', '--uninstall']],
+    });
   }
   if (tools.includes('i-have-adhd')) {
     const vendor = path.join(dir, 'vendor', 'i-have-adhd');
@@ -331,6 +337,7 @@ export function opencodeShared({ home, dir, core, profile, opts, v2 = false }) {
       tool: 'caveman',
       desc: 'Caveman skills for OpenCode',
       run: [['npx', '-y', skillsCli(), 'add', skillSource('caveman'), '--skill', 'caveman', 'caveman-compress', 'caveman-stats', '-a', 'opencode', '-g', '-y']],
+      filesOnly: true, // #546: the add and its remove only copy skill files; no running OpenCode to wait for
       // Without -a: `remove -a` keeps ~/.agents/skills while another detected agent may share that folder.
       undo: [['npx', '-y', skillsCli(), 'remove', 'caveman', 'caveman-compress', 'caveman-stats', '-g', '-y']],
     });
