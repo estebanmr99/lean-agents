@@ -275,7 +275,7 @@ test('--update replaces a stale settings.json hash from before #470; a user key 
   const env = { PATH: process.env.PATH, NVM_DIR: path.join(home, '.nvm'), HOME: home };
   const main = path.join(ROOT, 'scripts', 'lean.mjs');
   const run = (...args) => spawnSync(process.execPath, [main, '--home', home, ...args], { encoding: 'utf8', env });
-  const setup = ['--no-exec', '--yes', '--agents', 'claude', '--tools', 'context-mode,ponytail', '--privacy', 'standard', '--lang', 'en', '--profile', 'none'];
+  const setup = ['--no-exec', '--yes', '--agents', 'claude', '--tools', 'ponytail', '--privacy', 'standard', '--lang', 'en', '--profile', 'none'];
   const inst = run(...setup);
   assert.equal(inst.status, 0, inst.stdout + inst.stderr);
 
@@ -285,9 +285,9 @@ test('--update replaces a stale settings.json hash from before #470; a user key 
   for (const f of state.files) if (f.path === settings) { delete f.userHash; delete f.ignore; }
   fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
   const before = parse(fs.readFileSync(settings, 'utf8'));
-  before.enabledPlugins = { 'context-mode@context-mode': true, 'ponytail@ponytail': true };
+  // ponytail only: on Node < 24.15 context-mode runs as an MCP server and its plugin keys are not ours.
+  before.enabledPlugins = { 'ponytail@ponytail': true };
   before.extraKnownMarketplaces = {
-    'context-mode': { source: { source: 'github', repo: 'mksglu/context-mode' } },
     ponytail: { source: { source: 'github', repo: 'DietrichGebert/ponytail' } },
   };
   fs.writeFileSync(settings, `${JSON.stringify(before, null, 2)}\n`);
