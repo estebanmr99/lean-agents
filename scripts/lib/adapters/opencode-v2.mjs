@@ -138,7 +138,10 @@ export function localPluginFiles(dir, { fsx = fs, home } = {}) {
 // names the folder copilot-usage-tui, so that entry is dead even when its target file is missing or unreadable.
 export function copilotMeterEntries(dir, { fsx = fs, home } = {}) {
   const named = (p) => p && p.split(/[\\/]/).includes('copilot-usage-tui');
-  return tuiConfigs(dir, fsx).flatMap((c) => {
+  // cli.json and a stale tui.json(c) can both list the meter (the client's migration copies tui.json), so scan every file (#591).
+  const files = [['cli.json', 'plugins'], ['tui.json', 'plugin'], ['tui.jsonc', 'plugin']]
+    .map(([f, key]) => ({ path: path.join(dir, f), key })).filter((c) => fsx.existsSync(c.path));
+  return files.flatMap((c) => {
     let cfg;
     try { cfg = parse(fsx.readFileSync(c.path, 'utf8')); } catch { return []; }
     return (Array.isArray(cfg?.[c.key]) ? cfg[c.key] : []).flatMap((e) => {
@@ -382,5 +385,17 @@ if (tools.includes(name)) edits.push(mcpEdit(['mcp', 'servers', name], (command)
   const stale = staleMcpEdits(existingConfig(dir));
   edits.push(...stale.edits);
   actions.push({ kind: 'json', path: configPath(dir), edits, ...(stale.skipped.length && { note: `left stale keys alone: ${stale.skipped.join(', ')}` }) });
-  return { actions, commands };
+  return { actions: mergeJsonActions(actions), commands };
+}
+
+// Two json actions on one file would each start from the unedited text, so the second write drops the first (#591).
+function mergeJsonActions(actions) {
+  const out = [];
+  const byPath = new Map();
+  for (const a of actions) {
+    const first = a.kind === 'json' ? byPath.get(a.path) : null;
+    if (first) first.edits = [...first.edits, ...a.edits];
+    else { const c = a.kind === 'json' ? { ...a } : a; out.push(c); if (c.kind === 'json') byPath.set(c.path, c); }
+  }
+  return out;
 }
