@@ -15,11 +15,15 @@ const SHA = '2be44eb';
 const PASSING_AUDIT = '# Audit 9.9.9\n\n## Summary\n\n- ok\n\n## Findings and issues\n\n- none\n';
 
 // A repo dir with docs/audit-9.9.9.md and a `gh` stub that answers with canned JSON.
-function fixture({ audit = PASSING_AUDIT, runs = [{ conclusion: 'success' }], issues = [], expectSha = SHA } = {}) {
+function fixture({ audit = PASSING_AUDIT, runs = [{ conclusion: 'success' }], issues = [], expectSha = SHA, pin = 'v9.9.9' } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'release-gate-'));
   if (audit !== null) {
     fs.mkdirSync(path.join(dir, 'docs'), { recursive: true });
     fs.writeFileSync(path.join(dir, 'docs', 'audit-9.9.9.md'), audit);
+  }
+  if (pin !== null) {
+    fs.mkdirSync(path.join(dir, 'core'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'core', 'pins.json'), JSON.stringify({ pins: { 'lean-update': { version: pin } } }));
   }
   const bin = path.join(dir, 'bin');
   fs.mkdirSync(bin);
@@ -75,6 +79,14 @@ function gate(dir, sha = SHA) {
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
 }
 
+// #547: the pin check alone, offline: no gh, no audit file, no git.
+function pinsGate(dir, version) {
+  const r = spawnSync('bash', [SCRIPT, '--pins-only', version], {
+    cwd: dir, encoding: 'utf8', env: { PATH: process.env.PATH, HOME: dir },
+  });
+  return { code: r.status, out: `${r.stdout}${r.stderr}` };
+}
+
 test('passes with the required headings, no open audit issues and a green ci.yml run', SKIP, () => {
   const r = gate(fixture());
   assert.equal(r.code, 0, r.out);
@@ -110,4 +122,22 @@ test('fails on an open audit issue, but release-proof issues are exempt', SKIP, 
   assert.match(open.out, /open audit issues: #12/);
   const exempt = gate(fixture({ issues: [{ number: 13, labels: [{ name: 'audit' }, { name: 'release-proof' }] }] }));
   assert.equal(exempt.code, 0, exempt.out);
+});
+
+test('#547 --pins-only passes when the lean-update pin is the release version', SKIP, () => {
+  const r = pinsGate(fixture({ pin: 'v9.9.9' }), '9.9.9');
+  assert.equal(r.code, 0, r.out);
+});
+
+test('#547 --pins-only fails fast when the lean-update pin lags the release', SKIP, () => {
+  const r = pinsGate(fixture({ pin: 'v9.9.8' }), '9.9.9');
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /::error::core\/pins\.json lean-update pin is v9\.9\.8; the release must ship its own skill \(set it to v9\.9\.9\)/);
+});
+
+test('#547 the full gate fails on a lagging lean-update pin before it calls gh', SKIP, () => {
+  const r = gate(fixture({ pin: 'v9.9.8' }));
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /lean-update pin is v9\.9\.8/);
+  assert.doesNotMatch(r.out, /unexpected gh call/);
 });

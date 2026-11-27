@@ -1,14 +1,23 @@
 #!/usr/bin/env bash
-# Release gate for a tag. Checks this version's audit, open audit issues and a green ci.yml run for the SHA.
+# Release gate for a tag. Checks this version's lean-update skill pin, audit, open audit issues and a green ci.yml run for the SHA.
 # Start the audit from docs/audit-template.md.
-# Usage: bash scripts/release-gate.sh <version> [sha]   (default SHA: git rev-parse HEAD)
+# Usage: bash scripts/release-gate.sh [--pins-only] <version> [sha]   (default SHA: git rev-parse HEAD)
 set -eu
 
+pins_only=false
+if [ "${1:-}" = "--pins-only" ]; then pins_only=true; shift; fi
 version="${1:-}"
 if [ -z "$version" ]; then
-  echo "usage: bash scripts/release-gate.sh <version> [sha]" >&2
+  echo "usage: bash scripts/release-gate.sh [--pins-only] <version> [sha]" >&2
   exit 2
 fi
+# The release ships its own skill, so the pin must be the tag being released (#547).
+pin="$(node -e "process.stdout.write(String(JSON.parse(require('fs').readFileSync('core/pins.json','utf8')).pins['lean-update'].version))")"
+if [ "$pin" != "v$version" ]; then
+  echo "::error::core/pins.json lean-update pin is $pin; the release must ship its own skill (set it to v$version)" >&2
+  exit 1
+fi
+[ "$pins_only" = true ] && exit 0
 sha="${2:-$(git rev-parse HEAD)}"
 # gh matches only the full SHA; resolve a short one when the commit is present locally.
 sha=$(git rev-parse --verify --quiet "${sha}^{commit}" || printf '%s' "$sha")
