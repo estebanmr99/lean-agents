@@ -43,6 +43,13 @@ node tests/bench-savings.mjs --home "$(mktemp -d)" --run --model <provider/model
 
 Add `--prices in,cacheRead,cacheWrite,out` (USD per million tokens, from the provider's price page) to get a cache-aware "Priced Cost" and a median turn count per task in the results.
 
+### Cost, artifacts and the bench key
+
+- Each run's cost comes from OpenCode's own `--format json` step usage (`cost` per step), not from the key's spend. The key spend delta is read only as part of the `--max-usd` budget guard, together with the summed session cost so far (the larger of the two stops the run); OpenRouter updates the key spend late, so it alone is not a reliable per-run cost.
+- The workflows install the pinned OpenCode 2 build with `scripts/ci-install-opencode-v2.sh` (SHA256-checked; the OpenCode version comes from `core/pins.json`, key `opencode-v2`).
+- Artifacts hold the parsed results (`results.json`, `results.md`, `chart.svg`) and a redacted summary. `chart.svg` is written only when both `baseline` and `lean` variants run; the multi-agent benchmark writes `results.json` and `results.md`. Raw model stdout is not uploaded; a failing case records its check name and the last error line, redacted and capped at 200 characters.
+- The `OPENROUTER_API_KEY` repository secret used by these workflows must be a dedicated key with a provider-side credit limit. That limit is an owner step in the provider dashboard, not something the harness can set.
+
 ### Results and Artifacts
 
 The benchmark produces several files in the `--out` directory:

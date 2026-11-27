@@ -26,11 +26,69 @@ export async function keySpend(key, fetchFn = fetch) {
   return d.usage + d.byok_usage;
 }
 
-// Raw logs are uploaded as artifacts; the model runs shell with the key in its env, so strip it.
-export const redactKey = (text, key) => (key ? text.split(key).join('[REDACTED]') : text);
+// The model runs shell with the key in its env, so strip it from anything written out.
+// A shell command can also carry the key through base64 (`echo ... | base64`) or hex, so strip those forms too.
+export const redactKey = (text, key) => {
+  if (!key) return text;
+  const forms = new Set([key]);
+  for (const raw of [key, `${key}\n`]) {
+    const buf = Buffer.from(raw, 'utf8');
+    forms.add(buf.toString('base64'));
+    forms.add(buf.toString('base64url'));
+  }
+  forms.add(Buffer.from(key, 'utf8').toString('hex'));
+  let out = text;
+  // Longest first so a shorter encoded form never cuts into a longer one.
+  for (const form of [...forms].sort((a, b) => b.length - a.length)) {
+    if (form && form !== key) out = out.split(form).join('[REDACTED]');
+  }
+  return out.split(key).join('[REDACTED]');
+};
+
+// A run with no step-finish event has no provider cost to report: null becomes n/a, not $0.0000.
+export function sessionCost(usage) {
+  return usage && usage.turns > 0 && typeof usage.cost === 'number' && Number.isFinite(usage.cost) ? usage.cost : null;
+}
+
+export function totalSessionCost(sessions) {
+  if (sessions.length === 0) return null;
+  const costs = sessions.map((s) => s.cost);
+  return costs.every((c) => typeof c === 'number' && Number.isFinite(c)) ? costs.reduce((a, b) => a + b, 0) : null;
+}
+
+// Artifacts hold parsed results only; scrub the key and its encoded forms on the way to disk.
+export function writeArtifacts(outDir, files, key) {
+  fs.mkdirSync(outDir, { recursive: true });
+  const written = [];
+  for (const [name, content] of Object.entries(files)) {
+    const file = path.join(outDir, name);
+    fs.writeFileSync(file, redactKey(content, key));
+    written.push(file);
+  }
+  return written;
+}
+
+// Why a bench case failed: the check name plus the last error-shaped line, redacted and capped.
+export function failureReason({ check, timedOut, exit, conflict, stdout, stderr }, key, limit = 200) {
+  const parts = [];
+  if (conflict) parts.push('merge conflict');
+  if (check) parts.push(check);
+  if (timedOut) parts.push('timeout');
+  else if (typeof exit === 'number' && exit !== 0) parts.push(`exit ${exit}`);
+  const lines = `${stdout || ''}\n${stderr || ''}`.split('\n').map((l) => l.trim()).filter(Boolean);
+  const errorLine = [...lines].reverse().find((l) => /(error|failed|failure|not ok|assert|ERR_)/i.test(l));
+  if (errorLine) parts.push(errorLine);
+  return redactKey(parts.join(': '), key).slice(0, limit);
+}
 
 export function checkEnv(dir) {
   return { PATH: process.env.PATH || "", HOME: dir, NODE_OPTIONS: "" };
+}
+
+// OpenRouter updates the key spend late, so the budget floor is the larger of the summed OpenCode session cost so far
+// and the key spend delta (#527 review; main used `Math.max(totalCost + usage.cost, keyDelta)`).
+export function budgetReached(totalCost, keySpent, maxUsd) {
+  return Math.max(totalCost || 0, keySpent || 0) >= maxUsd;
 }
 
 // Exported for tests
@@ -491,6 +549,7 @@ test('failing test', () => { assert.strictEqual(val, 2); });
 
 // Exported for tests
 export function renderResultsMarkdown(summary, variants, totalCost = 0, prices = null) {
+  const costCell = (c) => (c == null ? 'n/a' : `$${c.toFixed(4)}`);
   let md = '| Task | Mode | Pass Rate | Median In | IQR In | Median Out | Median Time | Cost |\n';
   if (prices) {
     md = '| Task | Mode | Pass Rate | Median In | IQR In | Median Out | Median Turns | Median Time | Cost | Priced Cost |\n';
@@ -502,9 +561,9 @@ export function renderResultsMarkdown(summary, variants, totalCost = 0, prices =
     const iqrIn = `${s.in.p25.toFixed(0)}-${s.in.p75.toFixed(0)}`;
     const stableMark = s.stable ? ' ★' : '';
     if (prices) {
-      md += `| ${s.task} | ${s.mode} | ${(s.passRate * 100).toFixed(0)}% | ${s.in.median.toFixed(0)}${stableMark} | ${iqrIn} | ${s.out.median.toFixed(0)} | ${s.turns.median.toFixed(0)} | ${s.time.median.toFixed(0)}ms | $${s.totalCost.toFixed(4)} | $${s.totalPricedCost.toFixed(4)} |\n`;
+      md += `| ${s.task} | ${s.mode} | ${(s.passRate * 100).toFixed(0)}% | ${s.in.median.toFixed(0)}${stableMark} | ${iqrIn} | ${s.out.median.toFixed(0)} | ${s.turns.median.toFixed(0)} | ${s.time.median.toFixed(0)}ms | ${costCell(s.totalCost)} | $${s.totalPricedCost.toFixed(4)} |\n`;
     } else {
-      md += `| ${s.task} | ${s.mode} | ${(s.passRate * 100).toFixed(0)}% | ${s.in.median.toFixed(0)}${stableMark} | ${iqrIn} | ${s.out.median.toFixed(0)} | ${s.time.median.toFixed(0)}ms | $${s.totalCost.toFixed(4)} |\n`;
+      md += `| ${s.task} | ${s.mode} | ${(s.passRate * 100).toFixed(0)}% | ${s.in.median.toFixed(0)}${stableMark} | ${iqrIn} | ${s.out.median.toFixed(0)} | ${s.time.median.toFixed(0)}ms | ${costCell(s.totalCost)} |\n`;
     }
   }
 
@@ -548,7 +607,7 @@ export function renderResultsMarkdown(summary, variants, totalCost = 0, prices =
     const avgPctSaved = taskCount > 0 ? (totalPctSaved / taskCount) * 100 : 0;
     md += `\nlean vs baseline: input tokens ${avgPctSaved >= 0 ? '-' : '+'}${Math.abs(avgPctSaved).toFixed(1)}% (median over tasks)\n`;
   }
-  md += `\nTotal cost: $${totalCost.toFixed(4)}\n`;
+  md += `\nTotal cost: ${totalCost == null ? 'n/a' : `$${totalCost.toFixed(4)}`}\n`;
   if (prices) md += `\nPriced Cost uses ${prices.in},${prices.cacheRead},${prices.cacheWrite},${prices.out} USD per 1M tokens (in, cache read, cache write, out) and assumes input excludes cached tokens (VERIFY).\n`;
   return md;
 }
@@ -641,17 +700,16 @@ async function main() {
   let startSpend;
   try { startSpend = await keySpend(KEY); } catch (e) { console.error(`Budget check failed: ${e.message}`); process.exit(2); }
   const results = [];
-  let totalCost = 0;
+  let totalCost = 0; // OpenCode per-run usage cost, the only cost shown in the report.
+  let keySpent = 0; // Key spend delta: the --max-usd budget guard only.
   let consecutiveEmptyErrors = 0;
-  const RAW_DIR = path.join(ROOT, 'raw');
-  fs.mkdirSync(RAW_DIR, { recursive: true });
 
   for (const taskId of TASKS_TO_RUN) {
     const task = TASKS.find(t => t.id === taskId);
     for (const mode of VARIANTS) {
       for (let n = 1; n <= REPEATS; n++) {
-        if (totalCost >= MAX_USD) {
-          console.warn(`Budget reached ($${totalCost.toFixed(4)} >= $${MAX_USD}). Stopping.`);
+        if (budgetReached(totalCost, keySpent, MAX_USD)) {
+          console.warn(`Budget reached ($${Math.max(totalCost, keySpent).toFixed(4)} >= $${MAX_USD}). Stopping.`);
           break;
         }
 
@@ -695,9 +753,6 @@ async function main() {
         });
         const wallTime = Date.now() - start;
 
-        const rawLogPath = path.join(RAW_DIR, `${task.id}-${mode}-${n}.jsonl`);
-        fs.writeFileSync(rawLogPath, redactKey(res.stdout || '', KEY));
-
         const quotaErr = checkQuotaError(res.stdout || '');
         if (quotaErr) {
           console.error(`\nQuota stop: type=${quotaErr.type}, status=${quotaErr.status}. Stopping.`);
@@ -720,8 +775,9 @@ async function main() {
         }
 
         console.log(`  Events: ${types.join(', ') || 'none'}; exit ${res.status}`);
-        totalCost = Math.max(totalCost + usage.cost, await spentSoFar(startSpend));
-        console.log(`  Spent so far (key usage): $${totalCost.toFixed(4)}`);
+        keySpent = await spentSoFar(startSpend);
+        totalCost += usage.cost;
+        console.log(`  Spent so far (key usage): $${keySpent.toFixed(4)}`);
         const pass = task.check(workdir, finalText(res.stdout || ''));
 
         console.log(`  Pass: ${pass}, In: ${usage.inputTokens}, Out: ${usage.outputTokens}, Cache: ${usage.cacheTokens}, Cost: $${usage.cost.toFixed(4)}, Time: ${wallTime}ms`);
@@ -737,14 +793,15 @@ async function main() {
           cacheRead: usage.cacheRead,
           cacheWrite: usage.cacheWrite,
           turns: usage.turns,
-          cost: usage.cost,
+          cost: sessionCost(usage),
           pricedCost,
           wallTime,
+          failure: pass ? null : failureReason({ check: `${task.id} check`, exit: res.status, stdout: res.stdout, stderr: res.stderr }, KEY),
         });
       }
-      if (totalCost >= MAX_USD) break;
+      if (budgetReached(totalCost, keySpent, MAX_USD)) break;
     }
-    if (totalCost >= MAX_USD) break;
+    if (budgetReached(totalCost, keySpent, MAX_USD)) break;
   }
 
   if (OUT) {
@@ -768,7 +825,7 @@ async function main() {
           turns: getStats(taskResults.map(r => r.turns)),
           cost: getStats(taskResults.map(r => r.cost)),
           time: getStats(taskResults.map(r => r.wallTime)),
-          totalCost: taskResults.reduce((sum, r) => sum + r.cost, 0),
+          totalCost: totalSessionCost(taskResults),
           totalPricedCost: parsedPrices ? taskResults.reduce((sum, r) => sum + r.pricedCost, 0) : null,
         });
       }
@@ -799,16 +856,14 @@ async function main() {
       tasks: summary,
       raw: results
     };
-    fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(resultsJson, null, 2));
-    
-    const md = renderResultsMarkdown(summary, VARIANTS, totalCost, parsedPrices);
-    fs.writeFileSync(path.join(OUT, 'results.md'), md);
+    const md = renderResultsMarkdown(summary, VARIANTS, totalSessionCost(results), parsedPrices);
+    const files = { 'results.json': JSON.stringify(resultsJson, null, 2), 'results.md': md };
 
     // SVG Chart only if baseline and lean are present
     if (VARIANTS.includes('baseline') && VARIANTS.includes('lean')) {
-      const chartSvg = generateChart(summary, resultsJson);
-      fs.writeFileSync(path.join(OUT, 'chart.svg'), chartSvg);
+      files['chart.svg'] = generateChart(summary, resultsJson);
     }
+    writeArtifacts(OUT, files, KEY);
 
     console.log(`\nWrote results to ${OUT}`);
     console.log(md);

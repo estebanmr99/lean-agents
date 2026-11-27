@@ -15,7 +15,7 @@ What lean-agents configures per agent, how, and when each command or key was las
 | Caveman | `npx skills add … -a claude-code -g` | `npx skills add … -a opencode -g` | `npx skills add … -a opencode -g` | `npx skills add … -a github-copilot -g` | `npx skills add … -a antigravity-cli -g` (partial) |
 | Compaction | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=80` | `compaction.auto` + `compaction.buffer` | `compaction.auto` + `compaction.reserved`, optional DCP | planned | planned |
 | Strict privacy | env flags (below) | `share`, `update`, `policies` | `share`, `autoupdate`, `experimental.openTelemetry`, `disabled_providers` | `autoUpdate: false`; telemetry only through the `--disable-client-telemetry` flag | account setting only, printed as a reminder |
-| Token usage reporting | ➖ | `opencode run --format json` (stream event `type: "usage"`, or `type: "step-finish"` with `tokens` and `cost`; task #103 hint and opencode repo) | 2026-11-23 | ➖ | ➖ |
+| Token usage reporting | ➖ | `opencode run --format json` (min 2.1.4; stream event `type: "usage"`, or `type: "step-finish"` with `tokens` and `cost`; task #103 hint and opencode repo) | 2026-11-23 | ➖ | ➖ |
 
 ### VS Code Copilot and Cursor
 
@@ -391,7 +391,7 @@ Checked 2026-11-03. lean-agents does not add a Gemini CLI adapter: upstream says
 | --- | --- |
 | Top-level `--prompt` | yes |
 | `run --attach` | no (use `attach`/`serve` subcommands; both `--help` exit 0) |
-| `run --standalone` | yes |
+| `run --standalone` | yes (min 2.2.5) |
 | Mock model answers | exit 0, events `step_start,tool_use,step_finish,text`, `sessionID` present |
 | Unknown model / unknown provider | exit 1, `error` event `provider.no-route` |
 | Provider answers 403 (spend cap shape) | exit 1, `step_start` and `error` `provider.auth 403` with the body message (order varies by OS) |
