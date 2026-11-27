@@ -297,6 +297,8 @@ try:
     pump3(2)
     wait3("Copilot usage", 15, "the /copilot-usage palette row")
     print("2.x /copilot-usage palette row after --update: ok")
+    os.write(fd, b"\x1b")  # close the palette before starting a session
+    pump3(1)
     buf = b""
     os.write(fd, b"hello")
     os.write(fd, b"\r")
