@@ -49,7 +49,7 @@ function marketplaceMove(dir, name, repo) {
   let src;
   try {
     src = parse(fs.readFileSync(file, 'utf8'), [], { allowTrailingComma: true })?.extraKnownMarketplaces?.[name]?.source;
-  } catch { return {}; }
+  } catch (e) { return e.code === 'ENOENT' ? { missing: true } : {}; }
   if (!src || typeof src !== 'object') return { missing: true };
   const shown = src.repo ?? src.url;
   if (shown !== pluginRepo(repo)) {
@@ -110,7 +110,7 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
     // A fresh install records the entry we are about to add, so --uninstall removes it (another repo is the user's).
     else if (move.missing) settingsAction.edits.push({ path: ['extraKnownMarketplaces', name], value: { source: { source: 'github', repo: pluginRepo(repo), ref: repo.slice(repo.indexOf('#') + 1) } }, mode: 'setIfAbsent' });
     if (move.warning) warnings.push(move.warning);
-    const installed = (opts.prior ?? []).some((c) => c.ok !== false && (c.desc === desc
+    const installed = (opts.prior ?? []).some((c) => c.ok && (c.desc === desc
       || (c.run ?? []).some((a) => a[0] === 'claude' && a[1] === 'plugin' && (a[2] === 'install' || a[2] === 'update') && a[3] === id)));
     const run = [['claude', 'plugin', 'marketplace', 'add', repo]];
     if (installed && move.edit) run.push(['claude', 'plugin', 'marketplace', 'update', name], ['claude', 'plugin', 'update', id]);

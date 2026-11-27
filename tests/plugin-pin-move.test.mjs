@@ -123,6 +123,18 @@ test('two --update runs, then --update --undo restores the original old ref', ()
   assert.equal(entry(settings).ref, OLD_REF);
 });
 
+test('a fresh install records the marketplace entry and --uninstall removes it', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-plugin-fresh-'));
+  const settings = path.join(home, '.claude', 'settings.json');
+  lean(home, '--yes', '--no-exec', '--agents', 'claude', '--tools', 'context-mode', '--privacy', 'standard', '--lang', 'en', '--profile', 'none', '--ponytail-mode', 'off', '--no-bun', '--no-gh', '--terminal', 'none');
+  const created = parse(fs.readFileSync(settings, 'utf8')).extraKnownMarketplaces[NAME].source;
+  assert.equal(created.repo, REPO);
+  assert.equal(created.ref, NEW_REF);
+  lean(home, '--uninstall', '--yes', '--no-exec');
+  const left = fs.existsSync(settings) ? parse(fs.readFileSync(settings, 'utf8')).extraKnownMarketplaces : undefined;
+  assert.equal(left, undefined);
+});
+
 test('a prior record with the update sequence is installed again through marketplace update + plugin update', () => {
   const run = [['claude', 'plugin', 'marketplace', 'add', `${REPO}#${OLD_REF}`], ['claude', 'plugin', 'marketplace', 'update', NAME], ['claude', 'plugin', 'update', `${NAME}@${NAME}`]];
   const { home } = seed(REPO, { run });
