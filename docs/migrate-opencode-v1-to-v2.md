@@ -74,7 +74,7 @@ Do this in the 2.x files only (`~/.config/opencode/opencode.jsonc`, `cli.json`).
 | `compaction.reserved` | `compaction.buffer` |
 | `tui.json` | `cli.json` (the first 2.x start migrates it and leaves `tui.json` in place) |
 
-- **DCP:** the apply step adds it to `opencode.jsonc` for 2.x. Do not copy it into `cli.json` or keep it in `tui.json`: the CLI already loads its TUI part from the server config, and a second entry lists `/dcp` twice (#558). lean-agents removes those duplicate TUI entries; the files stay.
+- **DCP:** the apply step adds it to `opencode.jsonc` for 2.x. Do not copy it into `cli.json` or keep it in `tui.json`: the CLI already loads its TUI part from the server config, and a second entry is a second TUI registration (#558). lean-agents removes those duplicate TUI entries; the files stay. On 2.2.7 the palette can still print the DCP panel row twice with DCP only in `opencode.jsonc`; that remainder is upstream (the CLI loads the package's TUI entry for a server plugin), not config ([DCP tui.tsx](https://github.com/Tarquinen/opencode-dynamic-context-pruning/blob/master/lib/v2/tui.tsx), [CLI plugins](https://opencode.ai/docs/cli/plugins/)).
 - **Stale `tui.json`:** after the migration it is no longer read. `--doctor` warns; lean-agents never deletes it.
 - **Context Mode:** keep it as MCP under `mcp.servers.context-mode`, not as a plugin. Never keep both.
 - **Check:** `opencode debug config` must show your keys.
