@@ -22,17 +22,19 @@ export const stamp = (d = new Date()) => d.toISOString().replace(/\.\d+Z$/, 'Z')
 // Backup + frozen copy are two full copies; keep 1 GiB spare (plan 80b, decision 2).
 // The temp count copy of the db (os.tmpdir(), often the same volume) adds one more db.
 export const neededBytes = (bytes, dbBytes = 0) => 2 * bytes + dbBytes + GIB;
-export const opencodeRunning = (names) => names.some((n) => /^opencode(\.exe)?$/i.test(n.trim().split(/[\\/]/).pop()));
+const OPENCODE_RE = /^opencode(\.exe)?$/i;
+export const opencodeRunning = (names) => names.some((n) => OPENCODE_RE.test(n.trim().split(/[\\/]/).pop()));
 
 // One text for every refusal that meets a running OpenCode, so all four call sites say the same thing (#548).
 export const OPENCODE_RUNNING = "an opencode process is running (the 1.x app or the 2.x background service): run 'opencode service stop' (safe: it stops only the background service) and close OpenCode windows, then run this again";
 
-// #548: a row that stops the OpenCode 2 service only when the run itself started it (none before, one now).
-export function serviceStopRow({ before, agents = [], list = listProcesses }) {
-  if (before !== false || !agents.includes('opencode-v2')) return null;
+// #548: a row that stops the OpenCode 2 service only when this run started it: no opencode PID before, a new one after.
+export function serviceStopRow({ before, agents = [], pids = opencodePids }) {
+  if (!(before instanceof Set) || !agents.includes('opencode-v2')) return null;
   let after;
-  try { after = opencodeRunning(list()); } catch { return null; }
-  return after ? { desc: 'stop the OpenCode 2 background service that lean-agents started', run: [['opencode', 'service', 'stop']] } : null;
+  try { after = new Set(pids()); } catch { return null; }
+  const started = [...after].filter((p) => !before.has(p));
+  return !before.size && started.length ? { desc: 'stop the OpenCode 2 background service that lean-agents started', run: [['opencode', 'service', 'stop']] } : null;
 }
 
 // #488: --update must not swap the OpenCode binary or rewrite its plugins while the 1.x app or the 2.x service runs.
@@ -49,6 +51,22 @@ export function listProcesses(platform = process.platform) {
   const win = platform === 'win32';
   const out = execFileSync(win ? 'tasklist' : 'ps', win ? ['/FO', 'CSV', '/NH'] : ['-A', '-o', 'comm='], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   return out.split(/\r?\n/).map((l) => (win ? /^"([^"]*)"/.exec(l)?.[1] ?? '' : l)).filter(Boolean);
+}
+
+// PIDs of the running OpenCode processes, so a run can tell the service it started from the user's (#548).
+export function opencodePids(platform = process.platform) {
+  const win = platform === 'win32';
+  const out = execFileSync(win ? 'tasklist' : 'ps', win ? ['/FO', 'CSV', '/NH'] : ['-A', '-o', 'pid=,comm='], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const pids = [];
+  for (const line of out.split(/\r?\n/)) {
+    if (!line) continue;
+    const m = win ? /^"([^"]*)","(\d+)"/.exec(line) : /^\s*(\d+)\s+(.*)$/.exec(line);
+    if (!m) continue;
+    const pid = Number(win ? m[2] : m[1]);
+    const name = (win ? m[1] : m[2]).trim().split(/[\\/]/).pop();
+    if (OPENCODE_RE.test(name)) pids.push(pid);
+  }
+  return pids;
 }
 
 // Written last, atomically, once every check passed: backup-stamp.mjs reads it to open the apply gate.

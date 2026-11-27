@@ -5,26 +5,34 @@ import { serviceStopRow, runningBlocker, OPENCODE_RUNNING } from '../scripts/lib
 
 const stop = ['opencode', 'service', 'stop'];
 
-test('none before and one after: one opencode service stop row', () => {
-  const row = serviceStopRow({ before: false, agents: ['opencode-v2'], list: () => ['node', 'opencode'] });
+test('no pid before and a new one after: one opencode service stop row', () => {
+  const row = serviceStopRow({ before: new Set(), agents: ['opencode-v2'], pids: () => [42] });
   assert.deepEqual(row.run, [stop]);
   assert.match(row.desc, /stop the OpenCode 2 background service/);
 });
 
-test('one before: nothing is stopped', () => {
-  assert.equal(serviceStopRow({ before: true, agents: ['opencode-v2'], list: () => ['opencode'] }), null);
+test('the same pid before and after: nothing is stopped', () => {
+  assert.equal(serviceStopRow({ before: new Set([7]), agents: ['opencode-v2'], pids: () => [7] }), null);
 });
 
-test('none before and none after: nothing is stopped', () => {
-  assert.equal(serviceStopRow({ before: false, agents: ['opencode-v2'], list: () => ['node'] }), null);
+test('a pid before and a new one after: nothing is stopped (not ours)', () => {
+  assert.equal(serviceStopRow({ before: new Set([7]), agents: ['opencode-v2'], pids: () => [7, 42] }), null);
+});
+
+test('no pid before and none after: nothing is stopped', () => {
+  assert.equal(serviceStopRow({ before: new Set(), agents: ['opencode-v2'], pids: () => [] }), null);
 });
 
 test('OpenCode 2 not configured: nothing is stopped', () => {
-  assert.equal(serviceStopRow({ before: false, agents: ['claude'], list: () => ['opencode'] }), null);
+  assert.equal(serviceStopRow({ before: new Set(), agents: ['claude'], pids: () => [42] }), null);
 });
 
 test('cannot list the processes: nothing is stopped', () => {
-  assert.equal(serviceStopRow({ before: false, agents: ['opencode-v2'], list: () => { throw new Error('ps failed'); } }), null);
+  assert.equal(serviceStopRow({ before: new Set(), agents: ['opencode-v2'], pids: () => { throw new Error('ps failed'); } }), null);
+});
+
+test('the before list could not be read: nothing is stopped', () => {
+  assert.equal(serviceStopRow({ before: null, agents: ['opencode-v2'], pids: () => [42] }), null);
 });
 
 test('the refusal names the safe service stop command', () => {

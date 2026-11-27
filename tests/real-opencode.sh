@@ -14,8 +14,23 @@ opencode --version
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 
 # #548: show which lean-agents command starts the OpenCode 2 service, and fail if its own run leaves one behind.
-# shellcheck disable=SC2009 # the full command line and start time are the evidence this check keeps
-opencode_processes() { ps -A -o pid,lstart,command | grep -i '[o]pencode'; }
+# Match the executable name only (the engine does the same: `ps -A -o comm=`, basename), so this script's own
+# `bash tests/real-opencode.sh` command line never matches. The second `ps` prints the evidence for the log.
+opencode_pids() {
+  ps -A -o pid=,comm= | awk '{
+    name = $0;
+    sub(/^[ \t]*[0-9]+[ \t]+/, "", name);
+    sub(/^.*[\\\/]/, "", name);
+    sub(/[ \t]+$/, "", name);
+    if (name == "opencode" || name == "opencode.exe") { printf "%s%s", (pids ? "," : ""), $1; pids = pids $1 }
+  }'
+}
+opencode_processes() {
+  local pids
+  pids="$(opencode_pids)"
+  [ -n "$pids" ] || return 1
+  ps -o pid,lstart,command -p "$pids"
+}
 lean_run() {
   echo "== $(date -u +%T) before: lean-agents $*"
   opencode_processes || true

@@ -27,7 +27,7 @@ import { probePlugins } from './lib/plugin-health.mjs';
 import { adopt, inventory, saveState } from './lib/adopt.mjs';
 import { planPrereqs, pendingPrereqs, everythingAgents, undoArgv, nvmDirExistedBefore } from './lib/prereqs.mjs';
 import { upgradeInventory, formatUpgrade, nextRtkStep } from './lib/upgrade.mjs';
-import { backupOpencode, backupLayout, listProcesses, opencodeRunning, runningBlocker, serviceStopRow, OPENCODE_RUNNING } from './lib/opencode-backup.mjs';
+import { backupOpencode, backupLayout, listProcesses, opencodeRunning, opencodePids, runningBlocker, serviceStopRow, OPENCODE_RUNNING } from './lib/opencode-backup.mjs';
 import { readBackupStamp } from './lib/backup-stamp.mjs';
 import { isActive, failAt, applyPreflight, verifyBackup, configDrift, createSteps, makeCtx, runApply, runUndo, restoreData } from './lib/opencode-upgrade.mjs';
 import { planOpencode1, installOpencode1, removeOpencode1, layout as opencode1Layout } from './lib/opencode1.mjs';
@@ -262,14 +262,25 @@ const HELP = `Usage: lean-agents [options]
 const NO_INPUT = 'no terminal to ask on: pass --yes to accept the defaults, or --dry-run with --agents and --tools to preview';
 const DRY_RUN_HINT = 'to apply from a non-interactive shell, add --yes';
 
+// #548: the input prompter() reads from. Piped stdin (curl ... | bash) on a real terminal must still ask, on /dev/tty.
+function ttyInput() {
+  if (process.stdin.isTTY) return process.stdin;
+  // Test hook, guarded like LEAN_TEST_FAIL_AT: CI has no pty. '1' pretends a terminal exists, '0' pretends none.
+  const fake = process.env.LEAN_AGENTS_TEST === '1' ? process.env.LEAN_TTY : undefined;
+  if (fake === '1') return process.stdin;
+  if (fake === '0') return null;
+  try { return new tty.ReadStream(fs.openSync(process.platform === 'win32' ? 'CONIN$' : '/dev/tty', 'r')); } catch { return null; }
+}
+// The same probe the early no-tty check and the dry-run hint use, so both agree with prompter().
+function hasTty() {
+  const input = ttyInput();
+  if (input && input !== process.stdin) input.destroy();
+  return Boolean(input);
+}
+
 async function prompter(yes) {
   if (yes) return { ask: async (_q, def) => def, select: async ({ def }) => def, multi: async ({ defaults }) => defaults, close() {} };
-  let input = process.stdin;
-  if (!process.stdin.isTTY) {
-    // openSync reports a missing /dev/tty here, not later as a crash. A tty.ReadStream, unlike
-    // an fs stream, can close while a read is pending, so the process can exit.
-    try { input = new tty.ReadStream(fs.openSync(process.platform === 'win32' ? 'CONIN$' : '/dev/tty', 'r')); } catch { /* keep stdin */ }
-  }
+  const input = ttyInput() ?? process.stdin;
   if (canUseMenus(input)) return menuPrompter(input);
   const rl = readline.createInterface({ input, output: process.stdout });
   // Never fall back to the default answer here: nobody approved these changes.
@@ -749,11 +760,11 @@ async function install(o) {
   }
   if (o.command === 'update' && saved.options.migrateOnly) throw new Error(`nothing to update: only ${saved.adoptOnly ? '--adopt' : '--migrate'} ran here; install first (--everything --yes)`);
   // #548: the plan and release notes must not print before the one message that stops a non-interactive run.
-  if (!o.yes && !o.dryRun && !process.stdin.isTTY) throw new Error(NO_INPUT);
+  if (!o.yes && !o.dryRun && !hasTty()) throw new Error(NO_INPUT);
   // #548: remember the service state before any command of this run (the probes included), to stop it only if we started it.
   const trackService = o.exec && !o.dryRun;
   let opencodeBefore = null;
-  if (trackService) { try { opencodeBefore = opencodeRunning(listProcesses()); } catch { /* cannot list: never stop what may be the user's */ } }
+  if (trackService) { try { opencodeBefore = new Set(opencodePids()); } catch { /* cannot list: never stop what may be the user's */ } }
   const p = await choose(o, saved?.options);
   // A plain re-run starts fresh: say so when it changes the saved agents or profile (#304, seen on a real PC).
   const prior = o.command !== 'update' && !o.json && !o.project && !o.migrate && !o.adopt ? readState(o.home)?.options : null;
@@ -836,7 +847,7 @@ async function install(o) {
   if (o.dryRun) {
     p.close();
     console.log('Dry run: nothing was changed.');
-    if (!process.stdin.isTTY) console.log(DRY_RUN_HINT);
+    if (!hasTty()) console.log(DRY_RUN_HINT);
     return;
   }
   // The one question of --everything: the choose() prompter answers by default, so ask on a real one.
@@ -921,114 +932,117 @@ async function install(o) {
     privateDir(stateDir(o.home), stateDir(o.home));
     writePrivate(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(state, null, 2)}\n`);
   };
-  let applied = false;
-  try { apply(planned, backupDir, o.home, writeRoots(o), files); applied = true; refreshUserHashes(); } catch (e) {
-    if (o.json) printApplied(o, files, [], [e.message]);
-    throw e;
-  } finally { if (applied || files.length) save(); }
-  const report = [];
-  const errors = [];
-  if (o.exec) {
-    const noCli = new Set(); // agents whose CLI install failed above: their steps would only fail again
-    for (const [i, c] of commands.entries()) {
-      if (noCli.has(c.agent) && (c.run ?? []).some((argv) => argv[0] === AGENT_CLIS[c.agent])) { console.log(`  skipped: ${c.desc} (no ${AGENT_CLIS[c.agent]} CLI)`); continue; }
-      // gh is on by default, so having no installer for it (no brew or winget) must not fail the run.
-      // Planned before the prerequisites ran: --everything may have installed it since (macOS: brew's uv brings uvx). Not for --update's behind tools.
-      if (c.bin && !behind.has(c.tool) && which(c.bin)) continue;
-      if (c.manual) { console.log(`! ${c.desc}`); if (!c.optional) { failed++; errors.push(c.desc); } continue; }
-      const there = (c.skipIfExists && exists(c.skipIfExists)) || (c.skipIfOutput && quiet(c.skipIfOutput.cmd).ok);
-      if (there) {
-        if (!behind.has(c.tool)) continue;
-        // Installed at an older pin: undo it, then add it again at the new pin.
-        tail.length = 0;
-        if (!c.undo.every((argv) => run(undoArgv(argv), { dryRun: false, log: (l) => console.log(tilde(l, o.home)), env: c.env, json: o.json, logFile, tail }))) {
-          if (logFile) console.log(redactText(tail.slice(-20).map((l) => `    ${l}`).join('\n'), { home: o.home }));
-          console.log(`  ! could not remove the old ${c.desc}; left as it is.${logFile ? ` full output: ${tilde(logFile, o.home)}.` : ''} Fix it by hand, then --update.`);
-          failed++;
-          errors.push(`could not remove the old ${c.desc}`);
+  // #548: stop the service this run started even when a command throws.
+  let serviceStopped = false;
+  const stopOnce = () => { if (serviceStopped) return; serviceStopped = true; stopStartedOpenCode(o, opencodeBefore); };
+  try {
+    let applied = false;
+    try { apply(planned, backupDir, o.home, writeRoots(o), files); applied = true; refreshUserHashes(); } catch (e) {
+      if (o.json) printApplied(o, files, [], [e.message]);
+      throw e;
+    } finally { if (applied || files.length) save(); }
+    const report = [];
+    const errors = [];
+    if (o.exec) {
+      const noCli = new Set(); // agents whose CLI install failed above: their steps would only fail again
+      for (const [i, c] of commands.entries()) {
+        if (noCli.has(c.agent) && (c.run ?? []).some((argv) => argv[0] === AGENT_CLIS[c.agent])) { console.log(`  skipped: ${c.desc} (no ${AGENT_CLIS[c.agent]} CLI)`); continue; }
+        // gh is on by default, so having no installer for it (no brew or winget) must not fail the run.
+        // Planned before the prerequisites ran: --everything may have installed it since (macOS: brew's uv brings uvx). Not for --update's behind tools.
+        if (c.bin && !behind.has(c.tool) && which(c.bin)) continue;
+        if (c.manual) { console.log(`! ${c.desc}`); if (!c.optional) { failed++; errors.push(c.desc); } continue; }
+        const there = (c.skipIfExists && exists(c.skipIfExists)) || (c.skipIfOutput && quiet(c.skipIfOutput.cmd).ok);
+        if (there) {
+          if (!behind.has(c.tool)) continue;
+          // Installed at an older pin: undo it, then add it again at the new pin.
+          tail.length = 0;
+          if (!c.undo.every((argv) => run(undoArgv(argv), { dryRun: false, log: (l) => console.log(tilde(l, o.home)), env: c.env, json: o.json, logFile, tail }))) {
+            if (logFile) console.log(redactText(tail.slice(-20).map((l) => `    ${l}`).join('\n'), { home: o.home }));
+            console.log(`  ! could not remove the old ${c.desc}; left as it is.${logFile ? ` full output: ${tilde(logFile, o.home)}.` : ''} Fix it by hand, then --update.`);
+            failed++;
+            errors.push(`could not remove the old ${c.desc}`);
+            continue;
+          }
+        }
+        step++;
+        if (ui) ui.step(i + 1, commands.length, c.desc);
+        else if (!logFile) console.log(`- ${c.desc}`);
+        if (c.lifecycle) {
+          await agentLifecycle({ mode: 'install', agents: [c.lifecycle], home: o.home, realHome: REAL_HOME, stateDir: stateDir(o.home), dryRun: false, exec: true, yes: true, ask: async (_q, def) => def, yesNo, logFile });
+          const bin = c.bins.find((b) => fs.existsSync(b));
+          // The installer's PATH change reaches new terminals only: put its folder first here so the agent's steps below find it.
+          if (bin) process.env.PATH = `${path.dirname(bin)}${path.delimiter}${process.env.PATH ?? ''}`;
+          else { failed++; errors.push(c.desc); noCli.add(c.lifecycle); }
+          if (logFile && !ui) { stepLine(c, !!bin); if (!bin) console.log(`  ! failed: ${c.desc}. full output: ${tilde(logFile, o.home)}`); }
+          report.push({ desc: c.desc, ok: !!bin, exit: null });
+          if (ui) ui.result(!!bin, c.desc);
           continue;
         }
+        // Recorded before it runs, so a command killed midway can still be undone.
+        const rec = { desc: c.desc, ok: false, undo: c.undo, ...(c.reinstall && { from: c.from, owner: c.owner, reinstall: c.reinstall, reinstallAlways: c.reinstallAlways }), ...(c.env && { env: c.env }), ...(c.resumeKey && { resumeKey: c.resumeKey }) };
+        ran.push(rec);
+        save();
+        const codes = [];
+        const before = snap();
+        tail.length = 0;
+        const out = (l) => console.log(tilde(l, o.home));
+        const ok = c.run.every((argv) => { tail.length = 0; return run(argv, { dryRun: false, log: out, env: c.env, json: o.json, codes, logFile, tail }); });
+        for (const argv of c.always ?? []) run(argv, { dryRun: false, log: out, env: c.env, json: o.json, logFile, tail });
+        if (logFile && !ui) stepLine(c, ok);
+        if (logFile && !ok && !ui) showFailure(c);
+        else if (logFile && !ok) console.log(redactText(tail.slice(-20).map((l) => `    ${l}`).join('\n'), { home: o.home }));
+        refreshHashes(before);
+        report.push({ desc: c.desc, ok, exit: codes.at(-1) ?? null });
+        if (!ok && !c.optional) errors.push(c.desc);
+        if (ui) ui.result(ok || c.optional, c.desc);
+        else if (!ok && !c.optional && !logFile) console.log(`  ! failed: ${c.desc}. Run the command above by hand, then --doctor.`);
+        // An optional step (Bun) that fails only means Context Mode runs on Node; nothing to undo.
+        if (!ok && c.optional) { if (!(logFile && c.tool === 'lean-update')) console.log(c.tool === 'gh' ? '! gh install failed; install it yourself (--no-gh skips it).' : c.tool === 'lean-update' ? '! lean-update skill failed to install; run the command above by hand later.' : '! Bun install failed; Context Mode will run on Node.'); ran.pop(); save(); continue; }
+        if (!ok) failed++;
+        rec.ok = ok;
+        save();
       }
-      step++;
-      if (ui) ui.step(i + 1, commands.length, c.desc);
-      else if (!logFile) console.log(`- ${c.desc}`);
-      if (c.lifecycle) {
-        await agentLifecycle({ mode: 'install', agents: [c.lifecycle], home: o.home, realHome: REAL_HOME, stateDir: stateDir(o.home), dryRun: false, exec: true, yes: true, ask: async (_q, def) => def, yesNo, logFile });
-        const bin = c.bins.find((b) => fs.existsSync(b));
-        // The installer's PATH change reaches new terminals only: put its folder first here so the agent's steps below find it.
-        if (bin) process.env.PATH = `${path.dirname(bin)}${path.delimiter}${process.env.PATH ?? ''}`;
-        else { failed++; errors.push(c.desc); noCli.add(c.lifecycle); }
-        if (logFile && !ui) { stepLine(c, !!bin); if (!bin) console.log(`  ! failed: ${c.desc}. full output: ${tilde(logFile, o.home)}`); }
-        report.push({ desc: c.desc, ok: !!bin, exit: null });
-        if (ui) ui.result(!!bin, c.desc);
-        continue;
-      }
-      // Recorded before it runs, so a command killed midway can still be undone.
-      const rec = { desc: c.desc, ok: false, undo: c.undo, ...(c.reinstall && { from: c.from, owner: c.owner, reinstall: c.reinstall, reinstallAlways: c.reinstallAlways }), ...(c.env && { env: c.env }), ...(c.resumeKey && { resumeKey: c.resumeKey }) };
-      ran.push(rec);
-      save();
-      const codes = [];
-      const before = snap();
-      tail.length = 0;
-      const out = (l) => console.log(tilde(l, o.home));
-      const ok = c.run.every((argv) => { tail.length = 0; return run(argv, { dryRun: false, log: out, env: c.env, json: o.json, codes, logFile, tail }); });
-      for (const argv of c.always ?? []) run(argv, { dryRun: false, log: out, env: c.env, json: o.json, logFile, tail });
-      if (logFile && !ui) stepLine(c, ok);
-      if (logFile && !ok && !ui) showFailure(c);
-      else if (logFile && !ok) console.log(redactText(tail.slice(-20).map((l) => `    ${l}`).join('\n'), { home: o.home }));
-      refreshHashes(before);
-      report.push({ desc: c.desc, ok, exit: codes.at(-1) ?? null });
-      if (!ok && !c.optional) errors.push(c.desc);
-      if (ui) ui.result(ok || c.optional, c.desc);
-      else if (!ok && !c.optional && !logFile) console.log(`  ! failed: ${c.desc}. Run the command above by hand, then --doctor.`);
-      // An optional step (Bun) that fails only means Context Mode runs on Node; nothing to undo.
-      if (!ok && c.optional) { if (!(logFile && c.tool === 'lean-update')) console.log(c.tool === 'gh' ? '! gh install failed; install it yourself (--no-gh skips it).' : c.tool === 'lean-update' ? '! lean-update skill failed to install; run the command above by hand later.' : '! Bun install failed; Context Mode will run on Node.'); ran.pop(); save(); continue; }
-      if (!ok) failed++;
-      rec.ok = ok;
-      save();
     }
-  }
-  if (failed) {
-    console.log(`\n${failed} step(s) failed; see the lines marked ! above. Backups: ${backupDir}`);
-    stopStartedOpenCode(o, opencodeBefore);
-    ui?.summary('Summary', [`${failed} of ${commands.length} commands failed`, `Backups: ${backupDir}`], false);
-    process.exitCode = 1;
-    return o.json && printApplied(o, files, report, errors);
-  }
-  finished = true;
-  save();
-  if (o.json) printApplied(o, files, report, errors);
-  console.log(`\nDone. Backups: ${backupDir}`);
-  if (!o.project) await summaryPage(o, { updated: o.command === 'update' ? report.filter((r) => r.ok).map((r) => r.desc) : [] });
-  if (o.project) return console.log('Next: review and commit these files. Each teammate runs the installer once for the tools (rtk, context-mode, ...).');
-  console.log('Next: restart your agents, log in to your providers, then run --doctor.');
-  const shell = shellNotice();
-  if (shell) console.log(shell.text);
-  const rc = files.find((f) => f.id === 'path');
-  if (rc) console.log(`Open a new terminal (or run: . ${rc.path}) so the new PATH takes effect.`);
-  const todo = stillNeeded({ home: o.home, terminals: o.terminals, agents: o.agents });
-  if (todo.length) console.log(`Still needed from you:\n${todo.map((t) => `  - ${t.text}`).join('\n')}`);
-  if (o.tools.includes('playwright-extension')) console.log(`Signed-in browser: ${EXTENSION_NOTE}`);
-  if (o.tools.includes('code-mode') && o.agents.includes('claude')) console.log(`Code Mode: ${codeModeNote()}`);
-  if (o.gh) console.log('GitHub CLI: run `gh auth login` yourself; lean-agents never handles tokens.');
-  for (const n of o.notes) console.log(`Notes saved: ${n.path}. Ask your agent to apply them, showing you each change first.`);
-  if (o.network.telemetry === 'off' && o.agents.includes('claude')) {
-    console.log('Strict privacy: also turn off "Help improve Claude" in your claude.ai privacy settings.');
-  }
-  if (o.network.telemetry === 'off' && o.agents.includes('copilot-cli')) {
-    console.log('Strict privacy: Copilot CLI has no telemetry setting. Start it with --disable-client-telemetry.');
-  }
-  if (o.network.telemetry === 'off' && o.agents.includes('cursor')) {
-    console.log('Strict privacy: turn on Privacy Mode in Cursor settings. It is stored on your account.');
-  }
-  if (o.network.telemetry === 'off' && o.agents.includes('antigravity')) {
-    console.log('Strict privacy: turn off "Enable Telemetry" in Antigravity settings. It is stored on your account.');
-  }
-  if (o.network.autoUpdate === 'off' && o.agents.includes('antigravity')) {
-    console.log('Auto-updates off: Antigravity CLI updates itself and has no documented switch for it.');
-  }
-  stopStartedOpenCode(o, opencodeBefore);
-  ui?.summary('Summary', [`${files.length} files written, ${ran.length} commands run`, `Backups: ${backupDir}`], true);
+    if (failed) {
+      console.log(`\n${failed} step(s) failed; see the lines marked ! above. Backups: ${backupDir}`);
+      ui?.summary('Summary', [`${failed} of ${commands.length} commands failed`, `Backups: ${backupDir}`], false);
+      process.exitCode = 1;
+      return o.json && printApplied(o, files, report, errors);
+    }
+    finished = true;
+    save();
+    if (o.json) printApplied(o, files, report, errors);
+    console.log(`\nDone. Backups: ${backupDir}`);
+    if (!o.project) await summaryPage(o, { updated: o.command === 'update' ? report.filter((r) => r.ok).map((r) => r.desc) : [] });
+    if (o.project) return console.log('Next: review and commit these files. Each teammate runs the installer once for the tools (rtk, context-mode, ...).');
+    console.log('Next: restart your agents, log in to your providers, then run --doctor.');
+    const shell = shellNotice();
+    if (shell) console.log(shell.text);
+    const rc = files.find((f) => f.id === 'path');
+    if (rc) console.log(`Open a new terminal (or run: . ${rc.path}) so the new PATH takes effect.`);
+    const todo = stillNeeded({ home: o.home, terminals: o.terminals, agents: o.agents });
+    if (todo.length) console.log(`Still needed from you:\n${todo.map((t) => `  - ${t.text}`).join('\n')}`);
+    if (o.tools.includes('playwright-extension')) console.log(`Signed-in browser: ${EXTENSION_NOTE}`);
+    if (o.tools.includes('code-mode') && o.agents.includes('claude')) console.log(`Code Mode: ${codeModeNote()}`);
+    if (o.gh) console.log('GitHub CLI: run `gh auth login` yourself; lean-agents never handles tokens.');
+    for (const n of o.notes) console.log(`Notes saved: ${n.path}. Ask your agent to apply them, showing you each change first.`);
+    if (o.network.telemetry === 'off' && o.agents.includes('claude')) {
+      console.log('Strict privacy: also turn off "Help improve Claude" in your claude.ai privacy settings.');
+    }
+    if (o.network.telemetry === 'off' && o.agents.includes('copilot-cli')) {
+      console.log('Strict privacy: Copilot CLI has no telemetry setting. Start it with --disable-client-telemetry.');
+    }
+    if (o.network.telemetry === 'off' && o.agents.includes('cursor')) {
+      console.log('Strict privacy: turn on Privacy Mode in Cursor settings. It is stored on your account.');
+    }
+    if (o.network.telemetry === 'off' && o.agents.includes('antigravity')) {
+      console.log('Strict privacy: turn off "Enable Telemetry" in Antigravity settings. It is stored on your account.');
+    }
+    if (o.network.autoUpdate === 'off' && o.agents.includes('antigravity')) {
+      console.log('Auto-updates off: Antigravity CLI updates itself and has no documented switch for it.');
+    }
+    ui?.summary('Summary', [`${files.length} files written, ${ran.length} commands run`, `Backups: ${backupDir}`], true);
+  } finally { stopOnce(); }
 }
 
 // --update --undo (#278): each agent CLI goes back to the version it had before the first upgrade lean-agents ran.
@@ -1130,9 +1144,10 @@ function stopStartedOpenCode(o, before) {
   if (!o.exec || o.dryRun) return;
   const row = serviceStopRow({ before, agents: o.agents });
   if (!row) return;
-  console.log(`- ${row.desc}`);
-  const ok = run(row.run[0], { dryRun: false, log: (l) => console.log(tilde(l, o.home)), json: o.json });
-  console.log(ok
+  const say = o.json ? console.error : console.log; // --json keeps stdout for the one JSON object
+  say(`- ${row.desc}`);
+  const ok = run(row.run[0], { dryRun: false, log: (l) => say(tilde(l, o.home)), json: o.json });
+  say(ok
     ? 'lean-agents stopped the OpenCode 2 background service its commands started.'
     : '! lean-agents could not stop the OpenCode 2 background service its commands started: run `opencode service stop` by hand.');
 }
