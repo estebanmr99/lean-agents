@@ -274,7 +274,7 @@ curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/i
 & ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -DryRun
 ```
 
-`LEAN_AGENTS_VERSION=1.2.3` fija un release. Ya instalado, `--dry-run`, `--doctor` y `--uninstall` no usan la red. Un checkout local (`bash install.sh` desde un clon) se confía tal cual; solo la descarga del release se comprueba con checksum.
+`LEAN_AGENTS_VERSION=1.2.4` fija un release. Ya instalado, `--dry-run`, `--doctor` y `--uninstall` no usan la red. Un checkout local (`bash install.sh` desde un clon) se confía tal cual; solo la descarga del release se comprueba con checksum.
 
 ## Por qué
 
@@ -561,7 +561,8 @@ lean-agents es pegamento. El trabajo pesado lo hacen estos proyectos; dales una 
 - [x] Sesiones de agentes en paralelo (`scripts/parallel.mjs`)
 - [x] Integraciones de Warp y Orca para quien ya las usa
 - [x] App y CLI de Antigravity en macOS, Linux y Windows (la carga en la app sigue en VERIFY)
-- [x] `v1.2.3` (último): chequeo `--preflight`, una línea por paso con un log por ejecución, `--update` se detiene si OpenCode está abierto y no pregunta a mitad, procesos hijos sin `shell: true` (DEP0190), arreglos de rutas de home en Windows y de duplicados en `--adopt`. - [x] `v1.2.2`: RTK en OpenCode 2, `--upgrade-agent opencode` conserva servidores y plugins que antes perdía, versión de DCP alineada entre archivos, aviso de rtk antiguo, arreglos de doctor. - [x] `v1.2.1`: soporte de VS Code Insiders.
+- [x] `v1.2.4` (último): `--adopt` lista cada paquete npm global de cada Node de nvm, `--doctor` ya no marca `settings.json` tras `--update` en instalaciones anteriores a 1.2.2, pin del plugin context-mode v2.1.7, harness de benchmark multiagente.
+- [x] `v1.2.3`: chequeo `--preflight`, una línea por paso con un log por ejecución, `--update` se detiene si OpenCode está abierto y no pregunta a mitad, procesos hijos sin `shell: true` (DEP0190), arreglos de rutas de home en Windows y de duplicados en `--adopt`. - [x] `v1.2.2`: RTK en OpenCode 2, `--upgrade-agent opencode` conserva servidores y plugins que antes perdía, versión de DCP alineada entre archivos, aviso de rtk antiguo, arreglos de doctor. - [x] `v1.2.1`: soporte de VS Code Insiders.
 - [x] `v1.2.0`: rtk en Linux sin Homebrew, avisos más claros de versión de Node, base del proxy de Code Mode, spike de Codex CLI, Código de Conducta.
 - [x] `v1.1.0`: Harness de benchmark, instaladores de Antigravity/Cursor para Windows, --add-tools y guía de despliegue para equipos.
 - [x] `v1.0.0`: `--everything` para una máquina nueva, actualización guiada de OpenCode 1.x a 2.x con copia y deshacer, instalación con el agente de VS Code Copilot, plan de actualización y `--update --undo`, página de resumen; Node.js 22.20 o superior
