@@ -36,14 +36,6 @@ jobs:
   e2e-update:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    env:
-      # Everything the tools and lean-agents write stays inside this throwaway home, next to the checkout.
-      # runner.* is not allowed in a job-level env; github.workspace/.. is the job's own temp parent.
-      HOME: ${{ github.workspace }}/../e2e-home
-      XDG_CONFIG_HOME: ${{ github.workspace }}/../e2e-home/.config
-      NPM_CONFIG_PREFIX: ${{ github.workspace }}/../e2e-home/npm
-      E2E_RAW: ${{ github.workspace }}/../e2e-raw
-      E2E_OUT: ${{ github.workspace }}/../e2e-out
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -68,8 +60,22 @@ jobs:
           esac
 
       - name: Prepare the throwaway home
+        # Everything the tools and lean-agents write stays under RUNNER_TEMP; later steps read the exported values.
+        env:
+          HOME: ${{ runner.temp }}/e2e-home
+          XDG_CONFIG_HOME: ${{ runner.temp }}/e2e-home/.config
+          NPM_CONFIG_PREFIX: ${{ runner.temp }}/e2e-home/npm
+          E2E_RAW: ${{ runner.temp }}/e2e-raw
+          E2E_OUT: ${{ runner.temp }}/e2e-out
         run: |
           mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$NPM_CONFIG_PREFIX/bin" "$E2E_RAW" "$E2E_OUT"
+          {
+            echo "HOME=$HOME"
+            echo "XDG_CONFIG_HOME=$XDG_CONFIG_HOME"
+            echo "NPM_CONFIG_PREFIX=$NPM_CONFIG_PREFIX"
+            echo "E2E_RAW=$E2E_RAW"
+            echo "E2E_OUT=$E2E_OUT"
+          } >> "$GITHUB_ENV"
           {
             echo "$NPM_CONFIG_PREFIX/bin"
             echo "$HOME/.local/bin"
@@ -236,7 +242,7 @@ jobs:
           run_watched() {
             out="$1"; err="$2"; shift 2
             start="$(cat "$E2E_RAW/spend-before.txt")"
-            "$@" > "$out" 2> "$err" &
+            timeout 1800 "$@" > "$out" 2> "$err" &
             run_pid=$!
             (
               while kill -0 "$run_pid" 2>/dev/null; do
@@ -246,6 +252,7 @@ jobs:
                 set -e
                 if [ "$status" -eq 1 ] || [ "$status" -eq 2 ]; then
                   kill "$run_pid" 2>/dev/null || true
+                  opencode service stop >/dev/null 2>&1 || true
                   if [ "$status" -eq 1 ]; then
                     echo "cap hit: key spend reached max_usd $MAX_USD; killed opencode run $run_pid" > "$E2E_RAW/cap-hit.txt"
                   else
@@ -263,6 +270,10 @@ jobs:
             set -e
             kill "$watch_pid" 2>/dev/null || true
             wait "$watch_pid" 2>/dev/null || true
+            if [ "$code" -eq 124 ]; then
+              echo "::error::opencode run timed out"
+              echo "opencode run timed out" > "$E2E_RAW/timeout.txt"
+            fi
             return "$code"
           }
           set +e
@@ -275,6 +286,7 @@ jobs:
           cp "$E2E_RAW/transcript-first.err" "$E2E_RAW/transcript.err"
           if [ -f "$E2E_RAW/cap-hit.txt" ]; then echo "::error::$(cat "$E2E_RAW/cap-hit.txt")"; exit 1; fi
           if [ -f "$E2E_RAW/budget-error.txt" ]; then echo "::error::$(cat "$E2E_RAW/budget-error.txt")"; exit 1; fi
+          if [ "$code" -eq 124 ]; then exit 1; fi
           if [ "$code" -eq 0 ]; then
             decision="$(node tests/e2e-update.mjs consent --transcript "$E2E_RAW/transcript-first.jsonl" || true)"
             case "$decision" in
@@ -289,7 +301,10 @@ jobs:
                 printf '1\n' > "$E2E_RAW/yes-turns"
                 cat "$E2E_RAW/transcript-yes.jsonl" >> "$E2E_RAW/transcript.jsonl"
                 cat "$E2E_RAW/transcript-yes.err" >> "$E2E_RAW/transcript.err"
-                if [ "$yes_code" -ne 0 ]; then echo "$yes_code" > "$E2E_RAW/yes-exit-code"; fi
+                if [ "$yes_code" -ne 0 ]; then
+                  echo "$yes_code" > "$E2E_RAW/yes-exit-code"
+                  echo "$yes_code" > "$E2E_RAW/exit-code"
+                fi
                 ;;
               none) ;;
               *) echo "::error::the agent stopped on a question: $decision"; exit 1 ;;
@@ -355,4 +370,4 @@ jobs:
         with:
           name: e2e-update
           retention-days: 14
-          path: ${{ github.workspace }}/../e2e-out/
+          path: ${{ runner.temp }}/e2e-out/

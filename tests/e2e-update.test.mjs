@@ -181,8 +181,23 @@ test('e2e-update workflow: manual only, read-only token, capped budget and pinne
   assert.match(text, /tests\/e2e-update\.mjs evaluate/);
   assert.doesNotMatch(text, /echo\s+.*OPENROUTER_API_KEY/);
   assert.doesNotMatch(text, /set -x/);
-  // Job-level env cannot use the runner context (GitHub rejects the whole workflow file).
-  assert.doesNotMatch(text, /\$\{\{ runner\.temp \}\}/);
+  // Job-level env must not set HOME (only the prepare step exports it through GITHUB_ENV).
+  assert.doesNotMatch(text, /^    env:$/m);
+});
+
+test('e2e-update workflow: every agent run has a per-run timeout that fails the run', () => {
+  const text = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'e2e-update.yml'), 'utf8');
+  assert.match(text, /timeout 1800 "\$@"/);
+  assert.match(text, /\[ "\$code" -eq 124 \]/);
+  assert.match(text, /::error::opencode run timed out/);
+});
+
+test('e2e-update workflow: HOME and artifacts live under RUNNER_TEMP, not next to the checkout', () => {
+  const text = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'e2e-update.yml'), 'utf8');
+  assert.doesNotMatch(text, /github\.workspace\s*\}\}\/\.\./);
+  assert.match(text, /name: Prepare the throwaway home[\s\S]*?mkdir -p "\$HOME"/);
+  assert.match(text, /echo "HOME=\$HOME"[\s\S]*?>> "\$GITHUB_ENV"/);
+  assert.match(text, /path: \$\{\{ runner\.temp \}\}\/e2e-out\//);
 });
 
 test('e2e-update workflow: checkout mode serves the packed branch and the branch skill', () => {
