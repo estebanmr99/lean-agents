@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { parseTokenUsage, priceUsage, keySpend, redactKey, getStats, TASKS, setupVariant } from './bench-savings.mjs';
+import { parseTokenUsage, priceUsage, keySpend, redactKey, getStats, failureReason, writeArtifacts, TASKS, setupVariant } from './bench-savings.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const arg = (name) => {
@@ -46,14 +46,20 @@ export function fitsHeadroom(spent, est, sessions, maxUsd) {
 
 // Cost vs solo compares the median per-run cost of each mode with solo's median.
 // With --prices the token-priced cost is used instead of the provider-reported cost.
+// A run with no usage events has cost null and is left out; a mode with none of them reports n/a.
 export function costVsSolo(runs, prices) {
-  const median = (rs) => getStats(rs.map((r) => (prices ? (r.pricedCost || 0) : r.cost))).median;
+  const costs = (rs) => rs.map((r) => (prices ? r.pricedCost : r.cost)).filter((v) => typeof v === 'number' && Number.isFinite(v));
+  const median = (rs) => {
+    const values = costs(rs);
+    return values.length > 0 ? getStats(values).median : null;
+  };
   const solo = runs.filter((r) => r.mode === 'solo');
-  const base = solo.length > 0 ? median(solo) : 0;
+  const base = solo.length > 0 ? median(solo) : null;
   const out = {};
   for (const mode of new Set(runs.map((r) => r.mode))) {
     const rs = runs.filter((r) => r.mode === mode);
-    out[mode] = base > 0 ? median(rs) / base : null;
+    const m = median(rs);
+    out[mode] = base > 0 && m != null ? m / base : null;
   }
   return out;
 }
@@ -208,7 +214,7 @@ function prepareSessions(specs, { variant }) {
   }
 }
 
-async function runSession(spec, { model, timeout, variant, outDir, key, runLabel, spawnImpl }) {
+async function runSession(spec, { model, timeout, variant, key, spawnImpl }) {
   const res = await runOpenCode({
     cwd: spec.workdir,
     home: spec.home,
@@ -218,7 +224,6 @@ async function runSession(spec, { model, timeout, variant, outDir, key, runLabel
     variant,
     key,
     spawnImpl,
-    logPath: path.join(outDir, 'raw', `${runLabel}-${spec.name}.jsonl`),
   });
   return { name: spec.name, workdir: spec.workdir, ...res };
 }
@@ -287,7 +292,19 @@ async function runGroup(specs, opts, budget) {
   }
 }
 
-function summarizeSession(res, prices) {
+// Session cost comes from OpenCode's own step usage, never from the key spend delta.
+// No step-finish event means no cost to report: null becomes n/a, not $0.0000.
+export function sessionCost(usage) {
+  return usage && usage.turns > 0 && typeof usage.cost === 'number' && Number.isFinite(usage.cost) ? usage.cost : null;
+}
+
+export function totalSessionCost(sessions) {
+  if (sessions.length === 0) return null;
+  const costs = sessions.map((s) => s.cost);
+  return costs.every((c) => typeof c === 'number' && Number.isFinite(c)) ? costs.reduce((a, b) => a + b, 0) : null;
+}
+
+export function summarizeSession(res, prices) {
   const u = res.usage;
   return {
     name: res.name,
@@ -296,12 +313,37 @@ function summarizeSession(res, prices) {
     cacheRead: u.cacheRead,
     cacheWrite: u.cacheWrite,
     turns: u.turns,
-    cost: u.cost,
+    cost: sessionCost(u),
     pricedCost: prices ? priceUsage(u, prices) : null,
     wallTime: res.wallTime,
     timedOut: res.timedOut,
     exit: res.status,
   };
+}
+
+// Build the per-mode table rows from the raw run records.
+export function summarizeRuns(results, modes, prices) {
+  const summary = [];
+  const ratios = costVsSolo(results, prices);
+  for (const mode of modes) {
+    const rs = results.filter((r) => r.mode === mode);
+    if (rs.length === 0) continue;
+    const costs = rs.map((r) => r.cost);
+    summary.push({
+      mode,
+      runs: rs.length,
+      passRate: rs.filter((r) => r.pass).length / rs.length,
+      conflicts: rs.filter((r) => r.conflict).length,
+      input: getStats(rs.map((r) => r.inputTokens)),
+      output: getStats(rs.map((r) => r.outputTokens)),
+      turns: getStats(rs.map((r) => r.turns)),
+      time: getStats(rs.map((r) => r.wallTime)),
+      cost: costs.every((c) => typeof c === 'number' && Number.isFinite(c)) ? costs.reduce((a, b) => a + b, 0) : null,
+      pricedCost: prices ? rs.reduce((sum, r) => sum + (r.pricedCost || 0), 0) : null,
+      costVsSolo: ratios[mode] ?? null,
+    });
+  }
+  return summary;
 }
 
 export function renderMultiMarkdown(summary, prices) {
@@ -317,14 +359,14 @@ export function renderMultiMarkdown(summary, prices) {
       s.output.median.toFixed(0),
       s.turns.median.toFixed(0),
       `${s.time.median.toFixed(0)}ms`,
-      `$${s.cost.toFixed(4)}`,
+      s.cost == null ? 'n/a' : `$${s.cost.toFixed(4)}`,
     ];
     if (prices) cells.push(`$${(s.pricedCost || 0).toFixed(4)}`);
     md += `| ${cells.join(' | ')} |\n`;
   }
   md += '\nCost vs solo:\n';
   for (const s of summary) {
-    md += `- ${s.mode}: ${s.costVsSolo == null ? '-' : `${s.costVsSolo.toFixed(2)}x`}\n`;
+    md += `- ${s.mode}: ${s.costVsSolo == null ? 'n/a' : `${s.costVsSolo.toFixed(2)}x`}\n`;
   }
   if (prices) md += `\nPriced Cost uses ${prices.in},${prices.cacheRead},${prices.cacheWrite},${prices.out} USD per 1M tokens (in, cache read, cache write, out) and assumes input excludes cached tokens (VERIFY).\n`;
   return md;
@@ -441,6 +483,7 @@ async function main() {
         console.log(`\nRunning ${mode} repeat ${n}/${REPEATS}...`);
 
         const record = { mode, repeat: n, pass: false, conflict: false, sessions: [], wallTime: 0 };
+        const rawSessions = [];
         const opts = { model: MODEL, timeout: TIMEOUT, variant: VARIANT, outDir: OUT, key: KEY, runLabel, maxUsd: MAX_USD };
         const costBefore = await budget.refresh();
         let finalDir;
@@ -452,6 +495,7 @@ async function main() {
           const [res] = await runGroup([{
             name: 'solo', workdir: finalDir, home: path.join(runRoot, 'home-solo'), prompt: TASK9.prompt,
           }], opts, budget);
+          rawSessions.push(res);
           record.sessions.push(summarizeSession(res, parsedPrices));
           record.wallTime = res.wallTime;
         } else {
@@ -467,6 +511,7 @@ async function main() {
             };
           });
           const workerResults = await runGroup(workerSpecs, opts, budget);
+          rawSessions.push(...workerResults);
           workerResults.forEach((res) => record.sessions.push(summarizeSession(res, parsedPrices)));
 
           finalDir = path.join(runRoot, 'merged');
@@ -480,6 +525,7 @@ async function main() {
             const [reviewer] = await runGroup([{
               name: 'reviewer', workdir: finalDir, home: path.join(runRoot, 'home-reviewer'), prompt: REVIEWER_PROMPT,
             }], opts, budget);
+            rawSessions.push(reviewer);
             record.sessions.push(summarizeSession(reviewer, parsedPrices));
             record.wallTime = maxWorkerTime + reviewer.wallTime;
           } else {
@@ -492,11 +538,24 @@ async function main() {
         record.inputTokens = record.sessions.reduce((s, x) => s + x.inputTokens, 0);
         record.outputTokens = record.sessions.reduce((s, x) => s + x.outputTokens, 0);
         record.turns = record.sessions.reduce((s, x) => s + x.turns, 0);
-        // A run's cost is its real key-spend delta over the whole record.
-        record.cost = (await budget.refresh()) - costBefore;
+        // A run's cost is the sum of its sessions' own OpenCode step usage; the key spend only feeds --max-usd.
+        record.cost = totalSessionCost(record.sessions);
         record.pricedCost = parsedPrices ? record.sessions.reduce((s, x) => s + (x.pricedCost || 0), 0) : null;
-        budget.observeRun(record.cost, record.sessions.length);
-        console.log(`  Pass: ${record.pass}, Conflict: ${record.conflict}, Sessions: ${record.sessions.length}, In: ${record.inputTokens}, Out: ${record.outputTokens}, Cost: $${record.cost.toFixed(4)}, Time: ${record.wallTime}ms`);
+        const keyDelta = (await budget.refresh()) - costBefore;
+        budget.observeRun(keyDelta, record.sessions.length);
+        if (!record.pass) {
+          const last = rawSessions[rawSessions.length - 1] || {};
+          record.failure = failureReason({
+            check: record.conflict ? null : 'task9 check',
+            conflict: record.conflict,
+            timedOut: last.timedOut,
+            exit: last.status,
+            stdout: rawSessions.map((s) => s.stdout || '').join('\n'),
+            stderr: rawSessions.map((s) => s.stderr || '').join('\n'),
+          }, KEY);
+        }
+        const shownCost = record.cost == null ? 'n/a' : `$${record.cost.toFixed(4)}`;
+        console.log(`  Pass: ${record.pass}, Conflict: ${record.conflict}, Sessions: ${record.sessions.length}, In: ${record.inputTokens}, Out: ${record.outputTokens}, Cost: ${shownCost}, Time: ${record.wallTime}ms`);
         results.push(record);
       }
     }
@@ -505,32 +564,17 @@ async function main() {
     console.error(`\nStopping: ${e.message}`);
   }
   await budget.refresh().catch(() => {}); // record spend after children were killed
-  const totalCost = budget.spent;
+  const runCosts = results.map((r) => r.cost);
+  const totalCost = runCosts.length > 0 && runCosts.every((c) => typeof c === 'number' && Number.isFinite(c))
+    ? runCosts.reduce((a, b) => a + b, 0)
+    : null;
 
   if (OUT) {
     const opencodeVersion = spawnSync('opencode', ['--version'], { encoding: 'utf8' }).stdout?.trim() || 'unknown';
     const leanCommit = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout?.trim() || 'unknown';
     const runUrl = process.env.GITHUB_RUN_ID ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}` : null;
 
-    const summary = [];
-    const ratios = costVsSolo(results, parsedPrices);
-    for (const mode of MODES) {
-      const rs = results.filter((r) => r.mode === mode);
-      if (rs.length === 0) continue;
-      summary.push({
-        mode,
-        runs: rs.length,
-        passRate: rs.filter((r) => r.pass).length / rs.length,
-        conflicts: rs.filter((r) => r.conflict).length,
-        input: getStats(rs.map((r) => r.inputTokens)),
-        output: getStats(rs.map((r) => r.outputTokens)),
-        turns: getStats(rs.map((r) => r.turns)),
-        time: getStats(rs.map((r) => r.wallTime)),
-        cost: rs.reduce((sum, r) => sum + r.cost, 0),
-        pricedCost: parsedPrices ? rs.reduce((sum, r) => sum + r.pricedCost, 0) : null,
-        costVsSolo: ratios[mode] ?? null,
-      });
-    }
+    const summary = summarizeRuns(results, MODES, parsedPrices);
 
     const resultsJson = {
       date: new Date().toISOString().split('T')[0],
@@ -547,9 +591,8 @@ async function main() {
       summary,
       runs: results,
     };
-    fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(resultsJson, null, 2));
     const md = renderMultiMarkdown(summary, parsedPrices);
-    fs.writeFileSync(path.join(OUT, 'results.md'), md);
+    writeArtifacts(OUT, { 'results.json': JSON.stringify(resultsJson, null, 2), 'results.md': md }, KEY);
     console.log(`\nWrote results to ${OUT}`);
     console.log(md);
   }

@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseTokenUsage, finalText, keySpend, redactKey, checkQuotaError, isEmptyErrorRun, getStats, generateChart, renderResultsMarkdown, priceUsage, TASKS, checkEnv } from './bench-savings.mjs';
+import { parseTokenUsage, finalText, keySpend, redactKey, checkQuotaError, isEmptyErrorRun, getStats, generateChart, renderResultsMarkdown, priceUsage, failureReason, writeArtifacts, TASKS, checkEnv } from './bench-savings.mjs';
 import { doctor } from '../scripts/lib/doctor.mjs';
 import { buildSummary } from '../scripts/lib/summary-data.mjs';
 import { renderSummary } from '../scripts/lib/summary-html.mjs';
@@ -214,6 +214,44 @@ test('keySpend adds credit and BYOK usage and fails closed', async () => {
 test('redactKey removes every copy of the key', () => {
   assert.strictEqual(redactKey('a sk-or-x b sk-or-x', 'sk-or-x'), 'a [REDACTED] b [REDACTED]');
   assert.strictEqual(redactKey('plain', undefined), 'plain');
+});
+
+test('failureReason names the failing check with the last error line, redacted and capped at 200 chars', () => {
+  const key = 'test-bench-key-527';
+  const stdout = [
+    JSON.stringify({ type: 'text', part: { text: 'fixing' } }),
+    'AssertionError: expected 200 but got 401',
+    `debug ${key}`,
+  ].join('\n');
+  const reason = failureReason({ check: 'task10 check', exit: 1, stdout, stderr: '' }, key);
+  assert.match(reason, /task10 check/);
+  assert.match(reason, /AssertionError: expected 200 but got 401/);
+  assert.ok(!reason.includes(key), reason);
+  assert.ok(reason.length <= 200, `length ${reason.length}`);
+
+  const long = 'error ' + 'x'.repeat(500);
+  assert.strictEqual(failureReason({ check: 'task9 check', exit: 1, stdout: '', stderr: long }, '').length, 200);
+  assert.strictEqual(failureReason({ check: 'task9 check', conflict: true }, '').includes('merge conflict'), true);
+});
+
+test('written artifacts drop a base64 copy of the key', () => {
+  const key = 'test-bench-key-527';
+  const encoded = Buffer.from(key, 'utf8').toString('base64');
+  const dir = path.join(os.tmpdir(), `bench-redact-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+  try {
+    writeArtifacts(dir, {
+      'results.json': JSON.stringify({ failure: `leaked ${encoded}`, model: 'mock/model' }, null, 2),
+      'results.md': `key ${encoded}\n`,
+    }, key);
+    for (const name of ['results.json', 'results.md']) {
+      const text = fs.readFileSync(path.join(dir, name), 'utf8');
+      assert.ok(!text.includes(encoded), `${name} kept the base64 key`);
+      assert.ok(!text.includes(key), `${name} kept the raw key`);
+      assert.match(text, /\[REDACTED\]/);
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('parseTokenUsage reads step_finish with a nested part and cache object', () => {

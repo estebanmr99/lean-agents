@@ -5,7 +5,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { splitBugs, mergeWorkerChanges, collectChanges, parseMaxUsd, isPositiveInt, fitsHeadroom, costVsSolo, sessionsForMode, renderMultiMarkdown, runOpenCode, TASK9_BUG_TESTS } from './bench-multiagent.mjs';
+import { splitBugs, mergeWorkerChanges, collectChanges, parseMaxUsd, isPositiveInt, fitsHeadroom, costVsSolo, sessionsForMode, renderMultiMarkdown, runOpenCode, summarizeSession, summarizeRuns, totalSessionCost, TASK9_BUG_TESTS } from './bench-multiagent.mjs';
+import { parseTokenUsage } from './bench-savings.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SCRIPT = path.join(ROOT, 'tests', 'bench-multiagent.mjs');
@@ -179,4 +180,42 @@ test('results.md renders a table and cost vs solo from a hand-made summary', () 
   const noPrices = renderMultiMarkdown(summary, null);
   assert.doesNotMatch(noPrices, /Priced Cost/);
   assert.match(noPrices, /workers-2: 2\.00x/);
+});
+
+test('session cost is summed from the JSON step usage stream, not the key spend', () => {
+  const stream = [
+    JSON.stringify({ type: 'step_start' }),
+    JSON.stringify({ type: 'step-finish', tokens: { input: 100, output: 20, cache: { read: 5, write: 1 } }, cost: 0.0012 }),
+    JSON.stringify({ type: 'step-finish', tokens: { input: 50, output: 10 }, cost: 0.0008 }),
+  ].join('\n');
+  const usage = parseTokenUsage(stream);
+  const solo = summarizeSession({ name: 'solo', usage, wallTime: 123, timedOut: false, status: 0 }, null);
+  assert.strictEqual(solo.cost, 0.002);
+  assert.strictEqual(solo.inputTokens, 150);
+  assert.strictEqual(totalSessionCost([solo]), 0.002);
+
+  const worker = summarizeSession({ name: 'worker-0', usage: parseTokenUsage(stream), wallTime: 100, timedOut: false, status: 0 }, null);
+  const results = [
+    { mode: 'solo', cost: totalSessionCost([solo]), pricedCost: null, pass: true, conflict: false, inputTokens: 150, outputTokens: 30, turns: 2, wallTime: 123 },
+    { mode: 'workers-1', cost: totalSessionCost([worker, worker]), pricedCost: null, pass: true, conflict: false, inputTokens: 300, outputTokens: 60, turns: 4, wallTime: 100 },
+  ];
+  const summary = summarizeRuns(results, ['solo', 'workers-1'], null);
+  assert.ok(summary[0].cost > 0);
+  assert.ok(summary[1].cost > 0);
+  const md = renderMultiMarkdown(summary, null);
+  assert.match(md, /\| solo \| 100% \| 150 \| 30 \| 2 \| 123ms \| \$0\.0020 \|/);
+  assert.match(md, /\| workers-1 \| 100% \| 300 \| 60 \| 4 \| 100ms \| \$0\.0040 \|/);
+  assert.match(md, /Cost vs solo:\n- solo: 1\.00x\n- workers-1: 2\.00x/);
+});
+
+test('a session with no usage events costs n/a, not zero', () => {
+  const empty = summarizeSession({ name: 'solo', usage: parseTokenUsage('{"type":"step_start"}'), wallTime: 10, timedOut: false, status: 0 }, null);
+  assert.strictEqual(empty.cost, null);
+  assert.strictEqual(totalSessionCost([empty]), null);
+
+  const results = [{ mode: 'solo', cost: totalSessionCost([empty]), pricedCost: null, pass: false, conflict: false, inputTokens: 0, outputTokens: 0, turns: 0, wallTime: 10 }];
+  const md = renderMultiMarkdown(summarizeRuns(results, ['solo'], null), null);
+  assert.match(md, /\| solo \| 0% \| 0 \| 0 \| 0 \| 10ms \| n\/a \|/);
+  assert.match(md, /- solo: n\/a/);
+  assert.doesNotMatch(md, /\$0\.0000/);
 });

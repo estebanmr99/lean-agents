@@ -26,8 +26,40 @@ export async function keySpend(key, fetchFn = fetch) {
   return d.usage + d.byok_usage;
 }
 
-// Raw logs are uploaded as artifacts; the model runs shell with the key in its env, so strip it.
-export const redactKey = (text, key) => (key ? text.split(key).join('[REDACTED]') : text);
+// The model runs shell with the key in its env, so strip it from anything written out.
+// A shell command can also carry the key base64-encoded (`echo ... | base64`), so strip that form too.
+export const redactKey = (text, key) => {
+  if (!key) return text;
+  let out = text.split(key).join('[REDACTED]');
+  const encoded = Buffer.from(key, 'utf8').toString('base64');
+  if (encoded && encoded !== key) out = out.split(encoded).join('[REDACTED]');
+  return out;
+};
+
+// Artifacts hold parsed results only; scrub the key (and its base64 form) on the way to disk.
+export function writeArtifacts(outDir, files, key) {
+  fs.mkdirSync(outDir, { recursive: true });
+  const written = [];
+  for (const [name, content] of Object.entries(files)) {
+    const file = path.join(outDir, name);
+    fs.writeFileSync(file, redactKey(content, key));
+    written.push(file);
+  }
+  return written;
+}
+
+// Why a bench case failed: the check name plus the last error-shaped line, redacted and capped.
+export function failureReason({ check, timedOut, exit, conflict, stdout, stderr }, key, limit = 200) {
+  const parts = [];
+  if (conflict) parts.push('merge conflict');
+  if (check) parts.push(check);
+  if (timedOut) parts.push('timeout');
+  else if (typeof exit === 'number' && exit !== 0) parts.push(`exit ${exit}`);
+  const lines = `${stdout || ''}\n${stderr || ''}`.split('\n').map((l) => l.trim()).filter(Boolean);
+  const errorLine = [...lines].reverse().find((l) => /(error|failed|failure|not ok|assert|ERR_)/i.test(l));
+  if (errorLine) parts.push(errorLine);
+  return redactKey(parts.join(': '), key).slice(0, limit);
+}
 
 export function checkEnv(dir) {
   return { PATH: process.env.PATH || "", HOME: dir, NODE_OPTIONS: "" };
@@ -641,17 +673,16 @@ async function main() {
   let startSpend;
   try { startSpend = await keySpend(KEY); } catch (e) { console.error(`Budget check failed: ${e.message}`); process.exit(2); }
   const results = [];
-  let totalCost = 0;
+  let totalCost = 0; // OpenCode per-run usage cost, the only cost shown in the report.
+  let keySpent = 0; // Key spend delta: the --max-usd budget guard only.
   let consecutiveEmptyErrors = 0;
-  const RAW_DIR = path.join(ROOT, 'raw');
-  fs.mkdirSync(RAW_DIR, { recursive: true });
 
   for (const taskId of TASKS_TO_RUN) {
     const task = TASKS.find(t => t.id === taskId);
     for (const mode of VARIANTS) {
       for (let n = 1; n <= REPEATS; n++) {
-        if (totalCost >= MAX_USD) {
-          console.warn(`Budget reached ($${totalCost.toFixed(4)} >= $${MAX_USD}). Stopping.`);
+        if (keySpent >= MAX_USD) {
+          console.warn(`Budget reached ($${keySpent.toFixed(4)} >= $${MAX_USD}). Stopping.`);
           break;
         }
 
@@ -695,9 +726,6 @@ async function main() {
         });
         const wallTime = Date.now() - start;
 
-        const rawLogPath = path.join(RAW_DIR, `${task.id}-${mode}-${n}.jsonl`);
-        fs.writeFileSync(rawLogPath, redactKey(res.stdout || '', KEY));
-
         const quotaErr = checkQuotaError(res.stdout || '');
         if (quotaErr) {
           console.error(`\nQuota stop: type=${quotaErr.type}, status=${quotaErr.status}. Stopping.`);
@@ -720,8 +748,9 @@ async function main() {
         }
 
         console.log(`  Events: ${types.join(', ') || 'none'}; exit ${res.status}`);
-        totalCost = Math.max(totalCost + usage.cost, await spentSoFar(startSpend));
-        console.log(`  Spent so far (key usage): $${totalCost.toFixed(4)}`);
+        keySpent = await spentSoFar(startSpend);
+        totalCost += usage.cost;
+        console.log(`  Spent so far (key usage): $${keySpent.toFixed(4)}`);
         const pass = task.check(workdir, finalText(res.stdout || ''));
 
         console.log(`  Pass: ${pass}, In: ${usage.inputTokens}, Out: ${usage.outputTokens}, Cache: ${usage.cacheTokens}, Cost: $${usage.cost.toFixed(4)}, Time: ${wallTime}ms`);
@@ -740,11 +769,12 @@ async function main() {
           cost: usage.cost,
           pricedCost,
           wallTime,
+          failure: pass ? null : failureReason({ check: `${task.id} check`, exit: res.status, stdout: res.stdout, stderr: res.stderr }, KEY),
         });
       }
-      if (totalCost >= MAX_USD) break;
+      if (keySpent >= MAX_USD) break;
     }
-    if (totalCost >= MAX_USD) break;
+    if (keySpent >= MAX_USD) break;
   }
 
   if (OUT) {
@@ -799,16 +829,14 @@ async function main() {
       tasks: summary,
       raw: results
     };
-    fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(resultsJson, null, 2));
-    
     const md = renderResultsMarkdown(summary, VARIANTS, totalCost, parsedPrices);
-    fs.writeFileSync(path.join(OUT, 'results.md'), md);
+    const files = { 'results.json': JSON.stringify(resultsJson, null, 2), 'results.md': md };
 
     // SVG Chart only if baseline and lean are present
     if (VARIANTS.includes('baseline') && VARIANTS.includes('lean')) {
-      const chartSvg = generateChart(summary, resultsJson);
-      fs.writeFileSync(path.join(OUT, 'chart.svg'), chartSvg);
+      files['chart.svg'] = generateChart(summary, resultsJson);
     }
+    writeArtifacts(OUT, files, KEY);
 
     console.log(`\nWrote results to ${OUT}`);
     console.log(md);
