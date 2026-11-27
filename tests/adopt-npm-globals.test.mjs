@@ -97,8 +97,8 @@ test('npmGlobals lists every package under every Node, marks the active one and 
   assert.deepEqual(byName(g, 'fresh-cli')[0].status, []);
   assert.equal(g.packages.some((p) => p.name === 'npm'), false); // bundled with Node, not a user global
   assert.deepEqual(g.cleanup, [
-    { name: 'broken-pkg', node: '22.20.0', dir: s.oldDir },
-    { name: 'legacy-cli', node: '22.20.0', dir: s.oldDir },
+    { name: 'broken-pkg', folder: 'broken-pkg', node: '22.20.0', dir: s.oldDir },
+    { name: 'legacy-cli', folder: 'legacy-cli', node: '22.20.0', dir: s.oldDir },
   ]); // a name with a shell metacharacter gets no cleanup line
 });
 

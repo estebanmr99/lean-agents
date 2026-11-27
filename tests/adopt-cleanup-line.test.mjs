@@ -50,6 +50,12 @@ test('a global whose package.json name differs from its folder gets no cleanup l
   assert.deepEqual(r.npmGlobals.cleanup, []);
 });
 
+test('a mismatched folder does not earn a line for a genuine folder of the same name', async () => {
+  const s = seeded({ 'real-folder': { name: 'npm-check', version: '1.0.0' }, 'npm-check': { name: 'npm-check', version: '2.0.0' } });
+  const r = await inventory({ home: s.home, env: s.env, platform: process.platform, realHome: '/nowhere' });
+  assert.deepEqual(r.npmGlobals.cleanup, [`npm uninstall -g npm-check --prefix ${quote(`~${s.oldDir.slice(s.home.length)}`)}`]);
+});
+
 test('the cleanup line quotes a prefix that contains a space', async () => {
   const s = seeded({ 'legacy-cli': { version: '0.9.1' } }, { rootName: '.nvm dir' });
   const r = await inventory({ home: s.home, env: s.env, platform: process.platform, realHome: '/nowhere' });

@@ -22,14 +22,6 @@ import { clients, launchOf, pinOf, classify, npmCopies, npmGlobals, skillDirs, d
 import { agentFor } from './context-mode.mjs';
 
 const j = path.join;
-// The folder npm installed a global in: its manifest must name that same folder, else the line would remove another package (#525).
-const cleanupFolder = (c, platform, fsx) => {
-  const dir = j(c.dir, platform === 'win32' ? 'node_modules' : j('lib', 'node_modules'), ...c.name.split('/'));
-  let pkg = null;
-  try { pkg = JSON.parse(fsx.readFileSync(j(dir, 'package.json'), 'utf8')); } catch { /* unreadable: the folder name stands in */ }
-  if (pkg) return pkg.name === c.name ? c.name : null;
-  try { return fsx.statSync(dir).isDirectory() ? c.name : null; } catch { return null; }
-};
 // One shell argument for the printed cleanup line: POSIX single quote, Windows double quote (#525).
 const shellArg = (s, platform) => platform === 'win32' ? `"${s}"` : `'${s.replaceAll("'", "'\\''")}'`;
 const MANAGED_SKILLS = new Set(Object.entries(PINS).filter(([, p]) => p.kind === 'skill').map(([k]) => k));
@@ -295,10 +287,10 @@ export async function inventory({ home, env = process.env, platform = process.pl
   // --- Every global npm package under every nvm Node (#465): disclosure only, cleanup stays a printed line
   const g = npmGlobals(nvm, { env });
   const globalCleanup = [];
+  // Only the folder npm installed a global in can be removed by name: a manifest naming another package would remove the wrong one (#525).
   for (const c of g.cleanup) {
-    if (!isNpmName(c.name)) continue;
-    const folder = cleanupFolder(c, platform, fsx);
-    if (folder) globalCleanup.push(`npm uninstall -g ${folder} --prefix ${shellArg(rel(c.dir), platform)}`);
+    if (!isNpmName(c.name) || c.folder !== c.name) continue;
+    globalCleanup.push(`npm uninstall -g ${c.folder} --prefix ${shellArg(rel(c.dir), platform)}`);
   }
   const globals = {
     active: g.active,
