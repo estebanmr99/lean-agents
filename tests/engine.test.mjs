@@ -1569,6 +1569,8 @@ test('--update installs a pinned npm tool again when it is behind, and records t
   const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-bin-'));
   const log = path.join(bin, 'calls.log');
   for (const name of ['npm', 'npx', 'context-mode', 'rtk']) fs.writeFileSync(path.join(bin, name), `#!/bin/sh\necho "${name} $@" >> "${log}"\n`, { mode: 0o755 });
+  // An empty process list: an OpenCode running on the host must not trigger the #488 stop.
+  fs.writeFileSync(path.join(bin, 'ps'), '#!/bin/sh\n', { mode: 0o755 });
   const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, LEAN_AGENTS_SKILL_SOURCE: '' };
   const args = ['--yes', '--agents', 'opencode-v1', '--tools', 'context-mode', '--no-gh', '--no-bun', '--lang', 'en', '--profile', 'none'];
   lean(home, args, env);
