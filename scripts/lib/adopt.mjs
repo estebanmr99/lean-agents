@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { parse } from 'jsonc-parser';
-import { hasMark, plan as planFiles, revertJsonEdits, sha, writePrivate, privateDir, dropBackups, unsafe } from './fsops.mjs';
+import { hasMark, plan as planFiles, revertJsonEdits, sha, writePrivate, privateDir, dropBackups, unsafe, homeRel } from './fsops.mjs';
 import { PINS, npmSpec, pinVersions } from './pins.mjs';
 import { configHome, envDir, antigravityFootprint } from './system.mjs';
 import { configPath } from './adapters/opencode-v2.mjs';
@@ -111,7 +111,7 @@ export async function opencodeInfo(home, env, fsx = fs, { toolNode = null, sqlit
 }
 
 export async function inventory({ home, env = process.env, platform = process.platform, realHome = os.homedir(), fsx = fs, stateDir = j(home, '.config', 'lean-agents'), state = readState(stateDir) }) {
-  const rel = (p) => (p && p.startsWith(home) ? `~${p.slice(home.length)}` : p);
+  const rel = (p) => homeRel(p, home, platform);
   const items = [];
   const add = (it) => items.push({ client: it.client, kind: it.kind, name: it.name, file: rel(it.file), keyPath: it.keyPath ?? [], launch: it.launch ?? null, owner: it.owner, status: it.status ?? [], pin: it.pin ?? null, wanted: it.wanted ?? null, action: 'keep', ...(it.extra ?? {}) });
   const shape = (l) => ({ style: l.style, node: rel(l.node), nodeVersion: l.nodeVersion });
@@ -120,7 +120,7 @@ export async function inventory({ home, env = process.env, platform = process.pl
   // --- MCP servers (names only; args and env stay unread)
   const names = new Set();
   for (const { client, file, keyPath } of clients(home)) {
-    for (const s of mcpServers(file, keyPath)) {
+    for (const s of mcpServers(file, keyPath, fsx)) {
       const id = `${file}\0${s.name}`;
       if (seen.has(id)) continue;
       seen.add(id);
@@ -321,7 +321,7 @@ export async function adopt(o) {
   if (o.probePlugins) r.health.push(...await probePlugins(o.home)); // opt-in: starts a short-lived opencode serve
   // What --yes does (the apply plan, not only the inventory rows): the pin's target Node and the removals, which need a yes (#179 PC run).
   const ap = adoptPlan(r, { home: o.home, env: o.env ?? process.env, platform: o.platform ?? process.platform, realHome: o.realHome ?? os.homedir(), state: readState(o.stateDir ?? j(o.home, '.config', 'lean-agents')) });
-  r.apply = applyLines(ap, o.home);
+  r.apply = applyLines(ap, o.home, o.platform ?? process.platform);
   if (o.json) { process.stdout.write(`${JSON.stringify(r, null, 2)}\n`); return true; }
   const by = {};
   for (const i of r.items) by[`${i.kind}`] = (by[`${i.kind}`] ?? 0) + 1;
@@ -349,8 +349,8 @@ export async function adopt(o) {
 }
 
 // One line per action adoptApply takes, in its order.
-function applyLines(p, home) {
-  const rel = (f) => (f.startsWith(home) ? `~${f.slice(home.length)}` : f);
+export function applyLines(p, home, platform = process.platform) {
+  const rel = (f) => homeRel(f, home, platform);
   const yes = ' (needs a yes, or --confirm-removals)';
   return [
     ...(p.install ? [`install ${PINS['context-mode'].source}@${PINS['context-mode'].version} into Node ${p.install.node.version}${p.install.have ? ` (now ${p.install.have})` : ''}`] : []),
@@ -370,7 +370,11 @@ const absOf = (home, f) => (f === '~' || f.startsWith('~/') || f.startsWith('~\\
 const walk = (obj, p) => p.reduce((v, k) => (v && typeof v === 'object' ? v[k] : undefined), obj);
 const stamp = () => new Date().toISOString().replace(/[:.]/g, '-');
 const bytes = (f) => fs.readFileSync(f);
-const relIn = (home, f) => (f.startsWith(home + path.sep) ? path.relative(home, f) : f.replace(/^[A-Za-z]:/, '').replace(/^[\\/]+/, ''));
+export const relIn = (home, f, platform = process.platform) => {
+  const P = platform === 'win32' ? path.win32 : path;
+  const rel = homeRel(f, home, platform);
+  return rel !== f && rel.length > 1 ? P.relative(home, f) : f.replace(/^[A-Za-z]:/, '').replace(/^[\\/]+/, '');
+};
 
 // State file: --adopt adds `adopt` to an existing state.json, or creates one that only holds it (`adoptOnly`).
 const stateFile = (stateDir) => j(stateDir, 'state.json');
@@ -517,7 +521,7 @@ export async function adoptApply(o) {
   const actions = [...p.edits].map(([file, edits]) => ({ kind: 'json', path: file, edits }));
   for (const pl of planFiles(actions, [home, configHome(home), envDir(home, 'COPILOT_HOME', null)].filter(Boolean))) {
     if (pl.status !== 'modify') { if (pl.status === 'skip') console.log(`  skipped ${rel(pl.path)}: ${pl.note}`); continue; }
-    const backup = j(backupDir, 'files', relIn(home, pl.path));
+    const backup = j(backupDir, 'files', relIn(home, pl.path, platform));
     privateDir(path.dirname(backup), stateDir);
     fs.copyFileSync(pl.path, backup);
     fs.chmodSync(backup, 0o600);
@@ -532,7 +536,7 @@ export async function adoptApply(o) {
     for (const d of list) {
       const why = unsafe(d, [home]);
       if (why) { console.log(`  kept ${label} ${rel(d)}: ${why}`); continue; }
-      const backup = j(backupDir, 'dirs', relIn(home, d));
+      const backup = j(backupDir, 'dirs', relIn(home, d, platform));
       privateDir(path.dirname(backup), stateDir);
       fs.cpSync(d, backup, { recursive: true });
       adoptState.dirs.push({ path: d, backup });

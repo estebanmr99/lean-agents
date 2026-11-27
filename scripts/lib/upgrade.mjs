@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parse } from 'jsonc-parser';
-import { hasMark, plan, apply, describe } from './fsops.mjs';
+import { hasMark, plan, apply, describe, homeRel } from './fsops.mjs';
 import { configHome } from './system.mjs';
 import { configPath } from './adapters/opencode-v2.mjs';
 import { readBackupStamp } from './backup-stamp.mjs';
@@ -132,8 +132,8 @@ function configItems(home, ocDir, fsx, rel) {
 // Where the `opencode` binary came from, by its path. Unknown paths stay unknown.
 export const installVia = (p) => (!p ? null : /node_modules|[\\/]\.nvm[\\/]|[\\/]npm[\\/]/.test(p) ? 'npm' : /[\\/]\.opencode[\\/]bin/.test(p) ? 'script' : /homebrew|Cellar|linuxbrew/i.test(p) ? 'brew' : /scoop/i.test(p) ? 'scoop' : 'unknown');
 
-export function upgradeInventory(inv, { home, fsx = fs, binary = { path: null, version: null }, tools = [], rtk = { state: 'ok' } }) {
-  const rel = (p) => (p && p.startsWith(home) ? `~${p.slice(home.length)}` : p);
+export function upgradeInventory(inv, { home, fsx = fs, binary = { path: null, version: null }, tools = [], rtk = { state: 'ok' }, platform = process.platform }) {
+  const rel = (p) => homeRel(p, home, platform);
   const ocDir = j(configHome(home), 'opencode');
   const items = inv.items.map((it) => {
     if (!(it.client === 'opencode' || it.kind === 'skill')) return it;

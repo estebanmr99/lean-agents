@@ -91,7 +91,7 @@ SOURCES['opencode-v2'] = opencodeSource;
 export const MIGRATE_SOURCES = Object.keys(SOURCES);
 export const MIGRATE_TARGETS = MIGRATE_SOURCES;
 
-const text = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch { return null; } };
+const text = (p, fsx = fs) => { try { return fsx.readFileSync(p, 'utf8'); } catch { return null; } };
 const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
 const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
 const list = (dir, ext) => {
@@ -121,8 +121,8 @@ function skillFiles(dir) {
 }
 
 // Names of env and header keys only; values never leave this function.
-export function mcpServers(file, keyPath) {
-  const raw = text(file);
+export function mcpServers(file, keyPath, fsx = fs) {
+  const raw = text(file, fsx);
   const root = raw && parse(raw, [], { allowTrailingComma: true });
   let node = root;
   for (const k of keyPath) node = node && typeof node === 'object' ? node[k] : undefined;

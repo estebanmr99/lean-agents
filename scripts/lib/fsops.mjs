@@ -309,14 +309,15 @@ export function tilde(text, home, platform = process.platform) {
   if (!home || home === '/' || home === path.sep) return text;
   let out = text;
   const esc = (h) => h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  // Windows: any letter case (#493).
-  for (const h of new Set([home, home.replace(/\\/g, '/')])) out = out.replace(new RegExp(`${esc(h)}(?=[\\\\/])`, platform === 'win32' ? 'gi' : 'g'), '~');
+  // Windows: any letter case (#493). Only at the start of a path: /opt/x/home/me is not /home/me (#506);
+  // a home after `//` (file:///opt/me/x) still counts, so a file URL cannot leak it.
+  for (const h of new Set([home, home.replace(/\\/g, '/')])) out = out.replace(new RegExp(`(?:(?<=//)|(?<![\\\\/\\w.-]))${esc(h)}(?=[\\\\/])`, platform === 'win32' ? 'gi' : 'g'), '~');
   return out;
 }
 
 // `brief`: unchanged files are counted on one line instead of listed (#491).
-export function describe(planned, home, brief = false) {
-  const rel = (p) => (p === home || p.startsWith(home + path.sep) ? `~${p.slice(home.length)}` : p);
+export function describe(planned, home, brief = false, platform = process.platform) {
+  const rel = (p) => homeRel(p, home, platform);
   const same = brief ? planned.filter((p) => p.status === 'unchanged').length : 0;
   return [...planned
     .filter((p) => !(brief && p.status === 'unchanged'))
