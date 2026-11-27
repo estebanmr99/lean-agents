@@ -4,6 +4,22 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+## [1.2.5] - 2026-11-27
+
+### Added
+- `scripts/release-gate.sh <version> [sha]` runs the release gate (audit headings, open `audit` issues, green `ci.yml` run) locally, and `release.yml` calls it instead of inline steps (#515).
+- Changelog fragments: each PR adds `changes/<issue>.md`; `node scripts/changelog.mjs <version>` folds them into `CHANGELOG.md` in the release PR, so parallel PRs no longer conflict under `## [Unreleased]` (#516).
+
+### Changed
+- `core/AGENTS.md` trimmed from 3,016 to 1,599 bytes; every 1.2.4 safety rule kept (#532)
+
+### Docs
+- `docs/audit-template.md` with the headings a release audit must have (#515)
+
+### Fixed
+- Real-binary CI downloads retry a 5xx three times before failing (#505)
+- `--adopt` and `--upgrade-agent` shorten a Windows home path to `~` whatever its letter case, and `tilde()` no longer matches a home inside a longer path (#506)
+
 ## [1.2.4] - 2026-11-27
 
 ### Added
