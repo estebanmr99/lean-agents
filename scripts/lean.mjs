@@ -7,6 +7,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import tty from 'node:tty';
 import { fileURLToPath } from 'node:url';
+import { parse as parseJsonc } from 'jsonc-parser';
 import { plan, apply, undo, describe, tilde, sha, userHash, managedUserHash, writePrivate, privateDir, dropBackups, renameRetry } from './lib/fsops.mjs';
 import { loadCore, renderRules, loadProfile, useToolNode } from './lib/render.mjs';
 import { claudeAdapter } from './lib/adapters/claude.mjs';
@@ -532,11 +533,13 @@ function buildPlan(o, every = null) {
   const rules = renderRules(ROOT, o);
   const actions = [{ kind: 'file', path: rulesPath, content: rules }, ...o.notes];
   const commands = [];
+  const warnings = [];
   for (const agent of o.agents) {
     const profile = loadProfile(ROOT, FIXED_PROFILE[agent] ?? o.profile);
     const r = ADAPTERS[agent]({ home: o.home, core, profile, opts: o, rules, adhdCommand: adhdCommand(o.home), rulesPath: rulesPath.split(path.sep).join('/') });
     actions.push(...r.actions);
     commands.push(...r.commands.map((c) => ({ ...c, agent })));
+    warnings.push(...(r.warnings ?? []));
   }
   commands.push(...leanUpdateCommands(o.agents));
   if (o.tools.includes('coordinate')) commands.push(...coordinateCommands(o.agents));
@@ -552,7 +555,7 @@ function buildPlan(o, every = null) {
     actions.push({ kind: 'block', toml: true, path: path.join(o.home, '.bunfig.toml'), body: 'telemetry = false' });
   }
   actions.push(...posixPathActions(o, every));
-  return { planned: plan(actions, writeRoots(o), readState(o.home)?.files), commands };
+  return { planned: plan(actions, writeRoots(o), readState(o.home)?.files), commands, warnings };
 }
 
 // `behind`: tools whose pinned version is newer than the installed one (--update); their installs run even when the binary is there.
@@ -774,8 +777,9 @@ async function install(o) {
     console.log(`Note: your saved setup is ${prior.agents.join(', ')} with profile ${prior.profile ?? 'none'}; this run changes it. To keep it, use --update, or --add-tools a,b to add tools.`);
   }
   const every = o.everything && !o.migrate ? everythingPrereqs(o, readState(o.home)) : null;
-  const { planned, commands: agentCommands, migration } = buildPlan(o, every);
+  const { planned, commands: agentCommands, migration, warnings = [] } = buildPlan(o, every);
   if (migration && !migration.rows.length) { p.close(); console.log('Nothing to migrate: no rules, agents, skills, prompts, MCP servers or hooks found.'); return o.json && printApplied(o, [], [], []); }
+  for (const w of warnings) (o.json ? console.error : console.log)(tilde(w, o.home));
   const behind = new Set((saved ? behindPins(saved) : []).map((b) => pinTool(b.tool)));
   // The planner owns these installs; the per-tool ones below would repeat them.
   const owned = new Set(pendingPrereqs(every?.steps ?? []).map((s) => (s.id === 'node-24' ? 'node' : s.id)));
@@ -1047,27 +1051,83 @@ async function install(o) {
 
 // --update --undo (#278): each agent CLI goes back to the version it had before the first upgrade lean-agents ran.
 // Plan first; the answer (or --yes) runs it. A failed step is reported and the rest still run; --uninstall never does this.
+// It also moves our own extraKnownMarketplaces ref back through the recorded json edit (#546): only that key, so user
+// or `claude plugin` changes made since stay.
+// The current value at a JSON key path, or undefined when the file or key is gone.
+function readPathValue(file, keyPath) {
+  try {
+    let v = parseJsonc(fs.readFileSync(file, 'utf8'), [], { allowTrailingComma: true });
+    for (const k of keyPath) v = v?.[k];
+    return v;
+  } catch { return undefined; }
+}
+
+function marketplaceRestore(S) {
+  const entries = (S?.files ?? []).filter((f) => (f.applied ?? []).some((e) => e.marketplace));
+  if (!entries.length) return [];
+  // One restore per marketplace: across runs the first edit holds the user's original ref and the last holds ours.
+  const byName = new Map();
+  for (const f of entries) {
+    for (const e of f.applied ?? []) {
+      if (!e.marketplace) continue;
+      const g = byName.get(e.marketplace) ?? { path: f.path, edits: [] };
+      g.edits.push(e);
+      byName.set(e.marketplace, g);
+    }
+  }
+  const restores = [];
+  for (const [marketplace, g] of byName) {
+    const edit = { ...g.edits.at(-1), previous: g.edits[0].previous };
+    // Already reverted, or the user changed it since: it is not ours to move back.
+    if (JSON.stringify(readPathValue(g.path, edit.path)) !== JSON.stringify(edit.value)) continue;
+    restores.push({ path: g.path, marketplace, edit });
+  }
+  return restores;
+}
+
 async function undoAgentUpgrades(o) {
   const S = readState(o.home);
   const stamps = agentStamps(stateDir(o.home));
   const todo = undoPlan(S?.commands ?? [], stamps);
-  if (!todo.length) { console.log('nothing to undo: no agent CLI upgrade by lean-agents is recorded'); return true; }
+  const restore = marketplaceRestore(S);
+  if (!todo.length && !restore.length) { console.log('nothing to undo: no agent CLI upgrade or marketplace pin move by lean-agents is recorded'); return true; }
   console.log('lean-agents --update --undo plan (the oldest saved version per agent):');
   for (const c of todo) {
     console.log(`  - ${agentOf(c)}: back to ${c.from}`);
     for (const argv of [...c.reinstall, ...(c.reinstallAlways ?? [])]) console.log(`      $ ${argv.join(' ')}`);
   }
+  for (const r of restore) console.log(`  - ${tilde(r.path, o.home)}: marketplace ref ${r.edit.value} -> ${r.edit.previous ?? '(none)'}`);
   if (o.dryRun) { console.log('Dry run: nothing was changed.'); return true; }
-  if (!o.exec) { console.log('--no-exec: nothing was run. Not done.'); return false; }
-  if (!o.yes && !(process.stdin.isTTY && process.stdout.isTTY)) { console.log('No terminal to ask on: --yes runs it. Not done.'); return false; }
-  const p = await prompter(o.yes);
-  try { if (!yesNo(await p.ask('Reinstall these versions?', o.yes ? 'y' : 'n'))) { console.log('Cancelled.'); return true; } } finally { p.close(); }
-  Object.assign(process.env, childEnv(S.options.network));
-  const { ok, restored } = undoUpgrades(todo, {}, stamps);
-  // A restored agent's records are spent; a failed one keeps them so the next --update --undo retries it.
-  S.commands = S.commands.filter((c) => !(c.reinstall && restored.has(agentOf(c))));
-  S.updatedAt = new Date().toISOString();
-  writePrivate(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(S, null, 2)}\n`);
+  let ok = true;
+  if (todo.length) {
+    if (!o.exec) { console.log('--no-exec: nothing was run. Not done.'); return false; }
+    if (!o.yes && !(process.stdin.isTTY && process.stdout.isTTY)) { console.log('No terminal to ask on: --yes runs it. Not done.'); return false; }
+    const p = await prompter(o.yes);
+    try { if (!yesNo(await p.ask('Reinstall these versions?', o.yes ? 'y' : 'n'))) { console.log('Cancelled.'); return true; } } finally { p.close(); }
+    Object.assign(process.env, childEnv(S.options.network));
+    const { ok: agentsOk, restored } = undoUpgrades(todo, {}, stamps);
+    ok = agentsOk;
+    // A restored agent's records are spent; a failed one keeps them so the next --update --undo retries it.
+    S.commands = S.commands.filter((c) => !(c.reinstall && restored.has(agentOf(c))));
+    S.updatedAt = new Date().toISOString();
+    writePrivate(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(S, null, 2)}\n`);
+  }
+  if (restore.length) {
+    if (!o.yes && !(process.stdin.isTTY && process.stdout.isTTY)) { console.log('No terminal to ask on: --yes restores the marketplace ref. Not done.'); return false; }
+    const p = await prompter(o.yes);
+    let go;
+    try { go = yesNo(await p.ask('Restore the marketplace ref?', o.yes ? 'y' : 'n')); } finally { p.close(); }
+    if (!go) { console.log('Cancelled.'); return ok; }
+    // One undo entry per file, carrying every marketplace edit for it.
+    const files = new Map();
+    for (const r of restore) {
+      const g = files.get(r.path) ?? { path: r.path, kind: 'json', applied: [], hash: sha(fs.readFileSync(r.path, 'utf8')) };
+      g.applied.push(r.edit);
+      files.set(r.path, g);
+    }
+    const report = new Map(undo([...files.values()], writeRoots(o)).map(([status, p]) => [p, status]));
+    for (const r of restore) console.log(`- ${report.get(r.path)} ${tilde(r.path, o.home)} (${r.marketplace} marketplace ref ${r.edit.previous ?? '(none)'})`);
+  }
   return ok;
 }
 
