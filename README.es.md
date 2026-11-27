@@ -338,6 +338,7 @@ Si ya usas [Warp](https://www.warp.dev) u [Orca](https://github.com/stablyai/orc
 - Tras instalar imprime una lista «Todavía necesitas hacer tú» (login de Cursor, User Rules, **Install CLI & Skills** de Orca y el primer arranque); `--doctor` muestra la misma lista con lo ya hecho.
 - `--uninstall` quita lo que añadió. Con el preset de red todo apagado imprime los interruptores de telemetría (Warp `telemetry_enabled = false`, Orca `DO_NOT_TRACK=1`) y nunca edita los ajustes de las apps.
 - `--update` pone al día una app Warp u Orca gestionada hasta su pin. Si la app la instalaste tú y es más antigua que el pin, se ofrece una vez; sin interacción solo se adopta con `--install-terminal orca|warp|both`, y `--uninstall` nunca borra una app adoptada.
+- `--update` dentro de una sesión de OpenCode aplica todos los pasos que no tocan OpenCode y aplaza el resto (la actualización de OpenCode, `gsd --opencode`): imprime `deferred (OpenCode is running this session): <paso>` por cada uno, termina con código 0, y el siguiente `--update` desde una terminal (o al acabar la sesión) los completa; `--doctor` muestra una fila `pending` hasta entonces (#575).
 
 Fuentes y datos de GUI sin verificar: [docs/compatibility.md](docs/compatibility.md#terminals).
 
