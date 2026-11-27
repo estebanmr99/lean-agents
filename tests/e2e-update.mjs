@@ -93,7 +93,7 @@ export function checkoutUpdateCalled(transcript, releaseDir) {
   if (!transcript) return false;
   const targets = ['\\$\\{?LEAN_AGENTS_RELEASE_DIR\\}?'];
   if (releaseDir) targets.unshift(String(releaseDir).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  const cd = new RegExp(`(^|\\s)cd\\s+["']?(?:${targets.join('|')})["']?(\\s|$)`);
+  const cd = new RegExp(`(^|\\s)cd\\s+["']?(?:${targets.join('|')})["']?(?=\\s|;|&&|$)`);
   for (const line of transcript.split('\n')) {
     let ev;
     try { ev = JSON.parse(line); } catch { continue; }

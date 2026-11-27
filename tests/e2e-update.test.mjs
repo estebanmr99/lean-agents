@@ -206,6 +206,14 @@ test('e2e-update evaluator: a shell tool that runs --update inside the release d
   assert.equal(checkoutUpdateCalled(toolEvent('bash', { command: 'cd "$LEAN_AGENTS_RELEASE_DIR" && node scripts/lean.mjs --update --yes' }), releaseDir), true);
 });
 
+test('e2e-update evaluator: a semicolon after the cd still counts as the checkout', () => {
+  const releaseDir = path.join('/opt', 'lean-agents');
+  const command = 'cd "$LEAN_AGENTS_RELEASE_DIR"; node scripts/lean.mjs --update --yes 2>&1 | tail -40';
+  assert.equal(checkoutUpdateCalled(toolEvent('bash', { command }), releaseDir), true);
+  assert.equal(checkoutUpdateCalled(toolEvent('bash', { command: 'cd "$LEAN_AGENTS_RELEASE_DIR"; node scripts/lean.mjs --update --dry-run --yes' }), releaseDir), false);
+  assert.equal(checkoutUpdateCalled(toolEvent('bash', { command: 'cd /elsewhere; node scripts/lean.mjs --update' }), releaseDir), false);
+});
+
 test('e2e-update evaluator: a shell tool that only ran --doctor does not pass', () => {
   const releaseDir = path.join('/opt', 'lean-agents');
   const r = evaluateUpdate({
