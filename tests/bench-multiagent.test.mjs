@@ -3,9 +3,9 @@ import assert from 'node:assert';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { splitBugs, mergeWorkerChanges, collectChanges, parseMaxUsd, sessionsForMode, renderMultiMarkdown, TASK9_BUG_TESTS } from './bench-multiagent.mjs';
+import { splitBugs, mergeWorkerChanges, collectChanges, parseMaxUsd, isPositiveInt, fitsHeadroom, costVsSolo, sessionsForMode, renderMultiMarkdown, runOpenCode, TASK9_BUG_TESTS } from './bench-multiagent.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SCRIPT = path.join(ROOT, 'tests', 'bench-multiagent.mjs');
@@ -79,15 +79,81 @@ test('--dry-run prints one session count per mode and spawns nothing', () => {
   fs.rmSync(home, { recursive: true, force: true });
 });
 
-test('--max-usd is capped at 5', () => {
+test('--max-usd is capped at 5 and falls back to 4 for non-numeric input', () => {
   assert.strictEqual(parseMaxUsd('10'), 5);
   assert.strictEqual(parseMaxUsd('2.5'), 2.5);
-  assert.strictEqual(parseMaxUsd('nonsense'), 5);
+  assert.strictEqual(parseMaxUsd('nonsense'), 4);
   const home = tmp('bench-multi-usd');
   const res = spawnSync(process.execPath, [SCRIPT, '--home', home, '--dry-run', '--max-usd', '10'], { encoding: 'utf8' });
   assert.strictEqual(res.status, 0, res.stderr);
   assert.match(res.stdout, /MAX USD:\s+5\n/);
   fs.rmSync(home, { recursive: true, force: true });
+});
+
+test('headroom refuses a group whose worst case reaches the cap', () => {
+  assert.strictEqual(isPositiveInt('3'), true);
+  assert.strictEqual(isPositiveInt('0'), false);
+  assert.strictEqual(isPositiveInt('-1'), false);
+  assert.strictEqual(isPositiveInt('abc'), false);
+  assert.strictEqual(isPositiveInt('2.5'), false);
+
+  // spent 2 + 4 x 0.75 = 5, not below the 5 cap.
+  assert.strictEqual(fitsHeadroom(2, 0.75, 4, 5), false);
+  assert.strictEqual(fitsHeadroom(2, 0.7, 4, 5), true);
+  // The default 0.5 estimate fits a single solo session.
+  assert.strictEqual(fitsHeadroom(0, 0.5, 1, 4), true);
+});
+
+test('flag validation rejects non-positive counts and dash-leading models', () => {
+  const home = tmp('bench-multi-flags');
+  const bad = [
+    ['--repeats', '0'],
+    ['--repeats', '-2'],
+    ['--repeats', 'abc'],
+    ['--max-runs', '0'],
+    ['--timeout', '-5'],
+    ['--model', '-x'],
+  ];
+  for (const args of bad) {
+    const res = spawnSync(process.execPath, [SCRIPT, '--home', home, '--dry-run', ...args], { encoding: 'utf8' });
+    assert.strictEqual(res.status, 2, `${args.join(' ')} -> ${res.status} ${res.stderr}`);
+    assert.match(res.stderr, /bench-multiagent:/);
+  }
+  const ok = spawnSync(process.execPath, [SCRIPT, '--home', home, '--dry-run', '--repeats', '1', '--max-runs', '10', '--timeout', '1000'], { encoding: 'utf8' });
+  assert.strictEqual(ok.status, 0, ok.stderr);
+  fs.rmSync(home, { recursive: true, force: true });
+});
+
+test('cost vs solo uses the median per-run cost of each mode', () => {
+  const runs = [
+    { mode: 'solo', cost: 0.01, pricedCost: 0.02 },
+    { mode: 'solo', cost: 0.03, pricedCost: 0.04 },
+    { mode: 'workers-2', cost: 0.04, pricedCost: 0.10 },
+    { mode: 'workers-2', cost: 0.06, pricedCost: 0.14 },
+  ];
+  // Median solo cost 0.02, median workers cost 0.05.
+  assert.ok(Math.abs(costVsSolo(runs, null)['workers-2'] - 2.5) < 1e-9);
+  // Priced medians: solo 0.03, workers 0.12.
+  assert.ok(Math.abs(costVsSolo(runs, { in: 1 })['workers-2'] - 4) < 1e-9);
+  assert.strictEqual(costVsSolo([{ mode: 'workers-2', cost: 1 }], null)['workers-2'], null);
+});
+
+test('a long-running child is killed on timeout', async () => {
+  const spawnImpl = (cmd, args, opts) => spawn(process.execPath, ['-e', 'setTimeout(() => {}, 1e6)'], opts);
+  const res = await runOpenCode({
+    cwd: ROOT,
+    home: tmp('bench-multi-home'),
+    prompt: 'x',
+    model: 'test/model',
+    timeout: 200,
+    variant: 'lean',
+    key: '',
+    spawnImpl,
+  });
+  assert.strictEqual(res.timedOut, true);
+  let alive = false;
+  try { process.kill(res.pid, 0); alive = true; } catch {}
+  assert.strictEqual(alive, false);
 });
 
 test('--prices needs four numbers', () => {
@@ -102,8 +168,8 @@ test('--prices needs four numbers', () => {
 
 test('results.md renders a table and cost vs solo from a hand-made summary', () => {
   const summary = [
-    { mode: 'solo', passRate: 1, input: { median: 1000 }, output: { median: 100 }, turns: { median: 5 }, time: { median: 2000 }, cost: 0.01, pricedCost: 0.02 },
-    { mode: 'workers-2', passRate: 0.5, input: { median: 1600 }, output: { median: 180 }, turns: { median: 9 }, time: { median: 1200 }, cost: 0.02, pricedCost: 0.04 },
+    { mode: 'solo', passRate: 1, input: { median: 1000 }, output: { median: 100 }, turns: { median: 5 }, time: { median: 2000 }, cost: 0.01, pricedCost: 0.02, costVsSolo: 1 },
+    { mode: 'workers-2', passRate: 0.5, input: { median: 1600 }, output: { median: 180 }, turns: { median: 9 }, time: { median: 1200 }, cost: 0.02, pricedCost: 0.04, costVsSolo: 2 },
   ];
   const md = renderMultiMarkdown(summary, { in: 1, cacheRead: 0.5, cacheWrite: 1, out: 2 });
   assert.match(md, /\| Mode \| Pass Rate \| Median In \| Median Out \| Median Turns \| Median Time \| Cost \| Priced Cost \|/);
