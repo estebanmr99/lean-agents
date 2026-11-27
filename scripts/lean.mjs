@@ -40,14 +40,14 @@ import { buildSummary } from './lib/summary-data.mjs';
 import { loginRows } from './lib/logins.mjs';
 import { renderSummary, canOffer, openArgv } from './lib/summary-html.mjs';
 import { redactText } from './lib/redact.mjs';
-import { planUpdate, changelogNotes, formatUpdatePlan } from './lib/update-plan.mjs';
+import { planUpdate, appUpdateRows, appAdoptQuestion, appAdoptHint, appAdoptAction, changelogNotes, formatUpdatePlan } from './lib/update-plan.mjs';
 import { PINS, pinVersions, behindPins, pinTool, nodeRange, npmSpec, rtkPin, rtkTooOld } from './lib/pins.mjs';
 import { findNvm, installedNodes, nodeFloorFix, resolveToolNodes, nvmLatest, nvmInstallArgv, nvmEnv, toolEnv, satisfies, compare } from './lib/node-runtime.mjs';
 import { leanUpdateCommands, coordinateCommands, leanMigrateCommands } from './lib/lean-update.mjs';
 import { canUseMenus, menuPrompter, menuProgress } from './lib/ui.mjs';
 import { CATEGORIES, preset, onOff, fromPrivacy, privacyOf, childEnv, shareProxy, proxyReport } from './lib/network.mjs';
 import { unverifiedItems, notesFile } from './lib/unverified.mjs';
-import { detectTerminals, TERMINALS, parseTerminal, terminalCommands, terminalPrivacyNotes, orcaEnvSet, gitBashActions, stillNeeded, shellNotice } from './lib/terminals.mjs';
+import { detectTerminals, TERMINALS, parseTerminal, terminalCommands, installedAppVersions, appUpdateTarget, appRunning, terminalPrivacyNotes, orcaEnvSet, gitBashActions, stillNeeded, shellNotice } from './lib/terminals.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ADAPTERS = { claude: claudeAdapter, 'opencode-v1': opencodeV1Adapter, 'opencode-v2': opencodeV2Adapter, 'copilot-cli': copilotAdapter, antigravity: antigravityAdapter };
@@ -392,6 +392,10 @@ async function choose(o, saved) {
   o.deferred = resolved.skipped.map((s) => s.tool);
   o.toolNode = resolved.toolNode && { ...resolved.toolNode, nvmDir: nvm.dir };
   if (o.toolNode && o.agents.includes('claude') && o.tools.includes('context-mode')) console.log('Context Mode on Claude Code runs as an MCP server on its own Node: its hooks and skills (the plugin) are not installed.');
+  // The flag itself, before the saved choice fills o.installTerminals in below.
+  const requestedTerminals = o.installTerminals ? [...o.installTerminals] : [];
+  o.adoptedTerminals = [...new Set([...(saved?.adoptedTerminals ?? []), ...(o.adoptedTerminals ?? [])])];
+  o.declinedTerminals = [...new Set([...(saved?.declinedTerminals ?? []), ...(o.declinedTerminals ?? [])])];
   if (o.project) {
     o.terminals = [];
     o.installTerminals = [];
@@ -424,6 +428,51 @@ async function choose(o, saved) {
   } else {
     o.installTerminals = o.installTerminals ?? saved?.installTerminals ?? [];
     o.terminals = [...new Set([...o.terminals, ...o.installTerminals])];
+  }
+  if (o.command === 'update' && !o.project) {
+    // Keep the apps this install manages and add the ones --install-terminal asks for now.
+    o.installTerminals = [...new Set([...(saved?.installTerminals ?? []), ...requestedTerminals])];
+    o.terminals = [...new Set([...o.terminals, ...o.installTerminals])];
+    // An explicit --install-terminal overrides an earlier "no".
+    o.declinedTerminals = o.declinedTerminals.filter((a) => !requestedTerminals.includes(a));
+    const apps = installedAppVersions({ home: o.home, platform: process.platform, system: o.home === REAL_HOME, run: o.exec ? quiet : () => ({ ok: false, out: '' }) });
+    const rows = appUpdateRows({ pins: PINS, installed: apps, managed: saved?.installTerminals ?? [], platform: process.platform });
+    // --dry-run never asks: it plans adoptions, and non-interactively the hint names the flag.
+    // Test-only (LEAN_AGENTS_TEST=1): FORCE_ASK answers the adoption question even with --yes.
+    const canAsk = (!o.yes || (process.env.LEAN_AGENTS_TEST === '1' && process.env.LEAN_AGENTS_TEST_FORCE_ASK === '1')) && !o.everything && !o.dryRun;
+    // Test-only (LEAN_AGENTS_TEST=1): answer the adoption question without a terminal, so engine tests can prove a "no".
+    const testAnswers = process.env.LEAN_AGENTS_TEST === '1' && process.env.LEAN_AGENTS_TEST_APP_ANSWERS ? process.env.LEAN_AGENTS_TEST_APP_ANSWERS.split(',') : [];
+    for (const row of rows) {
+      if (row.action === 'update') continue;
+      const action = appAdoptAction({ row, requested: requestedTerminals, declined: o.declinedTerminals, canAsk });
+      const answer = action === 'ask' ? (testAnswers.length ? testAnswers.shift() : await p.ask(appAdoptQuestion(row), 'n')) : null;
+      // A user-installed app: adopt it only on a yes, or when --install-terminal names it. Undo then leaves it alone.
+      if (action === 'adopt' || (action === 'ask' && yesNo(answer))) {
+        o.installTerminals = [...new Set([...o.installTerminals, row.app])];
+        o.adoptedTerminals = [...new Set([...o.adoptedTerminals, row.app])];
+        row.action = 'update';
+        row.reason = null;
+      } else {
+        if (action === 'ask') o.declinedTerminals = [...new Set([...o.declinedTerminals, row.app])];
+        // Same channel as the other update notes, so --json stdout stays one JSON object.
+        (o.json ? console.error : console.log)(appAdoptHint(row));
+      }
+    }
+    for (const row of rows) {
+      if (row.action !== 'update' || row.app !== 'orca') continue;
+      const target = appUpdateTarget({
+        home: o.home, app: 'orca', platform: process.platform, system: o.home === REAL_HOME,
+        running: o.exec && o.home === REAL_HOME && appRunning({ app: 'orca' }),
+      });
+      if (target.blocked) {
+        row.action = 'held';
+        row.reason = target.blocked;
+      } else if (target.path) {
+        o.appPaths = { ...o.appPaths, orca: target.path };
+      }
+    }
+    o.appRows = rows;
+    o.appUpdates = rows.filter((r) => r.action === 'update').map((r) => r.app);
   }
   if (o.installTerminals?.length) {
     const isReal = o.home === REAL_HOME;
@@ -544,7 +593,7 @@ function buildPlan(o, every = null) {
   commands.push(...leanUpdateCommands(o.agents));
   if (o.tools.includes('coordinate')) commands.push(...coordinateCommands(o.agents));
   if (o.tools.includes('lean-migrate')) commands.push(...leanMigrateCommands(o.agents));
-  commands.push(...terminalCommands({ home: o.home, terminals: o.terminals, installTerminals: o.installTerminals, agents: o.agents, network: o.network, system: o.home === REAL_HOME, platform: process.platform }));
+  commands.push(...terminalCommands({ home: o.home, terminals: o.terminals, installTerminals: o.installTerminals, updateApps: o.appUpdates, adoptedTerminals: o.adoptedTerminals, appPaths: o.appPaths, agents: o.agents, network: o.network, system: o.home === REAL_HOME, platform: process.platform }));
   actions.push(...gitBashActions({ home: o.home, terminals: o.terminals, agents: o.agents }));
   if (o.tools.includes('gsd')) {
     const r = gsdPlan(ROOT, o.home, o);
@@ -732,6 +781,7 @@ function updateInfo(o, saved) {
   const numeric = Object.fromEntries(Object.entries(installed).map(([b, v]) => [b, v?.replace(/-.*/, '') ?? null]));
   const raw = { 'claude-code': installed.claude, 'opencode-v2': installed.opencode, 'copilot-cli': installed.copilot };
   const rows = planUpdate({ saved, pins: PINS, owned, installed: numeric }).map((r) => (r.action === 'update' && raw[r.tool] ? { ...r, raw: raw[r.tool] } : r));
+  rows.push(...(o.appRows ?? []));
   const log = path.join(ROOT, 'CHANGELOG.md');
   const current = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
   return { rows, notes: changelogNotes(fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '', saved.version ?? '0.0.0', current) };
@@ -923,7 +973,7 @@ async function install(o) {
       installedAt: previous?.installedAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       pins: pinVersions(),
-      options: o.migrate ? previous?.options ?? { migrateOnly: true, agents: o.agents, tools: [], privacy: o.privacy, network: o.network, gh: false, terminals: [], installTerminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false, shell: 'git-bash' } : { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, keepUpdater: !!o.keepUpdater, gh: o.gh, terminals: o.terminals, installTerminals: o.installTerminals, unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun, shell: o.shell },
+      options: o.migrate ? previous?.options ?? { migrateOnly: true, agents: o.agents, tools: [], privacy: o.privacy, network: o.network, gh: false, terminals: [], installTerminals: [], adoptedTerminals: [], declinedTerminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false, shell: 'git-bash' } : { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, keepUpdater: !!o.keepUpdater, gh: o.gh, terminals: o.terminals, installTerminals: o.installTerminals, adoptedTerminals: o.adoptedTerminals ?? [], declinedTerminals: o.declinedTerminals ?? [], unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun, shell: o.shell },
       ...(o.toolNode && { toolNode: { version: o.toolNode.version, installedByLean: !!o.toolNode.install || (previous?.toolNode?.version === o.toolNode.version && !!previous.toolNode.installedByLean) } }),
       files: [...(previous?.files ?? []), ...files],
       ...(previous?.opencode1 && { opencode1: previous.opencode1 }),
