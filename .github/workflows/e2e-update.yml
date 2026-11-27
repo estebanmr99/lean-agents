@@ -37,12 +37,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      # Everything the tools and lean-agents write stays inside this throwaway home.
-      HOME: ${{ runner.temp }}/e2e-home
-      XDG_CONFIG_HOME: ${{ runner.temp }}/e2e-home/.config
-      NPM_CONFIG_PREFIX: ${{ runner.temp }}/e2e-home/npm
-      E2E_RAW: ${{ runner.temp }}/e2e-raw
-      E2E_OUT: ${{ runner.temp }}/e2e-out
+      # Everything the tools and lean-agents write stays inside this throwaway home, next to the checkout.
+      # runner.* is not allowed in a job-level env; github.workspace/.. is the job's own temp parent.
+      HOME: ${{ github.workspace }}/../e2e-home
+      XDG_CONFIG_HOME: ${{ github.workspace }}/../e2e-home/.config
+      NPM_CONFIG_PREFIX: ${{ github.workspace }}/../e2e-home/npm
+      E2E_RAW: ${{ github.workspace }}/../e2e-raw
+      E2E_OUT: ${{ github.workspace }}/../e2e-out
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -354,4 +355,4 @@ jobs:
         with:
           name: e2e-update
           retention-days: 14
-          path: ${{ runner.temp }}/e2e-out/
+          path: ${{ github.workspace }}/../e2e-out/

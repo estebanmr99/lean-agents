@@ -181,6 +181,8 @@ test('e2e-update workflow: manual only, read-only token, capped budget and pinne
   assert.match(text, /tests\/e2e-update\.mjs evaluate/);
   assert.doesNotMatch(text, /echo\s+.*OPENROUTER_API_KEY/);
   assert.doesNotMatch(text, /set -x/);
+  // Job-level env cannot use the runner context (GitHub rejects the whole workflow file).
+  assert.doesNotMatch(text, /\$\{\{ runner\.temp \}\}/);
 });
 
 test('e2e-update workflow: checkout mode serves the packed branch and the branch skill', () => {
