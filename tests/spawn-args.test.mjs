@@ -15,7 +15,7 @@ test('#475: spawnArgs on Windows runs a .cmd shim through cmd.exe with every arg
   const r = spawnArgs('npx', ['-y', 'a b & c'], 'win32', () => ['C:\\Program Files\\nodejs\\npx', 'C:\\Program Files\\nodejs\\npx.cmd']);
   assert.equal(r.file.toLowerCase().endsWith('cmd.exe'), true);
   assert.deepEqual(r.args.slice(0, 3), ['/d', '/s', '/c']);
-  assert.equal(r.args[3], '""C:\\Program Files\\nodejs\\npx.cmd" ^"-y^" ^"a^ b^ ^&^ c^""');
+  assert.equal(r.args[3], '""C:\\Program Files\\nodejs\\npx.cmd" ^^^"-y^^^" ^^^"a^^^ b^^^ ^^^&^^^ c^^^""');
   assert.equal(r.opts.windowsVerbatimArguments, true);
   assert.equal('shell' in r.opts, false);
   // A real .exe and every POSIX binary run directly.

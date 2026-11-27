@@ -18,20 +18,17 @@ export const which = (bin) => whereAll(bin)[0] ?? null;
 
 // Windows .cmd shims (npm, npx) run through cmd.exe /d /s /c with each argument quoted and every cmd metacharacter ^-escaped,
 // the way cross-spawn (MIT) does it, so cmd never sees an open quote and `&`, `%` or `|` stay literal. Node 24 deprecates
-// args with `shell: true` because it only concatenates them (DEP0190, #475). npm's node_modules/.bin shims parse twice.
+// args with `shell: true` because it only concatenates them (DEP0190, #475). A batch file re-parses its %*,
+// so every argument is escaped twice: once for this cmd.exe line, once for the shim's own line.
 const META = /([()\][%!^"`<>&|;, *?])/g;
-const cmdArg = (a, twice) => {
-  const q = `"${String(a).replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, '$1$1')}"`.replace(META, '^$1');
-  return twice ? q.replace(META, '^$1') : q;
-};
+const cmdArg = (a) => `"${String(a).replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, '$1$1')}"`.replace(META, '^$1').replace(META, '^$1');
 export function spawnArgs(bin, args, platform = process.platform, resolve = whereAll) {
   const direct = { file: bin, args, opts: {} };
   if (platform !== 'win32' || /\.exe$/i.test(bin)) return direct;
   const full = /\.(cmd|bat)$/i.test(bin) && path.win32.isAbsolute(bin) ? bin : resolve(bin).find((f) => /\.(exe|cmd|bat)$/i.test(f));
   if (!full || /\.exe$/i.test(full)) return direct;
-  const twice = /node_modules[\\/]\.bin[\\/][^\\/]+\.(cmd|bat)$/i.test(full);
   // The file in plain quotes (a Windows path cannot hold `"`): a ^-escaped path breaks the shim's own %~dp0.
-  const line = [`"${full}"`, ...args.map((a) => cmdArg(a, twice))].join(' ');
+  const line = [`"${full}"`, ...args.map(cmdArg)].join(' ');
   return { file: process.env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', `"${line}"`], opts: { windowsVerbatimArguments: true } };
 }
 // The shim is looked up on the child's PATH, as cmd.exe did when `shell: true` ran it.
