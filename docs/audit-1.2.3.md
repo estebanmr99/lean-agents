@@ -24,7 +24,7 @@ Release audit of lean-agents for 1.2.3 (2026-11-26). Range: v1.2.2..89f269e (mai
   - CI: upload-artifact v7.0.2, download-artifact v8.0.2, and Dependabot grouped into one PR per ecosystem.
 - **Findings:** no HIGH. One MEDIUM, fixed before release (#510). Five LOW, all accepted.
 - **Owner-only gates:**
-  - Tag v1.2.3 (needs the owner's approval)
+  - Tag v1.2.3 (approved by the owner on 2026-11-26)
   - Release run green on the tagged SHA
   - OIDC publish proof
 
@@ -57,6 +57,6 @@ Release audit of lean-agents for 1.2.3 (2026-11-26). Range: v1.2.2..89f269e (mai
 
 ## Owner-only gates
 
-1. **Tag v1.2.3:** pending the owner's approval.
-2. **Release run green:** pending.
-3. **OIDC publish proof:** pending.
+1. **Tag v1.2.3:** approved by the owner on 2026-11-26. Tagged on 1052c9f: the first run (45933133811) stopped at the audit gate on a heading name before publishing anything (#512), and the tag was moved.
+2. **Release run green:** `release.yml` run 45934323340 passed on the tag (2026-11-26).
+3. **OIDC publish proof:** npm shows 1.2.3 as `latest`, with SLSA provenance (checked 2026-11-26).
