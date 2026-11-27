@@ -11,16 +11,19 @@ export function draftIssue({ network, home, env = process.env, versions = {}, co
   const clean = (t) => redactText(t, { home, env });
   const update = kind === 'update';
   const verify = kind === 'verify';
+  // At most 100 characters, cut after a whole word (#476).
+  const cut = (t) => (t.length <= 100 ? t : `${t.slice(0, 99).replace(/\s+\S*$/, '')}…`);
   const versionLines = Object.entries(versions).map(([k, v]) => `- ${k}: ${clean(v)}`);
   return {
-    title: clean(`${update ? 'Update finding' : verify ? 'Verify finding' : 'Install failed'}: ${command}`).slice(0, 100),
+    // "Problem running": the input can be a warning from a command that exited 0 (#476).
+    title: cut(clean(`${update ? 'Update finding' : verify ? 'Verify finding' : 'Problem running'}: ${command}`)),
     body: [
-      update ? '## What the update found' : verify ? '## What the check found' : '## What failed',
+      update ? '## What the update found' : verify ? '## What the check found' : '## What happened',
       `- OS: ${platform}`,
       ...versionLines,
       `- ${update || verify ? 'Tool' : 'Command'}: \`${clean(command)}\``,
       '',
-      update || verify ? '## Details' : '## Error',
+      update || verify ? '## Details' : '## Output',
       '```',
       clean(error).trim(),
       '```',
