@@ -73,7 +73,7 @@ test('A2 below min: one row with version, min and update command', { skip: win }
   assert.equal(rows.length, 1);
   assert.equal(rows[0].blocker, true);
   const text = formatPreflight(r, { home, env: {} });
-  assert.match(text, /0\.42\.0/); assert.match(text, /v1\.2\.0/); assert.match(text, /brew upgrade rtk/);
+  assert.match(text, /0\.42\.0/); assert.match(text, /minimum 1\.2\.0\n/); assert.match(text, /brew upgrade rtk/);
   assert.match(text, /1 blocker, 0 warnings\. Nothing was changed\./);
 });
 
@@ -282,6 +282,43 @@ test('#488 a running opencode (blocker with 1.x data, else warning) has a stop l
   assert.equal(warn.findings.find((x) => x.kind === 'opencode-running').blocker, false, 'no 1.x db: warning');
   writeJson(path.join(home, '.local', 'share', 'opencode', 'opencode.db'), 'db');
   assert.equal(preflight(base(home, [], { list: () => ['C:\\x\\opencode.exe'] })).findings.find((x) => x.kind === 'opencode-running').blocker, true);
+});
+
+// #547: only a copy under a Chocolatey folder changes the hint; every other copy keeps the route-based one.
+function probeTool({ platform, tool, file, version, pm = null }) {
+  const p = platform === 'win32' ? path.win32 : path.posix;
+  const home = platform === 'win32' ? 'D:\\tools\\home' : '/tmp/lean-preflight-home';
+  const fsx = { statSync: (f) => { if (f !== file) throw new Error('ENOENT'); return { isFile: () => true }; }, accessSync: (f) => { if (f !== file) throw new Error('EACCES'); }, realpathSync: (f) => f, existsSync: () => false };
+  const env = { PATH: p.dirname(file), ...(platform === 'win32' ? { PATHEXT: '.EXE' } : {}) };
+  return preflight({ home, env, platform, fsx, pm: pm ?? (platform === 'win32' ? 'winget' : null), probe: () => version, readWinPath: () => ({ user: '', machine: '' }), list: () => [], statfs: () => ({ bavail: 1e9, bsize: 4096 }), realHome: home });
+}
+
+test('#547 a Chocolatey jq gets choco upgrade jq', () => {
+  const r = probeTool({ platform: 'win32', tool: 'jq', file: 'C:\\ProgramData\\chocolatey\\bin\\jq.EXE', version: '1.8.1' });
+  assert.equal(r.findings.find((x) => x.tool === 'jq' && x.kind === 'below-min').fix, 'choco upgrade jq');
+});
+
+test('#547 a gh under WinGet Links gets winget upgrade', () => {
+  const r = probeTool({ platform: 'win32', tool: 'gh', file: 'D:\\tools\\WinGet\\Links\\gh.EXE', version: '2.100.0' });
+  assert.equal(r.findings.find((x) => x.tool === 'gh' && x.kind === 'below-min').fix, 'winget upgrade --id GitHub.cli');
+});
+
+test('#547 /usr/local/bin/jq on brew gets brew upgrade jq', () => {
+  const r = probeTool({ platform: 'linux', tool: 'jq', file: '/usr/local/bin/jq', version: '1.6.0', pm: 'brew' });
+  assert.equal(r.findings.find((x) => x.tool === 'jq' && x.kind === 'below-min').fix, 'brew upgrade jq');
+});
+
+test('#547 gh in its own install folder on win32 still gets winget upgrade', () => {
+  const r = probeTool({ platform: 'win32', tool: 'gh', file: 'C:\\Program Files\\GitHub CLI\\gh.EXE', version: '2.100.0' });
+  assert.equal(r.findings.find((x) => x.tool === 'gh' && x.kind === 'below-min').fix, 'winget upgrade --id GitHub.cli');
+});
+
+test('#547 the gh minimum prints without a leading v', () => {
+  const r = probeTool({ platform: 'win32', tool: 'gh', file: 'D:\\tools\\WinGet\\Links\\gh.EXE', version: '2.100.0' });
+  const text = formatPreflight(r, { home: 'D:\\tools\\home', env: {} });
+  assert.match(text, /minimum 2\.103\.3/);
+  assert.doesNotMatch(text, /minimum v2\.103\.3/);
+  assert.doesNotMatch(r.findings.find((x) => x.tool === 'gh' && x.kind === 'below-min').fix, /v2\.103\.3/);
 });
 
 test('jq fix line on win32 is winget (pure logic)', () => {

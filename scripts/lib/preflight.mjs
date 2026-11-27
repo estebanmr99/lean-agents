@@ -23,6 +23,8 @@ const TOOLS = [['claude', 'claude-code'], ['opencode', 'opencode-v2'], ['copilot
 const BEHIND_PIN = new Set(['claude-code', 'copilot-cli', 'context-mode']);
 // tool -> the prereqFor() key whose install row has the package-manager ids.
 const PREREQ = { rtk: 'rtk', uv: 'serena', gh: 'gh' };
+// Chocolatey ids, only for tools with a known package; any other copy keeps the route-based hint.
+const CHOCO = { jq: 'jq', gh: 'gh' };
 // Below `min` blocks only where lean-agents skips or fails its steps (rtk, #467); for the rest `min` is just the verified release.
 const BLOCKING_MIN = new Set(['rtk']);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -94,16 +96,24 @@ export function staleWindowPath({ env, readWinPath = readWinPathFromRegistry, fs
   return missing;
 }
 
-// How to update a tool, from the pins and the install table in system.mjs (no ids of its own).
-function updateFix(pinKey, platform, pm) {
+// A version as printed: one format everywhere, no leading `v` (pins keep theirs).
+const plain = (v) => (typeof v === 'string' ? v.replace(/^v(?=\d)/i, '') : v);
+
+// How to update a tool, from the pins and the install table in system.mjs. Only a copy under a Chocolatey folder
+// changes the hint; every other copy keeps the route the install table gives, as before #547.
+function updateFix(pinKey, platform, pm, copyPath = '') {
   const p = PINS[pinKey];
+  const ver = plain(p.min ?? p.version);
+  const release = `https://github.com/${p.source}/releases`;
   if (p.kind === 'npm') return `npm install -g ${npmSpec(pinKey)}`;
+  const choco = CHOCO[pinKey];
+  if (choco && /[\\/]chocolatey[\\/]/i.test(String(copyPath ?? ''))) return `choco upgrade ${choco}`;
   // jq has no prereqFor row; these ids are the ones prereqs.mjs installs it with.
-  if (pinKey === 'jq') return platform === 'win32' ? 'winget upgrade --id jqlang.jq' : pm === 'brew' ? 'brew upgrade jq' : `install ${p.min ?? p.version} or newer from https://github.com/${p.source}/releases, or run lean-agents --update`;
+  if (pinKey === 'jq') return platform === 'win32' ? 'winget upgrade --id jqlang.jq' : pm === 'brew' ? 'brew upgrade jq' : `install ${ver} or newer from ${release}, or run lean-agents --update`;
   const inst = PREREQ[pinKey] && prereqFor(PREREQ[pinKey], platform === 'win32' ? 'winget' : pm)?.install?.[0];
   if (inst?.[0] === 'winget') return `winget upgrade --id ${inst[inst.indexOf('--id') + 1]}`;
   if (inst?.[0] === 'brew') return `brew upgrade ${inst.at(-1)}`;
-  return `install ${p.min ?? p.version} or newer from https://github.com/${p.source}/releases, or run lean-agents --update`;
+  return `install ${ver} or newer from ${release}, or run lean-agents --update`;
 }
 
 // Several nvm Nodes with the same pinned npm tool in more than one, or only in a Node that is not the active one (#465).
@@ -167,9 +177,9 @@ export function preflight({ home, env = process.env, platform = process.platform
     const [win] = copies;
     const pin = PINS[pinKey];
     if (known(win.version) && pin.min && compare(win.version, pin.min) < 0) {
-      add({ tool, kind: 'below-min', blocker: BLOCKING_MIN.has(pinKey), version: win.version, min: pin.min, path: win.path, fix: updateFix(pinKey, platform, pm) });
+      add({ tool, kind: 'below-min', blocker: BLOCKING_MIN.has(pinKey), version: win.version, min: pin.min, path: win.path, fix: updateFix(pinKey, platform, pm, win.path) });
     } else if (known(win.version) && BEHIND_PIN.has(pinKey) && compare(win.version, pin.version) < 0) {
-      add({ tool, kind: 'behind-pin', blocker: false, version: win.version, pinned: pin.version, path: win.path, fix: updateFix(pinKey, platform, pm) });
+      add({ tool, kind: 'behind-pin', blocker: false, version: win.version, pinned: pin.version, path: win.path, fix: updateFix(pinKey, platform, pm, win.path) });
     }
     if (copies.length > 1) {
       const newer = copies.slice(1).some((c) => known(win.version) && known(c.version) && compare(c.version, win.version) > 0);
@@ -202,12 +212,12 @@ export function preflight({ home, env = process.env, platform = process.platform
 
 function line(f) {
   const tag = f.blocker ? 'BLOCKER' : 'warning';
-  const v = (x) => x ?? 'not checked';
-  if (f.kind === 'below-min') return [`${tag}  ${f.tool} ${f.version} at ${f.path} is older than the minimum ${f.min}`, `  fix: ${f.fix}`];
-  if (f.kind === 'behind-pin') return [`${tag}  ${f.tool} ${f.version} at ${f.path} is older than the pinned ${f.pinned}`, `  fix: ${f.fix}`];
+  const v = (x) => (x == null ? 'not checked' : plain(x));
+  if (f.kind === 'below-min') return [`${tag}  ${f.tool} ${v(f.version)} at ${f.path} is older than the minimum ${v(f.min)}`, `  fix: ${f.fix}`];
+  if (f.kind === 'behind-pin') return [`${tag}  ${f.tool} ${v(f.version)} at ${f.path} is older than the pinned ${v(f.pinned)}`, `  fix: ${f.fix}`];
   if (f.kind === 'relative-path') return [`${tag}  relative PATH entries skipped: ${f.entries.join('; ')}`, `  fix: ${f.fix}`];
   if (f.kind === 'stale-path') return [`${tag}  ${f.fix}`, ...(f.hidden.length ? [`    not visible in this window: ${f.hidden.join(', ')}`] : [])];
-  if (f.kind === 'nvm-copies') return [`${tag}  ${f.tool} is installed under ${f.copies.length} nvm Node${f.copies.length === 1 ? '' : 's'}${f.active ? ` (active: ${f.active})` : ''}: ${f.copies.map((c) => `${c.node} has ${c.version}`).join(', ')}`, `  fix: ${f.fix}`];
+  if (f.kind === 'nvm-copies') return [`${tag}  ${f.tool} is installed under ${f.copies.length} nvm Node${f.copies.length === 1 ? '' : 's'}${f.active ? ` (active: ${f.active})` : ''}: ${f.copies.map((c) => `${c.node} has ${v(c.version)}`).join(', ')}`, `  fix: ${f.fix}`];
   if (f.kind === 'backup-space') return [`${tag}  not enough disk space for the OpenCode 1.x backup: ${f.free} free, ${f.needed} needed`, `  fix: ${f.fix}`];
   if (f.kind === 'opencode-running') return [`${tag}  an opencode process is running`, `  fix: ${f.fix}`];
   return [`${tag}  ${f.tool}: ${f.copies.length} copies on PATH, the first one wins`,
