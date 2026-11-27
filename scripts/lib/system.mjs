@@ -10,8 +10,8 @@ import { allowedEnv } from './network.mjs';
 const isWin = process.platform === 'win32';
 
 // Every match, in PATH order. POSIX: `command -v` gets the name as "$1", never spliced into the script (#475); /bin/sh as shell: true used.
-const whereAll = (bin) => {
-  const r = isWin ? spawnSync('where', [bin], { encoding: 'utf8' }) : spawnSync('/bin/sh', ['-c', 'command -v "$1"', 'sh', bin], { encoding: 'utf8' });
+const whereAll = (bin, env) => {
+  const r = isWin ? spawnSync('where', [bin], { encoding: 'utf8', ...(env && { env }) }) : spawnSync('/bin/sh', ['-c', 'command -v "$1"', 'sh', bin], { encoding: 'utf8' });
   return r.status === 0 ? r.stdout.trim().split(/\r?\n/).filter(Boolean) : [];
 };
 export const which = (bin) => whereAll(bin)[0] ?? null;
@@ -33,7 +33,8 @@ export function spawnArgs(bin, args, platform = process.platform, resolve = wher
   const line = [full.replace(META, '^$1'), ...args.map((a) => cmdArg(a, twice))].join(' ');
   return { file: process.env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', `"${line}"`], opts: { windowsVerbatimArguments: true } };
 }
-const spawnFor = (argv, opts) => { const s = spawnArgs(argv[0], argv.slice(1)); return spawnSync(s.file, s.args, { ...opts, ...s.opts }); };
+// The shim is looked up on the child's PATH, as cmd.exe did when `shell: true` ran it.
+export const spawnFor = (argv, opts = {}) => { const s = spawnArgs(argv[0], argv.slice(1), process.platform, (b) => whereAll(b, opts.env)); return spawnSync(s.file, s.args, { ...opts, ...s.opts }); };
 
 // Windows .cmd/.bat files run through cmd.exe /d /s /c "<quoted file> <args>" (#475): no shell option, and a path with a cmd
 // metacharacter is refused (null) instead of being quoted. Args are fixed words from callers, so they need no quoting.
