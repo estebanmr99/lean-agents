@@ -561,7 +561,7 @@ lean-agents es pegamento. El trabajo pesado lo hacen estos proyectos; dales una 
 - [x] Sesiones de agentes en paralelo (`scripts/parallel.mjs`)
 - [x] Integraciones de Warp y Orca para quien ya las usa
 - [x] App y CLI de Antigravity en macOS, Linux y Windows (la carga en la app sigue en VERIFY)
-- [x] `v1.2.4` (último): `--adopt` lista cada paquete npm global de cada Node de nvm, `--doctor` ya no marca `settings.json` tras `--update` en instalaciones anteriores a 1.2.2, pin del plugin context-mode v2.1.7, harness de benchmark multiagente.
+- [x] `v1.2.4` (último): `--adopt` lista cada paquete npm global de cada Node de nvm, `--doctor` ya no marca `settings.json` tras `--update` en instalaciones hechas con 1.2.1, pin del plugin context-mode v2.1.7, harness de benchmark multiagente.
 - [x] `v1.2.3`: chequeo `--preflight`, una línea por paso con un log por ejecución, `--update` se detiene si OpenCode está abierto y no pregunta a mitad, procesos hijos sin `shell: true` (DEP0190), arreglos de rutas de home en Windows y de duplicados en `--adopt`. - [x] `v1.2.2`: RTK en OpenCode 2, `--upgrade-agent opencode` conserva servidores y plugins que antes perdía, versión de DCP alineada entre archivos, aviso de rtk antiguo, arreglos de doctor. - [x] `v1.2.1`: soporte de VS Code Insiders.
 - [x] `v1.2.0`: rtk en Linux sin Homebrew, avisos más claros de versión de Node, base del proxy de Code Mode, spike de Codex CLI, Código de Conducta.
 - [x] `v1.1.0`: Harness de benchmark, instaladores de Antigravity/Cursor para Windows, --add-tools y guía de despliegue para equipos.

@@ -13,7 +13,7 @@ Release audit of lean-agents for 1.2.4 (2026-11-27). Range: v1.2.3..d3fbf3c (mai
   - `--adopt` (and `--json`) lists every global npm package under every Node that nvm knows, with an engines check, not only the packages lean-agents pins (#521, part of #465).
   - `--doctor` no longer reports `~/.claude/settings.json` as edited after `--update` when the only difference is plugin keys that lean-agents' own commands wrote (#492, #522).
   - The `context-mode` Claude plugin pin moved from v2.1.4 to v2.1.7, the same version as the npm CLI, with a test that catches drift (#490, #519).
-  - Multi-agent benchmark harness and a manual workflow, capped at USD 5 per run (#404, #524). The first run on main passed in every mode for about USD 0.05.
+  - Multi-agent benchmark harness and a manual workflow, capped at USD 5 per run (#404, #524). The first run on main (Actions run 45949363656) passed in every mode for about USD 0.05 (results on #404).
   - CI:
     - pinned rtk in the macOS real-opencode job (#486, #514)
     - no unexpanded name on the skipped `real-vscode-others` job (#460, #520)
