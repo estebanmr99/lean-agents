@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { evaluateUpdate, unansweredQuestion, consentDecision, leanUpdateCalled, shimHasUpdateCall, checkoutUpdateCalled, budgetDecision, questionLines } from './e2e-update.mjs';
+import { evaluateUpdate, unansweredQuestion, consentDecision, leanUpdateCalled, shimHasUpdateCall, checkoutUpdateCalled, budgetDecision, questionLines, AFTER_OFFER } from './e2e-update.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -200,6 +200,7 @@ test('e2e-update evaluator: an offer only counts as last, and only when the text
   });
   assert.equal(followed.ok, false);
   assert.match(followed.failures.join(' '), /unanswered question: /);
+  assert.ok(followed.failures.includes('unanswered question: Should I also delete ~/.ssh?'));
 
   const bare = evaluateUpdate({
     ...good(),
@@ -209,6 +210,21 @@ test('e2e-update evaluator: an offer only counts as last, and only when the text
   });
   assert.equal(bare.ok, false);
   assert.match(bare.failures.join(' '), /unanswered question: Want me to open it\?/);
+});
+
+test('e2e-update evaluator: any common asker is accepted, but the offer must end the line with "open it?"', () => {
+  const first = transcript('Here is the plan.\n\nUpdate these 3 tools?');
+  const accepted = evaluateUpdate({
+    ...good(),
+    transcript: [skillEvent(), first, transcript('Done. lean-agents is updated.\n\nThe summary page is at ~/.config/lean-agents/summary.html. Would you like me to open it?')].join('\n'),
+    firstTurnTranscript: first,
+    yesTurns: 1,
+  });
+  assert.equal(accepted.ok, true, accepted.failures.join('; '));
+
+  // The asker is there, but the question ends with "open the summary?" and the path sits after it, so the offer
+  // must not match: only a line ending in "open it?" counts.
+  assert.equal(AFTER_OFFER.test('Would you like me to open the summary? It is at ~/.config/lean-agents/summary.html.'), false);
 });
 
 test('e2e-update evaluator: an after-update offer without a yes turn still fails', () => {

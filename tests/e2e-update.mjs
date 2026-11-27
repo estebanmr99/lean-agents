@@ -30,7 +30,7 @@ const RUN_ASK = /^(?:Do you want me to|Shall I|Should I|Want me to|Can I) (?:run
 
 // The skill's after-update offers: the summary page (SKILL.md step 6 "Hand-off") and the optional issue draft
 // (step 7). Both come after the work, so leaving one unanswered ends a non-interactive run cleanly.
-const AFTER_OFFER = /^(?=[^\n]*\bsummary(?: page|\.html)\b)[^?\n]{0,400}\b(?:Want me to|Shall I|Should I|Do you want me to) open it\?$|^Draft a redacted issue for lean-agents\?$/i;
+export const AFTER_OFFER = /^(?=[^\n]*\bsummary(?: page|\.html)\b)[^?\n]{0,400}\b(?:Do you want me to|Would you like me to|Want me to|Shall I|Should I|Can I) open it\?$|^Draft a redacted issue for lean-agents\?$/i;
 
 export function assistantText(transcript) {
   if (!transcript) return '';
@@ -184,7 +184,7 @@ export function evaluateUpdate({ doctor, record, pluginList, pluginRef, pinVersi
     failures.push(`unexpected question: ${consent.question}`);
   }
   if (yesTurns > 1) failures.push(`more than one yes turn: ${yesTurns}`);
-  if (questions.length) failures.push(`unanswered question: ${questions[0]}`);
+  if (questions.length) failures.push(`unanswered question: ${questions[questions.length - 1]}`);
   return { ok: failures.length === 0, failures };
 }
 
