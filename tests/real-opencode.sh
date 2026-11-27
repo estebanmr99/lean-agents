@@ -13,11 +13,82 @@ unset XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
 opencode --version
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 
-bash "$repo/install.sh" --yes --no-exec --agents opencode-v2 \
+# #548: show which lean-agents command starts the OpenCode 2 service, and fail if its own run leaves one behind.
+# Match the executable name only (the engine does the same: `ps -A -o comm=`, basename), so this script's own
+# `bash tests/real-opencode.sh` command line never matches. The second `ps` prints the evidence for the log.
+opencode_pids() {
+  ps -A -o pid=,comm= | awk '{
+    name = $0;
+    sub(/^[ \t]*[0-9]+[ \t]+/, "", name);
+    sub(/^.*[\\\/]/, "", name);
+    sub(/[ \t]+$/, "", name);
+    if (name == "opencode" || name == "opencode.exe") { printf "%s%s", (pids ? "," : ""), $1; pids = pids $1 }
+  }'
+}
+opencode_processes() {
+  local pids
+  pids="$(opencode_pids)"
+  [ -n "$pids" ] || return 1
+  ps -o pid,lstart,command -p "$pids"
+}
+# PIDs that appeared during the run; one that was already there belongs to the user or the test setup.
+new_pids() {
+  awk -v before=",$1," -v after="$2" 'BEGIN {
+    n = split(after, a, ",");
+    for (i = 1; i <= n; i++) if (a[i] != "" && index(before, "," a[i] ",") == 0) { printf "%s%s", (out ? "," : ""), a[i]; out = 1 }
+  }'
+}
+lean_run() {
+  local before after new rc=0
+  before="$(opencode_pids)"
+  echo "== $(date -u +%T) before: lean-agents $*"
+  opencode_processes || true
+  bash "$repo/install.sh" "$@" || rc=$?
+  after="$(opencode_pids)"
+  echo "== $(date -u +%T) after: lean-agents $*"
+  opencode_processes || true
+  new="$(new_pids "$before" "$after")"
+  if [ -n "$new" ]; then
+    echo "FAIL  an opencode process is left after: lean-agents $*" >&2
+    ps -o pid,lstart,command -p "$new" >&2 || true
+    exit 1
+  fi
+  return "$rc"
+}
+
+# The version probe above may start the service; clear it so every lean-agents run starts from none.
+opencode service stop >/dev/null 2>&1 || true
+
+lean_run --yes --no-exec --agents opencode-v2 \
   --tools serena,playwright,playwright-extension,ponytail,rtk --privacy strict --profile anthropic-api
+# A real --update with one already-installed tool: it runs the adapter and the end-of-run doctor, and must stop the service.
+lean_run --update --yes --tools rtk
 
 # Proves the file name the migration guide gives for the old tui.json.
 LC_ALL=C grep -aq 'opencode/cli.json' "$(command -v opencode)"
+
+# #556: a 1.x MCP entry translated by the upgrade code (oauth camelCase, enabled) must be accepted by 2.x as a
+# pre-registered client (oauth.client_id) with disabled, not fall back to dynamic client registration.
+node --input-type=module - "$repo" "$XDG_CONFIG_HOME/opencode/opencode.jsonc" <<'JS'
+import fs from 'node:fs';
+import { createRequire } from 'node:module';
+const [repo, file] = process.argv.slice(2);
+const { parse, modify, applyEdits } = createRequire(`${repo}/package.json`)('jsonc-parser');
+const { translateEdits } = await import(`${repo}/scripts/lib/upgrade.mjs`);
+const raw = fs.readFileSync(file, 'utf8');
+const cfg = parse(raw);
+const servers = cfg.mcp?.servers ?? {};
+const flat = {
+  ...servers,
+  remote: { type: 'remote', url: 'https://mcp.example.invalid/mcp', enabled: false, oauth: { clientId: 'fake-client-id', clientSecret: 'fake-client-secret', scope: 'read' } }, // gitleaks:allow (synthetic values)
+};
+const items = Object.keys(flat).map((name) => ({ client: 'opencode', kind: 'mcp', name, file, keyPath: ['mcp'], upgrade: { class: 'user-translatable' } }));
+let text = raw;
+for (const e of translateEdits({ ...cfg, mcp: flat }, items)) {
+  text = applyEdits(text, modify(text, e.path, e.mode === 'remove' ? undefined : e.value, { formattingOptions: { insertSpaces: true, tabSize: 2 } }));
+}
+fs.writeFileSync(file, text);
+JS
 
 opencode debug config > "$HOME/resolved.txt" 2>"$HOME/stderr.txt" || { cat "$HOME/resolved.txt" "$HOME/stderr.txt"; exit 1; }
 
@@ -50,6 +121,9 @@ const checks = {
   'ponytail plugin': (cfg.plugins ?? []).includes(npmSpec('ponytail')),
   'default_agent plan': cfg.default_agent === 'plan',
   'share disabled': cfg.share === 'disabled',
+  'mcp oauth client_id': servers.remote?.oauth?.client_id === 'fake-client-id' && servers.remote?.oauth?.client_secret !== undefined && servers.remote?.oauth?.scope === 'read',
+  'mcp oauth 1.x names gone': servers.remote && servers.remote.oauth.clientId === undefined && servers.remote.oauth.clientSecret === undefined,
+  'mcp enabled -> disabled': servers.remote?.disabled === true && servers.remote.enabled === undefined,
 };
 let failed = false;
 for (const [name, ok] of Object.entries(checks)) {
@@ -61,20 +135,24 @@ console.log('top-level keys:', Object.keys(cfg).sort().join(', '));
 if (failed) { console.log('--- config ---'); console.log(out.split('\n').slice(0, 150).join('\n')); console.log('--- agents ---'); console.log(agentsOut.slice(0, 4000)); process.exit(1); }
 JS
 
-# The registered Context Mode command must start an MCP server (#107): run it as written and send `initialize`.
-node --input-type=module - "$HOME/resolved.txt" "$repo" <<'JS'
+# The registered Context Mode command must start an MCP server (#107) and answer a real ctx_execute call (#562): without
+# `--agent opencode`, every ctx_* call fails with "Project source --agent is missing".
+node --input-type=module - "$HOME/resolved.txt" "$repo" "$HOME" <<'JS'
 import fs from 'node:fs';
 const { resolvedOpenCodeConfig } = await import(`${process.argv[3]}/scripts/lib/doctor.mjs`);
-const { probeInitialize } = await import(`${process.argv[3]}/scripts/lib/inventory.mjs`);
+const { probeInitialize, probeToolCall } = await import(`${process.argv[3]}/scripts/lib/inventory.mjs`);
 const { satisfies } = await import(`${process.argv[3]}/scripts/lib/node-runtime.mjs`);
 const { nodeRange } = await import(`${process.argv[3]}/scripts/lib/pins.mjs`);
 if (!satisfies(process.versions.node, nodeRange('context-mode'))) { console.log('skip  context-mode initialize (Node below the pin range)'); process.exit(0); }
 const cfg = resolvedOpenCodeConfig(fs.readFileSync(process.argv[2], 'utf8'));
 const entry = (cfg.mcp?.servers ?? cfg.mcp)?.['context-mode'];
 if (!entry) { console.log('FAIL  context-mode is not registered'); process.exit(1); }
+if (entry.command[entry.command.indexOf('--agent') + 1] !== 'opencode') { console.log(`FAIL  context-mode has no --agent opencode: ${entry.command.join(' ')}`); process.exit(1); }
 const r = await probeInitialize(entry.command, { expect: 'context-mode' });
 console.log(`${r.ok ? 'ok    ' : 'FAIL  '} context-mode initialize serverInfo.name = ${r.name}${r.error ? ` (${r.error})` : ''}`);
-process.exit(r.ok ? 0 : 1);
+const t = await probeToolCall(entry.command, { cwd: process.argv[4], expect: 'ctx-ok' });
+console.log(`${t.ok ? 'ok    ' : 'FAIL  '} context-mode ctx_execute --agent opencode${t.error ? ` (${t.error})` : ''}`);
+process.exit(r.ok && t.ok ? 0 : 1);
 JS
 
 # copilot-usage (fresh HOME, network on: strict skips it). Proves the plugin file lands and no tui.json entry is written
@@ -82,7 +160,7 @@ JS
 HOME="$(mktemp -d)"
 export HOME
 export XDG_CONFIG_HOME="$HOME/.config"
-bash "$repo/install.sh" --yes --no-exec --agents opencode-v2 --tools copilot-usage --network on --lang en --profile anthropic-api
+lean_run --yes --no-exec --agents opencode-v2 --tools copilot-usage --network on --lang en --profile anthropic-api
 node --input-type=module - "$HOME/.config/opencode" <<'JS'
 import fs from 'node:fs';
 import path from 'node:path';

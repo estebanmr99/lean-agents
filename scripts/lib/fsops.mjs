@@ -81,7 +81,7 @@ function getAt(text, keyPath) {
 }
 
 // True when `current` is the old shape in `legacy` (`*` in a string is a wildcard, `{semver}` is digits.digits.digits).
-function isLegacy(current, legacy = []) {
+export function isLegacy(current, legacy = []) {
   const eq = (a, b) => typeof b === 'string' && typeof a === 'string' ? new RegExp(`^${b.split('*').map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*').replace(/\\\{semver\\\}/g, '\\d+\\.\\d+\\.\\d+')}$`).test(a)
     : a && b && typeof a === 'object' && typeof b === 'object' ? Object.keys(a).length === Object.keys(b).length && Object.keys(b).every((k) => eq(a[k], b[k])) : a === b;
   return legacy.some((l) => eq(current, l));
@@ -283,7 +283,7 @@ export function plan(actions, roots = [], prior = []) {
     if (blocked) return { ...a, before: null, after: null, status: 'skip', note: blocked };
     const before = read(a.path);
     let after;
-    let note = '';
+    let note = a.note ?? '';
     let applied;
     let keptKeys;
     if (a.kind === 'file') {
@@ -301,9 +301,9 @@ export function plan(actions, roots = [], prior = []) {
         const createdParents = [];
         for (let k = 1; k <= depth; k++) if (absent(e.path.slice(0, k))) createdParents.push(e.path.slice(0, k));
         const previous = before === null ? undefined : getAt(before, e.path);
-        // An upgraded legacy entry has no user value to restore: uninstall removes it.
+        // A legacy entry is ours to move; with `restorePrevious` (MCP entries) --uninstall writes the old args back.
         const upgraded = e.mode === 'upgradeIf' && isLegacy(previous, e.legacy);
-        return { ...e, previous: upgraded ? undefined : previous, upgraded, createdParents };
+        return { ...e, previous: upgraded && !e.restorePrevious ? undefined : previous, upgraded, createdParents };
       });
       const owned = prior.filter((f) => f.path === a.path).flatMap((f) => f.applied ?? []);
       const r = applyJsonEdits(before, edits, owned);
@@ -312,9 +312,9 @@ export function plan(actions, roots = [], prior = []) {
       keptKeys = r.kept.map((k) => k.path.join('.'));
       const moved = r.applied.filter((e) => e.mode === 'arrayAdd' && /@\d+\.\d+\.\d+$/.test(e.replaced ?? '')).map((e) => `${path.basename(a.path)} ${e.label ?? 'pin'} ${e.replaced.replace(/^.*@/, '')} -> ${e.value.replace(/^.*@/, '')}${e.why ? ` ${e.why}` : ''}`);
       const removed = r.applied.filter((e) => e.mode === 'arrayRemove').map((e) => `${path.basename(a.path)} removes ${e.label ?? 'entry'}${e.why ? ` (${e.why})` : ''}`);
-      if (removed.length) note = removed.join('; ');
-      if (moved.length) note = [note, ...moved].filter(Boolean).join('; ');
-      if (r.kept.length) note = `kept your values for: ${r.kept.map((k) => k.path.join('.')).join(', ')}`;
+      const refMoves = r.applied.filter((e) => e.mode === 'set' && e.marketplace).map((e) => `${e.marketplace} marketplace ref ${e.previous ?? '(none)'} -> ${e.value} (settings.json entry moved, plugin data kept)`);
+      if (removed.length || moved.length || refMoves.length) note = [a.note, ...removed, ...moved, ...refMoves].filter(Boolean).join('; ');
+      if (r.kept.length) note = [a.note, `kept your values for: ${r.kept.map((k) => k.path.join('.')).join(', ')}`].filter(Boolean).join('; ');
     } else if (a.kind === 'block') {
       after = setBlock(before, a.body, a.toml, a.id);
     }

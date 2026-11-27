@@ -80,6 +80,18 @@ export function ownSkills(state) {
   return names;
 }
 
+// #562: Context Mode 2.1.7 resolves the project only from `--agent <id>` or CLAUDE_PROJECT_DIR, so an MCP entry without it
+// fails every ctx_* call. Own function so parallel doctor work (#556, #558) does not collide.
+function checkContextModeAgent(nodes, add, { home, platform }) {
+  for (const n of nodes.filter((x) => x.pin === 'context-mode' && !x.hasAgent)) {
+    const fix = n.client === 'cursor'
+      ? `remove the context-mode entry from Cursor's mcp.json (lean-agents no longer manages it): ${homeRel(n.file, home, platform)}`
+      : 'run lean-agents --update';
+    add(`context-mode agent for ${n.client} mcp ${n.name}`, 'error',
+      `Context Mode needs --agent <id>; without it every ctx_* call fails with "Project source --agent is missing". Fix: ${fix}`);
+  }
+}
+
 // Which Node runs each registered MCP command of a pinned tool, and skills that two folders of one agent both hold.
 // Read-only, and it also covers machines lean-agents did not set up (#104 points 4-5, #132).
 function checkInventory({ home, exec, run, env, platform, fsx, state }, add) {
@@ -98,7 +110,7 @@ function checkInventory({ home, exec, run, env, platform, fsx, state }, add) {
       : v.status === 'unknown' ? `${m.pin} needs Node ${v.range}; the Node behind this ${launch.style} entry could not be read`
         : `Node ${nodeVersion} (${launch.style})${v.fragile ? '; follows nvm use or PATH, so it can change, and VS Code or Cursor started outside this shell can resolve another Node' : ''}`;
     add(`node for ${where}`, status, detail);
-    return { client: m.client, name: m.name, pin: m.pin, style: launch.style, node: rel(launch.node), nodeVersion, range: v.range, status };
+    return { client: m.client, name: m.name, file: rel(m.file), pin: m.pin, style: launch.style, node: rel(launch.node), nodeVersion, range: v.range, status, hasAgent: m.hasAgent };
   });
   const ORCA = new Set(['orca-cli', 'orchestration', 'computer-use']);
   const bySkill = new Map();
@@ -257,7 +269,7 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
           add(`claude mcp ${s}`, mcp.ok && mcp.out.includes(s) ? 'ok' : 'error', mcp.ok ? '' : (mcp.failed ? 'claude mcp list timed out or did not run (90 s limit)' : `claude mcp list exited ${mcp.status}`));
         }
       }
-      if (o.agents.some((a) => a.startsWith('opencode'))) checkOpenCode(o, add, q);
+      if (o.agents.some((a) => a.startsWith('opencode'))) checkOpenCode(o, add, q, home, fsx);
       if (o.agents.includes('copilot-cli')) checkCopilot(o, add, q, withMcp);
       if (o.agents.includes('antigravity')) checkAntigravity(o, CORE_AGENTS, add, q, withMcp, findAgy(home, platform, env) ?? 'agy');
       // npx may have to download, which takes longer than a local check.
@@ -278,6 +290,7 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
   }
   checkAntigravityIde({ home, exec, run, platform, fsx }, add);
   const { nodes, skills } = checkInventory({ home, exec, run, env, platform, fsx, state }, add);
+  checkContextModeAgent(nodes, add, { home, platform });
   // #212: config listing a plugin is not proof it loads. Read-only; `probe` holds findings of the opt-in --probe-plugins server run.
   const dcp = dcpRow(home, { fsx, probe, probed });
   if (dcp) add('DCP', dcp.status, dcp.detail);
@@ -322,7 +335,33 @@ function checkAntigravityIde({ home, exec, run, platform, fsx }, add) {
   add('antigravity ide', 'note', `app check not available on this OS (config found: ${folders})`);
 }
 
-function checkOpenCode(o, add, q) {
+// 1.x MCP field names that OpenCode 2 ignores (#556). Read from the live file so a field OpenCode drops is still reported.
+const STALE_MCP_OAUTH = { clientId: 'client_id', clientSecret: 'client_secret', callbackPort: 'callback_port', redirectUri: 'redirect_uri' };
+export function staleMcpFields(cfg) {
+  const out = [];
+  for (const [name, s] of Object.entries(cfg?.mcp?.servers ?? {})) {
+    if (!s || typeof s !== 'object') continue;
+    if (s.enabled !== undefined) out.push(`mcp.servers.${name}.enabled -> disabled`);
+    if (!s.oauth || typeof s.oauth !== 'object') continue;
+    for (const [from, to] of Object.entries(STALE_MCP_OAUTH)) {
+      if (s.oauth[from] !== undefined) out.push(`mcp.servers.${name}.oauth.${from} -> oauth.${to}`);
+    }
+  }
+  return out;
+}
+
+function checkOpenCode(o, add, q, home, fsx) {
+  // A file that already went through the upgrade can still hold 1.x MCP names (#556): OpenCode 2 ignores them.
+  let stale = [];
+  try {
+    for (const f of ['opencode.jsonc', 'opencode.json']) {
+      const p = path.join(configHome(home), 'opencode', f);
+      if (!fsx.existsSync(p)) continue;
+      stale = staleMcpFields(parse(fsx.readFileSync(p, 'utf8'), [], { allowTrailingComma: true }));
+      break;
+    }
+  } catch { /* unreadable config: the debug config check below still runs */ }
+  if (stale.length) add('opencode mcp 1.x keys', 'changed', `${stale.join('; ')}. Fix: run lean-agents --update to rename them`);
   const r = q(['opencode', 'debug', 'config']);
   if (!r.ok) return add('opencode resolved config', 'error', '`opencode debug config` failed');
   let cfg;

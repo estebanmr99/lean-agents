@@ -120,21 +120,25 @@ test('--uninstall --yes keeps the backups; dropBackups deletes them', () => {
   assert.equal(fs.existsSync(backups), false);
 });
 
-test('a rerun fixes the old Context Mode entry, keeps an edited one, and uninstall removes it', () => {
+test('a rerun fixes the old Context Mode entry, keeps an edited one, and uninstall restores it', () => {
+  const user = (home) => process.platform === 'darwin' ? path.join(home, 'Library', 'Application Support', 'Code', 'User')
+    : process.platform === 'win32' ? path.join(home, 'AppData', 'Roaming', 'Code', 'User')
+      : path.join(home, '.config', 'Code', 'User');
   const run = (home, mcp) => {
-    fs.mkdirSync(path.join(home, '.cursor'), { recursive: true });
-    const file = path.join(home, '.cursor', 'mcp.json');
+    const file = path.join(user(home), 'mcp.json');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, mcp);
-    lean(home, ['--yes', '--no-exec', '--agents', 'cursor', '--tools', 'context-mode', '--lang', 'en']);
+    lean(home, ['--yes', '--no-exec', '--agents', 'vscode-copilot', '--tools', 'context-mode', '--lang', 'en']);
     return file;
   };
-  const entry = (args) => `{\n  "mcpServers": {\n    "context-mode": ${JSON.stringify({ command: 'npx', args })}\n  }\n}\n`;
+  const entry = (args) => `{\n  "servers": {\n    "context-mode": ${JSON.stringify({ type: 'stdio', command: 'npx', args })}\n  }\n}\n`;
 
   const old = tmp();
-  const oldFile = run(old, entry(['-y', 'context-mode@2.0.1']));
-  assert.deepEqual(JSON.parse(fs.readFileSync(oldFile, 'utf8')).mcpServers['context-mode'].args.slice(-1), ['server']);
+  const oldArgs = ['-y', 'context-mode@2.0.1'];
+  const oldFile = run(old, entry(oldArgs));
+  assert.deepEqual(JSON.parse(fs.readFileSync(oldFile, 'utf8')).servers['context-mode'].args.slice(-2), ['--agent', 'vscode']);
   lean(old, ['--uninstall', '--yes']);
-  assert.equal(JSON.parse(fs.readFileSync(oldFile, 'utf8')).mcpServers?.['context-mode'], undefined);
+  assert.deepEqual(JSON.parse(fs.readFileSync(oldFile, 'utf8')).servers['context-mode'].args, oldArgs);
 
   const mine = tmp();
   const edited = entry(['-y', 'context-mode@2.0.1', '--my-flag']);

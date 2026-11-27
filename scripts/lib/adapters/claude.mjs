@@ -1,11 +1,15 @@
 // Claude Code adapter. Files only under ~/.claude; MCP servers and plugins go through
 // the `claude` CLI so ~/.claude.json (which holds auth) is never edited directly.
+import fs from 'node:fs';
 import path from 'node:path';
-import { OWNED_MARK } from '../fsops.mjs';
+import { parse } from 'jsonc-parser';
+import { OWNED_MARK, isLegacy } from '../fsops.mjs';
 import { tierFor, modelFor } from '../render.mjs';
 import { privacyOf, updaterMode } from '../network.mjs';
 import { statuslineScript } from '../copilot-usage.mjs';
 import { marketplaceSource, skillSource, skillsCli } from '../pins.mjs';
+import { contextModeCommand } from '../context-mode.mjs';
+import { mcpServers } from '../migrate.mjs';
 
 // Also the key of its record in state.json: removing the entry replaces that record (empty undo), so --uninstall does not remove it twice.
 const CTX_MCP = 'Context Mode MCP server (user scope)';
@@ -39,15 +43,31 @@ const pluginKeys = (id, repo) => [
   { path: ['enabledPlugins', id], value: true },
   { path: ['extraKnownMarketplaces', id.split('@')[1]], repo: repo.replace(/#.*$/, '') },
 ];
-const plugin = (repo, id) => ({
-  run: [['claude', 'plugin', 'marketplace', 'add', repo], ['claude', 'plugin', 'install', id]],
-  undo: [['claude', 'plugin', 'uninstall', id]],
-});
+const pluginRepo = (repo) => repo.replace(/#.*$/, '');
+// The ref of our own marketplace entry when the pin moves (#546): `claude plugin marketplace add` refuses a repo whose
+// extraKnownMarketplaces entry names another ref. Only an entry with our repo is touched; another repo is the user's.
+function marketplaceMove(dir, name, repo) {
+  const file = path.join(dir, 'settings.json');
+  let src;
+  try {
+    src = parse(fs.readFileSync(file, 'utf8'), [], { allowTrailingComma: true })?.extraKnownMarketplaces?.[name]?.source;
+  } catch (e) { return e.code === 'ENOENT' ? { missing: true } : {}; }
+  if (!src || typeof src !== 'object') return { missing: true };
+  const shown = src.repo ?? src.url;
+  if (shown !== pluginRepo(repo)) {
+    return { warning: `! ${name} marketplace entry in ${file} points at ${shown ?? 'another source'}, not ${pluginRepo(repo)}: left as it is; change it or remove it by hand.` };
+  }
+  const ref = repo.slice(repo.indexOf('#') + 1);
+  // Only a recorded ref moves (a marketplace add without a ref, or a user's own edit, keeps its shape).
+  if (typeof src.ref !== 'string' || src.ref === ref) return {};
+  return { edit: { path: ['extraKnownMarketplaces', name, 'source', 'ref'], value: ref, mode: 'set', marketplace: name, keepIfChanged: true } };
+}
 
 export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdCommand }) {
   const dir = path.join(home, '.claude');
   const actions = [];
   const commands = [];
+  const warnings = [];
   const tools = opts.tools;
 
   actions.push({ kind: 'block', path: path.join(dir, 'CLAUDE.md'), body: `@${rulesPath}` });
@@ -84,35 +104,58 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
   const settingsAction = { kind: 'json', path: path.join(dir, 'settings.json'), edits };
   actions.push(settingsAction);
 
+  // Before `marketplace add`: move our own entry to the new pin, then refresh the marketplace and the plugin (#546).
+  const addPlugin = (tool, desc, repo, id) => {
+    const name = id.split('@')[1];
+    const move = marketplaceMove(dir, name, repo);
+    if (move.edit) settingsAction.edits.push(move.edit);
+    // A fresh install records the entry we are about to add, so --uninstall removes it (another repo is the user's).
+    else if (move.missing) settingsAction.edits.push({ path: ['extraKnownMarketplaces', name], value: { source: { source: 'github', repo: pluginRepo(repo), ref: repo.slice(repo.indexOf('#') + 1) } }, mode: 'setIfAbsent' });
+    if (move.warning) warnings.push(move.warning);
+    const installed = (opts.prior ?? []).some((c) => c.ok && (c.desc === desc
+      || (c.run ?? []).some((a) => a[0] === 'claude' && a[1] === 'plugin' && (a[2] === 'install' || a[2] === 'update') && a[3] === id)));
+    const run = [['claude', 'plugin', 'marketplace', 'add', repo]];
+    if (installed && move.edit) run.push(['claude', 'plugin', 'marketplace', 'update', name], ['claude', 'plugin', 'update', id]);
+    else run.push(['claude', 'plugin', 'install', id]);
+    commands.push({ tool, desc, run, undo: [['claude', 'plugin', 'uninstall', id]] });
+  };
+
   if (tools.includes('rtk')) {
     commands.push({ tool: 'rtk', desc: 'RTK hook for Claude Code', run: [['rtk', 'init', '-g', '--auto-patch']], undo: [['rtk', 'init', '-g', '--uninstall']] });
   }
   if (tools.includes('context-mode') && opts.toolNode) {
     // The plugin starts its server with the first `node` on PATH, so on an old Node it registers the absolute server instead (hooks and skills are lost).
-    commands.push({
-      tool: 'context-mode',
-      desc: CTX_MCP,
-      run: [['claude', 'mcp', 'add', '--scope', 'user', 'context-mode', '--', ...core.mcp['context-mode'].command]],
-      undo: [['claude', 'mcp', 'remove', '--scope', 'user', 'context-mode']],
-      skipIfOutput: { cmd: ['claude', 'mcp', 'get', 'context-mode'], ok: true },
-    });
+    const add = ['claude', 'mcp', 'add', '--scope', 'user', 'context-mode', '--', ...contextModeCommand(core.mcp['context-mode'].command, 'claude-code')];
+    const remove = ['claude', 'mcp', 'remove', '--scope', 'user', 'context-mode'];
+    const entry = mcpServers(path.join(home, '.claude.json'), ['mcpServers']).find((s) => s.name === 'context-mode');
+    if (!entry) {
+      commands.push({ tool: 'context-mode', desc: CTX_MCP, run: [add], undo: [remove], skipIfOutput: { cmd: ['claude', 'mcp', 'get', 'context-mode'], ok: true } });
+    } else if (entry.command.includes('--agent')) {
+      // Already rewritten by this version: nothing to plan.
+    } else if (isLegacy(entry.command, core.mcp['context-mode'].legacy)) {
+      // An entry lean-agents wrote before --agent existed: replace it so ctx_* calls resolve the project.
+      commands.push({ tool: 'context-mode', desc: CTX_MCP, run: [remove, add], undo: [remove] });
+    } else {
+      console.log('Kept your existing Context Mode MCP entry: it has different args. Add --agent claude-code to it, or remove it and run lean-agents --update.');
+    }
   } else if (tools.includes('context-mode')) {
     // An earlier run on an old Node registered the absolute MCP server; the plugin runs its own, so lean-agents removes the one it added.
     if ((opts.prior ?? []).some((c) => c.desc === CTX_MCP && c.undo?.length)) {
       commands.push({ tool: 'context-mode', desc: CTX_MCP, run: [['claude', 'mcp', 'remove', '--scope', 'user', 'context-mode']], undo: [] });
     }
     const repo = marketplaceSource('context-mode-plugin');
-    commands.push({ tool: 'context-mode', desc: 'Context Mode plugin', ...plugin(repo, 'context-mode@context-mode') });
+    addPlugin('context-mode', 'Context Mode plugin', repo, 'context-mode@context-mode');
     pluginWrites.push(...pluginKeys('context-mode@context-mode', repo));
   }
   if (tools.includes('ponytail')) {
     const repo = marketplaceSource('ponytail-plugin');
-    commands.push({ tool: 'ponytail', desc: 'Ponytail plugin', ...plugin(repo, 'ponytail@ponytail') });
+    addPlugin('ponytail', 'Ponytail plugin', repo, 'ponytail@ponytail');
     pluginWrites.push(...pluginKeys('ponytail@ponytail', repo));
   }
   if (tools.includes('i-have-adhd')) {
     const repo = marketplaceSource('i-have-adhd');
-    commands.push({ tool: 'i-have-adhd', desc: 'i-have-adhd plugin', ...plugin(repo, 'i-have-adhd@i-have-adhd') }, adhdCommand);
+    addPlugin('i-have-adhd', 'i-have-adhd plugin', repo, 'i-have-adhd@i-have-adhd');
+    commands.push(adhdCommand);
     pluginWrites.push(...pluginKeys('i-have-adhd@i-have-adhd', repo));
     if (opts.adhdAlways) actions.push({ kind: 'file', path: path.join(dir, '.i-have-adhd-always'), content: '' , force: true });
   }
@@ -146,5 +189,5 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
   }
   const uniqueWrites = [...new Map(pluginWrites.map((e) => [JSON.stringify(e), e])).values()];
   if (uniqueWrites.length) settingsAction.ignore = uniqueWrites;
-  return { actions, commands };
+  return { actions, commands, warnings };
 }
