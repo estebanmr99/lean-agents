@@ -181,6 +181,7 @@ Empieza siempre con `--dry-run`: muestra cada archivo y comando antes de cambiar
 - `--install-agent a,b` / `--uninstall-agent a,b` (opcional): instala un CLI de agente (`claude`, `opencode-v2`, `copilot-cli`, `cursor`, `antigravity`) desde su instalador fijado (se comprueba el SHA256 antes de ejecutarlo; Linux y macOS, y Copilot CLI, Antigravity CLI y Cursor CLI en Windows) o lo quita. Muestra primero el plan (`--dry-run` se detiene ahí; `--yes` omite la pregunta). La instalación registra los archivos que creó el instalador con su SHA256; la desinstalación borra solo los que siguen iguales, o ejecuta `npm uninstall -g`, nunca el desinstalador del propio agente, y no toca tu configuración ni tus datos. Un agente que instalaste tú se informa como "not installed by lean-agents" y no se toca. OpenCode 1.x nunca se instala ni se quita.
 - En PowerShell las opciones comunes van en PascalCase: `-DryRun`, `-AllTools`, `-Privacy strict`, `-Profile vertex-gemini`. Cualquier otra opción se pasa tal cual, por ejemplo `-DryRun --network off`.
 - Context Mode 2 necesita Node.js 24.15 y GSD Core necesita Node.js 24 (`engines.node` en `core/pins.json`). Con un Node activo más antiguo, lean-agents los ejecuta con un Node 24 de nvm sin cambiar tu Node por defecto (nvm-windows: uno ya instalado) y lo registra con su ruta absoluta; en Claude Code eso significa un servidor MCP en lugar del plugin de Context Mode, así que sus hooks y skills no se instalan. Sin nvm los omite con una línea. Todo lo demás funciona con Node.js 22.20 o superior.
+- Las entradas MCP de Context Mode llevan `--agent <id>` (VS Code `vscode`, OpenCode `opencode`, Copilot CLI `copilot-cli`, el MCP de respaldo de Claude `claude-code`); sin él, cada llamada `ctx_*` falla con `Project source --agent is missing`. Cursor y Antigravity se omiten y se avisan porque Context Mode 2.1.7 no tiene id para ellos.
 - Con Context Mode, el instalador también instala Bun por defecto (`ctx_execute` más rápido); añade `--no-bun` (`-NoBun` en PowerShell) para omitirlo. Con Antigravity, `--no-app` (`-NoApp`) omite la instalación de la app. Con Cursor, `--cursor-app` (`-CursorApp`) instala también la app de Cursor con brew o winget si falta; se registra y `--uninstall` la quita (en Linux, descárgala tú). Ver la fila de Bun en [Niveles de instalación](#niveles-de-instalación).
 
 ### Todas las opciones
@@ -310,7 +311,7 @@ En OpenCode, el plugin propio de rtk (`plugins/rtk.ts`, rtk 1.2.0 o más nuevo) 
 | Reglas | ⚠️ se escriben, carga sin probar | ➖ solo en ajustes, usa `--project` | ✅ `AGENTS.md` |
 | Subagentes | ⚠️ se escriben, carga sin probar | ⚠️ se escriben, carga sin probar | ✅ `.github/agents`; ⚠️ `.cursor/agents` (carga en Cursor CLI sin verificar) |
 | RTK | ⚠️ solo a través de Copilot CLI | ✅ | ➖ por usuario |
-| Context Mode, Serena, Playwright | ✅ MCP | ✅ MCP | ✅ `.vscode/mcp.json`, `.cursor/mcp.json` |
+| Context Mode, Serena, Playwright | ✅ MCP (`--agent vscode`) | ✅ MCP | ✅ `.vscode/mcp.json` (`--agent vscode`), `.cursor/mcp.json` (Context Mode omitido: sin id de Cursor) |
 | Navegador con tu sesión (opcional) | ✅ opcional | ✅ opcional | ➖ por usuario |
 | Skills Caveman, i-have-adhd | ⚠️ se escriben, carga sin probar | ⚠️ se escriben, carga sin probar | ➖ por usuario |
 
@@ -386,7 +387,7 @@ Pone la configuración compartida en un repositorio, así todo el equipo la reci
 | `AGENTS.md` | Las reglas, en un bloque marcado; tu propio texto se queda |
 | `.github/copilot-instructions.md`, `.cursor/rules/lean-agents.mdc` | Una línea que apunta a `AGENTS.md`, para que las reglas se carguen una vez |
 | `.github/agents/*.agent.md`, `.cursor/agents/*.md` | Subagentes por nivel para VS Code Copilot y Cursor |
-| `.vscode/mcp.json`, `.cursor/mcp.json` | Context Mode, y Serena y Playwright si los eliges |
+| `.vscode/mcp.json`, `.cursor/mcp.json` | Context Mode en VS Code (`--agent vscode`) y Serena/Playwright; Cursor solo recibe Serena/Playwright porque Context Mode 2.1.7 no tiene id de Cursor |
 
 Ejecútalo desde la raíz del repositorio, revisa el plan, aplica y haz commit:
 

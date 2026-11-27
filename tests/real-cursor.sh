@@ -38,7 +38,9 @@ cat "$HOME/mcp.txt"
 grep -q serena "$HOME/mcp.txt"
 grep -qE "(^|[^-[:alnum:]])playwright([^-]|$)" "$HOME/mcp.txt"
 grep -q playwright-extension "$HOME/mcp.txt"
-grep -q context-mode "$HOME/mcp.txt"
+# Context Mode 2.1.7 has no Cursor id in AGENT_IDS, so lean-agents reports it instead of writing a broken MCP entry (#562).
+refute grep -q context-mode "$HOME/mcp.txt"
+grep -q 'Context Mode has no Cursor agent id' "$HOME/install.txt"
 
 node "$repo/scripts/lean.mjs" --doctor </dev/null
 

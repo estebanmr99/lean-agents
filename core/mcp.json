@@ -29,7 +29,10 @@
         ["npx", "-y", "context-mode@{semver}"],
         ["npx", "-y", "context-mode@{semver}", "server"],
         ["*npx", "-y", "context-mode@{semver}", "server"],
-        ["*npx.cmd", "-y", "context-mode@{semver}", "server"]
+        ["*npx.cmd", "-y", "context-mode@{semver}", "server"],
+        ["npx", "-y", "context-mode@{semver}", "server", "--agent", "*"],
+        ["*npx", "-y", "context-mode@{semver}", "server", "--agent", "*"],
+        ["*npx.cmd", "-y", "context-mode@{semver}", "server", "--agent", "*"]
       ],
       "optional": false,
       "mcp_only_for": ["opencode-v2", "copilot-cli", "antigravity"]

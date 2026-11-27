@@ -79,6 +79,18 @@ export function ownSkills(state) {
   return names;
 }
 
+// #562: Context Mode 2.1.7 resolves the project only from `--agent <id>` or CLAUDE_PROJECT_DIR, so an MCP entry without it
+// fails every ctx_* call. Own function so parallel doctor work (#556, #558) does not collide.
+function checkContextModeAgent(nodes, add, { home, platform }) {
+  for (const n of nodes.filter((x) => x.pin === 'context-mode' && !x.hasAgent)) {
+    const fix = n.client === 'cursor'
+      ? `remove the context-mode entry from Cursor's mcp.json (lean-agents no longer manages it): ${homeRel(n.file, home, platform)}`
+      : 'run lean-agents --update';
+    add(`context-mode agent for ${n.client} mcp ${n.name}`, 'error',
+      `Context Mode needs --agent <id>; without it every ctx_* call fails with "Project source --agent is missing". Fix: ${fix}`);
+  }
+}
+
 // Which Node runs each registered MCP command of a pinned tool, and skills that two folders of one agent both hold.
 // Read-only, and it also covers machines lean-agents did not set up (#104 points 4-5, #132).
 function checkInventory({ home, exec, run, env, platform, fsx, state }, add) {
@@ -97,7 +109,7 @@ function checkInventory({ home, exec, run, env, platform, fsx, state }, add) {
       : v.status === 'unknown' ? `${m.pin} needs Node ${v.range}; the Node behind this ${launch.style} entry could not be read`
         : `Node ${nodeVersion} (${launch.style})${v.fragile ? '; follows nvm use or PATH, so it can change, and VS Code or Cursor started outside this shell can resolve another Node' : ''}`;
     add(`node for ${where}`, status, detail);
-    return { client: m.client, name: m.name, pin: m.pin, style: launch.style, node: rel(launch.node), nodeVersion, range: v.range, status };
+    return { client: m.client, name: m.name, file: rel(m.file), pin: m.pin, style: launch.style, node: rel(launch.node), nodeVersion, range: v.range, status, hasAgent: m.hasAgent };
   });
   const ORCA = new Set(['orca-cli', 'orchestration', 'computer-use']);
   const bySkill = new Map();
@@ -277,6 +289,7 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
   }
   checkAntigravityIde({ home, exec, run, platform, fsx }, add);
   const { nodes, skills } = checkInventory({ home, exec, run, env, platform, fsx, state }, add);
+  checkContextModeAgent(nodes, add, { home, platform });
   // #212: config listing a plugin is not proof it loads. Read-only; `probe` holds findings of the opt-in --probe-plugins server run.
   const dcp = dcpRow(home, { fsx, probe, probed });
   if (dcp) add('DCP', dcp.status, dcp.detail);
