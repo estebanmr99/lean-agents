@@ -10,7 +10,7 @@ import { configHome, envDir } from './system.mjs';
 import { configPath } from './adapters/opencode-v2.mjs';
 import { vscodeUserDir } from './adapters/vscode-copilot.mjs';
 import { mcpServers } from './migrate.mjs';
-import { installedNodes, satisfies } from './node-runtime.mjs';
+import { installedNodes, satisfies, compare, meetsEngines } from './node-runtime.mjs';
 
 const j = path.join;
 
@@ -115,6 +115,79 @@ export function npmCopies(nvm) {
     }
   }
   return out;
+}
+
+// The Node a new shell gets: nvm's `alias/default` (a full version or a major), else the `current` link. nvm-windows has no
+// alias/default: its NVM_SYMLINK (default C:\nodejs) points at the last `nvm use`. VERIFY on a Windows runner (#465).
+export function activeNodeVersion(nvm, { env = process.env, fsx = fs } = {}) {
+  if (!nvm) return null;
+  const nodes = installedNodes(nvm);
+  if (!nodes.length) return null;
+  const pick = (want) => {
+    const w = String(want).trim().replace(/^v/, '');
+    if (!/^\d/.test(w)) return null; // `node`, `lts/*`, `stable`: no concrete version
+    const exact = nodes.find((n) => n.version === w);
+    if (exact) return exact.version;
+    const major = /^(\d+)$/.exec(w);
+    return major ? nodes.filter((n) => n.version.split('.')[0] === major[1]).at(-1)?.version ?? null : null;
+  };
+  try {
+    const fromAlias = nvm.win ? null : pick(fsx.readFileSync(j(nvm.dir, 'alias', 'default'), 'utf8'));
+    if (fromAlias) return fromAlias;
+  } catch { /* no default alias */ }
+  const link = nvm.win ? env.NVM_SYMLINK ?? 'C:\\nodejs' : j(nvm.dir, 'current');
+  try {
+    const real = fsx.realpathSync(link);
+    return nodes.find((n) => path.resolve(n.dir) === path.resolve(real))?.version ?? null;
+  } catch { return null; }
+}
+
+// npm and corepack ship inside a Node install; they are not globals the user installed.
+const BUNDLED = new Set(['npm', 'corepack']);
+const NPM_NAME = /^(@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/;
+export const isNpmName = (name) => NPM_NAME.test(name);
+
+// Every global npm package under every nvm Node (#465): { name, version, node, dir, engines, active, status }. Read-only.
+// status: `not-active` (only under a Node that is not the default one), `version-differs` (the same name elsewhere at another
+// version), `engines-unmet` (the Node it sits under fails its own `engines.node`). `cleanup` names the uninstall command; the
+// caller prints it and never runs it.
+export function npmGlobals(nvm, { env = process.env, fsx = fs } = {}) {
+  const nodes = nvm ? installedNodes(nvm) : [];
+  const active = activeNodeVersion(nvm, { env, fsx });
+  const packages = [];
+  for (const n of nodes) {
+    const read = (dir, folder) => {
+      let pkg = null;
+      try { pkg = JSON.parse(fsx.readFileSync(j(dir, 'package.json'), 'utf8')); } catch { /* a failed install */ }
+      packages.push({ name: pkg?.name || folder, version: pkg?.version ?? null, node: n.version, dir: n.dir, engines: pkg?.engines?.node ?? null });
+    };
+    let list;
+    try { list = fsx.readdirSync(n.modules, { withFileTypes: true }); } catch { continue; }
+    for (const e of list) {
+      if (!e.isDirectory() || e.name.startsWith('.') || BUNDLED.has(e.name)) continue;
+      if (!e.name.startsWith('@')) { read(j(n.modules, e.name), e.name); continue; }
+      let scoped;
+      try { scoped = fsx.readdirSync(j(n.modules, e.name), { withFileTypes: true }); } catch { continue; }
+      for (const s of scoped) if (s.isDirectory()) read(j(n.modules, e.name, s.name), `${e.name}/${s.name}`);
+    }
+  }
+  const byName = new Map();
+  for (const p of packages) byName.set(p.name, [...(byName.get(p.name) ?? []), p]);
+  for (const p of packages) p.active = p.node === active;
+  for (const p of packages) {
+    const copies = byName.get(p.name);
+    p.status = [];
+    if (active && !p.active && !copies.some((c) => c.active)) p.status.push('not-active');
+    if (new Set(copies.map((c) => c.version)).size > 1) p.status.push('version-differs');
+    if (p.engines && meetsEngines(p.node, p.engines) === false) p.status.push('engines-unmet');
+  }
+  packages.sort((a, b) => compare(a.node, b.node) || (a.name < b.name ? -1 : 1));
+  return {
+    active,
+    nodes: nodes.map((n) => ({ version: n.version, dir: n.dir, active: n.version === active })),
+    packages,
+    cleanup: packages.filter((p) => p.status.includes('not-active') && isNpmName(p.name)).map((p) => ({ name: p.name, node: p.node, dir: p.dir })),
+  };
 }
 
 // Skill folders an agent reads, in no particular order. Sources and dates: docs/compatibility.md "Skill folders".

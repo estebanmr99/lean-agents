@@ -18,7 +18,7 @@ import { run } from './system.mjs';
 import { doctor, ownSkills } from './doctor.mjs';
 import { pluginHealth, probePlugins } from './plugin-health.mjs';
 import { orcaHooksFound } from './terminals.mjs';
-import { clients, launchOf, pinOf, classify, npmCopies, skillDirs, duplicateSkills, treeSha, probeInitialize } from './inventory.mjs';
+import { clients, launchOf, pinOf, classify, npmCopies, npmGlobals, skillDirs, duplicateSkills, treeSha, probeInitialize, isNpmName } from './inventory.mjs';
 
 const j = path.join;
 const MANAGED_SKILLS = new Set(Object.entries(PINS).filter(([, p]) => p.kind === 'skill').map(([k]) => k));
@@ -281,6 +281,15 @@ export async function inventory({ home, env = process.env, platform = process.pl
     add({ client: 'npm', kind: 'npm', name: `${c.name}@${c.version}`, file: c.prefix, owner: 'managed', status, pin: c.pin, wanted: PINS[c.pin].version, extra: { node: c.node } });
   }
 
+  // --- Every global npm package under every nvm Node (#465): disclosure only, cleanup stays a printed line
+  const g = npmGlobals(nvm, { env });
+  const globals = {
+    active: g.active,
+    nodes: g.nodes.map((n) => ({ ...n, dir: rel(n.dir) })),
+    packages: g.packages.map((p) => ({ name: p.name, version: p.version, node: p.node, active: p.active, engines: p.engines, status: p.status })),
+    cleanup: g.cleanup.filter((c) => isNpmName(c.name)).map((c) => `npm uninstall -g ${c.name} --prefix ${rel(c.dir)}`),
+  };
+
   // --- Known hand-made stopgaps: listed with their managed replacement
   const stopgaps = STOPGAPS.filter((s) => fsx.existsSync(j(home, ...s.rel))).map((s) => ({ file: rel(j(home, ...s.rel)), replaceWith: s.by }));
 
@@ -302,7 +311,7 @@ export async function inventory({ home, env = process.env, platform = process.pl
   const links = {};
   for (const i of items.filter(byLink)) for (const c of i.copies) (links[i.name] ??= new Set()).add(c);
   const byHand = Object.entries(links).map(([n, c]) => `skill ${n}: remove the extra link, keep one folder (${[...c].join(', ')})`);
-  return { version: 1, os: platform, toolNode, items, opencode: { ...oc, dataDir: rel(oc.dataDir) }, stopgaps, plan, byHand, health: pluginHealth(home, { fsx }), ok: !items.some((i) => i.action !== 'keep') };
+  return { version: 1, os: platform, toolNode, items, npmGlobals: globals, opencode: { ...oc, dataDir: rel(oc.dataDir) }, stopgaps, plan, byHand, health: pluginHealth(home, { fsx }), ok: !items.some((i) => i.action !== 'keep') };
 }
 
 export async function adopt(o) {
@@ -324,6 +333,13 @@ export async function adopt(o) {
     if (i.kind === 'skill' && i.fix) console.log(`            ${i.clients.join(' and ')} loads it twice: ${Object.entries(i.hashes).map(([d, h]) => `${d} ${h}`).join(', ')} (${i.differs ? 'differs' : 'identical'}); ${i.fix}`);
   }
   console.log(`  user-owned items kept untouched: ${r.items.filter((i) => i.owner === 'user' && i.action === 'keep').length}`);
+  const clean = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, '');
+  if (r.npmGlobals.packages.length) {
+    const g = r.npmGlobals;
+    console.log(`Global npm packages under nvm (active Node: ${g.active ?? 'unknown'}):`);
+    for (const p of g.packages) console.log(`  ${p.active ? '*' : ' '} ${p.node.padEnd(9)} ${clean(p.name)}@${p.version == null ? 'unknown' : clean(p.version)}${p.status.length ? `  [${p.status.join(', ')}]` : ''}`);
+    if (g.cleanup.length) console.log(`Cleanup (listed only, nothing runs automatically):\n${g.cleanup.map((l) => `  - ${l}`).join('\n')}`);
+  }
   for (const f of r.health) console.log(`  health    ${f.plugin || 'probe'} [${f.id}] ${f.line}\n            fix: ${f.fix}`);
   for (const s of r.stopgaps) console.log(`  stopgap   ${s.file}${s.replaceWith ? `: replace with ${s.replaceWith}` : `: ${s.note}`}`);
   console.log(r.plan.length ? `Plan (${r.plan.length} steps; add --yes to apply, --confirm-removals to allow the removals):\n${r.plan.map((l) => `  - ${l}`).join('\n')}` : 'Plan: nothing to change.');
