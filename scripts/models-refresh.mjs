@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { fetchWithRetry } from './lib/retry.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const CATALOG = 'https://models.dev/api.json';
@@ -50,7 +51,7 @@ function report({ missing, newer }) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const dir = path.join(ROOT, 'profiles');
   const profiles = fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')));
-  const res = await fetch(CATALOG);
+  const res = await fetchWithRetry(CATALOG);
   if (!res.ok) throw new Error(`${CATALOG}: HTTP ${res.status}`);
   const diff = diffModels(profiles, await res.json());
   console.log(report(diff));

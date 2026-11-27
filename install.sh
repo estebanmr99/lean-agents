@@ -70,7 +70,8 @@ fetch() {
   if [[ -n "${HTTPS_PROXY:-}${https_proxy:-}" && -n "${NODE_EXTRA_CA_CERTS:-}" && -z "${CURL_CA_BUNDLE:-}" && -z "${SSL_CERT_FILE:-}" && -r "$NODE_EXTRA_CA_CERTS" ]]; then
     ca=(--cacert "$NODE_EXTRA_CA_CERTS")
   fi
-  curl -fsSL "${ca[@]+"${ca[@]}"}" "$@"
+  # curl retries transient errors only (timeouts, 408, 429, 5xx) three times, 2s apart.
+  curl -fsSL --retry 3 --retry-delay 2 --retry-connrefused "${ca[@]+"${ca[@]}"}" "$@"
 }
 
 redact_url() { printf '%s' "$1" | sed 's|//[^/@]*@|//|'; }

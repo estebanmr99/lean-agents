@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { npmSpec, bunPin, rtkPin } from './pins.mjs';
 import { allowedEnv } from './network.mjs';
+import { CURL_RETRY } from './retry.mjs';
 
 const isWin = process.platform === 'win32';
 
@@ -245,7 +246,7 @@ export function bunInstall(home, dir, platform, pm, arch = process.arch) {
   const name = `bun-${platform === 'win32' ? 'windows' : 'linux'}-${arch === 'arm64' ? 'aarch64' : 'x64'}`;
   if (!sha256[name.slice(4)]) return null;
   const zip = path.join(dir, `${name}-${version}.zip`);
-  const download = [platform === 'win32' ? 'curl.exe' : 'curl', '-fsSL', '-o', zip, `https://github.com/oven-sh/bun/releases/download/bun-v${version}/${name}.zip`];
+  const download = [platform === 'win32' ? 'curl.exe' : 'curl', '-fsSL', '-o', zip, ...CURL_RETRY, `https://github.com/oven-sh/bun/releases/download/bun-v${version}/${name}.zip`];
   const verify = [process.execPath, VERIFY, zip, sha256[name.slice(4)]];
   // Undo removes only the binary this install put there, then the dirs it made if they are empty: ~/.bun may hold the user's cache or global packages.
   const exe = platform === 'win32' ? 'bun.exe' : 'bun';
@@ -278,7 +279,7 @@ export function rtkInstall(home, dir, platform, arch = process.arch) {
   if (!hash) return null;
   const triple = `${aarch === 'aarch64' ? 'aarch64' : 'x86_64'}-unknown-linux-musl`;
   const tarball = P.join(dir, `rtk-${triple}-${version}.tar.gz`);
-  const download = ['curl', '-fsSL', '--create-dirs', '-o', tarball, `https://github.com/rtk-ai/rtk/releases/download/${version}/rtk-${triple}.tar.gz`];
+  const download = ['curl', '-fsSL', '--create-dirs', '-o', tarball, ...CURL_RETRY, `https://github.com/rtk-ai/rtk/releases/download/${version}/rtk-${triple}.tar.gz`];
   const verify = [process.execPath, VERIFY, tarball, hash];
   const binDir = P.join(home, '.local', 'bin');
   const bin = P.join(binDir, 'rtk');

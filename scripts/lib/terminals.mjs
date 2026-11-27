@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { which, quiet } from './system.mjs';
 import { hasProxy } from './network.mjs';
+import { CURL_RETRY } from './retry.mjs';
 import { skillSource, skillsCli, PINS } from './pins.mjs';
 import { fileURLToPath } from 'node:url';
 
@@ -71,7 +72,7 @@ export function terminalCommands({ home, terminals = [], installTerminals = [], 
         desc: 'Install Warp app',
         skipIfExists: [`${local}\\Programs\\Warp`],
         run: [
-          ['curl', '-fsSL', '-o', exe, url],
+          ['curl', '-fsSL', '-o', exe, ...CURL_RETRY, url],
           ['node', VERIFY, exe, sha],
           [exe, '/CURRENTUSER', '/VERYSILENT']
         ],
@@ -100,7 +101,7 @@ cleanup() {
   rm -rf "$DIR"
 }
 trap cleanup EXIT
-curl -fsSL -o "$DIR/orca.dmg" "${url}"
+curl -fsSL ${CURL_RETRY.join(' ')} -o "$DIR/orca.dmg" "${url}"
 node "${VERIFY}" "$DIR/orca.dmg" "${sha}"
 hdiutil attach -nobrowse -readonly -mountpoint "$MOUNT" "$DIR/orca.dmg"
 MOUNTED=1
@@ -126,7 +127,7 @@ ditto "$MOUNT/Orca.app" "${home}/Applications/Orca.app"
         desc: 'Install Orca app',
         skipIfExists: [`${local}\\Programs\\Orca`],
         run: [
-          ['curl', '-fsSL', '-o', exe, url],
+          ['curl', '-fsSL', '-o', exe, ...CURL_RETRY, url],
           ['node', VERIFY, exe, sha],
           [exe, '/currentuser', '/S']
         ],
