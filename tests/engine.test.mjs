@@ -676,6 +676,22 @@ test('Claude: a run on a new Node removes the absolute Context Mode MCP an earli
   assert.ok(!/claude mcp remove --scope user context-mode/.test(plan([{ ...record, undo: [] }])), 'already removed: not removed twice');
 });
 
+test('--update replaces an old Claude Context Mode entry without --agent and leaves one that has it', { skip: process.platform === 'win32' }, () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const nvm = fakeNvm(['22.20.0', '24.22.2'], home);
+  lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--tools', 'context-mode', '--lang', 'en'], oldNode(nvm));
+  const file = path.join(home, '.claude.json');
+  const seed = (argv) => fs.writeFileSync(file, JSON.stringify({ mcpServers: { 'context-mode': { command: argv[0], args: argv.slice(1) } } }));
+  seed(['npx', '-y', 'context-mode@2.1.4', 'server']);
+  const out = lean(home, ['--update', '--yes', '--no-exec', '--dry-run'], oldNode(nvm));
+  assert.match(out, /claude mcp remove --scope user context-mode/);
+  assert.match(out, /claude mcp add --scope user context-mode -- .* --agent claude-code/);
+  assert.ok(out.indexOf('mcp remove') < out.indexOf('mcp add'), 'remove first');
+  seed([path.join(nvm, 'versions', 'node', 'v24.22.2', 'bin', 'node'), path.join(nvm, 'versions', 'node', 'v24.22.2', 'lib', 'node_modules', 'context-mode', 'cli.mjs'), 'server', '--agent', 'claude-code']);
+  const again = lean(home, ['--update', '--yes', '--no-exec', '--dry-run'], oldNode(nvm));
+  assert.doesNotMatch(again, /claude mcp add --scope user context-mode/);
+});
+
 test('a Node that nvm has to install is planned with nvm install <major>, an unchanged default alias, and Claude gets the MCP instead of the plugin', { skip: process.platform === 'win32' }, () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
   const nvm = fakeNvm(['22.20.0'], home);

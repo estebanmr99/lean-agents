@@ -81,7 +81,7 @@ function getAt(text, keyPath) {
 }
 
 // True when `current` is the old shape in `legacy` (`*` in a string is a wildcard, `{semver}` is digits.digits.digits).
-function isLegacy(current, legacy = []) {
+export function isLegacy(current, legacy = []) {
   const eq = (a, b) => typeof b === 'string' && typeof a === 'string' ? new RegExp(`^${b.split('*').map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*').replace(/\\\{semver\\\}/g, '\\d+\\.\\d+\\.\\d+')}$`).test(a)
     : a && b && typeof a === 'object' && typeof b === 'object' ? Object.keys(a).length === Object.keys(b).length && Object.keys(b).every((k) => eq(a[k], b[k])) : a === b;
   return legacy.some((l) => eq(current, l));
