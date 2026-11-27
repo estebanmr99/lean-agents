@@ -8,7 +8,7 @@ key=$1 dest=$2
 entry="(require(process.env.CI_DOWNLOADS || './tests/ci-downloads.json')['$key'] || require('./core/pins.json').pins['$key'])"
 url=$(node -p "$entry.url")
 want=$(node -p "$entry.sha256")
-curl -fsSL -o "$dest" "$url"
+curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -o "$dest" "$url"
 # Hashed in node: sha256sum prefixes the hash with a backslash when the path has one (Windows runners).
 got=$(node --input-type=module -e "import { sha256 } from './scripts/lib/verify-sha256.mjs'; console.log(sha256(process.argv[1]))" "$dest")
 if [ "$got" != "$want" ]; then

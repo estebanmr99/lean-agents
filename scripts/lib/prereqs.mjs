@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PINS } from './pins.mjs';
 import { bunInstall, rtkInstall } from './system.mjs';
+import { CURL_RETRY } from './retry.mjs';
 import { satisfies, compare, minVersion, nvmInstallArgv } from './node-runtime.mjs';
 
 const VERIFY_SHA = fileURLToPath(new URL('./verify-sha256.mjs', import.meta.url));
@@ -83,7 +84,7 @@ export function planPrereqs(probe) {
   const node = probe.execPath ?? 'node';
   const nvmDir = P.join(home, '.nvm');
   const floor = toolFloor();
-  const fetch = (url, file) => [win ? 'curl.exe' : 'curl', '-fsSL', '--create-dirs', '-o', file, url];
+  const fetch = (url, file) => [win ? 'curl.exe' : 'curl', '-fsSL', '--create-dirs', '-o', file, ...CURL_RETRY, url];
   const steps = [];
   const add = (s) => steps.push({ needsConsent: true, undo: null, skipIf: null, ...s, resumeKey: `prereq:${s.id}` });
 

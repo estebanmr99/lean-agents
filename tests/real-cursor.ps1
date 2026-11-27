@@ -1,6 +1,7 @@
 # Real Cursor CLI on Windows through install.ps1, throwaway USERPROFILE, plus Git Bash (#23). Used by CI.
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot
+. "$PSScriptRoot\Invoke-RetryDownload.ps1"
 $rtkVer = (Get-Content (Join-Path $repo 'core\pins.json') -Raw | ConvertFrom-Json).pins.rtk.version
 
 $dir = Join-Path $(if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [IO.Path]::GetTempPath() }) "lean agents $([guid]::NewGuid())"
@@ -22,7 +23,7 @@ $env:Path = "$dir\npm;$env:Path"
 if ($LASTEXITCODE -ne 0) { throw 'agent.cmd --version failed' }
 
 # winget is not on the runner image; install.ps1 falls back to the release zip.
-Invoke-WebRequest "https://github.com/rtk-ai/rtk/releases/download/$rtkVer/rtk-x86_64-pc-windows-msvc.zip" -OutFile "$dir\rtk.zip"
+Invoke-RetryDownload "https://github.com/rtk-ai/rtk/releases/download/$rtkVer/rtk-x86_64-pc-windows-msvc.zip" "$dir\rtk.zip"
 Expand-Archive "$dir\rtk.zip" "$dir\tools\rtk"
 
 $bash = "$env:ProgramFiles\Git\bin\bash.exe"

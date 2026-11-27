@@ -83,10 +83,18 @@ function Invoke-Download($Uri, $Out) {
   $web = @{ UseBasicParsing = $true; Uri = $Uri; OutFile = $Out }
   $proxy = Get-ProxyUrl $Uri
   if ($proxy) { $web.Proxy = $proxy; $web.ProxyUseDefaultCredentials = $true }
-  try { Invoke-WebRequest @web }
-  catch {
-    # The proxy URL can hold a password, so it is never printed.
-    throw "lean-agents: could not download $Uri ($($_.Exception.Message)). Behind a proxy? Set HTTPS_PROXY (and NO_PROXY) or the Windows system proxy. PowerShell trusts the Windows certificate store, not NODE_EXTRA_CA_CERTS, so a TLS-inspecting proxy's CA must be installed there."
+  # A 5xx is retried three times (1s, 2s, 4s); a 4xx or a network error fails at once.
+  for ($attempt = 0; ; $attempt++) {
+    try { Invoke-WebRequest @web; return }
+    catch {
+      $status = 0
+      if ($_.Exception.Response) { $status = [int]$_.Exception.Response.StatusCode }
+      if ($status -lt 500 -or $attempt -ge 3) {
+        # The proxy URL can hold a password, so it is never printed.
+        throw "lean-agents: could not download $Uri ($($_.Exception.Message)). Behind a proxy? Set HTTPS_PROXY (and NO_PROXY) or the Windows system proxy. PowerShell trusts the Windows certificate store, not NODE_EXTRA_CA_CERTS, so a TLS-inspecting proxy's CA must be installed there."
+      }
+      Start-Sleep -Seconds ([math]::Pow(2, $attempt))
+    }
   }
 }
 

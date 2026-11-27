@@ -82,7 +82,7 @@ test('every script installer has a pinned url and sha256 in core/pins.json', () 
   const home = tmp();
   for (const [a, row] of Object.entries(agentTable({ home, platform: 'linux', dir: home, realHome: '/nowhere' }))) {
     if (row.method !== 'script') continue;
-    assert.match(row.run[0][4], /^https:\/\//, a);
+    assert.match(row.run[0].find((a) => a.startsWith('https://')), /^https:\/\//, a);
     assert.match(row.run[1][3], /^[0-9a-f]{64}$/, a);
   }
 });

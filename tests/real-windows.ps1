@@ -2,6 +2,7 @@
 # The USERPROFILE has a space on purpose: paths must survive the .cmd shim handling.
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot
+. "$PSScriptRoot\Invoke-RetryDownload.ps1"
 $rtkVer = (Get-Content (Join-Path $repo 'core\pins.json') -Raw | ConvertFrom-Json).pins.rtk.version
 
 $dir = Join-Path $env:RUNNER_TEMP "lean agents $([guid]::NewGuid())"
@@ -19,7 +20,7 @@ opencode --version
 
 # winget is not on the runner image, so this also proves the release zip route.
 $rtkDir = "$dir\tools\rtk"
-Invoke-WebRequest "https://github.com/rtk-ai/rtk/releases/download/$rtkVer/rtk-x86_64-pc-windows-msvc.zip" -OutFile "$dir\rtk.zip"
+Invoke-RetryDownload "https://github.com/rtk-ai/rtk/releases/download/$rtkVer/rtk-x86_64-pc-windows-msvc.zip" "$dir\rtk.zip"
 Expand-Archive "$dir\rtk.zip" $rtkDir
 if (-not (Test-Path "$rtkDir\rtk.exe")) { throw 'rtk.exe is not at the top of the release zip' }
 

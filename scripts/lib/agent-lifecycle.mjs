@@ -8,6 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PINS } from './pins.mjs';
 import { sha256 } from './verify-sha256.mjs';
+import { CURL_RETRY } from './retry.mjs';
 import { run, which, version, antigravityPrereqs, packageManager, agyCandidates, BREW_AGY_LIMIT } from './system.mjs';
 import { writePrivate, privateDir } from './fsops.mjs';
 import { winPathDefault } from './opencode1.mjs';
@@ -24,7 +25,7 @@ export const VSCODE_NOTE = 'VS Code owns the GitHub Copilot extension: lean-agen
 function script(pinKey, dir, args = [], ext = '.sh') {
   const p = PINS[pinKey];
   const file = path.join(dir, `${pinKey}${ext}`);
-  return { version: null, download: file, run: [[ext === '.ps1' ? 'curl.exe' : 'curl', '-fsSL', '-o', file, p.url], [process.execPath, VERIFY, file, p.sha256], ext === '.ps1' ? ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', file, ...args] : ['bash', file, ...args]] };
+  return { version: null, download: file, run: [[ext === '.ps1' ? 'curl.exe' : 'curl', '-fsSL', '-o', file, ...CURL_RETRY, p.url], [process.execPath, VERIFY, file, p.sha256], ext === '.ps1' ? ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', file, ...args] : ['bash', file, ...args]] };
 }
 
 // Antigravity CLI on Windows: the pinned release zip holds antigravity.exe, installed as agy.exe where install.ps1 puts it
@@ -43,7 +44,7 @@ function agyWindows({ home, dir, realHome, env, arch }) {
   const ps = `$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.IO.Compression.FileSystem; if (Test-Path -LiteralPath '${q(tmp)}') { Remove-Item -Recurse -Force -LiteralPath '${q(tmp)}' }; [System.IO.Compression.ZipFile]::ExtractToDirectory('${q(zip)}', '${q(tmp)}'); New-Item -ItemType Directory -Force '${q(binDir)}' | Out-Null; Move-Item -Force '${q(W.join(tmp, 'antigravity.exe'))}' '${q(W.join(binDir, 'agy.exe'))}'; Remove-Item -Recurse -Force '${q(tmp)}'`;
   return {
     method: 'download', version: p.version, download: zip,
-    run: [['curl.exe', '-fsSL', '-o', zip, `https://github.com/google-antigravity/antigravity-cli/releases/download/${p.version}/agy_cli_windows_${key}.zip`], [process.execPath, VERIFY, zip, p.sha256[key]], ['powershell', '-NoProfile', '-NonInteractive', '-Command', ps]],
+    run: [['curl.exe', '-fsSL', '-o', zip, ...CURL_RETRY, `https://github.com/google-antigravity/antigravity-cli/releases/download/${p.version}/agy_cli_windows_${key}.zip`], [process.execPath, VERIFY, zip, p.sha256[key]], ['powershell', '-NoProfile', '-NonInteractive', '-Command', ps]],
     // agy updates itself: uninstall keeps a changed agy.exe (sha256 mismatch). VERIFY the setting that turns auto-update off.
     bins: [W.join(binDir, 'agy.exe')], dirs: local ? [binDir, local] : [binDir], pathDir: binDir,
   };

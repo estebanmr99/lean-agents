@@ -76,7 +76,7 @@ if [ "${CI_LATEST:-}" = true ]; then
   prev="$work/prev-src"
   node -e "require('node:fs').cpSync(process.argv[1], process.argv[2], { recursive: true, filter: (p) => !/(^|[\\\\/])(node_modules|\.git)([\\\\/]|$)/.test(p) })" "$repo" "$prev"
   ln -s "$repo/node_modules" "$prev/node_modules"
-  curl -fsSL "https://raw.githubusercontent.com/estebanmr99/lean-agents/v$rel/core/pins.json" -o "$work/release-pins.json"
+  curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors "https://raw.githubusercontent.com/estebanmr99/lean-agents/v$rel/core/pins.json" -o "$work/release-pins.json"
   node -e "const fs=require('node:fs'),[f,r]=process.argv.slice(1),j=JSON.parse(fs.readFileSync(f,'utf8')),o=JSON.parse(fs.readFileSync(r,'utf8'));for(const [k,p] of Object.entries(j.pins)){const q=o.pins?.[k];if(q&&q.version&&!p.hold)p.version=q.version}fs.writeFileSync(f,JSON.stringify(j,null,2))" "$prev/core/pins.json" "$work/release-pins.json"
   # Identical pins would make the cycle a no-op that still prints OK: skip instead.
   if ! node -e "const r=(f)=>JSON.parse(require('fs').readFileSync(f,'utf8')).pins,a=r(process.argv[1]),b=r(process.argv[2]);process.exit([...new Set([...Object.keys(a),...Object.keys(b)])].some((k)=>a[k]?.version!==b[k]?.version)?0:1)" "$prev/core/pins.json" "$repo/core/pins.json"; then

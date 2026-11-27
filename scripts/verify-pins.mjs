@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tagSha } from './version-watch.mjs';
+import { fetchWithRetry } from './lib/retry.mjs';
 
 const FILE = fileURLToPath(new URL('../core/pins.json', import.meta.url));
 
@@ -28,7 +29,7 @@ export async function verify(pins, get) {
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const headers = { 'User-Agent': 'lean-agents', ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}) };
-  const get = async (url) => { const r = await fetch(url, { headers }); if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`); return r.json(); };
+  const get = async (url) => { const r = await fetchWithRetry(url, { headers }); if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`); return r.json(); };
   const bad = await verify(JSON.parse(fs.readFileSync(FILE, 'utf8')).pins, get);
   for (const m of bad) console.log(`! ${m}`);
   console.log(bad.length ? `${bad.length} pin(s) do not match upstream` : 'every pin matches upstream');
