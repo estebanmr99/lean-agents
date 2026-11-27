@@ -274,7 +274,7 @@ curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/i
 & ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -DryRun
 ```
 
-`LEAN_AGENTS_VERSION=1.2.2` pins a release. Once installed, `--dry-run`, `--doctor` and `--uninstall` need no network. A local checkout (`bash install.sh` from a clone) is trusted as it is; only the release download is checksum-verified.
+`LEAN_AGENTS_VERSION=1.2.3` pins a release. Once installed, `--dry-run`, `--doctor` and `--uninstall` need no network. A local checkout (`bash install.sh` from a clone) is trusted as it is; only the release download is checksum-verified.
 
 ## Why
 
@@ -561,7 +561,7 @@ lean-agents is glue. The heavy lifting is done by these projects; please star th
 - [x] Parallel agent sessions (`scripts/parallel.mjs`)
 - [x] Warp and Orca agent integrations for users who already have them
 - [x] Antigravity app and CLI on macOS, Linux and Windows (app loading stays VERIFY)
-- [x] `v1.2.2` (latest): RTK on OpenCode 2, `--upgrade-agent opencode` keeps servers and plugins it used to drop, DCP version kept in step across files, older-rtk warning, doctor fixes. - [x] `v1.2.1`: VS Code Insiders support.
+- [x] `v1.2.3` (latest): `--preflight` setup check, one quiet line per step with a per-run log, `--update` stops while OpenCode runs and asks nothing mid-run, no `shell: true` child processes (DEP0190), Windows home paths and `--adopt` duplicate fixes. - [x] `v1.2.2`: RTK on OpenCode 2, `--upgrade-agent opencode` keeps servers and plugins it used to drop, DCP version kept in step across files, older-rtk warning, doctor fixes. - [x] `v1.2.1`: VS Code Insiders support.
 - [x] `v1.2.0`: rtk on Linux without Homebrew, clearer Node version hints, Code Mode proxy groundwork, Codex CLI spike, Code of Conduct.
 - [x] `v1.1.0`: Savings benchmark, Antigravity/Cursor Windows installers, --add-tools, and team rollout guide.
 - [x] `v1.0.0`: fresh-machine `--everything`, guided OpenCode 1.x to 2.x upgrade with backup and undo, install by the VS Code Copilot agent, update plan and `--update --undo`, summary page; Node.js 22.20 or newer
