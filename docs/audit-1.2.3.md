@@ -28,7 +28,7 @@ Release audit of lean-agents for 1.2.3 (2026-11-26). Range: v1.2.2..89f269e (mai
   - Release run green on the tagged SHA
   - OIDC publish proof
 
-## Findings
+## Findings and issues
 
 - **MEDIUM, fixed (#510):** in `scripts/copilot-context-mode.mjs`, if `npm root -g` failed, its empty output made the package candidate the relative `context-mode`. A `./context-mode/server.mjs` in the current folder could then be registered as Copilot's context-mode MCP server. #502 introduced this; before it, the script threw. Now only an absolute npm root is used, and a relative `which()` answer is ignored. `tests/copilot-context-mode.test.mjs` failed on main and passes now.
 - **LOW, accepted:** in `scripts/lib/system.mjs` `spawnArgs`, the resolved `.cmd` path goes in plain quotes, not ^-escaped (escaping breaks the shim's `%~dp0`). A `%VAR%` in that path would expand. The path comes from `where` on the child's own PATH, so it is already trusted to run. Follow-up: #507, one shim policy with `cmdInvocation`, which refuses such paths.
