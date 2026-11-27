@@ -35,11 +35,7 @@ data_root="$HOME/.claude/plugins/data"
 echo "plugin data dirs in $data_root:"
 if [ -d "$data_root" ]; then find "$data_root" -mindepth 1 -maxdepth 1 -print | tee "$work/data-dirs.txt"; else echo "(missing)"; fi
 data="$(find "$data_root" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | head -n 1)"
-if [ -z "$data" ]; then
-  # Claude Code does not create a data folder until the plugin saves something; this was the name seen in CI.
-  data="$data_root/context-mode-context-mode"
-  mkdir -p "$data"
-fi
+test -n "$data" || { echo "no plugin data dir under $data_root" >&2; exit 1; }
 echo "plugin data dir: $data"
 printf 'keep me\n' > "$data/sentinel"
 
