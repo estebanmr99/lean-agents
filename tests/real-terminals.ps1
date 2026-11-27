@@ -93,7 +93,7 @@ try {
   for ($i = 0; $i -lt 30 -and -not (Get-OrcaVersion); $i++) { Start-Sleep 2 }
   Assert-Eq 'seeded Orca version' (Get-OrcaVersion) $oldOrca
 
-  Invoke-Lean '--yes', '--agents', 'cursor', '--no-tools', '--terminal', 'orca', '--network', 'standard', '--lang', 'en'
+  Invoke-Lean '--yes', '--agents', 'cursor', '--no-tools', '--terminal', 'orca', '--privacy', 'standard', '--lang', 'en'
   Invoke-Lean '--update', '--install-terminal', 'orca', '--yes'
   Assert-Eq 'Orca after --update' (Get-OrcaVersion) $orcaPin
   Invoke-Lean '--uninstall', '--yes'
