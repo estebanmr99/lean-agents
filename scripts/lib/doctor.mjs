@@ -321,12 +321,16 @@ function checkAntigravityIde({ home, exec, run, platform, fsx }, add) {
 }
 
 // 1.x MCP field names that OpenCode 2 ignores (#556). Read from the live file so a field OpenCode drops is still reported.
+const STALE_MCP_OAUTH = { clientId: 'client_id', clientSecret: 'client_secret', callbackPort: 'callback_port', redirectUri: 'redirect_uri' };
 export function staleMcpFields(cfg) {
   const out = [];
   for (const [name, s] of Object.entries(cfg?.mcp?.servers ?? {})) {
     if (!s || typeof s !== 'object') continue;
     if (s.enabled !== undefined) out.push(`mcp.servers.${name}.enabled -> disabled`);
-    if (s.oauth && typeof s.oauth === 'object' && s.oauth.clientId !== undefined) out.push(`mcp.servers.${name}.oauth.clientId -> oauth.client_id`);
+    if (!s.oauth || typeof s.oauth !== 'object') continue;
+    for (const [from, to] of Object.entries(STALE_MCP_OAUTH)) {
+      if (s.oauth[from] !== undefined) out.push(`mcp.servers.${name}.oauth.${from} -> oauth.${to}`);
+    }
   }
   return out;
 }
@@ -342,7 +346,7 @@ function checkOpenCode(o, add, q, home, fsx) {
       break;
     }
   } catch { /* unreadable config: the debug config check below still runs */ }
-  if (stale.length) add('opencode mcp 1.x keys', 'changed', `${stale.join('; ')}. Fix: rename to the 2.x names (or run lean-agents --upgrade-agent opencode)`);
+  if (stale.length) add('opencode mcp 1.x keys', 'changed', `${stale.join('; ')}. Fix: run lean-agents --update to rename them`);
   const r = q(['opencode', 'debug', 'config']);
   if (!r.ok) return add('opencode resolved config', 'error', '`opencode debug config` failed');
   let cfg;

@@ -157,14 +157,15 @@ test('mcp 1.x oauth and enabled keys become 2.x names; an unhandled oauth key st
   const conf = { mcp: {
     oauth: { type: 'remote', url: 'https://mcp.example.invalid/oauth', enabled: false, oauth: { clientId: '{env:CLIENT_ID}', clientSecret: '{env:CLIENT_SECRET}', scope: 'read write' } },
     plain: { type: 'remote', url: 'https://mcp.example.invalid/plain', enabled: true, oauth: false },
-    manual: { type: 'remote', url: 'https://mcp.example.invalid/manual', oauth: { clientId: 'kept-id', redirectUri: 'http://127.0.0.1/callback' } },
+    redirect: { type: 'remote', url: 'https://mcp.example.invalid/redirect', oauth: { clientId: '{env:REDIRECT_ID}', redirectUri: 'http://127.0.0.1/callback' } },
+    manual: { type: 'remote', url: 'https://mcp.example.invalid/manual', oauth: { clientId: 'kept-id', audience: 'kept-audience' } },
   } };
   const s = await withPlaywright(['rtk'], conf);
   const manual = s.inv.items.find((i) => i.kind === 'mcp' && i.name === 'manual');
   assert.equal(manual.upgrade.class, 'user-manual');
-  assert.match(manual.upgrade.reason, /redirectUri -> oauth\.redirect_uri/);
+  assert.match(manual.upgrade.reason, /audience \(no verified 2\.x field\)/);
   const text = formatUpgrade(s.inv);
-  for (const v of ['{env:CLIENT_ID}', '{env:CLIENT_SECRET}', 'http://127.0.0.1/callback']) assert.ok(!text.includes(v), `${v} leaked`);
+  for (const v of ['{env:CLIENT_ID}', '{env:CLIENT_SECRET}', '{env:REDIRECT_ID}', 'http://127.0.0.1/callback', 'kept-audience']) assert.ok(!text.includes(v), `${v} leaked`);
   const original = fs.readFileSync(s.cfg, 'utf8');
   const r = upgradeApply({ ...s, stamp: STAMP });
   const c = read(s.cfg);
@@ -174,8 +175,25 @@ test('mcp 1.x oauth and enabled keys become 2.x names; an unhandled oauth key st
   assert.equal(c.mcp.servers.plain.disabled, undefined);
   assert.equal(c.mcp.servers.plain.enabled, undefined);
   assert.equal(c.mcp.servers.plain.oauth, false);
+  assert.deepEqual(c.mcp.servers.redirect.oauth, { client_id: '{env:REDIRECT_ID}', redirect_uri: 'http://127.0.0.1/callback' }, 'redirectUri moves with clientId');
   assert.equal(c.mcp.servers.manual, undefined);
-  assert.deepEqual(c.mcp.manual.oauth, { clientId: 'kept-id', redirectUri: 'http://127.0.0.1/callback' }, 'the unhandled key is not copied silently');
+  assert.deepEqual(c.mcp.manual.oauth, { clientId: 'kept-id', audience: 'kept-audience' }, 'the unhandled key is not copied silently');
+  undo(r.entries, [j(s.home, '.config', 'opencode')]);
+  assert.equal(fs.readFileSync(s.cfg, 'utf8'), original);
+});
+
+test('an already-2.x config with leftover 1.x MCP names is fixed by --upgrade-agent opencode (#556)', { skip }, async () => {
+  const conf = { mcp: { servers: {
+    remote: { type: 'remote', url: 'https://mcp.example.invalid/mcp', enabled: false, oauth: { clientId: '{env:ID}', clientSecret: '{env:SECRET}', callbackPort: 8080, redirectUri: 'http://127.0.0.1/cb' } },
+  } } };
+  const s = await withPlaywright(['rtk'], conf);
+  const original = fs.readFileSync(s.cfg, 'utf8');
+  const r = upgradeApply({ ...s, stamp: STAMP });
+  const c = read(s.cfg);
+  assert.deepEqual(c.mcp.servers.remote, {
+    type: 'remote', url: 'https://mcp.example.invalid/mcp', disabled: true,
+    oauth: { client_id: '{env:ID}', client_secret: '{env:SECRET}', callback_port: 8080, redirect_uri: 'http://127.0.0.1/cb' },
+  });
   undo(r.entries, [j(s.home, '.config', 'opencode')]);
   assert.equal(fs.readFileSync(s.cfg, 'utf8'), original);
 });

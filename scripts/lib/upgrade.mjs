@@ -5,7 +5,7 @@ import path from 'node:path';
 import { parse } from 'jsonc-parser';
 import { hasMark, plan, apply, describe, homeRel } from './fsops.mjs';
 import { configHome } from './system.mjs';
-import { configPath } from './adapters/opencode-v2.mjs';
+import { configPath, staleMcpEdits } from './adapters/opencode-v2.mjs';
 import { readBackupStamp } from './backup-stamp.mjs';
 
 const j = path.join;
@@ -29,11 +29,10 @@ export const TRANSLATIONS = [
 const row = (key) => TRANSLATIONS.find((t) => t.key === key);
 
 // MCP OAuth names from the 1.x -> 2.x guide (https://opencode.ai/docs/migrate-v1/, read 2026-11-27): clientId -> client_id,
-// clientSecret -> client_secret, callbackPort -> callback_port, redirectUri -> redirect_uri. Only the client pair and `scope`
-// are converted here; the callback/redirect pair stays user-manual until a real 2.x run proves the value shape.
-const MCP_OAUTH_COPY = { clientId: 'client_id', clientSecret: 'client_secret' };
-const MCP_OAUTH_KEEP = new Set([...Object.keys(MCP_OAUTH_COPY), 'client_id', 'client_secret', 'scope']);
-const MCP_OAUTH_MANUAL = { callbackPort: 'oauth.callback_port', redirectUri: 'oauth.redirect_uri' };
+// clientSecret -> client_secret, callbackPort -> callback_port, redirectUri -> redirect_uri. Values are copied untouched; the
+// value shape of the callback/redirect pair is VERIFY in docs/compatibility.md.
+const MCP_OAUTH_COPY = { clientId: 'client_id', clientSecret: 'client_secret', callbackPort: 'callback_port', redirectUri: 'redirect_uri' };
+const MCP_OAUTH_KEEP = new Set([...Object.keys(MCP_OAUTH_COPY), ...Object.values(MCP_OAUTH_COPY), 'scope']);
 
 // A 1.x MCP entry -> its 2.x shape: enabled/disabled and the OAuth client names. Unknown OAuth keys never reach here: the entry
 // is user-manual (mcpOauthManual) and stays in the 1.x flat map.
@@ -58,8 +57,7 @@ function mcp2Value(v) {
 // The 1.x OAuth keys this entry has that are not converted automatically, with the 2.x field to use. Empty when it is clean.
 function mcpOauthManual(v) {
   if (!v || typeof v !== 'object' || !v.oauth || typeof v.oauth !== 'object' || Array.isArray(v.oauth)) return [];
-  return Object.keys(v.oauth).filter((k) => !MCP_OAUTH_KEEP.has(k))
-    .map((k) => (MCP_OAUTH_MANUAL[k] ? `${k} -> ${MCP_OAUTH_MANUAL[k]}` : `${k} (no verified 2.x field)`));
+  return Object.keys(v.oauth).filter((k) => !MCP_OAUTH_KEEP.has(k)).map((k) => `${k} (no verified 2.x field)`);
 }
 
 // Keys with no verified 2.x equivalent, and so no row.
@@ -227,7 +225,8 @@ export function formatUpgrade(r) {
 
 // Edits that turn the 1.x config into 2.x keys, from `managed` and `user-translatable` rows only. Whole keys are set or removed
 // (never single array slots), so each edit undoes exactly. `user-manual` keys and entries are left where they are.
-// `inv.items` come from upgradeInventory; `cfg` is the parsed live config. A 2.x-shaped file (mcp.servers) yields no edits.
+// `inv.items` come from upgradeInventory; `cfg` is the parsed live config. A 2.x-shaped file gets only the leftover 1.x
+// MCP names renamed (staleMcpEdits).
 export function translateEdits(cfg, items) {
   const edits = [];
   const mine = items.filter((i) => i.upgrade && i.client === 'opencode' && i.kind !== 'file' && /opencode\.jsonc?$/.test(i.file ?? ''));
@@ -276,6 +275,8 @@ export function translateEdits(cfg, items) {
     for (const resource of c.disabled_providers) edits.push({ path: ['policies'], value: { effect: 'deny', action: 'provider.use', resource }, mode: 'arrayAdd' });
     drop(['disabled_providers']);
   }
+  // A config that is already 2.x-shaped can still hold 1.x MCP names (the owner's machine after the upgrade, #556).
+  if (c.mcp?.servers) edits.push(...staleMcpEdits(c).edits);
   return edits;
 }
 

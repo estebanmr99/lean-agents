@@ -23,16 +23,24 @@ function rowsFor(servers) {
   return JSON.parse(out).rows;
 }
 
-test('a 2.x config with oauth.clientId or enabled gets one warning row with the 2.x names', () => {
-  const rows = rowsFor({
-    remote: { type: 'remote', url: 'https://mcp.example.invalid/mcp', enabled: true, oauth: { clientId: 'fake-id', clientSecret: 'fake-secret' } },
-  }).filter((r) => r.item === 'opencode mcp 1.x keys');
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0].status, 'changed');
-  assert.match(rows[0].detail, /mcp\.servers\.remote\.enabled -> disabled/);
-  assert.match(rows[0].detail, /mcp\.servers\.remote\.oauth\.clientId -> oauth\.client_id/);
-  assert.match(rows[0].detail, /Fix: rename to the 2\.x names/);
-  assert.ok(!rows[0].detail.includes('fake-id') && !rows[0].detail.includes('fake-secret'), 'values stay out of the doctor');
+test('a 2.x config with each stale 1.x MCP key gets one warning row with the 2.x name', () => {
+  const cases = [
+    ['enabled', true, 'mcp.servers.remote.enabled -> disabled'],
+    ['oauth.clientId', 'fake-id', 'mcp.servers.remote.oauth.clientId -> oauth.client_id'],
+    ['oauth.clientSecret', 'fake-secret', 'mcp.servers.remote.oauth.clientSecret -> oauth.client_secret'],
+    ['oauth.callbackPort', 8080, 'mcp.servers.remote.oauth.callbackPort -> oauth.callback_port'],
+    ['oauth.redirectUri', 'http://127.0.0.1/cb', 'mcp.servers.remote.oauth.redirectUri -> oauth.redirect_uri'],
+  ];
+  for (const [key, value, expected] of cases) {
+    const server = { type: 'remote', url: 'https://mcp.example.invalid/mcp' };
+    if (key.startsWith('oauth.')) server.oauth = { [key.slice(6)]: value }; else server[key] = value;
+    const rows = rowsFor({ remote: server }).filter((r) => r.item === 'opencode mcp 1.x keys');
+    assert.equal(rows.length, 1, key);
+    assert.equal(rows[0].status, 'changed');
+    assert.match(rows[0].detail, new RegExp(expected.replace(/[.]/g, '\\.')));
+    assert.match(rows[0].detail, /Fix: run lean-agents --update/);
+    assert.ok(!rows[0].detail.includes(String(value)), `${key}: value leaked into the doctor`);
+  }
 });
 
 test('a config already using the 2.x names gets no warning', () => {

@@ -252,7 +252,7 @@ export function plan(actions, roots = [], prior = []) {
     if (blocked) return { ...a, before: null, after: null, status: 'skip', note: blocked };
     const before = read(a.path);
     let after;
-    let note = '';
+    let note = a.note ?? '';
     let applied;
     let keptKeys;
     if (a.kind === 'file') {
@@ -280,8 +280,8 @@ export function plan(actions, roots = [], prior = []) {
       applied = r.applied;
       keptKeys = r.kept.map((k) => k.path.join('.'));
       const moved = r.applied.filter((e) => e.mode === 'arrayAdd' && /@\d+\.\d+\.\d+$/.test(e.replaced ?? '')).map((e) => `${path.basename(a.path)} ${e.label ?? 'pin'} ${e.replaced.replace(/^.*@/, '')} -> ${e.value.replace(/^.*@/, '')}${e.why ? ` ${e.why}` : ''}`);
-      if (moved.length) note = moved.join('; ');
-      if (r.kept.length) note = `kept your values for: ${r.kept.map((k) => k.path.join('.')).join(', ')}`;
+      if (moved.length) note = [a.note, moved.join('; ')].filter(Boolean).join('; ');
+      if (r.kept.length) note = [a.note, `kept your values for: ${r.kept.map((k) => k.path.join('.')).join(', ')}`].filter(Boolean).join('; ');
     } else if (a.kind === 'block') {
       after = setBlock(before, a.body, a.toml, a.id);
     }
