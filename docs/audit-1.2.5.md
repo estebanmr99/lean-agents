@@ -17,9 +17,9 @@ Release audit of lean-agents for 1.2.5 (2026-11-27). Range: v1.2.4..f8fb8e5 (mai
   - CI: real-binary downloads retry a 5xx (and refused connections) three times, never a 4xx (#505, #538).
 - **Findings:** no HIGH, no MEDIUM. Four LOW findings, all accepted, with follow-ups in #540, #541 and #542.
 - **Owner-only gates:**
-  - Tag v1.2.5 (waits for the owner's approval)
-  - Release run green on the tagged SHA
-  - OIDC publish proof
+  - Tag v1.2.5 (approved by the owner on 2026-11-27). Tagged on fef310f after `ci.yml` run 45974642064 passed on it.
+  - Release run green: `release.yml` run 45990316301 passed on the tag (2026-11-27).
+  - OIDC publish proof: npm shows 1.2.5 as `latest`, with SLSA provenance (checked 2026-11-27).
 
 ## Findings and issues
 
