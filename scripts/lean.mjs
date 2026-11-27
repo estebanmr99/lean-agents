@@ -7,7 +7,6 @@ import path from 'node:path';
 import readline from 'node:readline';
 import tty from 'node:tty';
 import { fileURLToPath } from 'node:url';
-import { parse } from 'jsonc-parser';
 import { plan, apply, undo, describe, tilde, sha, userHash, managedUserHash, writePrivate, privateDir, dropBackups, renameRetry } from './lib/fsops.mjs';
 import { loadCore, renderRules, loadProfile, useToolNode } from './lib/render.mjs';
 import { claudeAdapter } from './lib/adapters/claude.mjs';
@@ -1020,52 +1019,52 @@ async function install(o) {
 
 // --update --undo (#278): each agent CLI goes back to the version it had before the first upgrade lean-agents ran.
 // Plan first; the answer (or --yes) runs it. A failed step is reported and the rest still run; --uninstall never does this.
-// It also puts settings.json back from the newest run backup when that file still has the marketplace ref --update moved (#546).
-function marketplaceRestore(home, S) {
-  const settings = path.join(home, '.claude', 'settings.json');
-  const entry = [...(S?.files ?? [])].reverse().find((f) => f.path === settings && (f.applied ?? []).some((e) => e.marketplace));
-  const edit = entry && [...entry.applied].reverse().find((e) => e.marketplace);
-  if (!edit) return null;
-  let current;
-  try { current = parse(fs.readFileSync(settings, 'utf8'), [], { allowTrailingComma: true }); } catch { return null; }
-  if (current?.extraKnownMarketplaces?.[edit.marketplace]?.source?.ref !== edit.value) return null;
-  const moves = path.join(stateDir(home), 'backups');
-  const names = fs.existsSync(moves) ? fs.readdirSync(moves).filter((n) => /^\d{4}-\d{2}-\d{2}T/.test(n)).sort().reverse() : [];
-  for (const name of names) {
-    const backup = path.join(moves, name, '.claude', 'settings.json');
-    if (!fs.existsSync(backup)) continue;
-    let old;
-    try { old = parse(fs.readFileSync(backup, 'utf8'), [], { allowTrailingComma: true }); } catch { continue; }
-    const to = old?.extraKnownMarketplaces?.[edit.marketplace]?.source?.ref;
-    return { path: settings, backup, name: edit.marketplace, from: edit.value, to: to ?? '(none)' };
-  }
-  return null;
+// It also moves our own extraKnownMarketplaces ref back through the recorded json edit (#546): only that key, so user
+// or `claude plugin` changes made since stay.
+function marketplaceRestore(S) {
+  const entries = (S?.files ?? []).filter((f) => (f.applied ?? []).some((e) => e.marketplace));
+  const edits = entries.flatMap((f) => (f.applied ?? []).filter((e) => e.marketplace));
+  if (!edits.length) return null;
+  const last = edits.at(-1);
+  return { path: entries.at(-1).path, edit: { ...last, previous: edits[0].previous } };
 }
 
 async function undoAgentUpgrades(o) {
   const S = readState(o.home);
   const stamps = agentStamps(stateDir(o.home));
   const todo = undoPlan(S?.commands ?? [], stamps);
-  const restore = marketplaceRestore(o.home, S);
+  const restore = marketplaceRestore(S);
   if (!todo.length && !restore) { console.log('nothing to undo: no agent CLI upgrade or marketplace pin move by lean-agents is recorded'); return true; }
   console.log('lean-agents --update --undo plan (the oldest saved version per agent):');
   for (const c of todo) {
     console.log(`  - ${agentOf(c)}: back to ${c.from}`);
     for (const argv of [...c.reinstall, ...(c.reinstallAlways ?? [])]) console.log(`      $ ${argv.join(' ')}`);
   }
-  if (restore) console.log(`  - ${tilde(restore.path, o.home)}: marketplace ref ${restore.from} -> ${restore.to} (from ${tilde(restore.backup, o.home)})`);
+  if (restore) console.log(`  - ${tilde(restore.path, o.home)}: marketplace ref ${restore.edit.value} -> ${restore.edit.previous ?? '(none)'}`);
   if (o.dryRun) { console.log('Dry run: nothing was changed.'); return true; }
-  if (!o.exec && todo.length) { console.log('--no-exec: nothing was run. Not done.'); return false; }
-  if (todo.length && !o.yes && !(process.stdin.isTTY && process.stdout.isTTY)) { console.log('No terminal to ask on: --yes runs it. Not done.'); return false; }
-  const p = await prompter(o.yes);
-  try { if (!yesNo(await p.ask('Restore these?', o.yes ? 'y' : 'n'))) { console.log('Cancelled.'); return true; } } finally { p.close(); }
-  if (restore) { const [what] = undo([{ path: restore.path, kind: 'json', backup: restore.backup, hash: sha(fs.readFileSync(restore.path, 'utf8')) }], writeRoots(o)); console.log(`- ${what} ${tilde(restore.path, o.home)} (${restore.name} marketplace ref ${restore.to})`); }
-  Object.assign(process.env, childEnv(S.options.network));
-  const { ok, restored } = todo.length ? undoUpgrades(todo, {}, stamps) : { ok: true, restored: new Set() };
-  // A restored agent's records are spent; a failed one keeps them so the next --update --undo retries it.
-  S.commands = S.commands.filter((c) => !(c.reinstall && restored.has(agentOf(c))));
-  S.updatedAt = new Date().toISOString();
-  writePrivate(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(S, null, 2)}\n`);
+  let ok = true;
+  if (todo.length) {
+    if (!o.exec) { console.log('--no-exec: nothing was run. Not done.'); return false; }
+    if (!o.yes && !(process.stdin.isTTY && process.stdout.isTTY)) { console.log('No terminal to ask on: --yes runs it. Not done.'); return false; }
+    const p = await prompter(o.yes);
+    try { if (!yesNo(await p.ask('Reinstall these versions?', o.yes ? 'y' : 'n'))) { console.log('Cancelled.'); return true; } } finally { p.close(); }
+    Object.assign(process.env, childEnv(S.options.network));
+    const { ok: agentsOk, restored } = undoUpgrades(todo, {}, stamps);
+    ok = agentsOk;
+    // A restored agent's records are spent; a failed one keeps them so the next --update --undo retries it.
+    S.commands = S.commands.filter((c) => !(c.reinstall && restored.has(agentOf(c))));
+    S.updatedAt = new Date().toISOString();
+    writePrivate(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(S, null, 2)}\n`);
+  }
+  if (restore) {
+    if (!o.yes && !(process.stdin.isTTY && process.stdout.isTTY)) { console.log('No terminal to ask on: --yes restores the marketplace ref. Not done.'); return false; }
+    const p = await prompter(o.yes);
+    let go;
+    try { go = yesNo(await p.ask('Restore the marketplace ref?', o.yes ? 'y' : 'n')); } finally { p.close(); }
+    if (!go) { console.log('Cancelled.'); return ok; }
+    const [what] = undo([{ path: restore.path, kind: 'json', applied: [restore.edit], hash: sha(fs.readFileSync(restore.path, 'utf8')) }], writeRoots(o));
+    console.log(`- ${what} ${tilde(restore.path, o.home)} (${restore.edit.marketplace} marketplace ref ${restore.edit.previous ?? '(none)'})`);
+  }
   return ok;
 }
 

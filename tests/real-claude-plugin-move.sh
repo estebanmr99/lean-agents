@@ -31,8 +31,16 @@ claude plugin list --json > "$work/list-old.json"
 test "$(version "$work/list-old.json")" = "${oldv#v}"
 
 # Data the plugin saved before the pin moved: an update must keep it (only `marketplace remove` deletes it).
-data="$HOME/.claude/plugins/data/context-mode@context-mode"
-mkdir -p "$data"
+data_root="$HOME/.claude/plugins/data"
+echo "plugin data dirs in $data_root:"
+if [ -d "$data_root" ]; then find "$data_root" -mindepth 1 -maxdepth 1 -print | tee "$work/data-dirs.txt"; else echo "(missing)"; fi
+data="$(find "$data_root" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | head -n 1)"
+if [ -z "$data" ]; then
+  # Claude Code does not create a data folder until the plugin saves something; this is its documented location.
+  data="$data_root/context-mode@context-mode"
+  mkdir -p "$data"
+fi
+echo "plugin data dir: $data"
 printf 'keep me\n' > "$data/sentinel"
 
 node "$repo/scripts/lean.mjs" --home "$HOME" --update --yes </dev/null 2>&1 | tee "$work/update.txt"
@@ -46,6 +54,6 @@ test -f "$data/sentinel"
 
 node "$repo/scripts/lean.mjs" --home "$HOME" --uninstall --yes </dev/null 2>&1 | tee "$work/uninstall.txt"
 refute grep -qE '^ *! ' "$work/uninstall.txt"
-# The entry is back to the pre-update ref (or gone); never left at the moved pin.
-node -e "const fs=require('node:fs'),f=process.env.HOME+'/.claude/settings.json';const s=JSON.parse(fs.readFileSync(f,'utf8'));const e=s.extraKnownMarketplaces&&s.extraKnownMarketplaces['context-mode'];if(e&&e.source&&e.source.ref===process.argv[1])throw new Error('left at the moved ref '+process.argv[1])" "$newv"
+# --uninstall reverts our ref edit: the entry is gone (strict), never left at the moved pin.
+node -e "const fs=require('node:fs'),f=process.env.HOME+'/.claude/settings.json';const s=JSON.parse(fs.readFileSync(f,'utf8'));const m=s.extraKnownMarketplaces||{};if(Object.prototype.hasOwnProperty.call(m,process.argv[1]))throw new Error('marketplace entry '+process.argv[1]+' still present: '+JSON.stringify(m[process.argv[1]]))" context-mode
 echo "real-claude-plugin-move: $oldv -> $newv OK"

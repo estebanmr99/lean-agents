@@ -50,7 +50,7 @@ function marketplaceMove(dir, name, repo) {
   try {
     src = parse(fs.readFileSync(file, 'utf8'), [], { allowTrailingComma: true })?.extraKnownMarketplaces?.[name]?.source;
   } catch { return {}; }
-  if (!src || typeof src !== 'object') return {};
+  if (!src || typeof src !== 'object') return { missing: true };
   const shown = src.repo ?? src.url;
   if (shown !== pluginRepo(repo)) {
     return { warning: `! ${name} marketplace entry in ${file} points at ${shown ?? 'another source'}, not ${pluginRepo(repo)}: left as it is; change it or remove it by hand.` };
@@ -58,7 +58,7 @@ function marketplaceMove(dir, name, repo) {
   const ref = repo.slice(repo.indexOf('#') + 1);
   // Only a recorded ref moves (a marketplace add without a ref, or a user's own edit, keeps its shape).
   if (typeof src.ref !== 'string' || src.ref === ref) return {};
-  return { edit: { path: ['extraKnownMarketplaces', name, 'source', 'ref'], value: ref, mode: 'set', marketplace: name } };
+  return { edit: { path: ['extraKnownMarketplaces', name, 'source', 'ref'], value: ref, mode: 'set', marketplace: name, keepIfChanged: true } };
 }
 
 export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdCommand }) {
@@ -107,10 +107,13 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
     const name = id.split('@')[1];
     const move = marketplaceMove(dir, name, repo);
     if (move.edit) settingsAction.edits.push(move.edit);
+    // A fresh install records the entry we are about to add, so --uninstall removes it (another repo is the user's).
+    else if (move.missing) settingsAction.edits.push({ path: ['extraKnownMarketplaces', name], value: { source: { source: 'github', repo: pluginRepo(repo), ref: repo.slice(repo.indexOf('#') + 1) } }, mode: 'setIfAbsent' });
     if (move.warning) warnings.push(move.warning);
-    const installed = (opts.prior ?? []).some((c) => (c.run ?? []).some((a) => a[0] === 'claude' && a[1] === 'plugin' && a[2] === 'install' && a[3] === id));
+    const installed = (opts.prior ?? []).some((c) => c.ok !== false && (c.desc === desc
+      || (c.run ?? []).some((a) => a[0] === 'claude' && a[1] === 'plugin' && (a[2] === 'install' || a[2] === 'update') && a[3] === id)));
     const run = [['claude', 'plugin', 'marketplace', 'add', repo]];
-    if (installed) run.push(['claude', 'plugin', 'marketplace', 'update', name], ['claude', 'plugin', 'update', id]);
+    if (installed && move.edit) run.push(['claude', 'plugin', 'marketplace', 'update', name], ['claude', 'plugin', 'update', id]);
     else run.push(['claude', 'plugin', 'install', id]);
     commands.push({ tool, desc, run, undo: [['claude', 'plugin', 'uninstall', id]] });
   };
