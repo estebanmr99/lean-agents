@@ -1,7 +1,7 @@
-// One shared download retry for Node's fetch: 3 retries on a 5xx or a network error, 1s/2s/4s apart.
-// A 4xx is final: the URL or the request is wrong, so a retry cannot help.
-// CURL_RETRY is the same policy for the curl commands the engine builds (curl 7.71+ has --retry-all-errors).
-export const CURL_RETRY = ['--retry', '3', '--retry-delay', '2', '--retry-all-errors'];
+// fetchWithRetry: 3 retries on a 5xx or a network error (1s, 2s, 4s); a 4xx is final.
+// CURL_RETRY: curl's built-in retries for transient errors only (timeouts, 408, 429, 5xx) with a fixed 2s delay.
+// --retry-all-errors is out: it retries a 404 and needs curl 7.71 (Ubuntu 20.04 ships 7.68).
+export const CURL_RETRY = ['--retry', '3', '--retry-delay', '2', '--retry-connrefused'];
 
 const DELAYS = [1000, 2000, 4000];
 
