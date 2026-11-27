@@ -28,6 +28,11 @@ on:
         default: 'lean'
         required: true
         type: string
+      task:
+        description: 'Splittable task to run (task12 is the new one; task9 is the old small one)'
+        default: 'task12'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -58,6 +63,31 @@ jobs:
           bash scripts/ci-install-opencode-v2.sh
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
 
+      - name: Provider smoke test
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          MODEL: ${{ inputs.model }}
+        run: |
+          # One token, one request: a bad key or model fails here, before any paid session.
+          node --input-type=module -e '
+            const model = process.env.MODEL.replace(/^openrouter\//, "").replace(/#.*$/, "");
+            const redact = (text) => process.env.OPENROUTER_API_KEY ? text.split(process.env.OPENROUTER_API_KEY).join("[redacted]") : text;
+            const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ model, max_tokens: 1, messages: [{ role: "user", content: "Reply with OK" }] }),
+            });
+            const body = await res.text();
+            if (!res.ok) {
+              console.error(redact(`smoke test failed (HTTP ${res.status}): ${body}`));
+              process.exit(1);
+            }
+            if (!JSON.parse(body).choices?.length) {
+              console.error(redact(`smoke test returned no choice: ${body}`));
+              process.exit(1);
+            }
+          '
+
       - name: Run Benchmark
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -66,10 +96,12 @@ jobs:
           MAX_USD: ${{ inputs.max_usd }}
           MODES: ${{ inputs.modes }}
           VARIANT: ${{ inputs.variant }}
+          TASK: ${{ inputs.task }}
         run: |
           node tests/bench-multiagent.mjs \
             --home "${RUNNER_TEMP}/bench-home" \
             --run \
+            --task "$TASK" \
             --model "$MODEL" \
             --repeats "$REPEATS" \
             --max-runs 200 \
