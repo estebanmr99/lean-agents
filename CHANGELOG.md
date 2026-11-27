@@ -11,6 +11,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ### Fixed
 - The Claude Code `context-mode` plugin pin moved from `v2.1.4` to `v2.1.7`, matching the npm CLI that `--update` already installs (#490). A new test fails when the two pins drift apart without a `note` on the plugin pin explaining why.
 - The skipped `real-vscode-others` job no longer shows an unexpanded `real-vscode (${{ matrix.os }})` name in the checks list (#460). It has no custom name now, so a skip should show `real-vscode-others` and a real run still shows one job per OS.
+- `--doctor` clears a stale `~/.claude/settings.json` hash left by 1.2.1, when the only difference is keys lean-agents' own `claude plugin` commands wrote (`enabledPlugins`, `extraKnownMarketplaces`): `--update` now refreshes the stored hash for tracked JSON files whose command-written key paths it knows, even when the file did not change in that run (#492). A key lean-agents does not write still shows "edited since install".
 
 ## [1.2.3] - 2026-11-26
 

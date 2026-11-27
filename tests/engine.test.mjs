@@ -267,6 +267,44 @@ test('--doctor does not flag a file our own commands edited; user edits still sh
   assert.match(row(), /edited since install/);
 });
 
+test('--update replaces a stale settings.json hash from before #470; a user key still shows (#492)', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const settings = path.join(home, '.claude', 'settings.json');
+  fs.mkdirSync(path.dirname(settings), { recursive: true });
+  fs.writeFileSync(settings, '{"model":"opus"}\n');
+  const env = { PATH: process.env.PATH, NVM_DIR: path.join(home, '.nvm'), HOME: home };
+  const main = path.join(ROOT, 'scripts', 'lean.mjs');
+  const run = (...args) => spawnSync(process.execPath, [main, '--home', home, ...args], { encoding: 'utf8', env });
+  const setup = ['--no-exec', '--yes', '--agents', 'claude', '--tools', 'context-mode,ponytail', '--privacy', 'standard', '--lang', 'en', '--profile', 'none'];
+  const inst = run(...setup);
+  assert.equal(inst.status, 0, inst.stdout + inst.stderr);
+
+  // A 1.2.1 state: the hash came from the json step, before `claude plugin` added the keys below.
+  const stateFile = path.join(home, '.config', 'lean-agents', 'state.json');
+  const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+  for (const f of state.files) if (f.path === settings) { delete f.userHash; delete f.ignore; }
+  fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+  const before = parse(fs.readFileSync(settings, 'utf8'));
+  before.enabledPlugins = { 'context-mode@context-mode': true, 'ponytail@ponytail': true };
+  before.extraKnownMarketplaces = {
+    'context-mode': { source: { source: 'github', repo: 'mksglu/context-mode' } },
+    ponytail: { source: { source: 'github', repo: 'DietrichGebert/ponytail' } },
+  };
+  fs.writeFileSync(settings, `${JSON.stringify(before, null, 2)}\n`);
+  const row = () => run('--doctor').stdout.split('\n').find((l) => /^(ok|changed|error)\s+\S*\.claude\/settings\.json/.test(l));
+  assert.match(row(), /edited since install/, 'the stale hash must show before --update');
+
+  const upd = run('--update', '--no-exec', '--yes');
+  assert.equal(upd.status, 0, upd.stdout + upd.stderr);
+  assert.doesNotMatch(row(), /edited since install/);
+
+  // A key lean-agents does not write is still the user's edit.
+  const after = parse(fs.readFileSync(settings, 'utf8'));
+  after.myOwnKey = 1;
+  fs.writeFileSync(settings, `${JSON.stringify(after, null, 2)}\n`);
+  assert.match(row(), /edited since install/);
+});
+
 test('an rtk older than the pinned min skips the rtk steps and says how to update (#467)', { skip: process.platform === 'win32' }, () => {
   const run = (v) => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));

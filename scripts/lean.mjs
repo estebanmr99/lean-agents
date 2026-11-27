@@ -7,7 +7,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import tty from 'node:tty';
 import { fileURLToPath } from 'node:url';
-import { plan, apply, undo, describe, tilde, sha, writePrivate, privateDir, dropBackups, renameRetry } from './lib/fsops.mjs';
+import { plan, apply, undo, describe, tilde, sha, userHash, writePrivate, privateDir, dropBackups, renameRetry } from './lib/fsops.mjs';
 import { loadCore, renderRules, loadProfile, useToolNode } from './lib/render.mjs';
 import { claudeAdapter } from './lib/adapters/claude.mjs';
 import { opencodeV1Adapter } from './lib/adapters/opencode-v1.mjs';
@@ -871,7 +871,10 @@ async function install(o) {
   const tracked = () => [...(previous?.files ?? []), ...files];
   const snap = () => new Map(tracked().map((f) => [f.path, fs.existsSync(f.path) && fs.statSync(f.path).isFile() ? sha(fs.readFileSync(f.path, 'utf8')) : null]));
   // A file that changed while one of our commands ran (rtk init, plugin installs) counts as ours: new hash, so --doctor stays ok.
-  const refreshHashes = (before) => { for (const [p, h] of snap()) if (h !== null && h !== before.get(p)) for (const f of tracked()) if (f.path === p) f.hash = h; };
+  const refreshHashes = (before) => { for (const [p, h] of snap()) if (h !== null && h !== before.get(p)) for (const f of tracked()) if (f.path === p) { f.hash = h; if (f.ignore?.length) { const u = userHash(fs.readFileSync(p, 'utf8'), f.ignore); if (u) f.userHash = u; } } };
+  // A stored hash from before #470 predates our own commands' edits: refresh the user-only hash for every tracked JSON
+  // file whose plan knows the key paths our commands write, even when nothing changed in this run (#492).
+  const refreshUserHashes = () => { for (const p of planned) { if (p.kind !== 'json' || !p.ignore?.length || !fs.existsSync(p.path)) continue; const u = userHash(fs.readFileSync(p.path, 'utf8'), p.ignore); if (!u) continue; const f = tracked().filter((e) => e.path === p.path).at(-1); if (f) { f.ignore = p.ignore; f.userHash = u; } } };
   const save = () => {
     const state = {
       version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version,
@@ -892,7 +895,7 @@ async function install(o) {
     writePrivate(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(state, null, 2)}\n`);
   };
   let applied = false;
-  try { apply(planned, backupDir, o.home, writeRoots(o), files); applied = true; } catch (e) {
+  try { apply(planned, backupDir, o.home, writeRoots(o), files); applied = true; refreshUserHashes(); } catch (e) {
     if (o.json) printApplied(o, files, [], [e.message]);
     throw e;
   } finally { if (applied || files.length) save(); }

@@ -170,6 +170,19 @@ export function revertJsonEdits(text, applied) {
   return text;
 }
 
+// Hash of a JSON file without the key paths lean-agents' own commands write (plugin installs, rtk hooks), so the doctor
+// tells the user's edits from ours even when the stored whole-file hash predates those commands (#492).
+export function userHash(text, ignore = []) {
+  const data = parse(text, [], { allowTrailingComma: true });
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  for (const keyPath of ignore) {
+    let o = data;
+    for (const k of keyPath.slice(0, -1)) o = o && typeof o === 'object' ? o[k] : undefined;
+    if (o && typeof o === 'object' && keyPath.length) delete o[keyPath.at(-1)];
+  }
+  return sha(JSON.stringify(data));
+}
+
 const idMarks = (id) => [`# lean-agents:${id}:start`, `# lean-agents:${id}:end`];
 
 export function setBlock(original, body, toml = false, id = undefined) {
@@ -245,7 +258,7 @@ export function plan(actions, roots = [], prior = []) {
     // A file lean-agents created and nobody edited since holds nothing of the user's: a rerun needs no backup of it.
     const mine = prior.filter((f) => f.path === a.path);
     const noBackup = before !== null && mine.some((f) => f.created) && sha(before) === mine.at(-1).hash;
-    return { ...a, before, after, applied, status, note, keptKeys, noBackup };
+    return { ...a, before, after, applied, status, note, keptKeys, noBackup, ...(a.ignore?.length && { userHash: userHash(after, a.ignore) }) };
   });
 }
 
@@ -298,7 +311,7 @@ export function apply(planned, backupDir, home, roots = [home], entries = []) {
     const dirs = [];
     for (let d = path.dirname(p.path); !fs.existsSync(d); d = path.dirname(d)) dirs.push(d);
     fs.mkdirSync(path.dirname(p.path), { recursive: true });
-    entries.push({ path: p.path, kind: p.kind, created: p.before === null, backup, hash: sha(p.after), applied: p.applied, noRestore: p.applied?.some((e) => e.upgraded), keepEmpty: p.keepEmpty, ...(p.id && { id: p.id }), ...(dirs.length && { dirs }) });
+    entries.push({ path: p.path, kind: p.kind, created: p.before === null, backup, hash: sha(p.after), applied: p.applied, noRestore: p.applied?.some((e) => e.upgraded), keepEmpty: p.keepEmpty, ...(p.userHash && { userHash: p.userHash, ignore: p.ignore }), ...(p.id && { id: p.id }), ...(dirs.length && { dirs }) });
     fs.writeFileSync(p.path, p.after);
   }
   return entries;
