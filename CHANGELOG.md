@@ -4,6 +4,67 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-27
+
+### Added
+- Multi-agent benchmark task12: four independent features plus three hidden seeded bugs, with per-arm seeded-bug counts (#431)
+- `--doctor` warns about a stale `tui.json` next to OpenCode 2's `cli.json`, names a local plugin written for the 1.x TUI API by path as not loaded, and marks DCP listed in both `opencode.jsonc` and `cli.json` as a duplicate `/dcp` (#558)
+- A hand copy of the #123 Copilot meter (detected by its `lean-agents#123` header, or by the `copilot-usage-tui` folder name when its file is missing or unreadable) is replaced by the managed `copilot-usage` tool on `--update` by default, including `--update --yes` without a TTY; an interactive "no" keeps it. `--add-tools copilot-usage` does the same without the question. The removal is one `arrayRemove` edit, so `--uninstall` puts the entry back (#558)
+- Manual `e2e-update` workflow: a real agent updates an install made by an old lean-agents release with no human input, under a key-spend cap, and uploads the redacted transcript and doctor JSON (#561)
+- Pure pass/fail evaluator for that run (`tests/e2e-update.mjs`) with unit tests over doctor JSON, the install record, `claude plugin list --json`, the one consent turn and the checkout shim log (#561)
+- The workflow has a `source` input: `checkout` (default) packs the branch, puts `lean-agents`/`npx`/`gh` shims first on PATH and copies the branch skill, so the run exercises this commit; `npm` has no shims and proves the published path (#561)
+- The shipped lean-update skill honors `LEAN_AGENTS_RELEASE_DIR` (a test-only override; unset for real users, so behavior is unchanged) (#561)
+
+### Changed
+- Multi-agent benchmark `--task` input (default task12, task9 still selectable), provider smoke test and seeded-bug column (#431)
+- Fixed: the budget headroom check crashed before the first session.
+- Bench cost per session now sums OpenCode's own step usage instead of the key spend delta; the key is only the `--max-usd` guard (#527)
+- Bench workflows install the pinned OpenCode 2 build with `scripts/ci-install-opencode-v2.sh` (#527)
+- `--preflight` prints every version in one format, without a leading `v` (#547)
+- The `lean-update` skill pin follows the release; `scripts/release-gate.sh` fails when it lags, with `--pins-only` for an offline check (#547)
+- `--update` checks for a terminal before printing the plan and release notes, and a non-interactive dry run ends with `to apply from a non-interactive shell, add --yes` (#548)
+- `--update` updates a managed Warp or Orca app to its pin and offers once to adopt a user-installed older app; non-interactive adoption needs `--install-terminal orca|warp|both` (#555)
+- On macOS Warp updates with `brew upgrade --cask warp` and follows the Homebrew cask; Orca updates in place where it was found (#555)
+- An interactive "no" to adopting an app is remembered and is not asked again; `--install-terminal` overrides it (#555)
+- OpenCode 2 TUI edits use `cli.json` once the terminal client has written it; `tui.json(c)` stays the fallback only when `cli.json` is absent, and lean-agents never deletes `tui.json` (#558)
+- On OpenCode 2, DCP stays in `opencode.jsonc` only: no TUI entry is added, and every DCP entry the user added to `cli.json` or a stale `tui.json(c)` is removed on `--update` (backed up, undone by `--uninstall`; the client's migration copies `tui.json`). `--doctor` reports that entry (file and fix line) before `--update` edits it (#558)
+- The duplicate `/dcp` palette row is **not** fixed by lean-agents: the pinned OpenCode 2.2.7 still prints two rows with DCP only in `opencode.jsonc`. DCP 3.2.0 registers a server command and a separate TUI command, and OpenCode 2.2.7 lists both (**VERIFY**: the split is read from DCP's `lib/v2/tui.tsx` and OpenCode's CLI plugin loading; CI `real-usage-v2` run 46035662013 printed two rows, and the updated gate asserts lean-agents' side: DCP registered exactly once in the config files). Upstream links are in `docs/compatibility.md` (#558)
+
+### Docs
+- `.claude/skills/release-train` runs one release per session with the same gated steps (#518)
+- README (EN and ES) and `docs/compatibility.md` record the OpenCode 2 `cli.json` migration, the stale `tui.json` warning, the meter replacement and the duplicate `/dcp` cause (#558)
+- `docs/compatibility.md` records the `opencode serve --service` / `opencode run --agent build --format json` and Claude `plugin list --json` / `marketplace update` facts the e2e-update job uses, with the proof runs from #546 and #548; `opencode run --continue` is cited from the pinned 2.2.7 command definition. The e2e-update run link is added after the first dispatch, and its result is posted on #546 (#561)
+- README (EN and ES) and `docs/compatibility.md` list Context Mode 2.1.7 `AGENT_IDS` and the per-client id (#562)
+
+### Fixed
+- A bench case that fails now records its failing check and last error line, redacted and capped at 200 characters (#527)
+- `--update` moves a Claude plugin marketplace pin in `~/.claude/settings.json` instead of failing, backs the file up, keeps plugin data, and `--update --undo` restores it (#546)
+- A Skills CLI skill refresh no longer blocks on a running OpenCode service; inside an OpenCode session the refusal never tells the agent to stop its own service (#546)
+- The RTK OpenCode plugin refresh (`rtk init -g --opencode`) is also files-only: it writes `plugins/rtk.ts` and runs `opencode --version`, so it never blocks inside OpenCode (#546)
+- A real OpenCode step inside an OpenCode session still needs a terminal; the refusal is all-or-nothing: one blocked step stops the whole run (#546)
+- Follow-ups: #575 defers OpenCode steps while OpenCode runs; #576 verifies the `OPENCODE` env var (#546)
+- `--preflight` suggests `choco upgrade` only for a `jq` or `gh` copy under a Chocolatey folder; every other copy keeps the winget/brew/release hint (#547)
+- The `lean-update` skill says to pass `--yes` without a TTY, run `opencode service stop` once when a run refuses, and stop at the first failure instead of working around it (#547)
+- lean-agents stops the OpenCode 2 background service when its own commands started it, and the refusal now names `opencode service stop` (#548)
+- A managed terminal app no longer stays on an old version after `--update` (#555)
+- An Orca update no longer leaves a stale `/Applications` copy while installing another one under `~/Applications` (#555)
+- An Orca update keeps the old app until the new copy is complete, so a failed download or copy no longer leaves no Orca (#555)
+- `--upgrade-agent opencode` translates a remote MCP's `oauth.clientId`/`clientSecret`/`callbackPort`/`redirectUri` to their snake_case names and `enabled` to `disabled`, so OpenCode 2 uses the pre-registered client instead of dynamic client registration (#556)
+- `--update` renames those leftover 1.x names in an already-2.x `mcp.servers` entry, keeps a snake_case target that already exists and reports the skipped key; `--uninstall` puts the original keys back (#556)
+- `--doctor` warns about each of those 1.x names and names `lean-agents --update` as the fix (#556)
+- `e2e-update` evaluator accepts the skill's after-update offers (the summary-page offer and the issue-draft offer) as the last question after the one yes turn, so a run that asks nothing else is not a false negative (#561)
+- `e2e-update` consent now takes the final `Update these N tools?` line even when the skill asked `Do you want me to run it?` just before it, and only plain run-it asks may precede it; the `lean-update` skill says to ask no other question in that message (#561)
+- The `lean-update` skill asks `Update these N tools?` word for word as its own last line, and the `e2e-update` evaluator accepts that question with the row names on the same line (`Update these 2 skill installs (plus the config fixes above)?`), so the job sends its one yes instead of failing with "unexpected question"; the accepted shape is words plus one optional parenthetical, so `Update these 3 tools and delete ~/.ssh?` is not consent (#561)
+- `e2e-update` evaluator also accepts an `--update` run executed from the checkout itself (`cd "$LEAN_AGENTS_RELEASE_DIR" && node scripts/lean.mjs --update`), not only a call through the `lean-agents`/`npx` shims; the workflow passes `--release-dir`, and the failure text is now "no --update call ran the checkout code" (#561)
+- `e2e-update` evaluator no longer counts `--update --dry-run` as an update, in the shim log and in a checkout command alike: a dry run only prints the plan (#561)
+- `e2e-update` service restart reads `svc_state` into a variable with `|| true`, so a non-zero status or a SIGPIPE no longer aborts under `set -euo pipefail`; the startup-failure branch prints `serve.log` through the redactor (#561)
+- `e2e-update` evaluator accepts `cd "$LEAN_AGENTS_RELEASE_DIR"; node scripts/lean.mjs --update` (a semicolon or `&&` after the directory, not only whitespace or the end of the command) (#561)
+- `e2e-update` restarts the OpenCode service with `OPENROUTER_API_KEY` before the smoke test: the service started by the old-release install kept that step's env, so `opencode run` reached it without the key (`provider.no-route`). It also records `service-ps.txt`, uploads `timeout.txt`, and prints 400 redacted characters of `smoke.jsonl`/`smoke.err` when the smoke test fails (#561)
+- Context Mode MCP entries pass `--agent <id>` (VS Code, OpenCode, Copilot CLI, Claude fallback), so every `ctx_*` call works; Cursor and Antigravity are reported and skipped because 2.1.7 has no id for them, `--update` rewrites old entries (the Claude MCP fallback removes and re-adds its own entry, the Copilot CLI helper replaces an old-shaped one), `--uninstall` restores them, and `--doctor` flags an entry without `--agent`; the Cursor row names the entry to remove instead of the `--update` fix (#562)
+
+### Security
+- Bench artifacts no longer upload raw model stdout, and base64 copies of the key are redacted from the written results (#527)
+
 ## [1.2.5] - 2026-11-27
 
 ### Added
