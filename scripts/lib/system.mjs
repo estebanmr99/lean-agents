@@ -30,7 +30,8 @@ export function spawnArgs(bin, args, platform = process.platform, resolve = wher
   const full = /\.(cmd|bat)$/i.test(bin) && path.win32.isAbsolute(bin) ? bin : resolve(bin).find((f) => /\.(exe|cmd|bat)$/i.test(f));
   if (!full || /\.exe$/i.test(full)) return direct;
   const twice = /node_modules[\\/]\.bin[\\/][^\\/]+\.(cmd|bat)$/i.test(full);
-  const line = [full.replace(META, '^$1'), ...args.map((a) => cmdArg(a, twice))].join(' ');
+  // The file in plain quotes (a Windows path cannot hold `"`): a ^-escaped path breaks the shim's own %~dp0.
+  const line = [`"${full}"`, ...args.map((a) => cmdArg(a, twice))].join(' ');
   return { file: process.env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', `"${line}"`], opts: { windowsVerbatimArguments: true } };
 }
 // The shim is looked up on the child's PATH, as cmd.exe did when `shell: true` ran it.

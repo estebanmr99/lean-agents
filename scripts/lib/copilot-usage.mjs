@@ -33,7 +33,9 @@ try {
 } catch {}
 let line;
 try {
-  const out = execFileSync('gh', ['api', 'copilot_internal/user'], { timeout: 15000, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });
+  // Windows: through cmd.exe with fixed words, so a gh.cmd shim works too and no shell option is needed (#475).
+  const argv = process.platform === 'win32' ? [process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', 'gh api copilot_internal/user']] : ['gh', ['api', 'copilot_internal/user']];
+  const out = execFileSync(argv[0], argv[1], { timeout: 15000, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });
   line = 'Copilot: ' + formatUsage(JSON.parse(out)) + '\\n';
 } catch { line = 'Copilot: ' + formatUsage(null) + '\\n'; }
 // Shared /tmp: never follow a planted symlink; 'wx' (O_EXCL) refuses any existing path.
