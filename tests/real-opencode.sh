@@ -67,6 +67,29 @@ lean_run --update --yes --tools rtk
 # Proves the file name the migration guide gives for the old tui.json.
 LC_ALL=C grep -aq 'opencode/cli.json' "$(command -v opencode)"
 
+# #556: a 1.x MCP entry translated by the upgrade code (oauth camelCase, enabled) must be accepted by 2.x as a
+# pre-registered client (oauth.client_id) with disabled, not fall back to dynamic client registration.
+node --input-type=module - "$repo" "$XDG_CONFIG_HOME/opencode/opencode.jsonc" <<'JS'
+import fs from 'node:fs';
+import { createRequire } from 'node:module';
+const [repo, file] = process.argv.slice(2);
+const { parse, modify, applyEdits } = createRequire(`${repo}/package.json`)('jsonc-parser');
+const { translateEdits } = await import(`${repo}/scripts/lib/upgrade.mjs`);
+const raw = fs.readFileSync(file, 'utf8');
+const cfg = parse(raw);
+const servers = cfg.mcp?.servers ?? {};
+const flat = {
+  ...servers,
+  remote: { type: 'remote', url: 'https://mcp.example.invalid/mcp', enabled: false, oauth: { clientId: 'fake-client-id', clientSecret: 'fake-client-secret', scope: 'read' } }, // gitleaks:allow (synthetic values)
+};
+const items = Object.keys(flat).map((name) => ({ client: 'opencode', kind: 'mcp', name, file, keyPath: ['mcp'], upgrade: { class: 'user-translatable' } }));
+let text = raw;
+for (const e of translateEdits({ ...cfg, mcp: flat }, items)) {
+  text = applyEdits(text, modify(text, e.path, e.mode === 'remove' ? undefined : e.value, { formattingOptions: { insertSpaces: true, tabSize: 2 } }));
+}
+fs.writeFileSync(file, text);
+JS
+
 opencode debug config > "$HOME/resolved.txt" 2>"$HOME/stderr.txt" || { cat "$HOME/resolved.txt" "$HOME/stderr.txt"; exit 1; }
 
 if LC_ALL=C grep -E -i 'LoadError|failed to load plugin' "$HOME/stderr.txt" "$HOME/resolved.txt"; then
@@ -98,6 +121,9 @@ const checks = {
   'ponytail plugin': (cfg.plugins ?? []).includes(npmSpec('ponytail')),
   'default_agent plan': cfg.default_agent === 'plan',
   'share disabled': cfg.share === 'disabled',
+  'mcp oauth client_id': servers.remote?.oauth?.client_id === 'fake-client-id' && servers.remote?.oauth?.client_secret !== undefined && servers.remote?.oauth?.scope === 'read',
+  'mcp oauth 1.x names gone': servers.remote && servers.remote.oauth.clientId === undefined && servers.remote.oauth.clientSecret === undefined,
+  'mcp enabled -> disabled': servers.remote?.disabled === true && servers.remote.enabled === undefined,
 };
 let failed = false;
 for (const [name, ok] of Object.entries(checks)) {
