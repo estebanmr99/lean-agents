@@ -7,7 +7,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { parseTokenUsage, priceUsage, keySpend, redactKey, getStats, failureReason, writeArtifacts, TASKS, setupVariant } from './bench-savings.mjs';
+import { parseTokenUsage, priceUsage, keySpend, redactKey, getStats, failureReason, writeArtifacts, TASKS, setupVariant, sessionCost, totalSessionCost } from './bench-savings.mjs';
+
+// Both harnesses share the null-cost handling; keep them importable from here for the tests.
+export { sessionCost, totalSessionCost };
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const arg = (name) => {
@@ -162,7 +165,7 @@ function sessionEnv(home) {
   return env;
 }
 
-export function runOpenCode({ cwd, home, prompt, model, timeout, variant, logPath, key, spawnImpl = spawn }) {
+export function runOpenCode({ cwd, home, prompt, model, timeout, variant, spawnImpl = spawn }) {
   return new Promise((resolve) => {
     const args = ['run', '--standalone', '--agent', 'build', '--format', 'json', '--model', model, prompt];
     const start = Date.now();
@@ -188,10 +191,6 @@ export function runOpenCode({ cwd, home, prompt, model, timeout, variant, logPat
       settled = true;
       clearTimeout(timer);
       liveChildren.delete(child);
-      if (logPath) {
-        fs.mkdirSync(path.dirname(logPath), { recursive: true });
-        fs.writeFileSync(logPath, redactKey(stdout, key));
-      }
       resolve({
         stdout, stderr, status, timedOut,
         pid: child.pid,
@@ -214,7 +213,7 @@ function prepareSessions(specs, { variant }) {
   }
 }
 
-async function runSession(spec, { model, timeout, variant, key, spawnImpl }) {
+async function runSession(spec, { model, timeout, variant, spawnImpl }) {
   const res = await runOpenCode({
     cwd: spec.workdir,
     home: spec.home,
@@ -222,7 +221,6 @@ async function runSession(spec, { model, timeout, variant, key, spawnImpl }) {
     model,
     timeout,
     variant,
-    key,
     spawnImpl,
   });
   return { name: spec.name, workdir: spec.workdir, ...res };
@@ -231,21 +229,30 @@ async function runSession(spec, { model, timeout, variant, key, spawnImpl }) {
 const BUDGET_POLL_MS = 30000;
 const START_EST_USD = 0.5;
 
+// OpenRouter updates the key spend late, so the cap also counts the summed session cost already reported.
+export function budgetSpent(keyDelta, sessionCostSum) {
+  return Math.max(keyDelta || 0, sessionCostSum || 0);
+}
+
 function createBudget({ key, maxUsd }) {
   let startSpend = 0;
-  let spent = 0;
+  let keyDelta = 0;
+  let sessionSpent = 0;
   let est = START_EST_USD;
   // A hung usage request must not stall the cap check: fail after 10 s so the stop-and-kill path runs.
   const spend = () => keySpend(key, (u, o) => fetch(u, { ...o, signal: AbortSignal.timeout(10000) }));
   return {
-    async init() { startSpend = await spend(); spent = 0; },
+    async init() { startSpend = await spend(); keyDelta = 0; sessionSpent = 0; },
     async refresh() {
       const now = await spend();
-      spent = Math.max(spent, now - startSpend);
-      return spent;
+      keyDelta = Math.max(keyDelta, now - startSpend);
+      return this.spent;
     },
-    get spent() { return spent; },
+    get spent() { return budgetSpent(keyDelta, sessionSpent); },
     get est() { return est; },
+    addSessionCost(cost) {
+      if (typeof cost === 'number' && Number.isFinite(cost)) sessionSpent += cost;
+    },
     observeRun(cost, sessions) {
       if (sessions > 0) est = Math.max(est, cost / sessions);
     },
@@ -293,17 +300,6 @@ async function runGroup(specs, opts, budget) {
 }
 
 // Session cost comes from OpenCode's own step usage, never from the key spend delta.
-// No step-finish event means no cost to report: null becomes n/a, not $0.0000.
-export function sessionCost(usage) {
-  return usage && usage.turns > 0 && typeof usage.cost === 'number' && Number.isFinite(usage.cost) ? usage.cost : null;
-}
-
-export function totalSessionCost(sessions) {
-  if (sessions.length === 0) return null;
-  const costs = sessions.map((s) => s.cost);
-  return costs.every((c) => typeof c === 'number' && Number.isFinite(c)) ? costs.reduce((a, b) => a + b, 0) : null;
-}
-
 export function summarizeSession(res, prices) {
   const u = res.usage;
   return {
@@ -540,6 +536,7 @@ async function main() {
         record.turns = record.sessions.reduce((s, x) => s + x.turns, 0);
         // A run's cost is the sum of its sessions' own OpenCode step usage; the key spend only feeds --max-usd.
         record.cost = totalSessionCost(record.sessions);
+        budget.addSessionCost(record.cost);
         record.pricedCost = parsedPrices ? record.sessions.reduce((s, x) => s + (x.pricedCost || 0), 0) : null;
         const keyDelta = (await budget.refresh()) - costBefore;
         budget.observeRun(keyDelta, record.sessions.length);

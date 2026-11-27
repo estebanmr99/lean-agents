@@ -27,16 +27,36 @@ export async function keySpend(key, fetchFn = fetch) {
 }
 
 // The model runs shell with the key in its env, so strip it from anything written out.
-// A shell command can also carry the key base64-encoded (`echo ... | base64`), so strip that form too.
+// A shell command can also carry the key through base64 (`echo ... | base64`) or hex, so strip those forms too.
 export const redactKey = (text, key) => {
   if (!key) return text;
-  let out = text.split(key).join('[REDACTED]');
-  const encoded = Buffer.from(key, 'utf8').toString('base64');
-  if (encoded && encoded !== key) out = out.split(encoded).join('[REDACTED]');
-  return out;
+  const forms = new Set([key]);
+  for (const raw of [key, `${key}\n`]) {
+    const buf = Buffer.from(raw, 'utf8');
+    forms.add(buf.toString('base64'));
+    forms.add(buf.toString('base64url'));
+  }
+  forms.add(Buffer.from(key, 'utf8').toString('hex'));
+  let out = text;
+  // Longest first so a shorter encoded form never cuts into a longer one.
+  for (const form of [...forms].sort((a, b) => b.length - a.length)) {
+    if (form && form !== key) out = out.split(form).join('[REDACTED]');
+  }
+  return out.split(key).join('[REDACTED]');
 };
 
-// Artifacts hold parsed results only; scrub the key (and its base64 form) on the way to disk.
+// A run with no step-finish event has no provider cost to report: null becomes n/a, not $0.0000.
+export function sessionCost(usage) {
+  return usage && usage.turns > 0 && typeof usage.cost === 'number' && Number.isFinite(usage.cost) ? usage.cost : null;
+}
+
+export function totalSessionCost(sessions) {
+  if (sessions.length === 0) return null;
+  const costs = sessions.map((s) => s.cost);
+  return costs.every((c) => typeof c === 'number' && Number.isFinite(c)) ? costs.reduce((a, b) => a + b, 0) : null;
+}
+
+// Artifacts hold parsed results only; scrub the key and its encoded forms on the way to disk.
 export function writeArtifacts(outDir, files, key) {
   fs.mkdirSync(outDir, { recursive: true });
   const written = [];
@@ -63,6 +83,12 @@ export function failureReason({ check, timedOut, exit, conflict, stdout, stderr 
 
 export function checkEnv(dir) {
   return { PATH: process.env.PATH || "", HOME: dir, NODE_OPTIONS: "" };
+}
+
+// OpenRouter updates the key spend late, so the budget floor is the larger of the summed OpenCode session cost so far
+// and the key spend delta (#527 review; main used `Math.max(totalCost + usage.cost, keyDelta)`).
+export function budgetReached(totalCost, keySpent, maxUsd) {
+  return Math.max(totalCost || 0, keySpent || 0) >= maxUsd;
 }
 
 // Exported for tests
@@ -523,6 +549,7 @@ test('failing test', () => { assert.strictEqual(val, 2); });
 
 // Exported for tests
 export function renderResultsMarkdown(summary, variants, totalCost = 0, prices = null) {
+  const costCell = (c) => (c == null ? 'n/a' : `$${c.toFixed(4)}`);
   let md = '| Task | Mode | Pass Rate | Median In | IQR In | Median Out | Median Time | Cost |\n';
   if (prices) {
     md = '| Task | Mode | Pass Rate | Median In | IQR In | Median Out | Median Turns | Median Time | Cost | Priced Cost |\n';
@@ -534,9 +561,9 @@ export function renderResultsMarkdown(summary, variants, totalCost = 0, prices =
     const iqrIn = `${s.in.p25.toFixed(0)}-${s.in.p75.toFixed(0)}`;
     const stableMark = s.stable ? ' ★' : '';
     if (prices) {
-      md += `| ${s.task} | ${s.mode} | ${(s.passRate * 100).toFixed(0)}% | ${s.in.median.toFixed(0)}${stableMark} | ${iqrIn} | ${s.out.median.toFixed(0)} | ${s.turns.median.toFixed(0)} | ${s.time.median.toFixed(0)}ms | $${s.totalCost.toFixed(4)} | $${s.totalPricedCost.toFixed(4)} |\n`;
+      md += `| ${s.task} | ${s.mode} | ${(s.passRate * 100).toFixed(0)}% | ${s.in.median.toFixed(0)}${stableMark} | ${iqrIn} | ${s.out.median.toFixed(0)} | ${s.turns.median.toFixed(0)} | ${s.time.median.toFixed(0)}ms | ${costCell(s.totalCost)} | $${s.totalPricedCost.toFixed(4)} |\n`;
     } else {
-      md += `| ${s.task} | ${s.mode} | ${(s.passRate * 100).toFixed(0)}% | ${s.in.median.toFixed(0)}${stableMark} | ${iqrIn} | ${s.out.median.toFixed(0)} | ${s.time.median.toFixed(0)}ms | $${s.totalCost.toFixed(4)} |\n`;
+      md += `| ${s.task} | ${s.mode} | ${(s.passRate * 100).toFixed(0)}% | ${s.in.median.toFixed(0)}${stableMark} | ${iqrIn} | ${s.out.median.toFixed(0)} | ${s.time.median.toFixed(0)}ms | ${costCell(s.totalCost)} |\n`;
     }
   }
 
@@ -580,7 +607,7 @@ export function renderResultsMarkdown(summary, variants, totalCost = 0, prices =
     const avgPctSaved = taskCount > 0 ? (totalPctSaved / taskCount) * 100 : 0;
     md += `\nlean vs baseline: input tokens ${avgPctSaved >= 0 ? '-' : '+'}${Math.abs(avgPctSaved).toFixed(1)}% (median over tasks)\n`;
   }
-  md += `\nTotal cost: $${totalCost.toFixed(4)}\n`;
+  md += `\nTotal cost: ${totalCost == null ? 'n/a' : `$${totalCost.toFixed(4)}`}\n`;
   if (prices) md += `\nPriced Cost uses ${prices.in},${prices.cacheRead},${prices.cacheWrite},${prices.out} USD per 1M tokens (in, cache read, cache write, out) and assumes input excludes cached tokens (VERIFY).\n`;
   return md;
 }
@@ -681,8 +708,8 @@ async function main() {
     const task = TASKS.find(t => t.id === taskId);
     for (const mode of VARIANTS) {
       for (let n = 1; n <= REPEATS; n++) {
-        if (keySpent >= MAX_USD) {
-          console.warn(`Budget reached ($${keySpent.toFixed(4)} >= $${MAX_USD}). Stopping.`);
+        if (budgetReached(totalCost, keySpent, MAX_USD)) {
+          console.warn(`Budget reached ($${Math.max(totalCost, keySpent).toFixed(4)} >= $${MAX_USD}). Stopping.`);
           break;
         }
 
@@ -766,15 +793,15 @@ async function main() {
           cacheRead: usage.cacheRead,
           cacheWrite: usage.cacheWrite,
           turns: usage.turns,
-          cost: usage.cost,
+          cost: sessionCost(usage),
           pricedCost,
           wallTime,
           failure: pass ? null : failureReason({ check: `${task.id} check`, exit: res.status, stdout: res.stdout, stderr: res.stderr }, KEY),
         });
       }
-      if (keySpent >= MAX_USD) break;
+      if (budgetReached(totalCost, keySpent, MAX_USD)) break;
     }
-    if (keySpent >= MAX_USD) break;
+    if (budgetReached(totalCost, keySpent, MAX_USD)) break;
   }
 
   if (OUT) {
@@ -798,7 +825,7 @@ async function main() {
           turns: getStats(taskResults.map(r => r.turns)),
           cost: getStats(taskResults.map(r => r.cost)),
           time: getStats(taskResults.map(r => r.wallTime)),
-          totalCost: taskResults.reduce((sum, r) => sum + r.cost, 0),
+          totalCost: totalSessionCost(taskResults),
           totalPricedCost: parsedPrices ? taskResults.reduce((sum, r) => sum + r.pricedCost, 0) : null,
         });
       }
@@ -829,7 +856,7 @@ async function main() {
       tasks: summary,
       raw: results
     };
-    const md = renderResultsMarkdown(summary, VARIANTS, totalCost, parsedPrices);
+    const md = renderResultsMarkdown(summary, VARIANTS, totalSessionCost(results), parsedPrices);
     const files = { 'results.json': JSON.stringify(resultsJson, null, 2), 'results.md': md };
 
     // SVG Chart only if baseline and lean are present

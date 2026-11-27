@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { splitBugs, mergeWorkerChanges, collectChanges, parseMaxUsd, isPositiveInt, fitsHeadroom, costVsSolo, sessionsForMode, renderMultiMarkdown, runOpenCode, summarizeSession, summarizeRuns, totalSessionCost, TASK9_BUG_TESTS } from './bench-multiagent.mjs';
+import { splitBugs, mergeWorkerChanges, collectChanges, parseMaxUsd, isPositiveInt, fitsHeadroom, costVsSolo, sessionsForMode, renderMultiMarkdown, runOpenCode, summarizeSession, summarizeRuns, totalSessionCost, TASK9_BUG_TESTS, budgetSpent } from './bench-multiagent.mjs';
 import { parseTokenUsage } from './bench-savings.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -89,6 +89,12 @@ test('--max-usd is capped at 5 and falls back to 4 for non-numeric input', () =>
   assert.strictEqual(res.status, 0, res.stderr);
   assert.match(res.stdout, /MAX USD:\s+5\n/);
   fs.rmSync(home, { recursive: true, force: true });
+});
+
+test('budget keeps the summed session cost as a floor when the key spend is flat', () => {
+  assert.strictEqual(budgetSpent(0, 2), 2);
+  assert.strictEqual(budgetSpent(1.5, 0.5), 1.5);
+  assert.strictEqual(budgetSpent(0, 0), 0);
 });
 
 test('headroom refuses a group whose worst case reaches the cap', () => {
@@ -206,6 +212,35 @@ test('session cost is summed from the JSON step usage stream, not the key spend'
   assert.match(md, /\| solo \| 100% \| 150 \| 30 \| 2 \| 123ms \| \$0\.0020 \|/);
   assert.match(md, /\| workers-1 \| 100% \| 300 \| 60 \| 4 \| 100ms \| \$0\.0040 \|/);
   assert.match(md, /Cost vs solo:\n- solo: 1\.00x\n- workers-1: 2\.00x/);
+});
+
+test('every pinned OpenCode install also puts .opencode/bin on GITHUB_PATH', () => {
+  const dir = path.join(ROOT, '.github', 'workflows');
+  // Step = a list item at step indentation plus its indented body.
+  const steps = (text) => {
+    const blocks = [];
+    let current = null;
+    for (const line of text.split('\n')) {
+      if (/^\s{4,}-\s/.test(line)) {
+        if (current) blocks.push(current.join('\n'));
+        current = [line];
+      } else if (current) {
+        current.push(line);
+      }
+    }
+    if (current) blocks.push(current.join('\n'));
+    return blocks;
+  };
+  const offenders = [];
+  for (const name of fs.readdirSync(dir).filter((f) => f.endsWith('.yml'))) {
+    const text = fs.readFileSync(path.join(dir, name), 'utf8');
+    for (const step of steps(text)) {
+      const runAt = step.search(/^\s*run:/m);
+      if (runAt === -1 || step.indexOf('ci-install-opencode-v2.sh') < runAt) continue;
+      if (!step.includes('.opencode/bin') || !step.includes('GITHUB_PATH')) offenders.push(name);
+    }
+  }
+  assert.deepStrictEqual(offenders, [], `steps install OpenCode without exporting .opencode/bin: ${offenders.join(', ')}`);
 });
 
 test('a session with no usage events costs n/a, not zero', () => {
