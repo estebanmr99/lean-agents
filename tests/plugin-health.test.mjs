@@ -182,3 +182,50 @@ test('probe on Windows: cmd /c runs the shim, env points at the throwaway dir, t
   assert.equal(c.opts.env.SystemRoot, 'D:\\Windows');
   assert.deepEqual(killed, ['taskkill /pid 4242 /T /F']);
 });
+
+// #495: OpenCode 2.2.7 caches plugins at <cache>/npm/<scope>/<base>@<spec>/<id>/node_modules (seen on a real 2.2.7, 2026-11-26).
+function npmLayout(h, spec, id, version) {
+  pkg(path.join(h, '.cache', 'opencode', 'npm', DCP.split('/')[0], `opencode-dcp@${spec}`, String(id)), DCP, version);
+}
+
+test('#495: dcp row reads the 2.2.7 npm/ cache and prefers the copy the pin loads over an older packages/ wrapper', async () => {
+  const { dcpRow } = await import('../scripts/lib/plugin-health.mjs');
+  const h = home({ server: [`${DCP}@3.2.0`], tui: [`${DCP}@3.2.0`] }); // packages/...@latest holds 3.2.1
+  pkg(path.join(h, '.cache', 'opencode', 'packages', DCP.split('/')[0], 'opencode-dcp@3.1.15'), DCP, '3.1.15');
+  npmLayout(h, '3.2.0', 100, '3.1.99'); // an older <id> is ignored
+  npmLayout(h, '3.2.0', 1795670200407, '3.2.0');
+  const row = dcpRow(h);
+  assert.equal(row.status, 'ok', row.detail);
+  assert.match(row.detail, /resolved: 3\.2\.0 ;/);
+});
+
+test('#495: an incomplete tree in the npm/ cache is reported', () => {
+  const h = home({ full: true, server: [`${DCP}@3.2.0`], tui: [`${DCP}@3.2.0`] });
+  pkg(path.join(h, '.cache', 'opencode', 'npm', DCP.split('/')[0], 'opencode-dcp@3.2.0', '1'), DCP, '3.2.0', { tiktoken: '1.0.22' });
+  const f = checkDepTree(h, DCP, fs, ['3.2.0']);
+  assert.equal(f.length, 1);
+  assert.match(f[0].line, /npm[\\/]@tarquinen[\\/]opencode-dcp@3\.2\.0[\\/]1: missing tiktoken/);
+});
+
+test('#495: the probe skips the config node_modules and wrappers the config does not ask for, so a big cache stays under the cap', async () => {
+  const h = home({ full: true, server: [`${DCP}@3.2.0`], tui: [`${DCP}@3.2.0`] });
+  npmLayout(h, '3.2.0', 1, '3.2.0');
+  w(path.join(h, '.config', 'opencode', 'node_modules', 'huge', 'blob.bin'), 'x');
+  const copied = [];
+  const real = fs.cpSync;
+  // every node_modules file under the config, and the unused packages/...@latest wrapper, would blow the cap if copied
+  const fsx = { ...fs, lstatSync: (p) => (/huge|opencode-dcp@latest/.test(String(p)) ? { size: 300 * 1024 * 1024 } : fs.lstatSync(p)),
+    cpSync: (a, b, o) => { copied.push(String(a)); return real(a, b, o); } };
+  const f = await probePlugins(h, { ...stubs(['dcp-compress']), fsx, timeoutMs: 2000, platform: 'linux' });
+  assert.deepEqual(f, []);
+  assert.ok(copied.some((c) => /npm[\\/]@tarquinen[\\/]opencode-dcp@3\.2\.0[\\/]1$/.test(c)), copied.join('\n'));
+  assert.ok(!copied.some((c) => /opencode-dcp@latest/.test(c)));
+});
+
+test('#495: a half-written newest <id> (no node_modules) does not hide the finished one', async () => {
+  const { dcpRow } = await import('../scripts/lib/plugin-health.mjs');
+  const h = home({ server: [`${DCP}@3.2.0`], tui: [`${DCP}@3.2.0`] });
+  npmLayout(h, '3.2.0', 5, '3.2.0');
+  fs.mkdirSync(path.join(h, '.cache', 'opencode', 'npm', DCP.split('/')[0], 'opencode-dcp@3.2.0', '9'), { recursive: true });
+  assert.equal(dcpRow(h).status, 'ok');
+});

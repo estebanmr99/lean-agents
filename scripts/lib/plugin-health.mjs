@@ -1,6 +1,6 @@
 // OpenCode plugin health (#212): a plugin listed in config is not proof it loads. Read-only: findings with a suggested fix, never a repair.
-// Cache layout (VERIFY, upstream source not readable when written, 2026-11): `<cache>/packages/<pkg>@<spec>/node_modules/<pkg>` with the
-// wrapper's package.json and lockfile beside it; older docs say `<cache>/node_modules/<pkg>`. Both are searched.
+// Cache layout: OpenCode 2.2.7 loads `<cache>/npm/<pkg>@<spec>/<id>/node_modules/<pkg>` (seen in a real 2.2.7 log and a temp-HOME run, 2026-11-26, #495);
+// older versions used `<cache>/packages/<pkg>@<spec>/node_modules/<pkg>` (VERIFY) and older docs `<cache>/node_modules/<pkg>`. All are searched.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -70,14 +70,23 @@ function missingDeps(pkgDir, root, fsx, seen = new Set(), depth = 0) {
   return [...new Set(miss)];
 }
 
-// Cached wrapper folders of a package: flat `packages/<name>@<spec>` or, for a scoped name, `packages/<scope>/<base>@<spec>` (VERIFY which one OpenCode writes).
+// Cached wrapper folders of a package with the spec each was installed for, newest layout first: `npm/<name>@<spec>/<id>` (2.2.7; only the
+// newest <id>), then `packages/<name>@<spec>`. A scoped name nests as `<layout>/<scope>/<base>@<spec>`; the flat form is also tried.
 function wrapperDirs(root, name, fsx) {
   const [scope, base] = name.startsWith('@') ? name.split('/') : [null, name];
+  const ls = (d) => { try { return fsx.readdirSync(d, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name); } catch { return []; } };
   const out = [];
-  for (const [dir, prefix] of [[path.join(root, 'packages'), `${name}@`], ...(scope ? [[path.join(root, 'packages', scope), `${base}@`]] : [])]) {
-    try {
-      for (const e of fsx.readdirSync(dir, { withFileTypes: true })) if (e.isDirectory() && e.name.startsWith(prefix)) out.push(path.join(dir, e.name));
-    } catch { /* no such folder */ }
+  for (const layout of ['npm', 'packages']) {
+    for (const [dir, prefix] of [[path.join(root, layout), `${name}@`], ...(scope ? [[path.join(root, layout, scope), `${base}@`]] : [])]) {
+      for (const e of ls(dir).filter((n) => n.startsWith(prefix))) {
+        const spec = e.slice(prefix.length);
+        if (layout === 'packages') { out.push({ dir: path.join(dir, e), spec }); continue; }
+        // Newest finished install: numeric (timestamp) ids first, highest first; one without node_modules is half-written.
+        const num = (x) => (/^\d+$/.test(x) ? Number(x) : -1);
+        const id = ls(path.join(dir, e)).filter((x) => ls(path.join(dir, e, x)).includes('node_modules')).sort((a, b) => num(b) - num(a) || b.localeCompare(a))[0];
+        if (id) out.push({ dir: path.join(dir, e, id), spec });
+      }
+    }
   }
   return out;
 }
@@ -92,8 +101,7 @@ export function checkDepTree(home, name, fsx = fs, specs = null) {
   if (!safePluginName(name)) return [];
   const root = cacheDir(home);
   const wanted = specs && new Set([...specs].map((v) => v || 'latest'));
-  const used = (d) => !wanted || wanted.has(path.basename(d).slice(path.basename(d).indexOf('@') + 1));
-  const wrappers = [path.join(root, 'node_modules'), ...wrapperDirs(root, name, fsx).filter(used).map((d) => path.join(d, 'node_modules'))];
+  const wrappers = [path.join(root, 'node_modules'), ...wrapperDirs(root, name, fsx).filter((w) => !wanted || wanted.has(w.spec)).map((w) => path.join(w.dir, 'node_modules'))];
   const out = [];
   for (const nm of wrappers) {
     const pkgDir = path.join(nm, ...name.split('/'));
@@ -123,8 +131,10 @@ export function dcpRow(home, { fsx = fs, probe = [], probed = false } = {}) {
   const server = specs.find((e) => e.file !== 'tui.json' && e.file !== 'tui.jsonc');
   const tui = specs.find((e) => e.file === 'tui.json' || e.file === 'tui.jsonc');
   const root = cacheDir(home);
-  const versions = [path.join(root, 'node_modules'), ...wrapperDirs(root, name, fsx).map((d) => path.join(d, 'node_modules'))]
+  const versions = [...wrapperDirs(root, name, fsx).map((w) => path.join(w.dir, 'node_modules')), path.join(root, 'node_modules')]
     .map((nm) => readJson(path.join(nm, ...name.split('/'), 'package.json'), fsx)?.version).filter(Boolean);
+  // Old wrappers stay in the cache: show the copy the registered spec loads when there is one.
+  const resolved = versions.find((v) => v === server?.version) ?? versions[0];
   const broken = checkDepTree(home, name, fsx, specs.map((e) => e.version)).length > 0;
   const failed = probe.some((f) => f.plugin === name);
   const spec = (e) => (e ? e.spec : 'none');
@@ -132,7 +142,7 @@ export function dcpRow(home, { fsx = fs, probe = [], probed = false } = {}) {
   const floating = specs.some((e) => !e.version || e.version === 'latest');
   const changed = floating || reconcileSpecs(specs).length || (versions.length > 0 && versions.every((v) => !specs.some((e) => e.version === v)));
   const status = broken || failed ? 'error' : changed ? 'changed' : 'ok';
-  const detail = `registered: ${spec(server)} (TUI: ${spec(tui)}) ; resolved: ${versions[0] ?? 'not in cache'} ; loads: ${loads}${floating ? '. Fix: run lean-agents again to pin it' : changed && status !== 'error' ? '. Fix: start OpenCode once so it fetches the pinned version, then run --doctor again' : ''}`;
+  const detail = `registered: ${spec(server)} (TUI: ${spec(tui)}) ; resolved: ${resolved ?? 'not in cache'} ; loads: ${loads}${floating ? '. Fix: run lean-agents again to pin it' : changed && status !== 'error' ? '. Fix: start OpenCode once so it fetches the pinned version, then run --doctor again' : ''}`;
   return { status, detail };
 }
 
@@ -184,9 +194,17 @@ export async function probePlugins(home, { bin = 'opencode', fsx = fs, spawnFn =
   try {
     try {
       const filter = capped(fsx);
-      fsx.cpSync(path.join(configHome(home), 'opencode'), path.join(xdg.XDG_CONFIG_HOME, 'opencode'), { recursive: true, filter });
+      // The config's own node_modules (local plugins' deps) and wrappers of specs the config no longer asks for are not needed for the known commands (#495).
+      const cfg = path.join(configHome(home), 'opencode');
+      fsx.cpSync(cfg, path.join(xdg.XDG_CONFIG_HOME, 'opencode'), { recursive: true, filter: (src) => path.relative(cfg, src).split(path.sep)[0] !== 'node_modules' && filter(src) });
       const root = cacheDir(home);
-      for (const n of wanted) for (const d of wrapperDirs(root, n, fsx)) fsx.cpSync(d, path.join(xdg.XDG_CACHE_HOME, 'opencode', path.relative(root, d)), { recursive: true, filter });
+      const specs = readSpecs(home, fsx);
+      for (const n of wanted) {
+        const want = new Set(specs.filter((e) => e.name === n).map((e) => e.version || 'latest'));
+        const all = wrapperDirs(root, n, fsx);
+        const pick = all.some((w) => want.has(w.spec)) ? all.filter((w) => want.has(w.spec)) : all; // none for the spec: copy what is there, or the probe would need the network
+        for (const { dir } of pick) fsx.cpSync(dir, path.join(xdg.XDG_CACHE_HOME, 'opencode', path.relative(root, dir)), { recursive: true, filter });
+      }
     } catch (e) {
       return [{ id: 'probe-failed', plugin: '', line: `could not copy the config or plugin cache for the probe (${e.code ?? e.message}), so the command check was skipped`, fix: 'check for broken symlinks or a very large node_modules in the OpenCode cache; then run --doctor --probe-plugins again' }];
     }
