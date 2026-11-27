@@ -34,14 +34,15 @@ export function renderClaudeAgent(agent, profile, web) {
 }
 
 // JSON key paths the `claude plugin` commands write: doctor ignores them when telling the user's edits from ours (#492).
-const pluginKeys = (id) => [['enabledPlugins', id], ['extraKnownMarketplaces', id.split('@')[1]]];
-const plugin = (repo, id, writes = []) => {
-  writes.push(...pluginKeys(id));
-  return {
-    run: [['claude', 'plugin', 'marketplace', 'add', repo], ['claude', 'plugin', 'install', id]],
-    undo: [['claude', 'plugin', 'uninstall', id]],
-  };
-};
+// Only the exact values those commands write count; any other value stays an edit in the hash.
+const pluginKeys = (id, repo) => [
+  { path: ['enabledPlugins', id], value: true },
+  { path: ['extraKnownMarketplaces', id.split('@')[1]], repo: repo.replace(/#.*$/, '') },
+];
+const plugin = (repo, id) => ({
+  run: [['claude', 'plugin', 'marketplace', 'add', repo], ['claude', 'plugin', 'install', id]],
+  undo: [['claude', 'plugin', 'uninstall', id]],
+});
 
 export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdCommand }) {
   const dir = path.join(home, '.claude');
@@ -100,13 +101,19 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
     if ((opts.prior ?? []).some((c) => c.desc === CTX_MCP && c.undo?.length)) {
       commands.push({ tool: 'context-mode', desc: CTX_MCP, run: [['claude', 'mcp', 'remove', '--scope', 'user', 'context-mode']], undo: [] });
     }
-    commands.push({ tool: 'context-mode', desc: 'Context Mode plugin', ...plugin(marketplaceSource('context-mode-plugin'), 'context-mode@context-mode', pluginWrites) });
+    const repo = marketplaceSource('context-mode-plugin');
+    commands.push({ tool: 'context-mode', desc: 'Context Mode plugin', ...plugin(repo, 'context-mode@context-mode') });
+    pluginWrites.push(...pluginKeys('context-mode@context-mode', repo));
   }
   if (tools.includes('ponytail')) {
-    commands.push({ tool: 'ponytail', desc: 'Ponytail plugin', ...plugin(marketplaceSource('ponytail-plugin'), 'ponytail@ponytail', pluginWrites) });
+    const repo = marketplaceSource('ponytail-plugin');
+    commands.push({ tool: 'ponytail', desc: 'Ponytail plugin', ...plugin(repo, 'ponytail@ponytail') });
+    pluginWrites.push(...pluginKeys('ponytail@ponytail', repo));
   }
   if (tools.includes('i-have-adhd')) {
-    commands.push({ tool: 'i-have-adhd', desc: 'i-have-adhd plugin', ...plugin(marketplaceSource('i-have-adhd'), 'i-have-adhd@i-have-adhd', pluginWrites) }, adhdCommand);
+    const repo = marketplaceSource('i-have-adhd');
+    commands.push({ tool: 'i-have-adhd', desc: 'i-have-adhd plugin', ...plugin(repo, 'i-have-adhd@i-have-adhd') }, adhdCommand);
+    pluginWrites.push(...pluginKeys('i-have-adhd@i-have-adhd', repo));
     if (opts.adhdAlways) actions.push({ kind: 'file', path: path.join(dir, '.i-have-adhd-always'), content: '' , force: true });
   }
   for (const name of ['serena', 'playwright']) {
@@ -130,7 +137,14 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
       undo: [['npx', '-y', skillsCli(), 'remove', 'caveman', 'caveman-compress', 'caveman-stats', '-a', 'claude-code', '-g', '-y']],
     });
   }
-  if (opts.terminals?.includes('warp')) pluginWrites.push(...pluginKeys('warp@claude-code-warp'));
-  if (pluginWrites.length) settingsAction.ignore = pluginWrites;
+  if (opts.terminals?.includes('warp')) pluginWrites.push(...pluginKeys('warp@claude-code-warp', 'warpdotdev/claude-code-warp'));
+  // An earlier install's plugin commands also wrote keys (for example warp when this --update has no --terminal).
+  for (const c of opts.prior ?? []) {
+    const add = c.run?.find((a) => a[0] === 'claude' && a[1] === 'plugin' && a[2] === 'marketplace' && a[3] === 'add');
+    const inst = c.run?.find((a) => a[0] === 'claude' && a[1] === 'plugin' && a[2] === 'install');
+    if (add?.[4] && inst?.[3]) pluginWrites.push(...pluginKeys(inst[3], add[4]));
+  }
+  const uniqueWrites = [...new Map(pluginWrites.map((e) => [JSON.stringify(e), e])).values()];
+  if (uniqueWrites.length) settingsAction.ignore = uniqueWrites;
   return { actions, commands };
 }

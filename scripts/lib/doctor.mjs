@@ -206,7 +206,8 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
       const rel = homeRel(f.path, home, platform);
       if (!fs.existsSync(f.path)) { add(rel, 'error', 'missing. Fix: run lean-agents again to restore it'); continue; }
       const text = fs.readFileSync(f.path, 'utf8');
-      const same = f.userHash ? userHash(text, f.ignore) === f.userHash : sha(text) === f.hash;
+      const usableIgnore = Array.isArray(f.ignore) && f.ignore.every((e) => e && Array.isArray(e.path) && e.path.length && e.path.every((k) => typeof k === 'string'));
+      const same = f.userHash && usableIgnore ? userHash(text, f.ignore) === f.userHash : sha(text) === f.hash;
       add(rel, same ? 'ok' : 'changed', same ? '' : 'edited since install (fine if on purpose)');
     }
     // Drift: the installer pinned other versions than core/pins.json lists now (a newer lean-agents, or an edited pin).

@@ -305,6 +305,94 @@ test('--update replaces a stale settings.json hash from before #470; a user key 
   assert.match(row(), /edited since install/);
 });
 
+test('--update refreshes the user hash only when the file is exactly lean-agents\' JSON plus plugin keys (#492)', () => {
+  const main = path.join(ROOT, 'scripts', 'lean.mjs');
+  const plugins = {
+    enabledPlugins: { 'context-mode@context-mode': true, 'ponytail@ponytail': true },
+    extraKnownMarketplaces: {
+      'context-mode': { source: { source: 'github', repo: 'mksglu/context-mode' } },
+      ponytail: { source: { source: 'github', repo: 'DietrichGebert/ponytail' } },
+    },
+  };
+  const setup = () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+    const settings = path.join(home, '.claude', 'settings.json');
+    fs.mkdirSync(path.dirname(settings), { recursive: true });
+    fs.writeFileSync(settings, '{"model":"opus"}\n');
+    const env = { PATH: process.env.PATH, NVM_DIR: path.join(home, '.nvm'), HOME: home };
+    const run = (...args) => spawnSync(process.execPath, [main, '--home', home, ...args], { encoding: 'utf8', env });
+    const inst = run('--no-exec', '--yes', '--agents', 'claude', '--tools', 'context-mode,ponytail', '--privacy', 'standard', '--lang', 'en', '--profile', 'none');
+    assert.equal(inst.status, 0, inst.stdout + inst.stderr);
+    // A 1.2.1 state: no user-only hash, so --doctor compares the whole file.
+    const stateFile = path.join(home, '.config', 'lean-agents', 'state.json');
+    const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+    for (const f of state.files) if (f.path === settings) { delete f.userHash; delete f.ignore; }
+    fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+    const write = (extra = {}) => {
+      const j = parse(fs.readFileSync(settings, 'utf8'));
+      Object.assign(j, { enabledPlugins: plugins.enabledPlugins, extraKnownMarketplaces: plugins.extraKnownMarketplaces }, extra);
+      fs.writeFileSync(settings, `${JSON.stringify(j, null, 2)}\n`);
+      return j;
+    };
+    const row = () => run('--doctor').stdout.split('\n').find((l) => /^(ok|changed|error)\s+\S*\.claude\/settings\.json/.test(l));
+    const update = () => {
+      const r = run('--update', '--no-exec', '--yes');
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+    };
+    return { home, settings, run, write, row, update };
+  };
+
+  // (a) A user key present before --update is not blessed by the hash refresh.
+  const a = setup();
+  a.write({ myOwnKey: 1 });
+  assert.match(a.row(), /edited since install/, 'the stale hash shows before --update');
+  a.update();
+  assert.match(a.row(), /edited since install/, 'a user key before --update still shows edited');
+
+  // (b) A user hook present before --update is not blessed either.
+  const b = setup();
+  b.write({ hooks: { PreToolUse: [{ matcher: '*', hooks: [{ type: 'command', command: 'echo mine' }] }] } });
+  b.update();
+  assert.match(b.row(), /edited since install/, 'a user hook before --update still shows edited');
+
+  // (c) A changed marketplace repo is an edit, not one of our keys.
+  const c = setup();
+  const cj = c.write();
+  cj.extraKnownMarketplaces.ponytail.source.repo = 'someone/other';
+  fs.writeFileSync(c.settings, `${JSON.stringify(cj, null, 2)}\n`);
+  c.update();
+  assert.match(c.row(), /edited since install/, 'a changed marketplace repo still shows edited');
+});
+
+test('--update ignores plugin keys from an earlier install, even without --terminal (#492)', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  const settings = path.join(home, '.claude', 'settings.json');
+  fs.mkdirSync(path.dirname(settings), { recursive: true });
+  fs.writeFileSync(settings, '{"model":"opus"}\n');
+  const env = { PATH: process.env.PATH, NVM_DIR: path.join(home, '.nvm'), HOME: home };
+  const main = path.join(ROOT, 'scripts', 'lean.mjs');
+  const run = (...args) => spawnSync(process.execPath, [main, '--home', home, ...args], { encoding: 'utf8', env });
+  const inst = run('--no-exec', '--yes', '--agents', 'claude', '--no-tools', '--privacy', 'standard', '--lang', 'en', '--profile', 'none');
+  assert.equal(inst.status, 0, inst.stdout + inst.stderr);
+
+  // The 1.2.1 state knows the warp plugin command, but this --update has no --terminal.
+  const stateFile = path.join(home, '.config', 'lean-agents', 'state.json');
+  const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+  state.commands = [{ tool: 'warp', desc: 'Warp plugin for Claude Code (needs jq)', ok: true, run: [['claude', 'plugin', 'marketplace', 'add', 'warpdotdev/claude-code-warp'], ['claude', 'plugin', 'install', 'warp@claude-code-warp']], undo: [['claude', 'plugin', 'uninstall', 'warp@claude-code-warp']] }];
+  for (const f of state.files) if (f.path === settings) { delete f.userHash; delete f.ignore; }
+  fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+  const before = parse(fs.readFileSync(settings, 'utf8'));
+  before.enabledPlugins = { 'warp@claude-code-warp': true };
+  before.extraKnownMarketplaces = { 'claude-code-warp': { source: { source: 'github', repo: 'warpdotdev/claude-code-warp' } } };
+  fs.writeFileSync(settings, `${JSON.stringify(before, null, 2)}\n`);
+  const row = () => run('--doctor').stdout.split('\n').find((l) => /^(ok|changed|error)\s+\S*\.claude\/settings\.json/.test(l));
+  assert.match(row(), /edited since install/, 'the stale hash shows before --update');
+
+  const upd = run('--update', '--no-exec', '--yes');
+  assert.equal(upd.status, 0, upd.stdout + upd.stderr);
+  assert.doesNotMatch(row(), /edited since install/, 'the warp keys from the prior install clear to ok');
+});
+
 test('an rtk older than the pinned min skips the rtk steps and says how to update (#467)', { skip: process.platform === 'win32' }, () => {
   const run = (v) => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
