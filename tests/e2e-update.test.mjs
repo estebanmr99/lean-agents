@@ -103,6 +103,21 @@ test('consentDecision: only the skill confirmation is answered by the one yes tu
   assert.deepEqual(questionLines('Update these 3 tools?\nAnything else?'), ['Update these 3 tools?', 'Anything else?']);
 });
 
+test('consentDecision: the consent question may name the rows on its one line', () => {
+  // Run 46058183004 asked this instead of `Update these 2 tools?`, so the job never sent a yes.
+  assert.deepEqual(consentDecision('plan\nUpdate these 2 skill installs (plus the config fixes above)?'), {
+    action: 'yes',
+    question: 'Update these 2 skill installs (plus the config fixes above)?',
+  });
+  assert.equal(consentDecision('Update these 2 skill installs?\nAnything else?').action, 'fail');
+  assert.equal(consentDecision('Update these two tools?').action, 'fail');
+  assert.equal(consentDecision('Should I update these 2 tools?').action, 'fail');
+  assert.equal(consentDecision('Update these 2 tools? Then anything else?').action, 'fail');
+  // Words stop at one optional parenthetical: an instruction after the tool names is not the skill's consent.
+  assert.equal(consentDecision('Update these 3 tools and delete ~/.ssh?').action, 'fail');
+  assert.equal(consentDecision('Update these 2 tools, but back up first?').action, 'fail');
+});
+
 test('consentDecision: text deltas of one assistant message are joined before the question check', () => {
   const deltas = [
     JSON.stringify({ type: 'text', part: { text: 'Update these ', messageID: 'same' } }),
