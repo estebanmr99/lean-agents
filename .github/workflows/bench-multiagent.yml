@@ -1,0 +1,86 @@
+name: Multi-Agent Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: 'Model to use (e.g. openrouter/deepseek/deepseek-v4.1-flash-1017)'
+        default: 'openrouter/deepseek/deepseek-v4.1-flash-1017'
+        required: true
+        type: string
+      max_usd:
+        description: 'Stop when the key has spent this much in this run (USD, at most 5)'
+        default: '4'
+        required: true
+        type: string
+      repeats:
+        description: 'Number of repeats per mode'
+        default: '3'
+        required: true
+        type: string
+      modes:
+        description: 'Modes to run (comma-separated: solo,workers-1,workers-2,workers-4)'
+        default: 'solo,workers-1,workers-2,workers-4'
+        required: true
+        type: string
+      variant:
+        description: 'Setup variant (baseline or lean)'
+        default: 'lean'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Use the runner's Linuxbrew
+        run: echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
+
+      - name: Install OpenCode
+        run: npm install -g @opencode/cli@2.2.5
+
+      - name: Run Benchmark
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          MODEL: ${{ inputs.model }}
+          REPEATS: ${{ inputs.repeats }}
+          MAX_USD: ${{ inputs.max_usd }}
+          MODES: ${{ inputs.modes }}
+          VARIANT: ${{ inputs.variant }}
+        run: |
+          node tests/bench-multiagent.mjs \
+            --home "${RUNNER_TEMP}/bench-home" \
+            --run \
+            --model "$MODEL" \
+            --repeats "$REPEATS" \
+            --max-runs 200 \
+            --max-usd "$MAX_USD" \
+            --modes "$MODES" \
+            --variant "$VARIANT" \
+            --out "${RUNNER_TEMP}/bench-out"
+
+      - name: Upload Results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bench-multiagent-results
+          retention-days: 3
+          path: |
+            ${{ runner.temp }}/bench-out/
