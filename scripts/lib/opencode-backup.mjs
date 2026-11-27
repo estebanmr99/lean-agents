@@ -24,13 +24,24 @@ export const stamp = (d = new Date()) => d.toISOString().replace(/\.\d+Z$/, 'Z')
 export const neededBytes = (bytes, dbBytes = 0) => 2 * bytes + dbBytes + GIB;
 export const opencodeRunning = (names) => names.some((n) => /^opencode(\.exe)?$/i.test(n.trim().split(/[\\/]/).pop()));
 
+// One text for every refusal that meets a running OpenCode, so all four call sites say the same thing (#548).
+export const OPENCODE_RUNNING = "an opencode process is running (the 1.x app or the 2.x background service): run 'opencode service stop' (safe: it stops only the background service) and close OpenCode windows, then run this again";
+
+// #548: a row that stops the OpenCode 2 service only when the run itself started it (none before, one now).
+export function serviceStopRow({ before, agents = [], list = listProcesses }) {
+  if (before !== false || !agents.includes('opencode-v2')) return null;
+  let after;
+  try { after = opencodeRunning(list()); } catch { return null; }
+  return after ? { desc: 'stop the OpenCode 2 background service that lean-agents started', run: [['opencode', 'service', 'stop']] } : null;
+}
+
 // #488: --update must not swap the OpenCode binary or rewrite its plugins while the 1.x app or the 2.x service runs.
 // A step touches OpenCode when its description or any argv word names it (the CLI upgrade, rtk init --opencode, gsd --opencode).
 export function runningBlocker(commands, list = listProcesses) {
   if (!commands.some((c) => /opencode/i.test([c.desc, ...(c.run ?? []).flat()].join(' ')))) return null;
   let names;
   try { names = list(); } catch (e) { return `cannot list the running processes (${String(e.message).split('\n')[0]}): not safe to update OpenCode; close it, then run this again`; }
-  return opencodeRunning(names) ? "an opencode process is running (the 1.x app or the 2.x background service): run 'opencode service stop' and close OpenCode windows, then run this again" : null;
+  return opencodeRunning(names) ? OPENCODE_RUNNING : null;
 }
 
 // Image names of every running process. shortcut: found by image name only (the 2.x service, and 1.19's platform binary, which npm's node wrapper spawns: VERIFY), not by command line.
@@ -138,7 +149,7 @@ export function backupOpencode({ home, dryRun = false, log = console.log, now = 
 
   const problems = [];
   try {
-    if (opencodeRunning(list())) problems.push('an opencode process is running (the 1.x app or the 2.x background service): close it first');
+    if (opencodeRunning(list())) problems.push(OPENCODE_RUNNING);
   } catch (e) { problems.push(`cannot list the running processes (${String(e.message).split('\n')[0]}): not safe to copy`); }
   let src;
   try { src = listSource(L); } catch (e) { return refuse([e.message]); }

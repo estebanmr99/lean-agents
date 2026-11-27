@@ -27,7 +27,7 @@ import { probePlugins } from './lib/plugin-health.mjs';
 import { adopt, inventory, saveState } from './lib/adopt.mjs';
 import { planPrereqs, pendingPrereqs, everythingAgents, undoArgv, nvmDirExistedBefore } from './lib/prereqs.mjs';
 import { upgradeInventory, formatUpgrade, nextRtkStep } from './lib/upgrade.mjs';
-import { backupOpencode, backupLayout, listProcesses, opencodeRunning, runningBlocker } from './lib/opencode-backup.mjs';
+import { backupOpencode, backupLayout, listProcesses, opencodeRunning, runningBlocker, serviceStopRow, OPENCODE_RUNNING } from './lib/opencode-backup.mjs';
 import { readBackupStamp } from './lib/backup-stamp.mjs';
 import { isActive, failAt, applyPreflight, verifyBackup, configDrift, createSteps, makeCtx, runApply, runUndo, restoreData } from './lib/opencode-upgrade.mjs';
 import { planOpencode1, installOpencode1, removeOpencode1, layout as opencode1Layout } from './lib/opencode1.mjs';
@@ -259,6 +259,9 @@ const HELP = `Usage: lean-agents [options]
   --usage                Print the Copilot credits left (one gh call, no model request)
 `;
 
+const NO_INPUT = 'no terminal to ask on: pass --yes to accept the defaults, or --dry-run with --agents and --tools to preview';
+const DRY_RUN_HINT = 'to apply from a non-interactive shell, add --yes';
+
 async function prompter(yes) {
   if (yes) return { ask: async (_q, def) => def, select: async ({ def }) => def, multi: async ({ defaults }) => defaults, close() {} };
   let input = process.stdin;
@@ -270,7 +273,7 @@ async function prompter(yes) {
   if (canUseMenus(input)) return menuPrompter(input);
   const rl = readline.createInterface({ input, output: process.stdout });
   // Never fall back to the default answer here: nobody approved these changes.
-  const noInput = () => new Error('no terminal to ask on: pass --yes to accept the defaults, or --dry-run with --agents and --tools to preview');
+  const noInput = () => new Error(NO_INPUT);
   let closed = false;
   let fail = null;
   rl.once('close', () => { closed = true; fail?.(noInput()); });
@@ -745,6 +748,12 @@ async function install(o) {
     throw new Error(`nothing to update: lean-agents is not installed${found ? '; run --adopt --yes, then install (--everything --yes)' : ''}`);
   }
   if (o.command === 'update' && saved.options.migrateOnly) throw new Error(`nothing to update: only ${saved.adoptOnly ? '--adopt' : '--migrate'} ran here; install first (--everything --yes)`);
+  // #548: the plan and release notes must not print before the one message that stops a non-interactive run.
+  if (!o.yes && !o.dryRun && !process.stdin.isTTY) throw new Error(NO_INPUT);
+  // #548: remember the service state before any command of this run (the probes included), to stop it only if we started it.
+  const trackService = o.exec && !o.dryRun;
+  let opencodeBefore = null;
+  if (trackService) { try { opencodeBefore = opencodeRunning(listProcesses()); } catch { /* cannot list: never stop what may be the user's */ } }
   const p = await choose(o, saved?.options);
   // A plain re-run starts fresh: say so when it changes the saved agents or profile (#304, seen on a real PC).
   const prior = o.command !== 'update' && !o.json && !o.project && !o.migrate && !o.adopt ? readState(o.home)?.options : null;
@@ -785,6 +794,7 @@ async function install(o) {
         else console.log(warn);
       }
       if (!o.dryRun) {
+        stopStartedOpenCode(o, opencodeBefore);
         p.close();
         console.log('nothing changed');
         process.exitCode = 1;
@@ -823,7 +833,12 @@ async function install(o) {
     if (behindPins(saved).length) console.log('Pins that will change (old -> new):');
     for (const b of behindPins(saved)) console.log(`${b.tool}: ${b.installed} -> ${b.pinned}`);
   }
-  if (o.dryRun) { p.close(); console.log('Dry run: nothing was changed.'); return; }
+  if (o.dryRun) {
+    p.close();
+    console.log('Dry run: nothing was changed.');
+    if (!process.stdin.isTTY) console.log(DRY_RUN_HINT);
+    return;
+  }
   // The one question of --everything: the choose() prompter answers by default, so ask on a real one.
   const q = o.everything && !o.yes ? await prompter(false) : p;
   if (q !== p) p.close();
@@ -975,6 +990,7 @@ async function install(o) {
   }
   if (failed) {
     console.log(`\n${failed} step(s) failed; see the lines marked ! above. Backups: ${backupDir}`);
+    stopStartedOpenCode(o, opencodeBefore);
     ui?.summary('Summary', [`${failed} of ${commands.length} commands failed`, `Backups: ${backupDir}`], false);
     process.exitCode = 1;
     return o.json && printApplied(o, files, report, errors);
@@ -1011,6 +1027,7 @@ async function install(o) {
   if (o.network.autoUpdate === 'off' && o.agents.includes('antigravity')) {
     console.log('Auto-updates off: Antigravity CLI updates itself and has no documented switch for it.');
   }
+  stopStartedOpenCode(o, opencodeBefore);
   ui?.summary('Summary', [`${files.length} files written, ${ran.length} commands run`, `Backups: ${backupDir}`], true);
 }
 
@@ -1108,6 +1125,18 @@ function saveJournalState(o, S) {
 
 const refuse = (problems) => { console.log(`refused, nothing changed:\n${problems.map((x) => `  - ${x}`).join('\n')}`); return false; };
 
+// #548: one visible command row, only when this run started the OpenCode 2 service; a failure is a warning, not a crash.
+function stopStartedOpenCode(o, before) {
+  if (!o.exec || o.dryRun) return;
+  const row = serviceStopRow({ before, agents: o.agents });
+  if (!row) return;
+  console.log(`- ${row.desc}`);
+  const ok = run(row.run[0], { dryRun: false, log: (l) => console.log(tilde(l, o.home)), json: o.json });
+  console.log(ok
+    ? 'lean-agents stopped the OpenCode 2 background service its commands started.'
+    : '! lean-agents could not stop the OpenCode 2 background service its commands started: run `opencode service stop` by hand.');
+}
+
 // How to update rtk with the package manager at hand (the #467 skip warning and the upgrade plan share it).
 const rtkUpdateHow = () => {
   const pm = packageManager();
@@ -1153,7 +1182,7 @@ async function undoUpgrade(o) {
   console.log(`undo: ${todo.length ? todo.join(', ') : 'no step left to undo'}, then the 1.x data comes back from ${L.frozen} (the 2.x db is moved aside, never deleted)`);
   if (o.dryRun || !o.yes) { console.log('dry run: nothing was changed (--yes does it)'); return true; }
   const problems = [];
-  try { if (opencodeRunning(listProcesses())) problems.push('an opencode process is running (the 1.x app or the 2.x background service): close it first; lean-agents did not start it'); } catch (e) { problems.push(`cannot list the running processes (${String(e.message).split('\n')[0]}): not safe to continue`); }
+  try { if (opencodeRunning(listProcesses())) problems.push(OPENCODE_RUNNING); } catch (e) { problems.push(`cannot list the running processes (${String(e.message).split('\n')[0]}): not safe to continue`); }
   const bad = verifyBackup(stamp.dir);
   if (bad.length) problems.push(`the backup does not match its manifest (${bad[0]}): not used; see ${path.join(stamp.dir, 'RESTORE.md')}`);
   if (!o.exec) problems.push('--no-exec: undo may run the OpenCode 2 uninstall and a `--version` probe');

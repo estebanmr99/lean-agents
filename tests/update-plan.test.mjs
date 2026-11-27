@@ -123,8 +123,8 @@ test('#489: --update reuses a saved profile none and does not ask for it again',
   assert.equal(lean(['--yes', '--agents', 'opencode-v2', '--tools', 'caveman', '--lang', 'en', '--profile', 'none']).status, 0);
   const state = JSON.parse(fs.readFileSync(path.join(home, '.config', 'lean-agents', 'state.json'), 'utf8'));
   assert.equal(state.options.profile, null, 'none is saved as null');
-  // No --dry-run: a dry run without a terminal takes the defaults and would hide the question. The plan question then fails on empty stdin.
-  const r = lean(['--update']);
+  // A non-dry run without a terminal now stops before the plan (#548), so this checks the reused profile in a dry run.
+  const r = lean(['--update', '--dry-run']);
   assert.doesNotMatch(`${r.stdout}${r.stderr}`, /OpenCode model profile/);
   assert.match(r.stdout, /profile: none/);
 });
@@ -139,7 +139,7 @@ test('#489: an older saved state with OpenCode but no profile key is reused as n
   delete state.options.profile;
   state.options.agents = ['opencode-v2'];
   fs.writeFileSync(file, JSON.stringify(state));
-  const r = lean(['--update']);
+  const r = lean(['--update', '--dry-run']);
   assert.doesNotMatch(`${r.stdout}${r.stderr}`, /OpenCode model profile/);
   assert.match(r.stdout, /profile: none/);
 });

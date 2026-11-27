@@ -13,8 +13,29 @@ unset XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
 opencode --version
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 
-bash "$repo/install.sh" --yes --no-exec --agents opencode-v2 \
+# #548: show which lean-agents command starts the OpenCode 2 service, and fail if its own run leaves one behind.
+# shellcheck disable=SC2009 # the full command line and start time are the evidence this check keeps
+opencode_processes() { ps -A -o pid,lstart,command | grep -i '[o]pencode'; }
+lean_run() {
+  echo "== $(date -u +%T) before: lean-agents $*"
+  opencode_processes || true
+  local rc=0
+  bash "$repo/install.sh" "$@" || rc=$?
+  echo "== $(date -u +%T) after: lean-agents $*"
+  if opencode_processes; then
+    echo "FAIL  an opencode process is left after: lean-agents $*" >&2
+    exit 1
+  fi
+  return "$rc"
+}
+
+# The version probe above may start the service; clear it so every lean-agents run starts from none.
+opencode service stop >/dev/null 2>&1 || true
+
+lean_run --yes --no-exec --agents opencode-v2 \
   --tools serena,playwright,playwright-extension,ponytail,rtk --privacy strict --profile anthropic-api
+# A real --update with one already-installed tool: it runs the adapter and the end-of-run doctor, and must stop the service.
+lean_run --update --yes --tools rtk
 
 # Proves the file name the migration guide gives for the old tui.json.
 LC_ALL=C grep -aq 'opencode/cli.json' "$(command -v opencode)"
@@ -82,7 +103,7 @@ JS
 HOME="$(mktemp -d)"
 export HOME
 export XDG_CONFIG_HOME="$HOME/.config"
-bash "$repo/install.sh" --yes --no-exec --agents opencode-v2 --tools copilot-usage --network on --lang en --profile anthropic-api
+lean_run --yes --no-exec --agents opencode-v2 --tools copilot-usage --network on --lang en --profile anthropic-api
 node --input-type=module - "$HOME/.config/opencode" <<'JS'
 import fs from 'node:fs';
 import path from 'node:path';
