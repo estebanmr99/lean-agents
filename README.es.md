@@ -189,7 +189,7 @@ Cada opción de `--help`. En PowerShell se escriben en PascalCase (`-DryRun`).
 
 | Opción | Qué hace |
 | --- | --- |
-| `--dry-run` | Muestra cada cambio de archivo y comando; no cambia nada. Sin terminal usa las elecciones guardadas o los valores por defecto y nunca pregunta |
+| `--dry-run` | Muestra cada cambio de archivo y comando; no cambia nada. Sin terminal usa las elecciones guardadas o los valores por defecto y nunca pregunta; un dry run no interactivo termina con un recordatorio: añade `--yes` |
 | `--yes` | Acepta los valores por defecto sin preguntar |
 | `--agents a,b` | Agentes a configurar: claude, opencode-v1, opencode-v2, copilot-cli, antigravity, vscode-copilot, cursor (por defecto: los instalados) |
 | `--tools a,b` | Herramientas opcionales además de RTK y Context Mode: serena, playwright, ponytail, caveman, i-have-adhd, dcp, codeburn, copilot-usage, gsd, autoskills, playwright-extension, coordinate, lean-migrate, code-mode |
