@@ -22,9 +22,12 @@ prev="$(git tag --list 'v*' --sort=-v:refname 2>/dev/null | grep -vx "v$version"
 if [ -n "$prev" ] && old="$(git show "$prev:core/pins.json" 2>/dev/null)"; then
   OLD_PINS="$old" node --input-type=module - "$(cd "$(dirname "$0")/.." && pwd)" <<'NODE' || exit 1
 import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 const root = process.argv[2];
-const { pinDowngrades } = await import(`${root}/scripts/lib/pin-downgrades.mjs`);
-const { errors, notices } = pinDowngrades(JSON.parse(process.env.OLD_PINS).pins, JSON.parse(fs.readFileSync(`${root}/core/pins.json`, 'utf8')).pins);
+// import() needs a file URL: a bare Windows path such as c:\... is rejected as an unsupported scheme (#590).
+const { pinDowngrades } = await import(pathToFileURL(path.join(root, 'scripts/lib/pin-downgrades.mjs')).href);
+const { errors, notices } = pinDowngrades(JSON.parse(process.env.OLD_PINS).pins, JSON.parse(fs.readFileSync(path.join(root, 'core/pins.json'), 'utf8')).pins);
 for (const n of notices) console.log(n);
 for (const e of errors) console.error(e);
 process.exit(errors.length ? 1 : 0);
