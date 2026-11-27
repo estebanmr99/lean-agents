@@ -3,35 +3,46 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
-import { inventory, applyLines } from '../scripts/lib/adopt.mjs';
+import { inventory, applyLines, relIn } from '../scripts/lib/adopt.mjs';
 import { upgradeInventory } from '../scripts/lib/upgrade.mjs';
-import { homeRel, tilde } from '../scripts/lib/fsops.mjs';
+import { homeRel, tilde, describe } from '../scripts/lib/fsops.mjs';
+import { configHome } from '../scripts/lib/system.mjs';
 
 const j = path.join;
 const winHome = path.win32.join('D:\\Data', 'me'); // D:\Data\me
 const winFile = path.win32.join(winHome, 'x.json');
+
+// A fake fs over the given files only: the win32 fixture paths never touch the runner's disk.
+const fakeFs = (files, dirs = new Map()) => ({
+  existsSync: (p) => files.has(p) || dirs.has(p),
+  readFileSync: (p) => {
+    if (!files.has(p)) throw Object.assign(new Error(`ENOENT: ${p}`), { code: 'ENOENT' });
+    return files.get(p);
+  },
+  readdirSync: (p) => dirs.get(p) ?? [],
+  realpathSync: (p) => p,
+});
 
 test('#506: tilde only shortens the home at the start of a path, never one inside a longer path', () => {
   assert.equal(tilde('/opt/x/home/me/a /opt/me/b', '/opt/me', 'linux'), '/opt/x/home/me/a ~/b');
   assert.equal(tilde('/opt/x/home/me/a', '/home/me', 'linux'), '/opt/x/home/me/a');
   assert.equal(tilde('$ x d:\\data\\me\\a D:/Data/me/b', winHome, 'win32'), '$ x ~\\a ~/b');
   assert.equal(tilde('/opt/me/a', '/opt/me', 'linux'), '~/a');
+  // A file:// URL still starts the home after `//`, so the URL cannot leak the full home path.
+  assert.equal(tilde('file:///opt/me/x --a=/opt/me/y', '/opt/me', 'linux'), 'file://~/x --a=~/y');
   assert.equal(homeRel('/opt/me/a', '/opt/me', 'linux'), '~/a');
   assert.equal(homeRel('/opt/ME/a', '/opt/me', 'linux'), '/opt/ME/a');
   assert.equal(homeRel(winFile.toLowerCase(), winHome, 'win32'), '~\\x.json');
 });
 
 test('#506: inventory shortens a mixed-case win32 home in a launch path', async () => {
-  const root = fs.realpathSync(fs.mkdtempSync(j(os.tmpdir(), 'home506-')));
-  const home = j(root, 'Data', 'Me');
-  fs.mkdirSync(home, { recursive: true });
-  const lower = j(root, 'data', 'me');
-  fs.writeFileSync(j(home, '.claude.json'), JSON.stringify({ mcpServers: { demo: { command: [j(lower, 'node')] } } }));
-  const r = await inventory({ home, env: { PATH: '' }, platform: 'win32', realHome: '/nowhere' });
+  const file = j(winHome, '.claude.json');
+  const node = path.win32.join('d:\\data\\me', 'node');
+  const fsx = fakeFs(new Map([[file, JSON.stringify({ mcpServers: { demo: { command: [node] } } })]]));
+  const r = await inventory({ home: winHome, env: { PATH: '' }, platform: 'win32', realHome: '/nowhere', fsx });
   const item = r.items.find((i) => i.kind === 'mcp' && i.name === 'demo');
-  assert.equal(item.launch.node, '~/node');
+  assert.match(item.launch.node, /^~[\\/]node$/);
 });
 
 test('#506: applyLines shortens a mixed-case win32 home', () => {
@@ -43,13 +54,28 @@ test('#506: applyLines shortens a mixed-case win32 home', () => {
 });
 
 test('#506: upgradeInventory shortens config paths under home at its call site', () => {
-  const root = fs.realpathSync(fs.mkdtempSync(j(os.tmpdir(), 'home506-')));
-  const home = j(root, 'Data', 'Me') + path.sep; // a trailing separator still counts as home
-  const ocDir = j(home, '.config', 'opencode');
-  fs.mkdirSync(j(ocDir, 'agent'), { recursive: true });
-  fs.writeFileSync(j(ocDir, 'opencode.json'), '{}');
-  fs.writeFileSync(j(ocDir, 'agent', 'a.md'), 'x');
-  const r = upgradeInventory({ items: [], opencode: { dataDir: null, sessions: null, major: null } }, { home, platform: 'win32' });
-  const f = r.items.find((i) => i.kind === 'file');
-  assert.equal(f.file, '~/.config/opencode/agent/a.md');
+  const fixture = (home) => {
+    const ocDir = j(configHome(home), 'opencode');
+    const agentDir = j(ocDir, 'agent');
+    const file = j(ocDir, 'opencode.jsonc');
+    const skill = j(agentDir, 'a.md');
+    const files = new Map([[file, '{}'], [skill, 'x']]);
+    const dirs = new Map([[agentDir, [{ name: 'a.md', isFile: () => true, isDirectory: () => false }]]]);
+    return { fsx: fakeFs(files, dirs), item: (r) => r.items.find((i) => i.kind === 'file') };
+  };
+  // No trailing separator, then a trailing one: both still count as home.
+  for (const home of [winHome, winHome + path.sep]) {
+    const { fsx, item } = fixture(home);
+    const r = upgradeInventory({ items: [], opencode: { dataDir: null, sessions: null, major: null } }, { home, platform: 'win32', fsx });
+    assert.match(item(r).file, /^~[\\/]\.config[\\/]opencode[\\/]agent[\\/]a\.md$/);
+  }
+});
+
+test('#506: describe shortens a mixed-case win32 home', () => {
+  const planned = [{ status: 'create', path: path.win32.join('D:\\Data\\me', 'x') }];
+  assert.equal(describe(planned, winHome, false, 'win32'), `  create    ~${path.win32.sep}x`);
+});
+
+test('#506: relIn keeps a mixed-case win32 path relative to home', () => {
+  assert.equal(relIn(winHome, winFile.toLowerCase(), 'win32'), 'x.json');
 });

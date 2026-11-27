@@ -120,7 +120,7 @@ export async function inventory({ home, env = process.env, platform = process.pl
   // --- MCP servers (names only; args and env stay unread)
   const names = new Set();
   for (const { client, file, keyPath } of clients(home)) {
-    for (const s of mcpServers(file, keyPath)) {
+    for (const s of mcpServers(file, keyPath, fsx)) {
       const id = `${file}\0${s.name}`;
       if (seen.has(id)) continue;
       seen.add(id);
@@ -370,7 +370,11 @@ const absOf = (home, f) => (f === '~' || f.startsWith('~/') || f.startsWith('~\\
 const walk = (obj, p) => p.reduce((v, k) => (v && typeof v === 'object' ? v[k] : undefined), obj);
 const stamp = () => new Date().toISOString().replace(/[:.]/g, '-');
 const bytes = (f) => fs.readFileSync(f);
-const relIn = (home, f) => (f.startsWith(home + path.sep) ? path.relative(home, f) : f.replace(/^[A-Za-z]:/, '').replace(/^[\\/]+/, ''));
+export const relIn = (home, f, platform = process.platform) => {
+  const P = platform === 'win32' ? path.win32 : path;
+  const rel = homeRel(f, home, platform);
+  return rel !== f && rel.length > 1 ? P.relative(home, f) : f.replace(/^[A-Za-z]:/, '').replace(/^[\\/]+/, '');
+};
 
 // State file: --adopt adds `adopt` to an existing state.json, or creates one that only holds it (`adoptOnly`).
 const stateFile = (stateDir) => j(stateDir, 'state.json');
@@ -517,7 +521,7 @@ export async function adoptApply(o) {
   const actions = [...p.edits].map(([file, edits]) => ({ kind: 'json', path: file, edits }));
   for (const pl of planFiles(actions, [home, configHome(home), envDir(home, 'COPILOT_HOME', null)].filter(Boolean))) {
     if (pl.status !== 'modify') { if (pl.status === 'skip') console.log(`  skipped ${rel(pl.path)}: ${pl.note}`); continue; }
-    const backup = j(backupDir, 'files', relIn(home, pl.path));
+    const backup = j(backupDir, 'files', relIn(home, pl.path, platform));
     privateDir(path.dirname(backup), stateDir);
     fs.copyFileSync(pl.path, backup);
     fs.chmodSync(backup, 0o600);
@@ -532,7 +536,7 @@ export async function adoptApply(o) {
     for (const d of list) {
       const why = unsafe(d, [home]);
       if (why) { console.log(`  kept ${label} ${rel(d)}: ${why}`); continue; }
-      const backup = j(backupDir, 'dirs', relIn(home, d));
+      const backup = j(backupDir, 'dirs', relIn(home, d, platform));
       privateDir(path.dirname(backup), stateDir);
       fs.cpSync(d, backup, { recursive: true });
       adoptState.dirs.push({ path: d, backup });
