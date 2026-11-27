@@ -118,12 +118,42 @@ test('consentDecision: the consent question may name the rows on its one line', 
   assert.equal(consentDecision('Update these 2 tools, but back up first?').action, 'fail');
 });
 
+test('consentDecision: the final skill question is the consent, and only a redundant run-it ask may precede it', () => {
+  // Run 46062068015 asked "Do you want me to run it?" and then "Update these 1 tools?"; the job sent no yes.
+  assert.deepEqual(consentDecision('Do you want me to run it?\n\nUpdate these 1 tools?'), {
+    action: 'yes',
+    question: 'Update these 1 tools?',
+  });
+  assert.deepEqual(consentDecision('Should I also delete your backups?\nUpdate these 1 tools?'), {
+    action: 'fail',
+    question: 'Should I also delete your backups?',
+  });
+  assert.equal(consentDecision('Update these 1 tools?\nDo you want me to run it?').action, 'fail');
+});
+
+test('unansweredQuestion: an answered consent excuses a redundant run-it ask in the same text', () => {
+  const text = 'Do you want me to run it?\n\nUpdate these 1 tools?';
+  assert.equal(unansweredQuestion(text, { consentAnswered: true }), null);
+  assert.equal(unansweredQuestion('Which release should I use?\nUpdate these 1 tools?', { consentAnswered: true }), 'Update these 1 tools?');
+});
+
 test('consentDecision: text deltas of one assistant message are joined before the question check', () => {
   const deltas = [
     JSON.stringify({ type: 'text', part: { text: 'Update these ', messageID: 'same' } }),
     JSON.stringify({ type: 'text', part: { text: '3 tools?', messageID: 'same' } }),
   ].join('\n');
   assert.equal(consentDecision(deltas).action, 'yes');
+});
+
+test('e2e-update evaluator: run 46062068015 needs one yes and no unanswered question', () => {
+  const first = transcript('Here is the plan.\n\nDo you want me to run it?\n\nUpdate these 1 tools?');
+  const r = evaluateUpdate({
+    ...good(),
+    transcript: [skillEvent(), first, transcript('Done. lean-agents is updated.')].join('\n'),
+    firstTurnTranscript: first,
+    yesTurns: 1,
+  });
+  assert.equal(r.ok, true, r.failures.join('; '));
 });
 
 test('e2e-update evaluator: one consent question plus one yes turn passes', () => {
