@@ -9,11 +9,14 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 // The section names CHANGELOG.md already uses, in the order a release lists them.
 export const SECTIONS = ['Added', 'Changed', 'Docs', 'Fixed', 'Security'];
 
+const VERSION_RE = /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/;
+
 function parseFragment(file) {
+  if (fs.lstatSync(file).isSymbolicLink()) throw new Error(`${file}: fragment is a symlink; write a real file in changes/`);
   const groups = new Map();
   let section = null;
   let bullets = 0;
-  fs.readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+  fs.readFileSync(file, 'utf8').split(/\r?\n/).forEach((line, i) => {
     if (!line.trim()) return;
     const heading = /^### (.+)$/.exec(line);
     if (heading) {
@@ -35,6 +38,7 @@ function parseFragment(file) {
 // Reads the fragments, inserts the release block below ## [Unreleased], then deletes the fragments.
 // A run with no fragments and the version already in CHANGELOG.md is a no-op.
 export function foldFragments({ version, changelogPath, changesDir, date = new Date().toISOString().slice(0, 10) }) {
+  if (!VERSION_RE.test(version)) throw new Error(`invalid version "${version}" (expected x.y.z or x.y.z-suffix)`);
   const changelog = fs.readFileSync(changelogPath, 'utf8');
   const hasVersion = changelog.split('\n').some((l) => l.startsWith(`## [${version}]`));
   const fragments = fs.readdirSync(changesDir).filter((f) => f.endsWith('.md') && f !== 'README.md').sort();
@@ -44,6 +48,15 @@ export function foldFragments({ version, changelogPath, changesDir, date = new D
     throw new Error(`no fragments in ${changesDir} (add changes/<issue>.md first)`);
   }
   if (hasVersion) throw new Error(`CHANGELOG.md already has ## [${version}]; fragments left in ${changesDir}`);
+
+  const lines = changelog.split('\n');
+  const unreleased = lines.findIndex((l) => l.startsWith('## [Unreleased]'));
+  if (unreleased < 0) throw new Error('CHANGELOG.md has no ## [Unreleased] heading');
+  let next = unreleased + 1;
+  while (next < lines.length && lines[next] === '') next += 1;
+  if (next < lines.length && !lines[next].startsWith('## [')) {
+    throw new Error(`CHANGELOG.md has lines under ## [Unreleased] (line ${next + 1}); move these lines into changes/<issue>.md before running the release`);
+  }
 
   const groups = new Map();
   for (const name of fragments) {
@@ -58,12 +71,6 @@ export function foldFragments({ version, changelogPath, changesDir, date = new D
     block.push(`### ${section}`, ...groups.get(section), '');
   }
   block.pop();
-
-  const lines = changelog.split('\n');
-  const unreleased = lines.findIndex((l) => l.startsWith('## [Unreleased]'));
-  if (unreleased < 0) throw new Error('CHANGELOG.md has no ## [Unreleased] heading');
-  let next = unreleased + 1;
-  while (next < lines.length && lines[next] === '') next += 1;
 
   const out = [...lines.slice(0, unreleased + 1), '', ...block, '', ...lines.slice(next)].join('\n');
   fs.writeFileSync(changelogPath, out);

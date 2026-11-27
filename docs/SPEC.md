@@ -540,7 +540,7 @@ Done when: the `assets` workflow renders every image and GIF, and the owner has 
 - `scripts/check-private.sh` passes locally; gitleaks passes.
 - No file outside a temporary HOME is touched by tests.
 - Every new command or config key is either verified (date in `docs/compatibility.md`) or marked **VERIFY** with an open issue.
-- README and docs updated for what changed; CHANGELOG entry under Unreleased.
+- README and docs updated for what changed; `changes/<issue>.md` added (see `changes/README.md`).
 - A short summary for the owner: what changed, how it was tested, what is pending.
 
 ### Before each release

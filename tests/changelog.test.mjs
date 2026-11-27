@@ -116,3 +116,73 @@ test('rejects an unknown section instead of writing it', (t) => {
   assert.throws(() => run(f), /501\.md.*section/i);
   assert.equal(fs.readFileSync(f.changelog, 'utf8'), BASE);
 });
+
+test('folds a CRLF fragment', (t) => {
+  const f = fixture();
+  t.after(() => fs.rmSync(f.dir, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(f.changes, '501.md'), '### Fixed\r\n- fixed one (#501)\r\n- fixed two (#501)\r\n');
+
+  run(f);
+  const text = fs.readFileSync(f.changelog, 'utf8');
+  assert.deepEqual(text.split('\n').filter((l) => l.startsWith('- fixed')), ['- fixed one (#501)', '- fixed two (#501)']);
+  assert.doesNotMatch(text, /\r/);
+});
+
+test('folds a fragment without a trailing newline', (t) => {
+  const f = fixture();
+  t.after(() => fs.rmSync(f.dir, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(f.changes, '501.md'), '### Fixed\n- fixed one (#501)');
+
+  run(f);
+  assert.equal(releaseNotes(fs.readFileSync(f.changelog, 'utf8'), '1.2.5'), '### Fixed\n- fixed one (#501)');
+});
+
+test('refuses non-blank lines left under Unreleased and changes nothing', (t) => {
+  const f = fixture();
+  t.after(() => fs.rmSync(f.dir, { recursive: true, force: true }));
+  const stray = BASE.replace('## [Unreleased]\n\n', '## [Unreleased]\n### Added\n- old (#0)\n\n');
+  fs.writeFileSync(f.changelog, stray);
+  fs.writeFileSync(path.join(f.changes, '501.md'), '### Fixed\n- fixed one (#501)\n');
+
+  assert.throws(() => run(f), /move these lines into changes\/<issue>\.md/i);
+  assert.equal(fs.readFileSync(f.changelog, 'utf8'), stray);
+  assert.deepEqual(fs.readdirSync(f.changes).sort(), ['501.md', 'README.md']);
+
+  const cli = spawnSync(process.execPath, [SCRIPT, '1.2.5', '--changelog', f.changelog, '--changes', f.changes], { encoding: 'utf8' });
+  assert.notEqual(cli.status, 0);
+  assert.match(cli.stderr, /move these lines into changes\/<issue>\.md/i);
+});
+
+test('rejects a malformed version', (t) => {
+  const f = fixture();
+  t.after(() => fs.rmSync(f.dir, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(f.changes, '501.md'), '### Fixed\n- fixed one (#501)\n');
+
+  assert.throws(() => run(f, '1.2'), /version/i);
+  assert.equal(fs.readFileSync(f.changelog, 'utf8'), BASE);
+  assert.equal(fs.readdirSync(f.changes).includes('501.md'), true);
+
+  const cli = spawnSync(process.execPath, [SCRIPT, 'v1.2.5', '--changelog', f.changelog, '--changes', f.changes], { encoding: 'utf8' });
+  assert.notEqual(cli.status, 0);
+  assert.match(cli.stderr, /version/i);
+});
+
+test('rejects a symlinked fragment', (t) => {
+  const f = fixture();
+  t.after(() => fs.rmSync(f.dir, { recursive: true, force: true }));
+  const target = path.join(f.dir, 'real.md');
+  fs.writeFileSync(target, '### Fixed\n- fixed one (#501)\n');
+  try {
+    fs.symlinkSync(target, path.join(f.changes, '501.md'));
+  } catch (error) {
+    if (process.platform === 'win32') {
+      t.skip('symlink creation needs Developer Mode or admin on Windows');
+      return;
+    }
+    throw error;
+  }
+
+  assert.throws(() => run(f), /501\.md.*symlink/i);
+  assert.equal(fs.readFileSync(f.changelog, 'utf8'), BASE);
+  assert.equal(fs.readFileSync(target, 'utf8'), '### Fixed\n- fixed one (#501)\n');
+});
