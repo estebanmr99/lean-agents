@@ -871,7 +871,7 @@ async function install(o) {
   const tracked = () => [...(previous?.files ?? []), ...files];
   const snap = () => new Map(tracked().map((f) => [f.path, fs.existsSync(f.path) && fs.statSync(f.path).isFile() ? sha(fs.readFileSync(f.path, 'utf8')) : null]));
   // A file that changed while one of our commands ran (rtk init, plugin installs) counts as ours: new hash, so --doctor stays ok.
-  const refreshHashes = (before) => { for (const [p, h] of snap()) if (h !== null && h !== before.get(p)) for (const f of tracked()) if (f.path === p) { f.hash = h; if (f.ignore?.length) { const u = userHash(fs.readFileSync(p, 'utf8'), f.ignore); if (u) f.userHash = u; } } };
+  const refreshHashes = (before) => { for (const [p, h] of snap()) if (h !== null && h !== before.get(p)) for (const f of tracked()) if (f.path === p) { f.hash = h; if (Array.isArray(f.ignore) && f.ignore.every((e) => Array.isArray(e?.path))) { const u = userHash(fs.readFileSync(p, 'utf8'), f.ignore); if (u) f.userHash = u; } } };
   // A stored hash from before #470 predates our own commands' edits: refresh the user-only hash for every tracked JSON
   // file whose plan knows the key paths our commands write, even when nothing changed in this run (#492). Only when the
   // file is exactly our planned JSON plus the ignored plugin keys; anything else stays flagged so --doctor shows an edit.
