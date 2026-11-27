@@ -147,6 +147,32 @@ test('rules mention only installed tools and honor the language', () => {
   assert.doesNotMatch(rules, /Serena|Context Mode|Playwright|ToolSearch|\{\{/);
 });
 
+test('core rules keep the full safety and verification wording', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
+  lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--no-tools', '--lang', 'en', '--privacy', 'standard']);
+  const rules = fs.readFileSync(path.join(home, '.config', 'lean-agents', 'AGENTS.md'), 'utf8');
+  for (const text of [
+    'Global rules for every project; project rules win.',
+    'Never read, print, copy or log secrets',
+    'passwords, auth files',
+    'Ask before anything irreversible',
+    'push, deploy, migrations, mass deletes, overwrites',
+    'Back up system/user config before edits',
+    'need explicit security review',
+    'if you could not verify, say so',
+    'only when asked or justified',
+    'say so when a simpler path exists, before doing it',
+    'do not handle impossible cases',
+    'Terse Caveman style',
+    'remove only your orphans',
+    'each change traces to task',
+    'review at end',
+  ]) assert.ok(rules.includes(text), text);
+  const core = fs.readFileSync(path.join(ROOT, 'core', 'AGENTS.md'), 'utf8');
+  for (const placeholder of ['{{LANG_RULE}}', '{{SERENA_HINT}}', '{{TOOL_RULES}}']) assert.ok(core.includes(placeholder), placeholder);
+  assert.ok(Buffer.byteLength(core) <= 1400, 'core/AGENTS.md stays within the 1,400-byte limit');
+});
+
 test('rules say when to use each installed tool', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
   lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--tools', 'playwright', '--lang', 'en', '--privacy', 'standard']);
