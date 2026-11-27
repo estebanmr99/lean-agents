@@ -76,6 +76,8 @@ try {
   }
 
   # 3. Optional Orca app: an older release is adopted by --update and moved to the pin; --uninstall leaves it alone.
+  # The env test above set HTTPS_PROXY to an unroutable host: drop it so the release download can reach GitHub.
+  Remove-Item Env:HTTPS_PROXY -ErrorAction SilentlyContinue
   $appdir = Join-Path $dir 'app'
   New-Item -ItemType Directory -Path "$appdir\AppData\Local" -Force | Out-Null
   $env:USERPROFILE = $appdir
