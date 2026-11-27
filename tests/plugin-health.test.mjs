@@ -221,3 +221,11 @@ test('#495: the probe skips the config node_modules and wrappers the config does
   assert.ok(copied.some((c) => /npm[\\/]@tarquinen[\\/]opencode-dcp@3\.2\.0[\\/]1$/.test(c)), copied.join('\n'));
   assert.ok(!copied.some((c) => /opencode-dcp@latest/.test(c)));
 });
+
+test('#495: a half-written newest <id> (no node_modules) does not hide the finished one', async () => {
+  const { dcpRow } = await import('../scripts/lib/plugin-health.mjs');
+  const h = home({ server: [`${DCP}@3.2.0`], tui: [`${DCP}@3.2.0`] });
+  npmLayout(h, '3.2.0', 5, '3.2.0');
+  fs.mkdirSync(path.join(h, '.cache', 'opencode', 'npm', DCP.split('/')[0], 'opencode-dcp@3.2.0', '9'), { recursive: true });
+  assert.equal(dcpRow(h).status, 'ok');
+});

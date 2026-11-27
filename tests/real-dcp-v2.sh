@@ -98,7 +98,7 @@ case "$commands" in
 esac
 
 # #495: doctor's DCP row must find the copy this OpenCode just cached (2.2.7: <cache>/npm/<pkg>@<spec>/<id>/node_modules).
-dcp_row="$(cd "$repo" && node --input-type=module -e "import('./scripts/lib/plugin-health.mjs').then((m) => { const r = m.dcpRow(process.argv[1]); console.log(r.status + ' ' + r.detail); })" "$HOME")"
+dcp_row="$(cd "$repo" && node --input-type=module -e "import('./scripts/lib/plugin-health.mjs').then((m) => { const r = m.dcpRow(process.argv[1]); console.log(r.status + ' ' + r.detail); })" "$HOME")" || dcp_row="crashed: the dcpRow call failed"
 want="${dcp_spec##*@}"
 case "$dcp_row" in
   "ok "*"resolved: $want ;"*) ok "doctor DCP row: $dcp_row" ;;

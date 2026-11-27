@@ -81,7 +81,9 @@ function wrapperDirs(root, name, fsx) {
       for (const e of ls(dir).filter((n) => n.startsWith(prefix))) {
         const spec = e.slice(prefix.length);
         if (layout === 'packages') { out.push({ dir: path.join(dir, e), spec }); continue; }
-        const id = ls(path.join(dir, e)).sort((a, b) => Number(b) - Number(a) || b.localeCompare(a))[0];
+        // Newest finished install: numeric (timestamp) ids first, highest first; one without node_modules is half-written.
+        const num = (x) => (/^\d+$/.test(x) ? Number(x) : -1);
+        const id = ls(path.join(dir, e)).filter((x) => ls(path.join(dir, e, x)).includes('node_modules')).sort((a, b) => num(b) - num(a) || b.localeCompare(a))[0];
         if (id) out.push({ dir: path.join(dir, e, id), spec });
       }
     }
@@ -199,7 +201,9 @@ export async function probePlugins(home, { bin = 'opencode', fsx = fs, spawnFn =
       const specs = readSpecs(home, fsx);
       for (const n of wanted) {
         const want = new Set(specs.filter((e) => e.name === n).map((e) => e.version || 'latest'));
-        for (const { dir } of wrapperDirs(root, n, fsx).filter((w) => want.has(w.spec))) fsx.cpSync(dir, path.join(xdg.XDG_CACHE_HOME, 'opencode', path.relative(root, dir)), { recursive: true, filter });
+        const all = wrapperDirs(root, n, fsx);
+        const pick = all.some((w) => want.has(w.spec)) ? all.filter((w) => want.has(w.spec)) : all; // none for the spec: copy what is there, or the probe would need the network
+        for (const { dir } of pick) fsx.cpSync(dir, path.join(xdg.XDG_CACHE_HOME, 'opencode', path.relative(root, dir)), { recursive: true, filter });
       }
     } catch (e) {
       return [{ id: 'probe-failed', plugin: '', line: `could not copy the config or plugin cache for the probe (${e.code ?? e.message}), so the command check was skipped`, fix: 'check for broken symlinks or a very large node_modules in the OpenCode cache; then run --doctor --probe-plugins again' }];
