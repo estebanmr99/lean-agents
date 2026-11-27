@@ -21,8 +21,9 @@ const readJson = (file) => {
 const normal = (v) => String(v ?? '').replace(/^v/, '');
 
 // The skill asks `Update these N tools?`, but a model may name the rows ("Update these 2 skill installs?"). Accept
-// those words on one line; a second question, or anything else, still fails.
-const CONSENT = /^Update these \d+ [^?\n]{1,80}\?$/i;
+// words and hyphens on one line plus one optional parenthetical ("(plus the config fixes above)"); a second
+// question, punctuation, or anything else still fails.
+const CONSENT = /^Update these \d+ [A-Za-z][A-Za-z -]{0,39}(?: \([^?()\n]{1,80}\))?\?$/i;
 
 export function assistantText(transcript) {
   if (!transcript) return '';
@@ -130,7 +131,7 @@ export function unansweredQuestion(transcript) {
     const last = lines[lines.length - 1];
     if (last && /\?\s*$/.test(last)) return last;
   }
-  const asked = assistant.match(/(?:^|\n)\s*(?:Update these \d+ [^?\n]{1,80}\?|Draft a redacted issue for lean-agents\?)\s*(?:\n|$)/i);
+  const asked = assistant.match(/(?:^|\n)\s*(?:Update these \d+ [A-Za-z][A-Za-z -]{0,39}(?: \([^?()\n]{1,80}\))?\?|Draft a redacted issue for lean-agents\?)\s*(?:\n|$)/i);
   return asked ? asked[0].trim() : null;
 }
 

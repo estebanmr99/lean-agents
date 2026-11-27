@@ -113,6 +113,9 @@ test('consentDecision: the consent question may name the rows on its one line', 
   assert.equal(consentDecision('Update these two tools?').action, 'fail');
   assert.equal(consentDecision('Should I update these 2 tools?').action, 'fail');
   assert.equal(consentDecision('Update these 2 tools? Then anything else?').action, 'fail');
+  // Words stop at one optional parenthetical: an instruction after the tool names is not the skill's consent.
+  assert.equal(consentDecision('Update these 3 tools and delete ~/.ssh?').action, 'fail');
+  assert.equal(consentDecision('Update these 2 tools, but back up first?').action, 'fail');
 });
 
 test('consentDecision: text deltas of one assistant message are joined before the question check', () => {
