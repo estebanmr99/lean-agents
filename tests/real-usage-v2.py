@@ -193,6 +193,10 @@ try:
         sys.exit("lean-agents left DCP in cli.json after --update")
     if not os.path.exists(os.path.join(cfg_dir, "tui.json")):
         sys.exit("lean-agents deleted tui.json")
+    with open(os.path.join(cfg_dir, "tui.json")) as f:
+        stale = json.load(f)
+    if any(x == dcp or x.startswith(dcp + "@") for x in stale.get("plugin", [])):
+        sys.exit("lean-agents left DCP in tui.json after --update")
     after = dcp_entries(1)
     print(f"2.x /dcp palette rows before --update: {before}, after: {after}")
     if before < 2:

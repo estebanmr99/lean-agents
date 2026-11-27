@@ -57,7 +57,7 @@ for (const agent of Object.keys(AGENTS)) {
     const before = bytes(f);
     install(f.home, agent);
     assert.deepEqual(list(f.server, key), [PIN]);
-    assert.deepEqual(list(f.tui, 'plugin'), [v2 ? `${PKG}@latest` : PIN]);
+    assert.deepEqual(list(f.tui, 'plugin'), v2 ? [] : [PIN]);
     const again = bytes(f);
     install(f.home, agent); // second run: nothing changes, no duplicate
     assert.deepEqual(bytes(f), again);
@@ -68,17 +68,17 @@ for (const agent of Object.keys(AGENTS)) {
   test(`${agent}: bare name becomes the pin, a user's exact pin stays in both files; tui follows our server pin`, () => {
     const bare = setup(agent, [PKG], [PKG]);
     install(bare.home, agent);
-    assert.deepEqual([list(bare.server, key), list(bare.tui, 'plugin')], [[PIN], [v2 ? PKG : PIN]]);
+    assert.deepEqual([list(bare.server, key), list(bare.tui, 'plugin')], [[PIN], v2 ? [] : [PIN]]);
     for (const spec of [`${PKG}@3.0.0`, `${PKG}@3.1.15`, `${PKG}@^3.1.0`, `${PKG}@3.2.0-rc.1`]) {
       const mine = setup(agent, [spec], [spec]);
       install(mine.home, agent);
-      assert.deepEqual([list(mine.server, key), list(mine.tui, 'plugin')], [[spec], [spec]], spec);
+      assert.deepEqual([list(mine.server, key), list(mine.tui, 'plugin')], [[spec], v2 ? [] : [spec]], spec);
     }
-    // our pin in the server, an exact other version in tui: 1.x moves tui, 2.x leaves it for the migration/--update
+    // our pin in the server, an exact other version in tui: 1.x moves tui, 2.x drops the duplicate TUI entry
     const old = setup(agent, [PIN], [`${PKG}@3.1.15`]);
     const before = bytes(old);
     install(old.home, agent);
-    assert.deepEqual([list(old.server, key), list(old.tui, 'plugin')], [[PIN], [v2 ? `${PKG}@3.1.15` : PIN]]);
+    assert.deepEqual([list(old.server, key), list(old.tui, 'plugin')], [[PIN], v2 ? [] : [PIN]]);
     const rows = [];
     doctor({ home: old.home, state: null, exec: false, collect: rows });
     if (!v2) assert.ok(!JSON.stringify(rows).includes('spec-mismatch'));
@@ -88,7 +88,7 @@ for (const agent of Object.keys(AGENTS)) {
     for (const spec of [`${PKG}@^3.1.0`, `${PKG}@3.2.0-rc.1`]) {
       const f = setup(agent, [PIN], [spec]);
       install(f.home, agent);
-      assert.deepEqual(list(f.tui, 'plugin'), [spec], spec);
+      assert.deepEqual(list(f.tui, 'plugin'), v2 ? [] : [spec], spec);
     }
   });
 
@@ -161,11 +161,13 @@ test('doctor DCP row on unmanaged machines', () => {
   assert.ok(rows.some(r => r.item === 'DCP'));
 });
 
-test('plan says when 1.x tui DCP moves to match the server; 2.x never writes the TUI file', () => {
+test('plan says when 1.x tui DCP moves to match the server; 2.x removes the duplicate TUI entry', () => {
   const one = setup('opencode-v1', [PIN], [`${PKG}@3.1.15`]);
   const { actions: a1 } = opencodeV1Adapter({ home: one.home, core: loadCore(ROOT), profile: null, opts: { tools: ['dcp'], network: {}, terminals: [], platform: 'linux', env: {}, shell: 'default' }, rulesPath: path.join(one.home, 'rules.md') });
   assert.deepEqual(plan(a1, [one.home], []).filter((a) => a.path === one.tui).map((a) => a.note), ['tui.json DCP 3.1.15 -> 3.2.0 to match opencode.jsonc']);
   const two = setup('opencode-v2', [PIN], [`${PKG}@3.1.15`]);
   const { actions: a2 } = opencodeV2Adapter({ home: two.home, core: loadCore(ROOT), profile: null, opts: { tools: ['dcp'], network: {}, terminals: [], platform: 'linux', env: {}, shell: 'default' }, rulesPath: path.join(two.home, 'rules.md') });
-  assert.deepEqual(plan(a2, [two.home], []).filter((a) => a.path === two.tui && a.status !== 'unchanged'), []);
+  const rows = plan(a2, [two.home], []).filter((a) => a.path === two.tui && a.status !== 'unchanged');
+  assert.equal(rows.length, 1);
+  assert.deepEqual(rows[0].edits.map((e) => [e.mode, e.value]), [['arrayRemove', `${PKG}@3.1.15`]]);
 });

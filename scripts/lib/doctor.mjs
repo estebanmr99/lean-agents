@@ -364,9 +364,11 @@ function openCodeTuiRows({ home, state, platform = process.platform, fsx = fs },
     const dcp = '@tarquinen/opencode-dcp';
     const spec = (v) => typeof v === 'string' && (v === dcp || v.startsWith(`${dcp}@`));
     const server = read(configPath(dir));
-    const tui = read(cli);
-    if ((server?.plugins ?? server?.plugin ?? []).some(spec) && (tui?.plugins ?? []).some(spec)) {
-      add('DCP /dcp duplicate', 'changed', 'DCP is listed in opencode.jsonc and cli.json, so the TUI lists /dcp twice; opencode.jsonc already loads its TUI part. Fix: run lean-agents --update (it removes the cli.json entry, backed up)');
+    const tuiFiles = [['cli.json', read(cli)], ['tui.json', read(path.join(dir, 'tui.json'))], ['tui.jsonc', read(path.join(dir, 'tui.jsonc'))]]
+      .filter(([, cfg]) => (cfg?.plugins ?? cfg?.plugin ?? []).some(spec))
+      .map(([name]) => name);
+    if ((server?.plugins ?? server?.plugin ?? []).some(spec) && tuiFiles.length) {
+      add('DCP /dcp duplicate', 'changed', `DCP is listed in opencode.jsonc and ${tuiFiles.join(' and ')}, so the TUI lists /dcp twice; opencode.jsonc already loads its TUI part. Fix: run lean-agents --update (it removes the duplicate TUI entries, backed up)`);
     }
   }
   const seen = new Set();

@@ -141,24 +141,25 @@ export function copilotMeterEntries(dir, { fsx = fs, home } = {}) {
 // DCP TUI entry (shared by 1.x and 2.x). 1.x: tui.json(c), only for a file that already exists and already lists DCP. tui follows the server
 // config (#479): when the server ends up with our pin (none yet, the pin, a bare name or `@latest`), an exact other version in
 // tui moves to it too; a server pin the user chose leaves tui alone. Ranges and pre-releases are never moved.
-// 2.x: opencode.json(c) already loads DCP's TUI part, so no TUI entry is added and one the migration copied into cli.json
-// is dropped (#558, opencode.ai/docs/cli/plugins, 2026-11-27).
+// 2.x: opencode.json(c) already loads DCP's TUI part, so no TUI entry is added and every TUI entry (cli.json, and the
+// stale tui.json(c) the client's migration copies) is dropped (#558, opencode.ai/docs/cli/plugins, 2026-11-27).
 export function dcpTuiActions(dir, { v2 = false, fsx = fs } = {}) {
   const pkg = PINS['opencode-dcp'].source;
   const pin = npmSpec('opencode-dcp');
   const actions = [];
   if (v2) {
-    // The server entry already loads DCP's TUI part (opencode.ai/docs/cli/plugins, 2026-11-27), so no config is added
-    // before cli.json exists, and an entry the 1.x->2.x migration copied there is dropped.
-    if (!fsx.existsSync(path.join(dir, 'cli.json')) || !serverDcpSpecs(dir).length) return actions;
-    try {
-      const plugins = parse(fsx.readFileSync(path.join(dir, 'cli.json'), 'utf8'))?.plugins;
+    // The server entry already loads DCP's TUI part (opencode.ai/docs/cli/plugins, 2026-11-27), so no entry is added and
+    // every TUI entry is dropped: cli.json, and tui.json(c), because the client's migration copies that file on start.
+    if (!serverDcpSpecs(dir).length) return actions;
+    for (const [file, key] of [['cli.json', 'plugins'], ['tui.json', 'plugin'], ['tui.jsonc', 'plugin']]) {
+      const p = path.join(dir, file);
+      if (!fsx.existsSync(p)) continue;
+      let plugins;
+      try { plugins = parse(fsx.readFileSync(p, 'utf8'))?.[key]; } catch { continue; }
       const mine = (Array.isArray(plugins) ? plugins : []).filter((x) => typeof x === 'string' && (x === pkg || x.startsWith(`${pkg}@`)));
       if (mine.length) {
-        actions.push({ kind: 'json', path: path.join(dir, 'cli.json'), edits: mine.map((value) => ({ path: ['plugins'], value, mode: 'arrayRemove', label: 'DCP', why: 'opencode.jsonc already loads its TUI part' })) });
+        actions.push({ kind: 'json', path: p, edits: mine.map((value) => ({ path: [key], value, mode: 'arrayRemove', label: 'DCP', why: 'opencode.jsonc already loads its TUI part' })) });
       }
-    } catch (e) {
-      // unreadable file: leave it alone
     }
     return actions;
   }

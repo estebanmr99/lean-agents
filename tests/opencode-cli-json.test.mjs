@@ -43,12 +43,13 @@ const install = (home, tools = ['dcp'], prior = []) => {
 };
 const list = (f, key) => parse(fs.readFileSync(f, 'utf8'))[key];
 
-test('2.x with cli.json: the DCP TUI entry is removed, other TUI plugins and tui.json stay, undo puts it back', () => {
+test('2.x with cli.json: DCP is removed from cli.json and the stale tui.json, other TUI plugins stay, undo restores both', () => {
   const f = setup({ cli: ['some-tui-plugin', `${PKG}@3.1.15`], tui: [`${PKG}@3.1.15`] });
   const tuiBytes = fs.readFileSync(f.tui, 'utf8');
   const one = install(f.home);
   assert.deepEqual(list(f.cli, 'plugins'), ['some-tui-plugin']);
-  assert.equal(fs.readFileSync(f.tui, 'utf8'), tuiBytes, 'stale tui.json is never edited on 2.x once cli.json exists');
+  assert.deepEqual(list(f.tui, 'plugin'), [], 'the migration would copy a TUI entry again');
+  assert.ok(fs.existsSync(f.tui), 'stale tui.json file itself is never deleted');
   const two = [...one, ...install(f.home, ['dcp'], one)];
   assert.deepEqual(list(f.cli, 'plugins'), ['some-tui-plugin'], 'a rerun adds nothing');
   undo(two, [f.home]);
@@ -56,17 +57,22 @@ test('2.x with cli.json: the DCP TUI entry is removed, other TUI plugins and tui
   assert.equal(fs.readFileSync(f.tui, 'utf8'), tuiBytes);
 });
 
-test('2.x without cli.json: no DCP entry is added to the old tui.json; the migration/--update drops a copied one', () => {
+test('2.x without cli.json: a DCP entry in the old tui.json is removed, so the migration cannot copy a duplicate', () => {
   const f = setup({ tui: [`${PKG}@latest`] });
   install(f.home);
-  assert.deepEqual(list(f.tui, 'plugin'), [`${PKG}@latest`]);
-  assert.ok(!fs.existsSync(f.cli));
+  assert.deepEqual(list(f.tui, 'plugin'), []);
+  assert.ok(fs.existsSync(f.tui), 'tui.json itself stays');
+  // No server entry: cli/tui may be the only copy, so it stays.
+  const own = setup({ server: [], tui: [PIN] });
+  install(own.home);
+  assert.deepEqual(list(own.tui, 'plugin'), [PIN]);
 });
 
-test('a normal --update repair (DCP not in the saved tools) drops the cli.json entry when opencode.jsonc has DCP', () => {
+test('a normal --update repair (DCP not in the saved tools) drops the cli.json and tui.json entries when opencode.jsonc has DCP', () => {
   const f = setup({ cli: [PIN], tui: [PIN] });
   install(f.home, ['serena']);
   assert.deepEqual(list(f.cli, 'plugins'), []);
+  assert.deepEqual(list(f.tui, 'plugin'), []);
   // No server entry: the cli.json entry may be the only copy, so it stays.
   const own = setup({ cli: [PIN], server: [] });
   install(own.home, ['serena']);
@@ -128,7 +134,7 @@ test('doctor: DCP in opencode.jsonc and cli.json is one duplicate /dcp warning',
   doctor({ home: f.home, state: null, exec: false, collect: rows });
   const row = rows.find((r) => r.item === 'DCP /dcp duplicate');
   assert.equal(row.status, 'changed');
-  assert.match(row.detail, /listed in opencode\.jsonc and cli\.json/);
+  assert.match(row.detail, /listed in opencode\.jsonc and cli\.json and tui\.json/);
   assert.match(row.detail, /lean-agents --update/);
 });
 
