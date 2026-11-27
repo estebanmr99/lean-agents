@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sha } from './fsops.mjs';
+import { sha, homeRel } from './fsops.mjs';
 import { PINS, npmSpec, behindPins, nodeRange, rtkPin, rtkTooOld } from './pins.mjs';
 import { version, quiet, findAgy, antigravityFootprint, wingetAnswer } from './system.mjs';
 import { redactText } from './redact.mjs';
@@ -81,7 +81,7 @@ export function ownSkills(state) {
 // Which Node runs each registered MCP command of a pinned tool, and skills that two folders of one agent both hold.
 // Read-only, and it also covers machines lean-agents did not set up (#104 points 4-5, #132).
 function checkInventory({ home, exec, run, env, platform, fsx, state }, add) {
-  const rel = (p) => (p && p.startsWith(home) ? `~${p.slice(home.length)}` : p);
+  const rel = (p) => homeRel(p, home, platform);
   const nodes = mcpLaunches(home, { env, platform, fsx }).map((m) => {
     let nodeVersion = m.launch.nodeVersion;
     // Only with exec: a symlink or PATH Node has no version in its path, so ask it.
@@ -141,7 +141,8 @@ export function projectNode({ cwd, home, nodeVersion, fsx = fs }) {
       let range;
       try { range = JSON.parse(fsx.readFileSync(pkg, 'utf8')).engines?.node; } catch { return null; }
       if (typeof range !== 'string' || !range.trim()) return null;
-      const rel = pkg.startsWith(home) ? `~${pkg.slice(home.length).replaceAll('\\', '/')}` : pkg;
+      const short = homeRel(pkg, home);
+      const rel = short === pkg ? pkg : short.replaceAll('\\', '/');
       const gui = '; VS Code or Cursor started outside this shell can resolve another Node';
       // shortcut: only an exact version and >=a.b.c are checked; ^, ~, x and || ranges get a note, add a parser when a real project needs one.
       let fits;
@@ -202,7 +203,7 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
     }
     const latest = [...new Map(state.files.map((f) => [f.path, f])).values()];
     for (const f of latest) {
-      const rel = f.path.startsWith(home) ? `~${f.path.slice(home.length)}` : f.path;
+      const rel = homeRel(f.path, home, platform);
       if (!fs.existsSync(f.path)) { add(rel, 'error', 'missing. Fix: run lean-agents again to restore it'); continue; }
       const same = sha(fs.readFileSync(f.path, 'utf8')) === f.hash;
       add(rel, same ? 'ok' : 'changed', same ? '' : 'edited since install (fine if on purpose)');
