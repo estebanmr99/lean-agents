@@ -280,7 +280,8 @@ export function plan(actions, roots = [], prior = []) {
       applied = r.applied;
       keptKeys = r.kept.map((k) => k.path.join('.'));
       const moved = r.applied.filter((e) => e.mode === 'arrayAdd' && /@\d+\.\d+\.\d+$/.test(e.replaced ?? '')).map((e) => `${path.basename(a.path)} ${e.label ?? 'pin'} ${e.replaced.replace(/^.*@/, '')} -> ${e.value.replace(/^.*@/, '')}${e.why ? ` ${e.why}` : ''}`);
-      if (moved.length) note = [a.note, moved.join('; ')].filter(Boolean).join('; ');
+      const refMoves = r.applied.filter((e) => e.mode === 'set' && e.marketplace).map((e) => `${e.marketplace} marketplace ref ${e.previous ?? '(none)'} -> ${e.value} (settings.json entry moved, plugin data kept)`);
+      if (moved.length || refMoves.length) note = [a.note, ...moved, ...refMoves].filter(Boolean).join('; ');
       if (r.kept.length) note = [a.note, `kept your values for: ${r.kept.map((k) => k.path.join('.')).join(', ')}`].filter(Boolean).join('; ');
     } else if (a.kind === 'block') {
       after = setBlock(before, a.body, a.toml, a.id);

@@ -13,8 +13,56 @@ unset XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
 opencode --version
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 
-bash "$repo/install.sh" --yes --no-exec --agents opencode-v2 \
+# #548: show which lean-agents command starts the OpenCode 2 service, and fail if its own run leaves one behind.
+# Match the executable name only (the engine does the same: `ps -A -o comm=`, basename), so this script's own
+# `bash tests/real-opencode.sh` command line never matches. The second `ps` prints the evidence for the log.
+opencode_pids() {
+  ps -A -o pid=,comm= | awk '{
+    name = $0;
+    sub(/^[ \t]*[0-9]+[ \t]+/, "", name);
+    sub(/^.*[\\\/]/, "", name);
+    sub(/[ \t]+$/, "", name);
+    if (name == "opencode" || name == "opencode.exe") { printf "%s%s", (pids ? "," : ""), $1; pids = pids $1 }
+  }'
+}
+opencode_processes() {
+  local pids
+  pids="$(opencode_pids)"
+  [ -n "$pids" ] || return 1
+  ps -o pid,lstart,command -p "$pids"
+}
+# PIDs that appeared during the run; one that was already there belongs to the user or the test setup.
+new_pids() {
+  awk -v before=",$1," -v after="$2" 'BEGIN {
+    n = split(after, a, ",");
+    for (i = 1; i <= n; i++) if (a[i] != "" && index(before, "," a[i] ",") == 0) { printf "%s%s", (out ? "," : ""), a[i]; out = 1 }
+  }'
+}
+lean_run() {
+  local before after new rc=0
+  before="$(opencode_pids)"
+  echo "== $(date -u +%T) before: lean-agents $*"
+  opencode_processes || true
+  bash "$repo/install.sh" "$@" || rc=$?
+  after="$(opencode_pids)"
+  echo "== $(date -u +%T) after: lean-agents $*"
+  opencode_processes || true
+  new="$(new_pids "$before" "$after")"
+  if [ -n "$new" ]; then
+    echo "FAIL  an opencode process is left after: lean-agents $*" >&2
+    ps -o pid,lstart,command -p "$new" >&2 || true
+    exit 1
+  fi
+  return "$rc"
+}
+
+# The version probe above may start the service; clear it so every lean-agents run starts from none.
+opencode service stop >/dev/null 2>&1 || true
+
+lean_run --yes --no-exec --agents opencode-v2 \
   --tools serena,playwright,playwright-extension,ponytail,rtk --privacy strict --profile anthropic-api
+# A real --update with one already-installed tool: it runs the adapter and the end-of-run doctor, and must stop the service.
+lean_run --update --yes --tools rtk
 
 # Proves the file name the migration guide gives for the old tui.json.
 LC_ALL=C grep -aq 'opencode/cli.json' "$(command -v opencode)"
@@ -108,7 +156,7 @@ JS
 HOME="$(mktemp -d)"
 export HOME
 export XDG_CONFIG_HOME="$HOME/.config"
-bash "$repo/install.sh" --yes --no-exec --agents opencode-v2 --tools copilot-usage --network on --lang en --profile anthropic-api
+lean_run --yes --no-exec --agents opencode-v2 --tools copilot-usage --network on --lang en --profile anthropic-api
 node --input-type=module - "$HOME/.config/opencode" <<'JS'
 import fs from 'node:fs';
 import path from 'node:path';

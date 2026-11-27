@@ -189,7 +189,7 @@ Every flag from `--help`. In PowerShell the same flags are PascalCase (`-DryRun`
 
 | Flag | What it does |
 | --- | --- |
-| `--dry-run` | Show every file change and command; change nothing. Without a terminal it uses saved choices or defaults and never asks |
+| `--dry-run` | Show every file change and command; change nothing. Without a terminal it uses saved choices or defaults and never asks; a non-interactive dry run ends with the reminder to add `--yes` |
 | `--yes` | Accept defaults without asking |
 | `--agents a,b` | Agents to set up: claude, opencode-v1, opencode-v2, copilot-cli, antigravity, vscode-copilot, cursor (default: the ones installed) |
 | `--tools a,b` | Optional tools on top of RTK and Context Mode: serena, playwright, ponytail, caveman, i-have-adhd, dcp, codeburn, copilot-usage, gsd, autoskills, playwright-extension, coordinate, lean-migrate, code-mode |
