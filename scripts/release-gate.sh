@@ -17,6 +17,19 @@ if [ "$pin" != "v$version" ]; then
   echo "::error::core/pins.json lean-update pin is $pin; the release must ship its own skill (set it to v$version)" >&2
   exit 1
 fi
+# Compare against the highest v* tag that is not this release (not HEAD^: a release PR can hold several commits) (#590).
+prev="$(git tag --list 'v*' --sort=-v:refname 2>/dev/null | grep -vx "v$version" | head -n 1 || true)"
+if [ -n "$prev" ] && old="$(git show "$prev:core/pins.json" 2>/dev/null)"; then
+  OLD_PINS="$old" node --input-type=module - "$(cd "$(dirname "$0")/.." && pwd)" <<'NODE' || exit 1
+import fs from 'node:fs';
+const root = process.argv[2];
+const { pinDowngrades } = await import(`${root}/scripts/lib/pin-downgrades.mjs`);
+const { errors, notices } = pinDowngrades(JSON.parse(process.env.OLD_PINS).pins, JSON.parse(fs.readFileSync(`${root}/core/pins.json`, 'utf8')).pins);
+for (const n of notices) console.log(n);
+for (const e of errors) console.error(e);
+process.exit(errors.length ? 1 : 0);
+NODE
+fi
 [ "$pins_only" = true ] && exit 0
 sha="${2:-$(git rev-parse HEAD)}"
 # gh matches only the full SHA; resolve a short one when the commit is present locally.

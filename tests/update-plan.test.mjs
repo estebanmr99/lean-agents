@@ -231,3 +231,8 @@ test('#488: --update refuses before any command while opencode runs; --dry-run s
   const ran = fs.existsSync(mark) ? fs.readFileSync(mark, 'utf8').split('\n').filter((l) => l && !l.endsWith(' --version')) : [];
   assert.deepEqual(ran, [], 'only version probes ran');
 });
+
+// #590: an installed app newer than the pin is never an update row (guard: compareAppVersions(have, pinned) >= 0 in appUpdateRows).
+test('appUpdateRows: installed newer than the pin gives no row, for Orca and Warp', () => {
+  assert.deepEqual(appUpdateRows({ pins, platform: 'win32', installed: { orca: '1.4.290', warp: '0.2026.12.01.08.17.stable_01' }, managed: ['orca', 'warp'] }), []);
+});
