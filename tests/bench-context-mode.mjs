@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { quiet } from '../scripts/lib/system.mjs';
 
 const [label, out, baseline] = process.argv.slice(2);
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'bench');
@@ -15,7 +16,7 @@ const RUNS = 10;
 // Minimal MCP client: newline-delimited JSON-RPC 2.0 over the server's stdin and stdout.
 // The v2 `context-mode` bin is a CLI that exits 0, so start the server file of the global package.
 // CTX_SERVER=<start.mjs> starts the plugin entry instead (tests/real-bun.sh, Linux re-exec check).
-const globalRoot = process.env.CTX_SERVER ? '' : spawnSync('npm', ['root', '-g'], { encoding: 'utf8', shell: process.platform === 'win32' }).stdout.trim();
+const globalRoot = process.env.CTX_SERVER ? '' : quiet(['npm', 'root', '-g']).out.trim();
 const server = spawn(process.execPath, [process.env.CTX_SERVER ?? path.join(globalRoot, 'context-mode', 'server.mjs'), '--agent', 'claude-code'], { stdio: ['pipe', 'pipe', 'pipe'] });
 let stderr = '';
 server.stderr.on('data', (d) => { stderr += d; });

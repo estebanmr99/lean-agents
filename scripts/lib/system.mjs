@@ -9,13 +9,30 @@ import { allowedEnv } from './network.mjs';
 
 const isWin = process.platform === 'win32';
 
-export function which(bin) {
-  const r = spawnSync(isWin ? 'where' : 'command', isWin ? [bin] : ['-v', bin], { shell: !isWin, encoding: 'utf8' });
-  return r.status === 0 ? r.stdout.trim().split(/\r?\n/)[0] : null;
-}
+// Every match, in PATH order. POSIX: `command -v` gets the name as "$1", never spliced into the script (#475); /bin/sh as shell: true used.
+const whereAll = (bin, env) => {
+  const r = isWin ? spawnSync('where', [bin], { encoding: 'utf8', ...(env && { env }) }) : spawnSync('/bin/sh', ['-c', 'command -v "$1"', 'sh', bin], { encoding: 'utf8' });
+  return r.status === 0 ? r.stdout.trim().split(/\r?\n/).filter(Boolean) : [];
+};
+export const which = (bin) => whereAll(bin)[0] ?? null;
 
-// Windows .cmd shims (npm, npx) need a shell; real .exe files must not get one, or paths with spaces split.
-const useShell = (bin) => isWin && !/\.exe$/i.test(bin) && !/\.exe$/i.test(which(bin) ?? '');
+// Windows .cmd shims (npm, npx) run through cmd.exe /d /s /c with each argument quoted and every cmd metacharacter ^-escaped,
+// the way cross-spawn (MIT) does it, so cmd never sees an open quote and `&`, `%` or `|` stay literal. Node 24 deprecates
+// args with `shell: true` because it only concatenates them (DEP0190, #475). A batch file re-parses its %*,
+// so every argument is escaped twice: once for this cmd.exe line, once for the shim's own line.
+const META = /([()\][%!^"`<>&|;, *?])/g;
+const cmdArg = (a) => `"${String(a).replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, '$1$1')}"`.replace(META, '^$1').replace(META, '^$1');
+export function spawnArgs(bin, args, platform = process.platform, resolve = whereAll) {
+  const direct = { file: bin, args, opts: {} };
+  if (platform !== 'win32' || /\.exe$/i.test(bin)) return direct;
+  const full = /\.(cmd|bat)$/i.test(bin) && path.win32.isAbsolute(bin) ? bin : resolve(bin).find((f) => /\.(exe|cmd|bat)$/i.test(f));
+  if (!full || /\.exe$/i.test(full)) return direct;
+  // The file in plain quotes (a Windows path cannot hold `"`): a ^-escaped path breaks the shim's own %~dp0.
+  const line = [`"${full}"`, ...args.map(cmdArg)].join(' ');
+  return { file: process.env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', `"${line}"`], opts: { windowsVerbatimArguments: true } };
+}
+// The shim is looked up on the child's PATH, as cmd.exe did when `shell: true` ran it.
+export const spawnFor = (argv, opts = {}) => { const s = spawnArgs(argv[0], argv.slice(1), process.platform, (b) => whereAll(b, opts.env)); return spawnSync(s.file, s.args, { ...opts, ...s.opts }); };
 
 // Windows .cmd/.bat files run through cmd.exe /d /s /c "<quoted file> <args>" (#475): no shell option, and a path with a cmd
 // metacharacter is refused (null) instead of being quoted. Args are fixed words from callers, so they need no quoting.
@@ -34,7 +51,7 @@ export function versionFull(bin, args = ['--version'], env = {}, timeout = 20000
     const inv = cmdInvocation(bin, args);
     if (!inv) return 'unknown';
     r = spawnSync(inv.file, inv.argv, { ...opts, windowsVerbatimArguments: true });
-  } else r = spawnSync(bin, args, { ...opts, shell: useShell(bin) });
+  } else r = spawnFor([bin, ...args], opts);
   const m = `${r.stdout}${r.stderr}`.match(/\d+\.\d+\.\d+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?/);
   return m ? m[0] : 'unknown';
 }
@@ -286,7 +303,7 @@ function runLogged(argv, env, logFile, tail) {
   try {
     const start = fs.fstatSync(fd).size;
     fs.writeSync(fd, `$ ${argv.join(' ')}\n`);
-    const r = spawnSync(argv[0], argv.slice(1), { stdio: ['ignore', fd, fd], shell: useShell(argv[0]), env: { ...allowedEnv(), ...env } });
+    const r = spawnFor(argv, { stdio: ['ignore', fd, fd], env: { ...allowedEnv(), ...env } });
     const size = fs.fstatSync(fd).size;
     const buf = Buffer.alloc(Math.min(size - start, 65536));
     fs.readSync(fd, buf, 0, buf.length, size - buf.length);
@@ -311,8 +328,8 @@ export function run(argv, { dryRun, log, env, json, codes, logFile, tail }) {
   if (dryRun) return true;
   const isSkills = argv.some((a) => /^skills@/.test(a));
   const r = isSkills
-    ? spawnSync(argv[0], argv.slice(1), { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8', shell: useShell(argv[0]), env: { ...allowedEnv(), ...env } })
-    : spawnSync(argv[0], argv.slice(1), { stdio: ['ignore', json ? 2 : 'inherit', json ? 2 : 'inherit'], shell: useShell(argv[0]), env: { ...allowedEnv(), ...env } });
+    ? spawnFor(argv, { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8', env: { ...allowedEnv(), ...env } })
+    : spawnFor(argv, { stdio: ['ignore', json ? 2 : 'inherit', json ? 2 : 'inherit'], env: { ...allowedEnv(), ...env } });
   if (isSkills) {
     (json ? process.stderr : process.stdout).write(r.stdout ?? '');
     process.stderr.write(r.stderr ?? '');
@@ -326,7 +343,7 @@ export function run(argv, { dryRun, log, env, json, codes, logFile, tail }) {
 }
 
 export function quiet(argv, timeout = 30000, env = {}) {
-  const r = spawnSync(argv[0], argv.slice(1), { encoding: 'utf8', shell: useShell(argv[0]), timeout, env: { ...allowedEnv(), ...env } });
+  const r = spawnFor(argv, { encoding: 'utf8', timeout, env: { ...allowedEnv(), ...env } });
   // `failed`: the command did not finish (timeout, signal, not runnable), so a non-zero status says nothing about its answer.
   return { ok: r.status === 0, failed: Boolean(r.error || r.signal), status: r.status, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
 }
