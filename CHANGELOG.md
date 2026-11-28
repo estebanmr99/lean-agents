@@ -7,7 +7,7 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 ## [1.4.0] - 2026-11-28
 
 ### Added
-- `/lean-update` works as a slash command in OpenCode 1.x and 2.x: lean-agents writes `~/.config/opencode/commands/lean-update.md` (owned file, undone by `--uninstall`, a user file with that name is kept); `--doctor` shows one `lean-update command` row per agent (#572)
+- `/lean-update` works as a slash command in OpenCode 1.x and 2.x: lean-agents writes `~/.config/opencode/commands/lean-update.md` (owned file, undone by `--uninstall`, a user file with that name is kept); `--doctor` shows one `lean-update command` row per agent. OpenCode only for now; the other agents are the rest of #572 (#572)
 - `--remove-tools a,b` removes single tools (for example `gsd`) without a full uninstall: plan, confirm, their recorded undo commands and file edits, and they leave the saved tools so `--update` does not bring them back (#573)
 - `--update` inside an OpenCode session applies the steps that do not touch OpenCode and defers the others (and any file under the OpenCode config folder) until you close OpenCode and run `lean-agents --update` in a terminal; `--doctor` shows a `pending` row (#575)
 
