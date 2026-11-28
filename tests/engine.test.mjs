@@ -1041,13 +1041,44 @@ test('gh installs at user scope with brew or winget, only when asked for', () =>
   assert.deepEqual(prereqFor('gh', 'brew').install, [['brew', 'install', 'gh']]);
   assert.deepEqual(prereqFor('gh', 'winget').install[0].slice(0, 6), ['winget', 'install', '--id', 'GitHub.cli', '-e', '--scope']);
   assert.equal(prereqFor('gh', null).install, null);
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-gh-'));
-  const f = path.join(home, '.config', 'lean-agents', 'state.json');
-  lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--no-tools', '--lang', 'en']);
-  assert.equal(JSON.parse(fs.readFileSync(f, 'utf8')).options.gh, false);
-  const out = lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--no-tools', '--lang', 'en', '--gh']);
+  // Pin PATH: a stub dir with or without gh, plus only the system dir `where` needs on Windows (#549).
+  const dir = (home, name, withGh) => {
+    const bin = path.join(home, name);
+    fs.mkdirSync(bin);
+    fs.writeFileSync(path.join(bin, 'brew'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    fs.writeFileSync(path.join(bin, 'winget.cmd'), '@exit /b 0\r\n');
+    if (withGh) {
+      fs.writeFileSync(path.join(bin, 'gh'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+      fs.writeFileSync(path.join(bin, 'gh.cmd'), '@exit /b 0\r\n');
+    }
+    if (process.platform !== 'win32') return { PATH: bin, NVM_DIR: path.join(home, '.nvm'), HOME: home };
+    // `where` matches winget.cmd only through PATHEXT, and needs SystemRoot to start.
+    const { SystemRoot, PATHEXT } = process.env;
+    return { PATH: `${bin}${path.delimiter}${path.join(SystemRoot, 'System32')}`, NVM_DIR: path.join(home, '.nvm'), HOME: home, SystemRoot, PATHEXT };
+  };
+  const install = prereqFor('gh', process.platform === 'win32' ? 'winget' : 'brew').install[0];
+  const command = `$ ${install.join(' ')}`;
+  const stateArgs = ['--yes', '--no-exec', '--agents', 'claude', '--no-tools', '--lang', 'en'];
+  const planArgs = ['--yes', '--dry-run', '--agents', 'claude', '--no-tools', '--lang', 'en'];
+
+  const missingHome = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-gh-missing-'));
+  const missingEnv = dir(missingHome, 'bin', false);
+  lean(missingHome, stateArgs, missingEnv);
+  const missingState = path.join(missingHome, '.config', 'lean-agents', 'state.json');
+  assert.equal(JSON.parse(fs.readFileSync(missingState, 'utf8')).options.gh, true);
+  const missing = lean(missingHome, planArgs, missingEnv);
+  assert.ok(missing.includes(command), `plans the missing gh install:\n${missing}`);
+
+  const presentHome = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-gh-present-'));
+  const presentEnv = dir(presentHome, 'bin', true);
+  lean(presentHome, stateArgs, presentEnv);
+  const presentState = path.join(presentHome, '.config', 'lean-agents', 'state.json');
+  assert.equal(JSON.parse(fs.readFileSync(presentState, 'utf8')).options.gh, false);
+  const out = lean(presentHome, [...stateArgs, '--gh'], presentEnv);
   assert.match(out, /gh auth login/);
-  assert.equal(JSON.parse(fs.readFileSync(f, 'utf8')).options.gh, true);
+  assert.equal(JSON.parse(fs.readFileSync(presentState, 'utf8')).options.gh, true);
+  const present = lean(presentHome, [...planArgs, '--gh'], presentEnv);
+  assert.ok(!present.includes(command), `does not reinstall a gh already on PATH:\n${present}`);
 });
 
 test('undocumented settings: asked only when relevant, kept when another agent set them up, never guessed', async () => {
