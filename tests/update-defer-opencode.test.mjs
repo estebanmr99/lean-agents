@@ -23,8 +23,14 @@ function fixture({ ps = PS } = {}) {
   for (const [name, body] of [['ps', ps], ['opencode', OPENCODE], ['npx', NPX], ['git', NPX]]) fs.writeFileSync(path.join(bin, name), body, { mode: 0o755 });
   const home = path.join(dir, 'home');
   fs.mkdirSync(home);
-  const base = { PATH: `${bin}${path.delimiter}${path.dirname(process.execPath)}`, HOME: home };
-  if (process.env.NVM_DIR) base.NVM_DIR = process.env.NVM_DIR;
+  // Synthetic nvm with a Node 24 so the gsd step plans on any machine (CI has no real nvm).
+  const nvm = path.join(home, '.nvm');
+  const n24 = path.join(nvm, 'versions', 'node', 'v24.15.0');
+  fs.mkdirSync(path.join(n24, 'bin'), { recursive: true });
+  fs.mkdirSync(path.join(n24, 'lib', 'node_modules'), { recursive: true });
+  fs.writeFileSync(path.join(nvm, 'nvm.sh'), '');
+  fs.writeFileSync(path.join(n24, 'bin', 'node'), NPX, { mode: 0o755 });
+  const base = { PATH: `${bin}${path.delimiter}${path.dirname(process.execPath)}`, HOME: home, NVM_DIR: nvm };
   const lean = (args, extra = {}) => spawnSync(process.execPath, [LEAN, '--home', home, ...args], { encoding: 'utf8', env: { ...base, ...extra }, input: '' });
   const stateFile = path.join(home, '.config', 'lean-agents', 'state.json');
   return { home, lean, state: () => JSON.parse(fs.readFileSync(stateFile, 'utf8')), stateFile };
