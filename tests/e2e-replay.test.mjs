@@ -157,8 +157,8 @@ test('prescribed question: a run-it ask after the yes is unanswered; the skill a
 });
 
 test('prescribed question: the step-6 summary-page offer is allowed as the last line after the yes', () => {
-  // The skill has no quoted question for this offer, so the test pins the exact sentence it is based on.
-  assert.ok(SKILL.includes('tell the user it exists and offer to open it after they agree'));
+  // The skill prescribes the question word for word (#579); the test pins it.
+  assert.ok(SKILL.includes('`The summary page is at <path>. Want me to open it?`'));
   const result = afterYes('The summary page is at /tmp/x/summary.html. Want me to open it?');
   assert.equal(result.ok, true, result.failures.join('; '));
 });

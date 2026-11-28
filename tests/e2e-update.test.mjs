@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { evaluateUpdate, unansweredQuestion, consentDecision, leanUpdateCalled, shimHasUpdateCall, checkoutUpdateCalled, budgetDecision, questionLines, AFTER_OFFER } from './e2e-update.mjs';
@@ -419,4 +421,66 @@ test('e2e-update workflow: one consent turn, then the evaluator checks every pas
   assert.match(text, /--yes-turns "\$yes_turns"/);
   assert.match(text, /--source "\$SOURCE"/);
   assert.match(text, /--shim-log "\$E2E_RAW\/shim\.log"/);
+});
+
+test('e2e-update evaluator: || after the cd target still counts as the checkout', () => {
+  const releaseDir = path.join('/opt', 'lean-agents');
+  assert.equal(checkoutUpdateCalled(toolEvent('bash', { command: 'cd "$LEAN_AGENTS_RELEASE_DIR" || exit 1; node scripts/lean.mjs --update --yes' }), releaseDir), true);
+  assert.equal(checkoutUpdateCalled(toolEvent('bash', { command: `cd ${releaseDir} || exit 1\nnode scripts/lean.mjs --update --yes` }), releaseDir), true);
+  assert.equal(checkoutUpdateCalled(toolEvent('bash', { command: 'cd "$LEAN_AGENTS_RELEASE_DIR"||exit 1; node scripts/lean.mjs --update --yes' }), releaseDir), true);
+  assert.equal(checkoutUpdateCalled(toolEvent('bash', { command: 'cd /elsewhere || exit 1; node scripts/lean.mjs --update' }), releaseDir), false);
+});
+
+test('e2e-update evaluator: the prescribed step-6 question is the accepted last question after one yes turn', () => {
+  const first = transcript('Here is the plan.\n\nUpdate these 3 tools?');
+  for (const path of ['`~/.config/lean-agents/summary.html`', '`D:\\tools\\summary.html`']) {
+    const r = evaluateUpdate({
+      ...good(),
+      transcript: [skillEvent(), first, transcript(`Done.\n\nThe summary page is at ${path}. Want me to open it?`)].join('\n'),
+      firstTurnTranscript: first,
+      yesTurns: 1,
+    });
+    assert.equal(r.ok, true, r.failures.join('; '));
+  }
+  assert.equal(AFTER_OFFER.test('The summary page is at `/tmp/x/summary.html`. Want me to open it?'), true);
+  assert.equal(AFTER_OFFER.test('The page is at `/tmp/x/other.html`. Want me to open it?'), false);
+});
+
+test('e2e-update skill: step 6 prescribes the exact summary-page question', () => {
+  const skill = fs.readFileSync(path.join(ROOT, 'skills', 'lean-update', 'SKILL.md'), 'utf8');
+  assert.ok(skill.includes('`The summary page is at <path>. Want me to open it?`'));
+});
+
+test('e2e-update redact: generic sk-or keys go, and an empty key fails the step', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'e2e-redact-'));
+  const file = path.join(dir, 'raw.txt');
+  fs.writeFileSync(file, ['known', `sk-or-${'v1-realkey123456'}`, 'other', `sk-or-${'v1-OtherKey_abc-123456'}`, 'short sk-or-x\n'].join(' '));
+  const run = (key) => spawnSync(process.execPath, [path.join(ROOT, 'tests', 'e2e-update.mjs'), 'redact', '--in', file], {
+    encoding: 'utf8',
+    env: { PATH: process.env.PATH, HOME: dir, OPENROUTER_API_KEY: key },
+  });
+  const ok = run('sk-or-v1-realkey123456');
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.equal(ok.stdout, 'known [REDACTED] other sk-or-REDACTED short sk-or-x\n');
+  for (const key of ['', undefined]) {
+    const bad = run(key);
+    assert.notEqual(bad.status, 0);
+    assert.doesNotMatch(bad.stdout, /OtherKey/);
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('e2e-update workflow: the agent steps never carry the key (#579)', () => {
+  const text = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'e2e-update.yml'), 'utf8');
+  const steps = text.split(/\n {6}- name: /).slice(1);
+  const withKey = steps.filter((s) => /^[^\n]*\n(?:.*\n)*?\s+OPENROUTER_API_KEY: \$\{\{ secrets/.test(s)).map((s) => s.split('\n')[0]);
+  const agent = steps.filter((s) => /^\s+(?:timeout 180 )?opencode run --|\bif ! timeout 180 opencode run --/m.test(s)).map((s) => s.split('\n')[0]);
+  assert.ok(agent.length >= 2);
+  const agentSteps = steps.filter((x) => agent.includes(x.split('\n')[0]));
+  for (const name of agent) assert.ok(!withKey.includes(name), `${name} carries the key`);
+  for (const s of agentSteps) {
+    assert.match(s, /\[ -z "\$\{OPENROUTER_API_KEY:-\}" \] \|\| \{ echo "::error::key visible to the agent shell"; exit 1; \}/);
+  }
+  assert.ok(withKey.includes('Start the OpenCode service'));
+  assert.match(text, /accepted risk[^\n]*#523/);
 });
