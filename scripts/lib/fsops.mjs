@@ -387,6 +387,32 @@ function removeEmptyDirs(dirs = []) {
   for (const d of dirs) try { fs.rmdirSync(d); } catch { return; }
 }
 
+// Files an earlier release wrote and this one no longer plans (#593). Removes each recorded owned file (by basename) only while it
+// still carries the mark, drops its record either way, and takes back our `statusLine` edit of a sibling settings.json while the
+// value is still ours. Returns the records to keep and the paths removed.
+export function retireOwned(entries, names) {
+  const gone = entries.filter((e) => e.kind === 'file' && names.includes(path.basename(e.path)));
+  if (!gone.length) return { files: entries, removed: [] };
+  const removed = [];
+  for (const e of gone) {
+    const now = read(e.path);
+    if (now !== null && hasMark(now)) { fs.rmSync(e.path); removed.push(e.path); removeEmptyDirs(e.dirs); }
+  }
+  const dirs = new Set(gone.map((e) => path.dirname(e.path)));
+  const files = entries.filter((e) => !gone.includes(e)).map((e) => {
+    if (e.kind !== 'json' || !dirs.has(path.dirname(e.path)) || !e.applied?.some((a) => a.path.join('.') === 'statusLine')) return e;
+    const now = read(e.path);
+    const mine = e.applied.filter((a) => a.path.join('.') === 'statusLine');
+    const rest = e.applied.filter((a) => !mine.includes(a));
+    if (now === null) return { ...e, applied: rest };
+    const text = revertJsonEdits(now, mine);
+    const untouched = sha(now) === e.hash;
+    if (text !== now) fs.writeFileSync(e.path, text);
+    return { ...e, applied: rest, ...(untouched && { hash: sha(text) }) };
+  });
+  return { files, removed };
+}
+
 // Undo state entries. If the user edited a file after install, remove only our parts.
 export function undo(entries, roots = []) {
   const report = [];
