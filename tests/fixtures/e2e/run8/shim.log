@@ -1,0 +1,4 @@
+npx -y context-mode@2.1.7 server
+npx -y context-mode@2.1.7 server --agent opencode
+npx -y skills@1.8.1 add estebanmr99/lean-agents#v1.2.5 --skill lean-update -a claude-code -g -y
+npx -y skills@1.8.1 add estebanmr99/lean-agents#v1.2.5 --skill lean-update -a opencode -g -y

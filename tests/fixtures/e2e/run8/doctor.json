@@ -1,0 +1,215 @@
+{
+  "ok": true,
+  "behind": [],
+  "nodes": [
+    {
+      "client": "opencode",
+      "name": "context-mode",
+      "file": "~/.config/opencode/opencode.jsonc",
+      "pin": "context-mode",
+      "style": "npx-path",
+      "node": "/opt/hostedtoolcache/node/24.22.3/x64/bin/node",
+      "nodeVersion": null,
+      "range": ">=24.15.0",
+      "status": "note",
+      "hasAgent": true
+    }
+  ],
+  "skills": [
+    {
+      "name": "lean-update",
+      "dirs": [
+        "~/.agents/skills",
+        "~/.claude/skills"
+      ],
+      "differs": false,
+      "unreadable": false,
+      "winner": "unknown (load order)",
+      "agents": [
+        "opencode"
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "item": "Active setup",
+      "status": "ok",
+      "detail": "rules 2196 bytes (~549 tokens), tools on: rtk, context-mode, subagents: 10"
+    },
+    {
+      "item": "lean-agents",
+      "status": "ok",
+      "detail": "v1.2.5, agents: claude, opencode-v2, privacy: standard"
+    },
+    {
+      "item": "node for lean-agents",
+      "status": "ok",
+      "detail": "Node 24.22.3"
+    },
+    {
+      "item": "project Node",
+      "status": "ok",
+      "detail": "Node 24.22.3 fits engines.node >=22.20 in /tmp/x/work/lean-agents/lean-agents/package.json; VS Code or Cursor started outside this shell can resolve another Node"
+    },
+    {
+      "item": "~/.config/lean-agents/AGENTS.md",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "~/.claude/CLAUDE.md",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "~/.claude/agents/debug.md",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "~/.claude/agents/explore.md",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "~/.claude/agents/planner.md",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "~/.claude/agents/research.md",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "~/.claude/agents/review.md",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "~/.claude/settings.json",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "~/.config/opencode/agents/debug.md",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "~/.config/opencode/agents/explore.md",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "~/.config/opencode/agents/planner.md",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "~/.config/opencode/agents/research.md",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "~/.config/opencode/agents/review.md",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "~/.config/opencode/opencode.jsonc",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "~/.config/lean-agents/summary.html",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "pinned versions",
+      "status": "ok",
+      "detail": "16 pins match core/pins.json"
+    },
+    {
+      "item": "install rtk v1.2.0",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "install context-mode",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "RTK hook for Claude Code",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "Context Mode plugin",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "RTK plugin for OpenCode",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "lean-update skill for claude-code",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "lean-update skill for opencode",
+      "status": "ok",
+      "detail": ""
+    },
+    {
+      "item": "node for opencode mcp context-mode",
+      "status": "note",
+      "detail": "context-mode needs Node >=24.15.0; the Node behind this npx-path entry could not be read"
+    },
+    {
+      "item": "duplicate skill lean-update",
+      "status": "ok",
+      "detail": "in ~/.agents/skills and ~/.claude/skills (read by opencode); identical copies that lean-agents installed (the Skills CLI writes one per agent folder)"
+    },
+    {
+      "item": "OpenCode Code Mode",
+      "status": "ok",
+      "detail": "on for 1 MCP servers"
+    },
+    {
+      "item": "network env",
+      "status": "ok",
+      "detail": "HTTP_PROXY=not set"
+    },
+    {
+      "item": "network env",
+      "status": "ok",
+      "detail": "HTTPS_PROXY=not set"
+    },
+    {
+      "item": "network env",
+      "status": "ok",
+      "detail": "NO_PROXY=not set"
+    },
+    {
+      "item": "network env",
+      "status": "ok",
+      "detail": "NODE_EXTRA_CA_CERTS=not set"
+    },
+    {
+      "item": "network env",
+      "status": "ok",
+      "detail": "SSL_CERT_FILE=not set"
+    },
+    {
+      "item": "network env",
+      "status": "ok",
+      "detail": "NODE_USE_SYSTEM_CA=not set"
+    }
+  ]
+}

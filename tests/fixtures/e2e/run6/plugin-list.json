@@ -1,0 +1,22 @@
+[
+  {
+    "id": "context-mode@context-mode",
+    "version": "2.1.4",
+    "scope": "user",
+    "enabled": true,
+    "installPath": "/tmp/x/work/_temp/e2e-home/.claude/plugins/cache/context-mode/context-mode/2.1.4",
+    "installedAt": "2026-11-27T20:13:15.549Z",
+    "lastUpdated": "2026-11-27T20:13:15.549Z",
+    "mcpServers": {
+      "context-mode": {
+        "command": "node",
+        "args": [
+          "${CLAUDE_PLUGIN_ROOT}/server.mjs",
+          "--agent",
+          "claude-code"
+        ]
+      }
+    },
+    "projectEnabled": false
+  }
+]
