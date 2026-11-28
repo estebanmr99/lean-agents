@@ -36,6 +36,10 @@ Run the script with `npx -y lean-agents@<version> <flags>` (the latest release v
    - Show the full draft. Only after a yes: `gh issue create --repo estebanmr99/lean-agents --title "<title>" --body-file <draft>`.
 8. **Report**: old -> new per tool, what you verified (`--doctor --json`), what is left for the user.
 
+## Remove a tool
+
+"remove <tool>" (for example GSD) maps to `--remove-tools <tool>`, not to `--uninstall`. Run `--remove-tools <tool> --dry-run --yes`, show its plan in plain words, and run `--remove-tools <tool> --yes` once the user's request or reply says to remove it. Add no new question. A core tool (`rtk`, `context-mode`) is refused with exit 2: relay that line.
+
 ## Fallback: the script cannot run
 
 Only when Node is missing or the machine blocks the script. Use the table of commands and the install lines in `docs/manual-install.md` (sections 4, 6, 7) by hand, with the same table, the same ask, the same backup and the same read-back. Say that this is the fallback: nothing here is recorded in `state.json`, so `--uninstall` will not know about it.

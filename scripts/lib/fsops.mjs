@@ -376,7 +376,7 @@ export function apply(planned, backupDir, home, roots = [home], entries = []) {
     const dirs = [];
     for (let d = path.dirname(p.path); !fs.existsSync(d); d = path.dirname(d)) dirs.push(d);
     fs.mkdirSync(path.dirname(p.path), { recursive: true });
-    entries.push({ path: p.path, kind: p.kind, created: p.before === null, backup, hash: sha(p.after), applied: p.applied, noRestore: p.applied?.some((e) => e.upgraded), keepEmpty: p.keepEmpty, ...(p.userHash && { userHash: p.userHash, ignore: p.ignore }), ...(p.id && { id: p.id }), ...(dirs.length && { dirs }) });
+    entries.push({ path: p.path, kind: p.kind, created: p.before === null, backup, hash: sha(p.after), applied: p.applied, noRestore: p.applied?.some((e) => e.upgraded), keepEmpty: p.keepEmpty, ...(p.userHash && { userHash: p.userHash, ignore: p.ignore }), ...(p.id && { id: p.id }), ...(p.tool && { tool: p.tool }), ...(dirs.length && { dirs }) });
     fs.writeFileSync(p.path, p.after);
   }
   return entries;

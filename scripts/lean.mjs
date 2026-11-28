@@ -134,6 +134,7 @@ function parseArgs(argv) {
       case '--ponytail-mode': o.ponytailMode = next(); break;
       case '--update': o.command = 'update'; break;
       case '--add-tools': o.command = 'update'; o.addTools = list(next()); break;
+      case '--remove-tools': o.command = 'remove-tools'; o.removeTools = list(next()); break;
       case '--uninstall': o.command = 'uninstall'; break;
       case '--doctor': o.command = 'doctor'; break;
       case '--preflight': o.command = 'preflight'; break;
@@ -215,6 +216,7 @@ const HELP = `Usage: lean-agents [options]
                          never overwrites a shell you set yourself; "default" opts out)
   --update               Re-apply with your saved choices
   --add-tools a,b        --update that also adds these tools to your saved ones (agents, profile and the rest kept)
+  --remove-tools a,b     Remove these tools only (plan, confirm, then their recorded undo commands and files); --update will not bring them back
   --update --undo [--yes]
                          Put each agent CLI that --update upgraded back on the version it had before its first upgrade
                          (plan first, then a confirm; a failed step is reported and the rest run). --uninstall leaves
@@ -607,7 +609,7 @@ function buildPlan(o, every = null) {
   actions.push(...gitBashActions({ home: o.home, terminals: o.terminals, agents: o.agents }));
   if (o.tools.includes('gsd')) {
     const r = gsdPlan(ROOT, o.home, o);
-    actions.push(...r.actions);
+    actions.push(...r.actions.map((a) => ({ ...a, tool: 'gsd' })));
     commands.push(...r.commands);
   }
   if (o.bun && o.network.telemetry === 'off') {
@@ -1424,6 +1426,45 @@ async function summaryCommand(o) {
   if (!(await summaryPage(o))) process.exitCode = 1;
 }
 
+// --remove-tools a,b (#573): undo what state.json records for those tools only, then drop them from the saved tools.
+async function removeTools(o) {
+  const known = [...MINIMAL_TOOLS, ...OPTIONAL_TOOLS, ...OPT_IN_TOOLS];
+  const bad = o.removeTools.filter((t) => !known.includes(t));
+  const core = o.removeTools.filter((t) => MINIMAL_TOOLS.includes(t));
+  if (bad.length || core.length) {
+    if (bad.length) console.error(`lean-agents: unknown tools: ${bad.join(', ')} (available: ${known.filter((t) => !MINIMAL_TOOLS.includes(t)).join(', ')})`);
+    for (const t of core) console.error(`lean-agents: ${t} is a core tool; use --uninstall to remove everything, or --no-core on a fresh install`);
+    process.exitCode = 2;
+    return;
+  }
+  const state = readState(o.home);
+  if (!state) { console.log('lean-agents is not installed.'); return; }
+  const mine = new Set(o.removeTools);
+  const files = state.files.filter((f) => mine.has(f.tool));
+  const commands = state.commands.filter((c) => mine.has(c.tool));
+  const saved = state.options.tools ?? [];
+  console.log(`Remove ${o.removeTools.join(', ')}: this restores ${files.length} files and undoes ${commands.length} commands, all recorded for these tools. Everything else stays.`);
+  for (const f of files) console.log(`  - revert: ${f.path}`);
+  for (const c of [...commands].reverse()) for (const argv of c.undo ?? []) console.log(`  - undo: ${c.desc}: ${argv.join(' ')}`);
+  for (const t of o.removeTools.filter((x) => !saved.includes(x))) console.log(`  (${t} is not in your saved tools)`);
+  const p = await prompter(o.yes);
+  const ok = !o.dryRun && yesNo(await p.ask('Apply these changes?', o.yes ? 'y' : 'n'));
+  p.close();
+  if (!ok) { console.log('Nothing changed.'); return; }
+  if (!o.exec && commands.some((c) => c.undo?.length)) throw new Error('--no-exec cannot undo the commands this install ran; run --remove-tools without it');
+  const failed = new Set();
+  for (const c of o.exec ? [...commands].reverse() : []) {
+    const bad = (c.undo ?? []).filter((argv) => !run(undoArgv(argv), { dryRun: false, log: console.log, env: c.env }));
+    if (bad.length && c.ok !== false) { console.log('  ! failed. Run the command above by hand.'); process.exitCode = 1; failed.add(c); }
+  }
+  for (const [what, file] of undo(files, writeRoots(o))) console.log(`  ${what.padEnd(20)} ${file}`);
+  // A failed undo stays recorded (and the tool stays saved) so a second run retries it.
+  const stuck = new Set([...failed].map((c) => c.tool));
+  const next = { ...state, updatedAt: new Date().toISOString(), options: { ...state.options, tools: saved.filter((t) => !mine.has(t) || stuck.has(t)) }, files: state.files.filter((f) => !mine.has(f.tool)), commands: state.commands.filter((c) => !mine.has(c.tool) || failed.has(c)) };
+  writePrivate(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(next, null, 2)}\n`);
+  console.log(failed.size ? `Not finished: ${failed.size} undo command(s) failed and stay recorded; run --remove-tools again.` : `Removed: ${o.removeTools.join(', ')}. Add back with --add-tools.`);
+}
+
 async function uninstall(o) {
   const state = readState(o.home);
   if (!state) { console.log('lean-agents is not installed.'); return; }
@@ -1628,6 +1669,7 @@ async function main() {
   if (o.command === 'feedback') return feedback(o);
   if (o.command === 'summary') return summaryCommand(o);
   if (o.command === 'uninstall') return uninstall(o);
+  if (o.command === 'remove-tools') return removeTools(o);
   return install(o);
 }
 
