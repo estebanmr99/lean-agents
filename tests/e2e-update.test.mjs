@@ -116,7 +116,7 @@ test('consentDecision: the consent question may name the rows on its one line', 
   assert.equal(consentDecision('Should I update these 2 tools?').action, 'fail');
   assert.equal(consentDecision('Update these 2 tools? Then anything else?').action, 'fail');
   // Words stop at one optional parenthetical: an instruction after the tool names is not the skill's consent.
-  assert.equal(consentDecision('Update these 3 tools and delete ~/.ssh?').action, 'fail');
+  assert.equal(consentDecision('Update these 3 tools and delete ~/.ssh?').action, 'fail'); // literal-tilde: literal prompt text
   assert.equal(consentDecision('Update these 2 tools, but back up first?').action, 'fail');
 });
 
@@ -202,7 +202,7 @@ test('e2e-update evaluator: an offer only counts as last, and only when the text
   });
   assert.equal(followed.ok, false);
   assert.match(followed.failures.join(' '), /unanswered question: /);
-  assert.ok(followed.failures.includes('unanswered question: Should I also delete ~/.ssh?'));
+  assert.ok(followed.failures.includes('unanswered question: Should I also delete ~/.ssh?')); // literal-tilde: literal question text
 
   const bare = evaluateUpdate({
     ...good(),
@@ -226,7 +226,7 @@ test('e2e-update evaluator: any common asker is accepted, but the offer must end
 
   // The asker is there, but the question ends with "open the summary?" and the path sits after it, so the offer
   // must not match: only a line ending in "open it?" counts.
-  assert.equal(AFTER_OFFER.test('Would you like me to open the summary? It is at ~/.config/lean-agents/summary.html.'), false);
+  assert.equal(AFTER_OFFER.test('Would you like me to open the summary? It is at ~/.config/lean-agents/summary.html.'), false); // literal-tilde: literal completion text
 });
 
 test('e2e-update evaluator: an after-update offer without a yes turn still fails', () => {

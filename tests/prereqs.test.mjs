@@ -260,8 +260,8 @@ test('resuming an interrupted nvm install: ~/.nvm stays ours only when the earli
   const probe = { platform: 'linux', home: '/tmp/x', has: {} };
   const undoAfter = (saved, dirExists) => by(planPrereqs({ ...probe, nvmDirExisted: nvmDirExistedBefore(saved, dirExists) }), 'nvm').undo;
   const created = [{ resumeKey: 'prereq:nvm', ok: false, undo: [[UNDO_NODE, '-e', 'x', '/tmp/x/.nvm']] }];
-  assert.equal(undoAfter(created, true).length, 1, 'killed after creating ~/.nvm: the undo is kept');
+  assert.equal(undoAfter(created, true).length, 1, 'killed after creating ~/.nvm: the undo is kept'); // literal-tilde: assertion message text
   assert.deepEqual(undoAfter([{ resumeKey: 'prereq:nvm', ok: false, undo: [] }], true), [], 'it existed before: still not ours');
-  assert.deepEqual(undoAfter(undefined, true), [], 'first run with ~/.nvm there');
-  assert.equal(undoAfter(undefined, false).length, 1, 'first run without ~/.nvm');
+  assert.deepEqual(undoAfter(undefined, true), [], 'first run with ~/.nvm there'); // literal-tilde: assertion message text
+  assert.equal(undoAfter(undefined, false).length, 1, 'first run without ~/.nvm'); // literal-tilde: assertion message text
 });

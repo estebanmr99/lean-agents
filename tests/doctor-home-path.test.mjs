@@ -18,7 +18,7 @@ test('#493: a lowercase drive letter still prints as ~ in doctor --json (Windows
   assert.ok(items.includes('~\\.copilot\\x.md'), items.join(' | ')); // literal-tilde: doctor win32 path contract
   assert.ok(!items.some((i) => /Data\\me/i.test(i)));
   const text = rows('D:\\Data\\me', [{ path: 'd:\\Data\\me\\.copilot\\x.md', hash: 'h' }], 'win32', false);
-  assert.match(text, /~\\\.copilot\\x\.md/);
+  assert.match(text, /~\\\.copilot\\x\.md/); // literal-tilde: explicit win32 doctor output
   assert.doesNotMatch(text, /Data\\me/i);
 });
 
@@ -32,6 +32,6 @@ test('#493: homeRel is case-insensitive on Windows only, and stops at a path bou
 });
 
 test('#493: tilde in plan and failure lines matches any case on Windows only', () => {
-  assert.equal(tilde('$ x d:\\data\\me\\a D:/Data/me/b', 'D:\\Data\\me', 'win32'), '$ x ~\\a ~/b');
+  assert.equal(tilde('$ x d:\\data\\me\\a D:/Data/me/b', 'D:\\Data\\me', 'win32'), '$ x ~\\a ~/b'); // literal-tilde: explicit win32 tilde contract
   assert.equal(tilde('$ x /Srv/ME/a', '/Srv/me', 'darwin'), '$ x /Srv/ME/a');
 });

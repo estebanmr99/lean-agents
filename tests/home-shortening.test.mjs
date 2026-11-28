@@ -25,12 +25,12 @@ const fakeFs = (files, dirs = new Map()) => ({
 });
 
 test('#506: tilde only shortens the home at the start of a path, never one inside a longer path', () => {
-  assert.equal(tilde('/opt/x/home/me/a /opt/me/b', '/opt/me', 'linux'), '/opt/x/home/me/a ~/b');
+  assert.equal(tilde('/opt/x/home/me/a /opt/me/b', '/opt/me', 'linux'), '/opt/x/home/me/a ~/b'); // literal-tilde: explicit platform contract
   assert.equal(tilde('/opt/x/home/me/a', '/home/me', 'linux'), '/opt/x/home/me/a');
-  assert.equal(tilde('$ x d:\\data\\me\\a D:/Data/me/b', winHome, 'win32'), '$ x ~\\a ~/b');
+  assert.equal(tilde('$ x d:\\data\\me\\a D:/Data/me/b', winHome, 'win32'), '$ x ~\\a ~/b'); // literal-tilde: explicit win32 contract
   assert.equal(tilde('/opt/me/a', '/opt/me', 'linux'), '~/a'); // literal-tilde: explicit linux contract
   // A file:// URL still starts the home after `//`, so the URL cannot leak the full home path.
-  assert.equal(tilde('file:///opt/me/x --a=/opt/me/y', '/opt/me', 'linux'), 'file://~/x --a=~/y');
+  assert.equal(tilde('file:///opt/me/x --a=/opt/me/y', '/opt/me', 'linux'), 'file://~/x --a=~/y'); // literal-tilde: explicit linux contract
   assert.equal(homeRel('/opt/me/a', '/opt/me', 'linux'), '~/a'); // literal-tilde: explicit linux contract
   assert.equal(homeRel('/opt/ME/a', '/opt/me', 'linux'), '/opt/ME/a');
   assert.equal(homeRel(winFile.toLowerCase(), winHome, 'win32'), '~\\x.json'); // literal-tilde: explicit win32 contract

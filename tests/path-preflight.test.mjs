@@ -40,7 +40,7 @@ test('A1 shadowed copy: old rtk first on PATH, newer later; both listed, old win
   assert.equal(f.copies.length, 2);
   assert.equal(f.copies[0].version, '0.42.0');
   const text = formatPreflight(r, { home, env: { USER: 'alice' } });
-  assert.match(text, /~\/old\/rtk/); assert.match(text, /~\/new\/rtk/);
+  assert.match(text, /~\/old\/rtk/); assert.match(text, /~\/new\/rtk/); // literal-tilde: test skipped on win32
   assert.match(text, /wins/); assert.match(text, /remove .*or put/i);
   assert.equal(r.blockers, r.findings.filter((x) => x.blocker).length);
 });
@@ -156,7 +156,7 @@ test('A5 --json redacts a Windows path whose backslashes JSON would escape', () 
   const r = preflight({ home: 'C:\\Profiles\\carol', env, platform: 'win32', fsx, probe: (f) => (f.includes('\\a\\') ? '0.42.0' : '1.2.0'), readWinPath: () => ({ user: '', machine: '' }), pm: 'winget', list: () => [], statfs: () => ({ bavail: 1e9, bsize: 4096 }) });
   const out = formatPreflight(r, { home: 'C:\\Profiles\\carol', env, json: true });
   assert.ok(!/carol/i.test(out), out);
-  assert.match(out, /~\\\\a\\\\rtk\.EXE/);
+  assert.match(out, /~\\\\a\\\\rtk\.EXE/); // literal-tilde: explicit win32 JSON-escaped path
 });
 
 test('A4 read-only: the HOME tree hash is identical after a preflight run (CLI)', { skip: win }, () => {

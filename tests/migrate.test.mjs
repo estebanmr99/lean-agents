@@ -90,8 +90,8 @@ test('migrate writes the items, keeps secrets out, and --uninstall restores the 
   put(home, '.config/opencode/opencode.jsonc', '{\n  // keep me\n  "theme": "dark"\n}\n');
   const before = snapshot(home);
   const out = lean(home, ['--yes', '--no-exec', '--migrate', 'cursor', '--agents', 'claude,opencode-v2']);
-  assert.match(out, /agent x\s+~\/\.cursor\/agents\/x\.md\s+~\/\.claude\/agents\/x\.md\s+migrated/);
-  assert.match(out, /hooks\s+~\/\.cursor\/hooks\.json\s+-\s+reported/);
+  assert.match(out, /agent x\s+~\/\.cursor\/agents\/x\.md\s+~\/\.claude\/agents\/x\.md\s+migrated/); // literal-tilde: lean() output normalizes \ to /
+  assert.match(out, /hooks\s+~\/\.cursor\/hooks\.json\s+-\s+reported/); // literal-tilde: lean() output normalizes \ to /
   assert.match(out, /Set these env vars[^\n]*GH_TOKEN/);
   assert.ok(fs.existsSync(path.join(home, '.claude', 'skills', 'demo', 'SKILL.md')));
   const oc = fs.readFileSync(path.join(home, '.config', 'opencode', 'opencode.jsonc'), 'utf8');
@@ -110,7 +110,7 @@ test('an existing target item is skipped and stays byte-identical', () => {
   const home = cursorHome();
   put(home, '.claude/agents/x.md', 'mine\n');
   const out = lean(home, ['--yes', '--no-exec', '--migrate', 'cursor', '--agents', 'claude']);
-  assert.match(out, /agent x\s+\S+\s+~\/\.claude\/agents\/x\.md\s+skipped/);
+  assert.match(out, /agent x\s+\S+\s+~\/\.claude\/agents\/x\.md\s+skipped/); // literal-tilde: lean() output normalizes \ to /
   assert.equal(fs.readFileSync(path.join(home, '.claude', 'agents', 'x.md'), 'utf8'), 'mine\n');
   assert.ok(fs.existsSync(path.join(home, '.cursor', 'agents', 'x.md')), 'the source is never moved');
 });
@@ -220,7 +220,7 @@ test('antigravity is a target for rules, agents, skills and MCP; --uninstall res
   put(home, '.claude/CLAUDE.md', 'Be brief.\n');
   const before = snapshot(home);
   const out = lean(home, ['--yes', '--no-exec', '--migrate', 'claude', '--agents', 'antigravity']);
-  assert.match(out, /rules\s+\S+\s+~\/\.gemini\/config\/rules\/migrated-rules\.md\s+migrated/);
+  assert.match(out, /rules\s+\S+\s+~\/\.gemini\/config\/rules\/migrated-rules\.md\s+migrated/); // literal-tilde: lean() output normalizes \ to /
   assert.match(fs.readFileSync(path.join(home, '.gemini', 'config', 'rules', 'migrated-rules.md'), 'utf8'), /Be brief\./);
   lean(home, ['--yes', '--no-exec', '--migrate', 'cursor', '--agents', 'antigravity']);
   const dir = path.join(home, '.gemini', 'config');

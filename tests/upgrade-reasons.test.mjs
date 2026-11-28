@@ -61,7 +61,7 @@ test('each upgrade row names its own file, so the two opencode-dcp rows read apa
   const r = await seed();
   const dcp = r.items.filter((i) => i.upgrade && /opencode-dcp/.test(i.name ?? ''));
   assert.deepEqual(dcp.map((i) => i.file).sort(), [tildePath('.config', 'opencode', 'opencode.jsonc'), tildePath('.config', 'opencode', 'tui.json')]);
-  for (const line of formatUpgrade(r).split('\n').filter((l) => /opencode-dcp/.test(l))) assert.match(line, /\(~\/\.config\/opencode\/(opencode\.jsonc|tui\.json)\)$/);
+  for (const line of formatUpgrade(r).split('\n').filter((l) => /opencode-dcp/.test(l))) assert.match(line, /\(~\/\.config\/opencode\/(opencode\.jsonc|tui\.json)\)$/); // literal-tilde: test skipped on win32
 });
 
 test('the dry run says up front that OpenCode 2 migrates the sessions on first start', () => {

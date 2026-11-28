@@ -43,7 +43,7 @@ test('A1: a failing step prints its last lines and the log path', { skip: !posix
   const r = lean(s, []);
   assert.match(r.stdout, /✗/);
   assert.match(r.stdout, /stub-stderr-npx -y skills/);
-  assert.match(r.stdout, /full output: ~\/\.config\/lean-agents\/logs\//);
+  assert.match(r.stdout, /full output: ~\/\.config\/lean-agents\/logs\//); // literal-tilde: POSIX-only test
   assert.ok(!r.stdout.split('Done.')[0].split('Commands:')[1].split('\n\n')[1].includes(s.home), 'home printed as ~');
 });
 
@@ -117,7 +117,7 @@ test('a log that cannot be written falls back to the terminal and the install go
 });
 
 test('tilde only replaces a whole home folder, never an empty home or /', () => {
-  assert.equal(tilde('$ cp /h/u/a /h/user2/b', '/h/u'), '$ cp ~/a /h/user2/b');
+  assert.equal(tilde('$ cp /h/u/a /h/user2/b', '/h/u'), '$ cp ~/a /h/user2/b'); // literal-tilde: explicit Windows input contract
   assert.equal(tilde('D:\\work\\x D:/work/y', 'D:\\work'), '~\\x ~/y'); // literal-tilde: expected output mirrors the input separators
   assert.equal(tilde('/usr/bin', '/'), '/usr/bin');
   assert.equal(tilde('/usr/bin', ''), '/usr/bin');
