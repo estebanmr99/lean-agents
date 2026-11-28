@@ -215,7 +215,8 @@ export function userHash(text, ignore = []) {
     const value = o[keyPath.at(-1)];
     const src = value && typeof value === 'object' ? value.source : undefined;
     const match = entry.repo !== undefined ? src && (src.repo === entry.repo || src.url === entry.repo) : value === entry.value;
-    if (match) delete o[keyPath.at(-1)];
+    // A marketplace entry has fields besides the source our plugin command writes; only the source is ours.
+    if (match) entry.repo !== undefined ? delete value.source : delete o[keyPath.at(-1)];
   }
   return sha(JSON.stringify(data));
 }
@@ -228,10 +229,19 @@ function pruneToManaged(node, prefix, ignore, managed) {
   const out = {};
   for (const [k, v] of Object.entries(node)) {
     const keyPath = [...prefix, k];
-    if (ignore.some((p) => samePath(p, keyPath))) continue;
+    const ignored = ignore.some((e) => samePath(e.path, keyPath));
+    if (ignored) {
+      // A marketplace entry is only partly ours: keep its other fields in the hash (see userHash).
+      const entry = ignore.find((e) => samePath(e.path, keyPath));
+      if (entry.repo !== undefined && v && typeof v === 'object') {
+        const { source, ...rest } = v;
+        out[k] = rest;
+      }
+      continue;
+    }
     if (managed.some((p) => samePath(p, keyPath))) out[k] = v;
     else if (managed.some((p) => underPath(p, keyPath))) out[k] = pruneToManaged(v, keyPath, ignore, managed);
-    else if (ignore.some((p) => underPath(p, keyPath))) out[k] = pruneToManaged(v, keyPath, ignore, managed);
+    else if (ignore.some((e) => underPath(e.path, keyPath))) out[k] = pruneToManaged(v, keyPath, ignore, managed);
   }
   return out;
 }
@@ -242,7 +252,7 @@ function pruneToManaged(node, prefix, ignore, managed) {
 export function managedUserHash(text, ignore = [], managed = []) {
   const data = parse(text, [], { allowTrailingComma: true });
   if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
-  return sha(JSON.stringify(pruneToManaged(data, [], ignore.map((e) => e.path), managed)));
+  return sha(JSON.stringify(pruneToManaged(data, [], ignore, managed)));
 }
 
 const idMarks = (id) => [`# lean-agents:${id}:start`, `# lean-agents:${id}:end`];
@@ -283,6 +293,7 @@ export function plan(actions, roots = [], prior = []) {
     if (blocked) return { ...a, before: null, after: null, status: 'skip', note: blocked };
     const before = read(a.path);
     let after;
+    let hashText;
     let note = a.note ?? '';
     let applied;
     let keptKeys;
@@ -310,6 +321,12 @@ export function plan(actions, roots = [], prior = []) {
       after = r.text;
       applied = r.applied;
       keptKeys = r.kept.map((k) => k.path.join('.'));
+      // A keepIfChanged value the user replaced is not our baseline: hash our own value, so --doctor still shows the edit.
+      hashText = after;
+      for (const k of r.kept) {
+        const e = edits.find((x) => x.keepIfChanged && samePath(x.path, k.path));
+        if (e) hashText = applyEdits(hashText, modify(hashText, e.path, e.value, FORMAT));
+      }
       const moved = r.applied.filter((e) => e.mode === 'arrayAdd' && /@\d+\.\d+\.\d+$/.test(e.replaced ?? '')).map((e) => `${path.basename(a.path)} ${e.label ?? 'pin'} ${e.replaced.replace(/^.*@/, '')} -> ${e.value.replace(/^.*@/, '')}${e.why ? ` ${e.why}` : ''}`);
       const removed = r.applied.filter((e) => e.mode === 'arrayRemove').map((e) => `${path.basename(a.path)} removes ${e.label ?? 'entry'}${e.why ? ` (${e.why})` : ''}`);
       const refMoves = r.applied.filter((e) => e.mode === 'set' && e.marketplace).map((e) => `${e.marketplace} marketplace ref ${e.previous ?? '(none)'} -> ${e.value} (settings.json entry moved, plugin data kept)`);
@@ -322,7 +339,7 @@ export function plan(actions, roots = [], prior = []) {
     // A file lean-agents created and nobody edited since holds nothing of the user's: a rerun needs no backup of it.
     const mine = prior.filter((f) => f.path === a.path);
     const noBackup = before !== null && mine.some((f) => f.created) && sha(before) === mine.at(-1).hash;
-    return { ...a, before, after, applied, status, note, keptKeys, noBackup, ...(a.ignore?.length && { userHash: userHash(after, a.ignore) }) };
+    return { ...a, before, after, applied, status, note, keptKeys, noBackup, ...(a.ignore?.length && { userHash: userHash(hashText ?? after, a.ignore), baseline: hashText ?? after }) };
   });
 }
 
