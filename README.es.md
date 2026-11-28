@@ -106,7 +106,8 @@ Nunca leas, muestres ni guardes mis claves o tokens.
 
 | Agente | Comando | De dónde viene |
 | --- | --- | --- |
-| Claude Code, Copilot CLI, Cursor, Antigravity | `/lean-update` | la skill `lean-update` |
+| Claude Code, Cursor, Antigravity | `/lean-update` | la skill `lean-update` |
+| Copilot CLI | escribe `/lean-update` en tu prompt | la skill `lean-update` (lista del menú `/` **VERIFY**) |
 | OpenCode 1.x y 2.x | `/lean-update` | `~/.config/opencode/commands/lean-update.md` (lo escribe lean-agents; allí las skills no son comandos) |
 | VS Code Copilot | pide «lean-update» en el chat | skill; aún no se escribe un archivo de prompt (carpeta **VERIFY**) |
 

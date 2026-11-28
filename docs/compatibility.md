@@ -523,7 +523,11 @@ Upstream sources, all checked 2026-11-05: Claude Code [memory](https://code.clau
 
 | Agent | How `/lean-update` runs | Source | Checked |
 | --- | --- | --- | --- |
-| Claude Code, Copilot CLI, Cursor, Antigravity | the installed `lean-update` skill is invocable as `/lean-update`; nothing extra is written | upstream skills docs (see Migration sources above) | 2026-11-27 |
+| Claude Code | the installed `lean-update` skill runs as `/lean-update` ("you can invoke one directly with `/skill-name`"); nothing extra is written | [skills](https://code.claude.com/docs/en/skills) | 2026-11-28 |
+| Cursor | the skill runs as `/lean-update` ("explicitly invoked via `/skill-name`"); nothing extra is written | [skills](https://cursor.com/docs/context/skills) | 2026-11-28 |
+| Antigravity | the skill runs as `/lean-update` ("Type `/<skill-name>` in the message box to explicitly invoke a skill"); nothing extra is written | [skills](https://antigravity.google/docs/skills) | 2026-11-28 |
+| Copilot CLI | **VERIFY**: the docs say to name a skill in the prompt "preceded by a forward slash"; whether `/lean-update` appears in the `/` menu is not confirmed | [add skills](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-skills) | 2026-11-28 |
+| All agents | **VERIFY**: no real-binary CI check yet shows `/lean-update` listed per agent (open in #572) | — | 2026-11-28 |
 | OpenCode 1.x and 2.x | skills are not slash commands; lean-agents writes `~/.config/opencode/commands/lean-update.md` (`description` frontmatter, `$ARGUMENTS`) that loads the skill | [commands](https://opencode.ai/docs/commands/) | 2026-11-27 |
 | VS Code Copilot | prompt files `*.prompt.md` run as `/name`, but the user-level folder is **VERIFY** (`<VS Code user dir>/prompts`); lean-agents writes none yet; the skill is the path meanwhile | [prompt files](https://code.visualstudio.com/docs/copilot/customization/prompt-files) | 2026-11-25 |
 
