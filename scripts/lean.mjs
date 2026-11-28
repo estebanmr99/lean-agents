@@ -1439,13 +1439,24 @@ async function removeTools(o) {
   }
   const state = readState(o.home);
   if (!state) { console.log('lean-agents is not installed.'); return; }
-  const mine = new Set(o.removeTools);
-  const files = state.files.filter((f) => mine.has(f.tool));
-  const commands = state.commands.filter((c) => mine.has(c.tool));
   const saved = state.options.tools ?? [];
+  // Old records carry no tool. A file under the tool's own folder is still attributable to it (#573 review).
+  const HINTS = {
+    gsd: ['.gsd'], 'i-have-adhd': ['i-have-adhd'], ponytail: ['ponytail'], dcp: ['dcp'], 'copilot-usage': ['lean-copilot-usage', 'copilot-usage'],
+    serena: ['serena'], playwright: ['playwright'], 'playwright-extension': ['playwright'], 'context-mode': ['context-mode'],
+    rtk: ['rtk'], caveman: ['caveman'], autoskills: ['autoskills'], 'lean-migrate': ['lean-migrate'], 'coordinate': ['coordinate', 'coordinate-watch'], 'code-mode': ['code-mode'],
+  };
+  const legacy = (t) => state.files.some((f) => !f.tool && (HINTS[t] ?? [t]).some((n) => f.path.split(/[\\/]/).some((p) => p === n || p.startsWith(`${n}-`) || p.endsWith(`-${n}`))));
+  const hasRecord = (t) => state.files.some((f) => f.tool === t) || state.commands.some((c) => c.tool === t);
+  // With no per-tool record at all there is nothing to revert: keep the tool saved so --update still manages it.
+  const warn = new Set(o.removeTools.filter((t) => legacy(t) || (!hasRecord(t) && saved.includes(t))));
+  const active = o.removeTools.filter((t) => !warn.has(t) && (saved.includes(t) || hasRecord(t)));
+  const files = state.files.filter((f) => active.includes(f.tool));
+  const commands = state.commands.filter((c) => active.includes(c.tool));
   console.log(`Remove ${o.removeTools.join(', ')}: this restores ${files.length} files and undoes ${commands.length} commands, all recorded for these tools. Everything else stays.`);
   for (const f of files) console.log(`  - revert: ${f.path}`);
   for (const c of [...commands].reverse()) for (const argv of c.undo ?? []) console.log(`  - undo: ${c.desc}: ${argv.join(' ')}`);
+  for (const t of o.removeTools) if (warn.has(t)) console.log(`${t}: files from an earlier install stay until --uninstall (no per-tool record)`);
   for (const t of o.removeTools.filter((x) => !saved.includes(x))) console.log(`  (${t} is not in your saved tools)`);
   const p = await prompter(o.yes);
   const ok = !o.dryRun && yesNo(await p.ask('Apply these changes?', o.yes ? 'y' : 'n'));
@@ -1457,12 +1468,17 @@ async function removeTools(o) {
     const bad = (c.undo ?? []).filter((argv) => !run(undoArgv(argv), { dryRun: false, log: console.log, env: c.env }));
     if (bad.length && c.ok !== false) { console.log('  ! failed. Run the command above by hand.'); process.exitCode = 1; failed.add(c); }
   }
-  for (const [what, file] of undo(files, writeRoots(o))) console.log(`  ${what.padEnd(20)} ${file}`);
-  // A failed undo stays recorded (and the tool stays saved) so a second run retries it.
+  const reports = undo(files, writeRoots(o));
+  for (const [what, file] of reports) console.log(`  ${what.padEnd(20)} ${file}`);
+  // A failed undo stays recorded (and the tool stays saved) so a second run retries it. A file undo left alone (the user edited
+  // it, or it is a symlink) keeps its record too, so --uninstall can still see it.
   const stuck = new Set([...failed].map((c) => c.tool));
-  const next = { ...state, updatedAt: new Date().toISOString(), options: { ...state.options, tools: saved.filter((t) => !mine.has(t) || stuck.has(t)) }, files: state.files.filter((f) => !mine.has(f.tool)), commands: state.commands.filter((c) => !mine.has(c.tool) || failed.has(c)) };
+  const left = new Set(reports.filter(([what]) => what.startsWith('left')).map(([, file]) => file));
+  const removed = active.filter((t) => !stuck.has(t));
+  const next = { ...state, updatedAt: new Date().toISOString(), options: { ...state.options, tools: saved.filter((t) => !removed.includes(t)) }, files: state.files.filter((f) => !active.includes(f.tool) || left.has(f.path)), commands: state.commands.filter((c) => !active.includes(c.tool) || failed.has(c)) };
   writePrivate(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(next, null, 2)}\n`);
-  console.log(failed.size ? `Not finished: ${failed.size} undo command(s) failed and stay recorded; run --remove-tools again.` : `Removed: ${o.removeTools.join(', ')}. Add back with --add-tools.`);
+  if (failed.size) console.log(`Not finished: ${failed.size} undo command(s) failed and stay recorded; run --remove-tools again.`);
+  else if (removed.length) console.log(`Removed: ${removed.join(', ')}. Add back with --add-tools.`);
 }
 
 async function uninstall(o) {

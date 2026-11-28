@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
@@ -14,6 +15,8 @@ const env = { PATH: process.env.PATH, NVM_DIR: path.join(os.tmpdir(), 'no-nvm'),
 const run = (home, args) => spawnSync(process.execPath, [ENGINE, '--home', home, '--lang', 'en', '--profile', 'none', ...args], { encoding: 'utf8', env: { ...env, HOME: home } });
 const stateFile = (home) => path.join(home, '.config', 'lean-agents', 'state.json');
 const readState = (home) => JSON.parse(fs.readFileSync(stateFile(home), 'utf8'));
+const writeState = (home, state) => fs.writeFileSync(stateFile(home), JSON.stringify(state, null, 2));
+const sha = (text) => crypto.createHash('sha256').update(text).digest('hex');
 
 // Installs gsd + caveman, then records a harmless gsd undo (a node no-op) as the real install would record npx.
 function setup() {
@@ -76,4 +79,75 @@ test('--remove-tools nope: unknown tool lists valid names, exit 2', () => {
   const r = run(home, ['--remove-tools', 'nope', '--yes']);
   assert.equal(r.status, 2);
   assert.match(r.stderr, /unknown tools: nope \(available: .*gsd/);
+});
+
+test('--remove-tools ponytail: its own file is reverted, other tools stay', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-rm-pony-'));
+  const i = run(home, ['--no-exec', '--yes', '--agents', 'opencode-v2', '--tools', 'ponytail']);
+  assert.equal(i.status, 0, i.stderr);
+  const pony = path.join(home, '.config', 'ponytail', 'config.json');
+  const agent = path.join(home, '.config', 'opencode', 'agents', 'debug.md');
+  assert.ok(fs.existsSync(pony));
+  assert.ok(fs.existsSync(agent));
+
+  const r = run(home, ['--remove-tools', 'ponytail', '--yes']);
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.ok(!fs.existsSync(pony), 'ponytail config reverted');
+  assert.ok(fs.existsSync(agent), 'another tool\'s file stays');
+  assert.ok(!readState(home).options.tools.includes('ponytail'));
+  assert.match(r.stdout, /Removed: ponytail\./);
+});
+
+test('--remove-tools gsd: an untagged file record warns and keeps gsd saved', () => {
+  const home = setup();
+  const s = readState(home);
+  const rec = s.files.find((f) => f.tool === 'gsd');
+  assert.ok(rec, 'setup has a gsd file record');
+  delete rec.tool;
+  writeState(home, s);
+
+  const r = run(home, ['--remove-tools', 'gsd', '--yes']);
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.match(r.stdout, /gsd: files from an earlier install stay until --uninstall \(no per-tool record\)/);
+  assert.doesNotMatch(r.stdout, /Removed: gsd/);
+  assert.ok(fs.existsSync(defaults(home)), 'untagged file stays');
+  assert.ok(readState(home).options.tools.includes('gsd'), 'gsd stays saved');
+  assert.ok(readState(home).commands.some((c) => c.tool === 'gsd'), 'its command stays recorded');
+});
+
+test('--remove-tools gsd: a file left because the user edited it keeps its record', () => {
+  const home = setup();
+  const file = path.join(home, '.gsd', 'keep.txt');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const original = 'installed\n';
+  fs.writeFileSync(file, original);
+  const s = readState(home);
+  s.files.push({ tool: 'gsd', kind: 'file', path: file, created: true, hash: sha(original) });
+  writeState(home, s);
+  const edited = 'my own edit\n';
+  fs.writeFileSync(file, edited);
+
+  const r = run(home, ['--remove-tools', 'gsd', '--yes']);
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.equal(fs.readFileSync(file, 'utf8'), edited, 'the edit survives byte for byte');
+  assert.ok(readState(home).files.some((f) => f.path === file), 'the record stays for --uninstall');
+});
+
+test('--remove-tools: a failed undo command stays recorded and fails the run', () => {
+  const home = setup();
+  const s = readState(home);
+  s.commands.push({ tool: 'caveman', desc: 'failing caveman undo', run: [], undo: [[process.execPath, '-e', 'process.exit(1)']], ok: true });
+  writeState(home, s);
+
+  const dry = run(home, ['--remove-tools', 'caveman', '--dry-run']);
+  assert.equal(dry.status, 0, dry.stderr);
+  assert.match(dry.stdout, /undo: failing caveman undo/);
+  assert.doesNotMatch(dry.stdout, /Apply these changes\?/);
+
+  const r = run(home, ['--remove-tools', 'caveman', '--yes']);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(r.stdout, /Not finished: 1 undo command\(s\) failed/);
+  const after = readState(home);
+  assert.ok(after.commands.some((c) => c.desc === 'failing caveman undo'), 'failed undo stays recorded');
+  assert.ok(after.options.tools.includes('caveman'), 'tool stays saved');
 });

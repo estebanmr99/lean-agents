@@ -149,7 +149,7 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
     addPlugin('i-have-adhd', 'i-have-adhd plugin', repo, 'i-have-adhd@i-have-adhd');
     commands.push(adhdCommand);
     pluginWrites.push(...pluginKeys('i-have-adhd@i-have-adhd', repo));
-    if (opts.adhdAlways) actions.push({ kind: 'file', path: path.join(dir, '.i-have-adhd-always'), content: '' , force: true });
+    if (opts.adhdAlways) actions.push({ kind: 'file', tool: 'i-have-adhd', path: path.join(dir, '.i-have-adhd-always'), content: '' , force: true });
   }
   for (const name of ['serena', 'playwright']) {
     if (!tools.includes(name)) continue;
