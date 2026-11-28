@@ -999,7 +999,15 @@ async function install(o) {
       if (!f) continue;
       const managed = [...(p.edits ?? []).map((e) => e.path), ...(f.applied ?? []).map((e) => e.path)];
       const u = userHash(fs.readFileSync(p.path, 'utf8'), p.ignore);
-      if (u !== p.userHash || managedUserHash(p.after, p.ignore, managed) !== p.userHash) continue;
+      const baseline = p.baseline ?? p.after;
+      // The planned file is our baseline only while it holds nothing but managed and ignored keys; a kept or user key
+      // stays an edit, so keep the earlier baseline (or hash) instead of blessing it.
+      if (u !== userHash(baseline, p.ignore) || managedUserHash(baseline, p.ignore, managed) !== u) {
+        const prev = previous?.files?.filter((e) => e.path === p.path).at(-1);
+        if (prev?.userHash) { f.userHash = prev.userHash; f.ignore = prev.ignore; }
+        else { delete f.userHash; delete f.ignore; if (prev?.hash) f.hash = prev.hash; }
+        continue;
+      }
       f.ignore = p.ignore;
       f.userHash = u;
     }
