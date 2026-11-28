@@ -826,14 +826,9 @@ jobs:
           grep -q playwright "$HOME/mcp.txt"
           if ! grep -q 'context-mode needs Node >=24.15.0' "$HOME/install.txt"; then grep -q 'plugin:context-mode' "$HOME/mcp.txt"; fi
           grep -q 'rtk hook' "$HOME/.claude/settings.json"
-          # Claude status line (#123): written because the fresh HOME had none; run its command with a fake gh.
-          mkdir -p "$HOME/fakegh"
-          printf '%s\n' '#!/bin/sh' "echo '{\"quota_reset_date\":\"2026-12-01\",\"quota_snapshots\":{\"premium_interactions\":{\"unlimited\":false,\"entitlement\":25000,\"remaining\":15441,\"percent_remaining\":61.7}}}'" > "$HOME/fakegh/gh"
-          chmod +x "$HOME/fakegh/gh"
-          cmd="$(node -p 'JSON.parse(require("fs").readFileSync(process.env.HOME + "/.claude/settings.json", "utf8")).statusLine.command')"
-          line="$(echo '{}' | PATH="$HOME/fakegh:$PATH" TMPDIR="$(mktemp -d)" bash -c "$cmd")"
-          echo "status line: $line"
-          test "$line" = 'Copilot: 15441 of 25000 credits left (61%), about $154.41 of $250.00, resets 2026-12-01'
+          # copilot-usage is OpenCode-only (#593): Claude gets no status line script and no statusLine key.
+          test ! -e "$HOME/.claude/lean-copilot-usage-statusline.mjs"
+          if grep -q statusLine "$HOME/.claude/settings.json"; then exit 1; fi
           test -f "$HOME/.claude/skills/caveman/SKILL.md"
           grep -q '^disable-model-invocation: false$' "$HOME"/.claude/plugins/cache/i-have-adhd/i-have-adhd/*/skills/i-have-adhd/SKILL.md
           node -e 'JSON.parse(require("fs").readFileSync(process.env.HOME + "/.claude/settings.json", "utf8"))'
@@ -893,14 +888,9 @@ jobs:
           grep -q playwright "$HOME/mcp.txt"
           if ! grep -q 'context-mode needs Node >=24.15.0' "$HOME/install.txt"; then grep -q 'plugin:context-mode' "$HOME/mcp.txt"; fi
           grep -q 'rtk hook' "$HOME/.claude/settings.json"
-          # Claude status line (#123): written because the fresh HOME had none; run its command with a fake gh.
-          mkdir -p "$HOME/fakegh"
-          printf '%s\n' '#!/bin/sh' "echo '{\"quota_reset_date\":\"2026-12-01\",\"quota_snapshots\":{\"premium_interactions\":{\"unlimited\":false,\"entitlement\":25000,\"remaining\":15441,\"percent_remaining\":61.7}}}'" > "$HOME/fakegh/gh"
-          chmod +x "$HOME/fakegh/gh"
-          cmd="$(node -p 'JSON.parse(require("fs").readFileSync(process.env.HOME + "/.claude/settings.json", "utf8")).statusLine.command')"
-          line="$(echo '{}' | PATH="$HOME/fakegh:$PATH" TMPDIR="$(mktemp -d)" bash -c "$cmd")"
-          echo "status line: $line"
-          test "$line" = 'Copilot: 15441 of 25000 credits left (61%), about $154.41 of $250.00, resets 2026-12-01'
+          # copilot-usage is OpenCode-only (#593): Claude gets no status line script and no statusLine key.
+          test ! -e "$HOME/.claude/lean-copilot-usage-statusline.mjs"
+          if grep -q statusLine "$HOME/.claude/settings.json"; then exit 1; fi
           test -f "$HOME/.claude/skills/caveman/SKILL.md"
           grep -q '^disable-model-invocation: false$' "$HOME"/.claude/plugins/cache/i-have-adhd/i-have-adhd/*/skills/i-have-adhd/SKILL.md
           node -e 'JSON.parse(require("fs").readFileSync(process.env.HOME + "/.claude/settings.json", "utf8"))'

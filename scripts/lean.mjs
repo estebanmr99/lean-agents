@@ -8,7 +8,7 @@ import readline from 'node:readline';
 import tty from 'node:tty';
 import { fileURLToPath } from 'node:url';
 import { parse as parseJsonc } from 'jsonc-parser';
-import { plan, apply, undo, describe, tilde, sha, userHash, managedUserHash, writePrivate, privateDir, dropBackups, renameRetry } from './lib/fsops.mjs';
+import { plan, apply, undo, describe, tilde, sha, userHash, managedUserHash, writePrivate, privateDir, dropBackups, renameRetry, retireOwned } from './lib/fsops.mjs';
 import { loadCore, renderRules, loadProfile, useToolNode } from './lib/render.mjs';
 import { claudeAdapter } from './lib/adapters/claude.mjs';
 import { opencodeV1Adapter } from './lib/adapters/opencode-v1.mjs';
@@ -966,6 +966,12 @@ async function install(o) {
   let step = 0;
   const stepLine = (c, ok) => console.log(redactText(`[${step}/${Math.max(total, step)}] ${c.desc} ${ok ? '✓' : '✗'}`, { home: o.home }));
   const previous = readState(o.home);
+  // 1.3.0 wrote a Claude statusline script for copilot-usage; the meter is OpenCode-only now (#593).
+  if (previous?.files) {
+    const r = retireOwned(previous.files, ['lean-copilot-usage-statusline.mjs']);
+    previous.files = r.files;
+    for (const p of r.removed) console.log(`  removed ${tilde(p, o.home)} (copilot-usage no longer covers Claude Code)`);
+  }
   const files = [];
   const ran = [];
   let failed = 0;

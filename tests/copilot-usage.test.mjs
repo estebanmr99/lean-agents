@@ -1,6 +1,7 @@
 // copilot-usage: --usage output, the OpenCode TUI plugin install/uninstall, and the plugin itself (fake gh, fake api).
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -312,58 +313,45 @@ test('fresh HOME: install creates tui.json, uninstall removes it (the empty plug
   assert.ok(!fs.existsSync(path.join(dir, 'plugins', 'lean-copilot-usage', 'tui.js')));
 });
 
-// Claude Code status line: written only when the user has none, removed by --uninstall only while it is still ours.
-const claudeArgs = ['--agents', 'claude', '--tools', 'copilot-usage', '--network', 'on'];
+// Claude Code gets no copilot-usage file or edit (#593); --update retires what 1.3.0 wrote.
 const settingsOf = (home) => path.join(home, '.claude', 'settings.json');
 const script = (home) => path.join(home, '.claude', 'lean-copilot-usage-statusline.mjs');
+const stateOf = (home) => path.join(home, '.config', 'lean-agents', 'state.json');
+const bothArgs = ['--agents', 'claude,opencode-v2', '--tools', 'copilot-usage', '--network', 'on'];
 
-test('claude statusLine: none set -> written, runs, and uninstall removes it', () => {
+test('claude + opencode-v2 + copilot-usage: no Claude statusline file, no statusLine edit', () => {
   const home = tmp('home');
-  engine(home, claudeArgs);
-  const s = JSON.parse(fs.readFileSync(settingsOf(home), 'utf8')).statusLine;
-  assert.equal(s.type, 'command');
-  assert.ok(s.command.includes(script(home).replaceAll('\\', '/')));
-  assert.match(fs.readFileSync(script(home), 'utf8'), /^\/\/ managed by lean-agents\n/);
-  // The shipped script, run with a fake gh and its own cache dir: same text as --usage, behind a label.
-  const run = (json) => {
-    const r = spawnSync(process.execPath, [script(home)], { encoding: 'utf8', env: { ...process.env, PATH: fakeGh(json), TMPDIR: tmp('cache'), TEMP: tmp('cache') } });
-    assert.equal(r.status, 0, r.stderr);
-    return r.stdout.trim();
-  };
-  assert.equal(run(LIMITED), 'Copilot: 15441 of 25000 credits left (61%), about $154.41 of $250.00, resets 2026-12-01');
-  assert.equal(run(UNLIMITED), 'Copilot: Unlimited premium requests');
-  assert.equal(run(null), 'Copilot: unavailable');
+  engine(home, bothArgs);
+  assert.ok(!fs.existsSync(script(home)));
+  assert.ok(!('statusLine' in JSON.parse(fs.readFileSync(settingsOf(home), 'utf8'))));
+});
+
+// A 1.3.0-like state: the marked script and its state record (plus our statusLine edit) added to a fresh install.
+function as130(home, text = '// managed by lean-agents\nconsole.log("x");\n') {
+  engine(home, bothArgs);
+  fs.writeFileSync(script(home), text);
+  const st = JSON.parse(fs.readFileSync(stateOf(home), 'utf8'));
+  st.files.push({ path: script(home), kind: 'file', created: true, backup: null, hash: crypto.createHash('sha256').update(text).digest('hex') });
+  fs.writeFileSync(stateOf(home), JSON.stringify(st));
+  return st;
+}
+
+test('--update removes the managed 1.3.0 statusline file and its record; uninstall stays clean', () => {
+  const home = tmp('home');
+  as130(home);
+  engine(home, ['--update']);
+  assert.ok(!fs.existsSync(script(home)));
+  assert.ok(!JSON.parse(fs.readFileSync(stateOf(home), 'utf8')).files.some((f) => f.path === script(home)));
   engine(home, ['--uninstall']);
   assert.ok(!fs.existsSync(script(home)));
-  assert.ok(!fs.existsSync(settingsOf(home)) || !('statusLine' in JSON.parse(fs.readFileSync(settingsOf(home), 'utf8'))));
 });
 
-test('claude statusLine: the user\'s own value is kept, with a note, and survives uninstall', () => {
+test('--update keeps an unmarked user file with that name, and uninstall leaves it', () => {
   const home = tmp('home');
-  fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
-  const mine = { type: 'command', command: 'echo mine' };
-  fs.writeFileSync(settingsOf(home), JSON.stringify({ statusLine: mine }));
-  assert.match(engine(home, claudeArgs), /kept your values for:.*statusLine/);
-  assert.deepEqual(JSON.parse(fs.readFileSync(settingsOf(home), 'utf8')).statusLine, mine);
+  as130(home, 'console.log("mine");\n');
+  engine(home, ['--update']);
+  assert.equal(fs.readFileSync(script(home), 'utf8'), 'console.log("mine");\n');
+  assert.ok(!JSON.parse(fs.readFileSync(stateOf(home), 'utf8')).files.some((f) => f.path === script(home)));
   engine(home, ['--uninstall']);
-  assert.deepEqual(JSON.parse(fs.readFileSync(settingsOf(home), 'utf8')).statusLine, mine);
-});
-
-test('claude statusLine: a value the user changed after install stays on uninstall', () => {
-  const home = tmp('home');
-  engine(home, claudeArgs);
-  const j = JSON.parse(fs.readFileSync(settingsOf(home), 'utf8'));
-  j.statusLine = { type: 'command', command: 'echo later' };
-  fs.writeFileSync(settingsOf(home), JSON.stringify(j));
-  engine(home, ['--uninstall']);
-  assert.equal(JSON.parse(fs.readFileSync(settingsOf(home), 'utf8')).statusLine.command, 'echo later');
-});
-
-test('claude statusLine: not installed without the copilot-usage tool or under --outbound off', () => {
-  for (const args of [['--agents', 'claude', '--no-tools', '--network', 'on'], ['--agents', 'claude', '--tools', 'copilot-usage', '--outbound', 'off']]) {
-    const home = tmp('home');
-    engine(home, args);
-    assert.ok(!('statusLine' in JSON.parse(fs.readFileSync(settingsOf(home), 'utf8'))));
-    assert.ok(!fs.existsSync(script(home)));
-  }
+  assert.ok(fs.existsSync(script(home)));
 });

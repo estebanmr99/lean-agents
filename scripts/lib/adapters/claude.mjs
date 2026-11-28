@@ -6,7 +6,6 @@ import { parse } from 'jsonc-parser';
 import { OWNED_MARK, isLegacy } from '../fsops.mjs';
 import { tierFor, modelFor } from '../render.mjs';
 import { privacyOf, updaterMode } from '../network.mjs';
-import { statuslineScript } from '../copilot-usage.mjs';
 import { marketplaceSource, skillSource, skillsCli } from '../pins.mjs';
 import { contextModeCommand } from '../context-mode.mjs';
 import { mcpServers } from '../migrate.mjs';
@@ -93,13 +92,6 @@ export function claudeAdapter({ home, core, profile, opts, rulesPath, adhdComman
   if (updater && !(updater === 'setIfAbsent' && (opts.env ?? process.env).DISABLE_AUTOUPDATER !== undefined)) edits.push({ path: ['env', 'DISABLE_AUTOUPDATER'], value: '1', mode: updater });
   // Opt-in only (#304): experimental, and a session started with it resumes only with it on. User settings only; project settings ignore it.
   if (tools.includes('code-mode')) edits.push({ path: ['env', 'CLAUDE_CODE_EXPERIMENTAL_CODE_MODE'], value: '1', mode: 'setIfAbsent' });
-  if (tools.includes('copilot-usage')) {
-    // Only when the user has no statusLine (setIfAbsent); uninstall removes it only while it is still ours. Forward slashes: Claude runs it through bash, also on Windows.
-    const script = path.join(dir, 'lean-copilot-usage-statusline.mjs');
-    actions.push({ kind: 'file', path: script, content: statuslineScript() });
-    const q = (p) => `"${p.replaceAll('\\', '/')}"`;
-    edits.push({ path: ['statusLine'], value: { type: 'command', command: `${q(process.execPath)} ${q(script)}` }, mode: 'setIfAbsent', keepIfChanged: true });
-  }
   const pluginWrites = [];
   const settingsAction = { kind: 'json', path: path.join(dir, 'settings.json'), edits };
   actions.push(settingsAction);

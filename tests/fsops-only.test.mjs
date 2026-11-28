@@ -11,12 +11,11 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const WRITE = /\b(?:fs|fsx)\.(?:writeFileSync|appendFileSync|renameSync|rmSync|unlinkSync|copyFileSync|cpSync|symlinkSync)\(|require\('fs'\)/g;
 
 const ALLOWED = {
-  'scripts/lib/fsops.mjs': 8, // the action kinds themselves
+  'scripts/lib/fsops.mjs': 10, // the action kinds themselves, plus retireOwned (#593: removes a marked file an older release wrote)
   'scripts/lean.mjs': 2, // removes its own scratch HOME after probing versions; --uninstall removes the step logs
   'scripts/lib/adapters/opencode-v2.mjs': 1, // inside the vendor undo script, guarded by unsafe()
   'scripts/lib/adopt.mjs': 10, // --adopt --yes: backup first, automatic undo on failure, --adopt --undo restores
   'scripts/lib/agent-lifecycle.mjs': 4, // removes the files it recorded, only while their sha256 still matches; downloaded installers
-  'scripts/lib/copilot-usage.mjs': 2, // its own status-line cache file
   'scripts/lib/opencode-backup.mjs': 10, // frozen session backups lean-agents owns
   'scripts/lib/opencode-upgrade.mjs': 5, // the guided upgrade, with its own undo and rollback
   'scripts/lib/opencode1.mjs': 6, // the opencode1 side-by-side binary lean-agents installs
