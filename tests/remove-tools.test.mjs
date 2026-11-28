@@ -98,7 +98,7 @@ test('--remove-tools ponytail: its own file is reverted, other tools stay', () =
   assert.match(r.stdout, /Removed: ponytail\./);
 });
 
-test('--remove-tools gsd: an untagged file record warns and keeps gsd saved', () => {
+test('--remove-tools gsd: a 1.3.0 untagged file record is attributed and reverted', () => {
   const home = setup();
   const s = readState(home);
   const rec = s.files.find((f) => f.tool === 'gsd');
@@ -106,13 +106,49 @@ test('--remove-tools gsd: an untagged file record warns and keeps gsd saved', ()
   delete rec.tool;
   writeState(home, s);
 
+  // The command keeps its `tool` tag, as a real 1.3.0 install records it.
   const r = run(home, ['--remove-tools', 'gsd', '--yes']);
   assert.equal(r.status, 0, r.stderr + r.stdout);
-  assert.match(r.stdout, /gsd: files from an earlier install stay until --uninstall \(no per-tool record\)/);
-  assert.doesNotMatch(r.stdout, /Removed: gsd/);
-  assert.ok(fs.existsSync(defaults(home)), 'untagged file stays');
-  assert.ok(readState(home).options.tools.includes('gsd'), 'gsd stays saved');
-  assert.ok(readState(home).commands.some((c) => c.tool === 'gsd'), 'its command stays recorded');
+  assert.match(r.stdout, /Removed: gsd/);
+  assert.doesNotMatch(r.stdout, /earlier install/);
+  assert.ok(!fs.existsSync(defaults(home)), 'untagged gsd file reverted');
+  const after = readState(home);
+  assert.ok(!after.options.tools.includes('gsd'), 'gsd no longer saved');
+  assert.ok(!after.files.some((f) => f.tool === 'gsd' || f.path === defaults(home)), 'no gsd file record left');
+  assert.ok(!after.commands.some((c) => c.tool === 'gsd'), 'no gsd command record left');
+});
+
+test('--remove-tools gsd: tagged and untagged gsd files are both reverted', () => {
+  const home = setup();
+  const extra = path.join(home, '.gsd', 'extra.txt');
+  fs.mkdirSync(path.dirname(extra), { recursive: true });
+  fs.writeFileSync(extra, 'extra\n');
+  const s = readState(home);
+  s.files.push({ kind: 'file', path: extra, created: true, hash: sha('extra\n') });
+  writeState(home, s);
+
+  const r = run(home, ['--remove-tools', 'gsd', '--yes']);
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.match(r.stdout, /Removed: gsd/);
+  assert.ok(!fs.existsSync(defaults(home)), 'tagged gsd file reverted');
+  assert.ok(!fs.existsSync(extra), 'untagged gsd file reverted');
+  const after = readState(home);
+  assert.ok(!after.options.tools.includes('gsd'), 'gsd no longer saved');
+  assert.ok(!after.files.some((f) => f.tool === 'gsd' || f.path === extra), 'no gsd file record left');
+});
+
+test('--remove-tools: a saved tool with no record warns and stays saved', () => {
+  const home = setup();
+  const s = readState(home);
+  s.files = s.files.filter((f) => f.tool !== 'caveman');
+  s.commands = s.commands.filter((c) => c.tool !== 'caveman');
+  writeState(home, s);
+
+  const r = run(home, ['--remove-tools', 'caveman', '--yes']);
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.match(r.stdout, /caveman: files from an earlier install stay until --uninstall \(no per-tool record\)/);
+  assert.doesNotMatch(r.stdout, /Removed: caveman/);
+  assert.ok(readState(home).options.tools.includes('caveman'), 'caveman stays saved');
 });
 
 test('--remove-tools gsd: a file left because the user edited it keeps its record', () => {

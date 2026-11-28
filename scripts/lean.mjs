@@ -1446,12 +1446,15 @@ async function removeTools(o) {
     serena: ['serena'], playwright: ['playwright'], 'playwright-extension': ['playwright'], 'context-mode': ['context-mode'],
     rtk: ['rtk'], caveman: ['caveman'], autoskills: ['autoskills'], 'lean-migrate': ['lean-migrate'], 'coordinate': ['coordinate', 'coordinate-watch'], 'code-mode': ['code-mode'],
   };
-  const legacy = (t) => state.files.some((f) => !f.tool && (HINTS[t] ?? [t]).some((n) => f.path.split(/[\\/]/).some((p) => p === n || p.startsWith(`${n}-`) || p.endsWith(`-${n}`))));
+  const hints = (t, f) => !f.tool && (HINTS[t] ?? [t]).some((n) => f.path.split(/[\\/]/).some((p) => p === n || p.startsWith(`${n}-`) || p.endsWith(`-${n}`)));
+  const legacy = (t) => state.files.some((f) => hints(t, f));
   const hasRecord = (t) => state.files.some((f) => f.tool === t) || state.commands.some((c) => c.tool === t);
-  // With no per-tool record at all there is nothing to revert: keep the tool saved so --update still manages it.
-  const warn = new Set(o.removeTools.filter((t) => legacy(t) || (!hasRecord(t) && saved.includes(t))));
-  const active = o.removeTools.filter((t) => !warn.has(t) && (saved.includes(t) || hasRecord(t)));
-  const files = state.files.filter((f) => active.includes(f.tool));
+  // With no record of any kind there is nothing to revert: keep the tool saved so --update still manages it.
+  const warn = new Set(o.removeTools.filter((t) => !legacy(t) && !hasRecord(t) && saved.includes(t)));
+  // A legacy-attributable file counts as a record, so an install made by 1.3.0 still reverts its files (and its tagged commands).
+  const active = o.removeTools.filter((t) => !warn.has(t) && (saved.includes(t) || hasRecord(t) || legacy(t)));
+  const mine = (f) => f.tool ? active.includes(f.tool) : active.some((t) => hints(t, f));
+  const files = state.files.filter(mine);
   const commands = state.commands.filter((c) => active.includes(c.tool));
   console.log(`Remove ${o.removeTools.join(', ')}: this restores ${files.length} files and undoes ${commands.length} commands, all recorded for these tools. Everything else stays.`);
   for (const f of files) console.log(`  - revert: ${f.path}`);
@@ -1475,7 +1478,7 @@ async function removeTools(o) {
   const stuck = new Set([...failed].map((c) => c.tool));
   const left = new Set(reports.filter(([what]) => what.startsWith('left')).map(([, file]) => file));
   const removed = active.filter((t) => !stuck.has(t));
-  const next = { ...state, updatedAt: new Date().toISOString(), options: { ...state.options, tools: saved.filter((t) => !removed.includes(t)) }, files: state.files.filter((f) => !active.includes(f.tool) || left.has(f.path)), commands: state.commands.filter((c) => !active.includes(c.tool) || failed.has(c)) };
+  const next = { ...state, updatedAt: new Date().toISOString(), options: { ...state.options, tools: saved.filter((t) => !removed.includes(t)) }, files: state.files.filter((f) => !mine(f) || left.has(f.path)), commands: state.commands.filter((c) => !active.includes(c.tool) || failed.has(c)) };
   writePrivate(path.join(stateDir(o.home), 'state.json'), `${JSON.stringify(next, null, 2)}\n`);
   if (failed.size) console.log(`Not finished: ${failed.size} undo command(s) failed and stay recorded; run --remove-tools again.`);
   else if (removed.length) console.log(`Removed: ${removed.join(', ')}. Add back with --add-tools.`);
