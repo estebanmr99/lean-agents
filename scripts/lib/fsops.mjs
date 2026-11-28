@@ -216,7 +216,14 @@ export function userHash(text, ignore = []) {
     const src = value && typeof value === 'object' ? value.source : undefined;
     const match = entry.repo !== undefined ? src && (src.repo === entry.repo || src.url === entry.repo) : value === entry.value;
     // A marketplace entry has fields besides the source our plugin command writes; only the source is ours.
-    if (match) entry.repo !== undefined ? delete value.source : delete o[keyPath.at(-1)];
+    if (match) {
+      if (entry.repo === undefined) delete o[keyPath.at(-1)];
+      else {
+        delete value.source;
+        // An entry holding only the source leaves the hash exactly as the old whole-entry drop did.
+        if (!Object.keys(value).length) delete o[keyPath.at(-1)];
+      }
+    }
   }
   return sha(JSON.stringify(data));
 }
@@ -235,7 +242,7 @@ function pruneToManaged(node, prefix, ignore, managed) {
       const entry = ignore.find((e) => samePath(e.path, keyPath));
       if (entry.repo !== undefined && v && typeof v === 'object') {
         const { source, ...rest } = v;
-        out[k] = rest;
+        if (Object.keys(rest).length) out[k] = rest;
       }
       continue;
     }
