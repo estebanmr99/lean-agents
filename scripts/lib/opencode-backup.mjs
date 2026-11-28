@@ -31,6 +31,7 @@ export const OPENCODE_RUNNING = "an opencode process is running (the 1.x app or 
 export const OPENCODE_RUNNING_INSIDE = "you are running inside OpenCode: close this OpenCode session, then run `lean-agents --update` from a terminal";
 // VERIFY: OpenCode 2 sets OPENCODE for the shells its tools run (docs/compatibility.md).
 export const insideOpenCode = (env = process.env) => Boolean(env?.OPENCODE);
+export const OPENCODE_STOP_FAILED = '! lean-agents could not stop the OpenCode 2 background service its commands started: run `opencode service stop` by hand.';
 export const opencodeRunningText = (env = process.env) => (insideOpenCode(env) ? OPENCODE_RUNNING_INSIDE : OPENCODE_RUNNING);
 
 // #548: a row that stops the OpenCode 2 service only when this run started it: no opencode PID before, a new one after.
@@ -40,6 +41,21 @@ export function serviceStopRow({ before, agents = [], pids = opencodePids }) {
   try { after = new Set(pids()); } catch { return null; }
   const started = [...after].filter((p) => !before.has(p));
   return !before.size && started.length ? { desc: 'stop the OpenCode 2 background service that lean-agents started', run: [['opencode', 'service', 'stop']] } : null;
+}
+
+// #592: a lean-agents call that may auto-start the OpenCode 2 service (the --doctor probes) notes the service state first;
+// stop() then runs the #548 stop only if that call started it. Nothing is listed unless OpenCode 2 is configured.
+// shortcut: compares PID sets, so a service the user starts during the window looks like ours (same limit as #548); stops only when the before set was empty.
+export function serviceGuard({ agents = [], pids = opencodePids } = {}) {
+  if (!agents.includes('opencode-v2')) return { stop() {} };
+  let before = null;
+  try { before = new Set(pids()); } catch { /* cannot list: never stop what may be the user's */ }
+  return {
+    stop(run, say = console.log) {
+      const row = serviceStopRow({ before, agents, pids });
+      if (row && !run(row.run[0])?.ok) say(OPENCODE_STOP_FAILED);
+    },
+  };
 }
 
 // #488: --update must not swap the OpenCode binary or rewrite its plugins while the 1.x app or the 2.x service runs.
@@ -63,7 +79,11 @@ export function listProcesses(platform = process.platform) {
 // PIDs of the running OpenCode processes, so a run can tell the service it started from the user's (#548).
 export function opencodePids(platform = process.platform) {
   const win = platform === 'win32';
-  const out = execFileSync(win ? 'tasklist' : 'ps', win ? ['/FO', 'CSV', '/NH'] : ['-A', '-o', 'pid=,comm='], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  return parseOpencodePids(execFileSync(win ? 'tasklist' : 'ps', win ? ['/FO', 'CSV', '/NH'] : ['-A', '-o', 'pid=,comm='], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }), win);
+}
+
+// The PID column of `tasklist /FO CSV /NH` (win) or `ps -A -o pid=,comm=`, kept for OpenCode's image names.
+export function parseOpencodePids(out, win) {
   const pids = [];
   for (const line of out.split(/\r?\n/)) {
     if (!line) continue;
