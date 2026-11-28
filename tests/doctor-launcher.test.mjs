@@ -13,7 +13,8 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'doctor-launcher-'));
 // On win32 PATHEXT and SystemRoot stay inherited: `where` needs them to match a .cmd stub.
 function withPath(dir, fn) {
   const saved = { PATH: process.env.PATH, PATHEXT: process.env.PATHEXT, SystemRoot: process.env.SystemRoot };
-  process.env.PATH = dir;
+  // win32: `where` (System32) must stay reachable, or every lookup reads as not found.
+  process.env.PATH = win ? `${dir};${path.join(saved.SystemRoot || 'C:\\Windows', 'System32')}` : dir;
   if (win) { process.env.PATHEXT = saved.PATHEXT; process.env.SystemRoot = saved.SystemRoot; }
   try { return fn(); } finally {
     for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
