@@ -43,7 +43,7 @@ test('--uninstall --dry-run lists undo for bun-path and jq and leaves state.json
   assert.equal(res.status, 0, res.stdout + res.stderr);
   assert.match(res.stdout, /This restores 0 files and undoes 2 commands\./);
   assert.match(res.stdout, /  - undo: prerequisite: jq/);
-  assert.match(res.stdout, /  - undo: put ~\\\.bun\\bin on your user PATH \(open a new terminal\)/);
+  assert.match(res.stdout, /  - undo: put ~\\\.bun\\bin on your user PATH \(open a new terminal\)/); // literal-tilde: hardcoded Windows description text
   assert.match(res.stdout, /Nothing changed\./);
 
   const afterContent = fs.readFileSync(stateFile, 'utf8');

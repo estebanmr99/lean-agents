@@ -23,7 +23,7 @@ const logins = loginRows({ agents: ['claude'], gh: true, exec: false });
 test('model groups installed, kept, skipped, updated and the doctor result', () => {
   const m = buildSummary({ rows, applied, logins, updated: ['claude'], home, env: {} });
   assert.deepEqual(m.summary.installed, ['.claude/CLAUDE.md', '.config/opencode/opencode.json', 'install rtk']);
-  assert.deepEqual(m.summary.kept, ['~/.claude/CLAUDE.md']);
+  assert.deepEqual(m.summary.kept, ['~/.claude/CLAUDE.md']); // literal-tilde: input fixture copied through
   assert.deepEqual(m.summary.skipped, ['Copilot extension']);
   assert.deepEqual(m.summary.updated, ['claude']);
   assert.equal(m.ok, false);
@@ -36,7 +36,7 @@ test('model groups installed, kept, skipped, updated and the doctor result', () 
 test('no home path, email or token survives anywhere in the model', () => {
   const s = JSON.stringify(buildSummary({ rows, applied, logins, home, env: {} }));
   assert.doesNotMatch(s, /\/opt\/lean-home|example\.com|ghp_/);
-  assert.match(s, /~\/bin/);
+  assert.match(s, /~\/bin/); // literal-tilde: input uses a POSIX home literal
 });
 
 test('env values are redacted too', () => {

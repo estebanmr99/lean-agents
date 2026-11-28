@@ -112,7 +112,7 @@ test('real engine: dry-run plans the block, apply writes it and prints notice, u
   fs.writeFileSync(path.join(home, '.profile'), 'export MINE=1\n');
   const dry = runLean('--dry-run');
   assert.equal(dry.status, 0, dry.stderr);
-  assert.match(dry.stdout, /modify\s+~\/\.profile/);
+  assert.match(dry.stdout, /modify\s+~\/\.profile/); // literal-tilde: POSIX-only test
 
   const applyRun = runLean();
   assert.equal(applyRun.status, 0, applyRun.stderr);

@@ -7,6 +7,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { inventory } from '../scripts/lib/adopt.mjs';
 import { seedHandbuilt, treeHash, SECRETS } from './fixtures/handbuilt.mjs';
+import { tildePath } from './helpers/home-path.mjs';
 
 const j = path.join;
 const LEAN = path.resolve(import.meta.dirname, '..', 'scripts', 'lean.mjs');
@@ -59,7 +60,7 @@ test('dry run: every class shows up with the planned action', { skip }, async ()
   assert.deepEqual(npm.map((n) => [n.node, n.action]), [['22.20.0', 'remove'], ['24.15.0', 'upgrade']]); // old copy goes, the tool Node's copy is upgraded
   assert.equal(r.toolNode.source, 'reuse'); assert.equal(r.toolNode.version, '24.15.0');
 
-  assert.deepEqual(r.stopgaps.map((x) => x.file).sort(), ['~/.config/opencode/plugins/orca-status-tui-shim.js', '~/.local/bin/copilot-usage']);
+  assert.deepEqual(r.stopgaps.map((x) => x.file).sort(), [tildePath('.config', 'opencode', 'plugins', 'orca-status-tui-shim.js'), tildePath('.local', 'bin', 'copilot-usage')]);
   assert.ok(r.stopgaps.every((x) => /managed/.test(x.replaceWith)));
   assert.ok(r.plan.length > 0 && r.ok === false);
   assert.equal(r.opencode.major, 1);

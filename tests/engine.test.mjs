@@ -1120,7 +1120,7 @@ test('undocumented settings: asked only when relevant, kept when another agent s
   const src = path.join(home, 'it-notes.txt');
   fs.writeFileSync(src, 'line 1\nline 2 http://a:b@c\n');
   assert.match(notesFile(home, item, src).content, /Source: .*it-notes\.txt\n\nline 1\nline 2 http:\/\/\*\*\*@c\n$/);
-  assert.match(notesFile(home, item, '~/it-notes.txt').content, /Source: .*it-notes\.txt/);
+  assert.match(notesFile(home, item, '~/it-notes.txt').content, /Source: .*it-notes\.txt/); // literal-tilde: user-typed input path, not an expected OS path
 });
 
 test('--yes keeps every tool default for undocumented settings and writes no notes', () => {
@@ -1362,7 +1362,7 @@ test('bunInstall: pinned zip, SHA256 check before extraction, undo only for what
 
 test('bunPathCommand returns the same PowerShell strings as bunInstall on Windows', () => {
   const b = bunPathCommand("C:\\Users\\O'Neil");
-  assert.equal(b.desc, 'put ~\\.bun\\bin on your user PATH (open a new terminal)');
+  assert.equal(b.desc, 'put ~\\.bun\\bin on your user PATH (open a new terminal)'); // literal-tilde: hardcoded Windows bun path text
   assert.equal(b.tool, 'bun-path');
   assert.equal(b.run[0][0], 'powershell');
   assert.match(b.run[0].at(-1), /SetEnvironmentVariable\('Path'/);

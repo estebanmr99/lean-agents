@@ -149,6 +149,6 @@ test('inside OpenCode no file under the OpenCode config folder changes; other ag
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(ocFiles(f.home), before);
   assert.notEqual(fs.readFileSync(claudeRules, 'utf8'), '# managed by lean-agents\nstale\n');
-  assert.match(r.stderr, /^deferred \(OpenCode is running this session\): update ~\/\.config\/opencode\/agents\/debug\.md$/m);
+  assert.match(r.stderr, /^deferred \(OpenCode is running this session\): update ~\/\.config\/opencode\/agents\/debug\.md$/m); // literal-tilde: POSIX-only test
   assert.ok(f.state().pending.steps.some((s) => /opencode\/agents\/debug\.md/.test(s.desc)));
 });

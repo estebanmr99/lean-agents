@@ -120,7 +120,7 @@ test('terminalCommands: an Orca update replaces the app where it was found and r
   const update = terminalCommands({ home, terminals: [], installTerminals: ['orca'], updateApps: ['orca'], appPaths: { orca: found }, agents: [], platform: 'darwin', system: true }).find((c) => c.tool === 'orca');
   const script = update.run[0].at(-1);
   assert.ok(script.includes(found), 'the stale /Applications copy is replaced in place');
-  assert.ok(!script.includes(path.join(home, 'Applications', 'Orca.app')), 'no second copy in ~/Applications');
+  assert.ok(!script.includes(path.join(home, 'Applications', 'Orca.app')), 'no second copy in ~/Applications'); // literal-tilde: assertion message text
   assert.match(script, /pgrep -x Orca/);
   assert.deepEqual(update.undo, [['rm', '-rf', found]]);
 });

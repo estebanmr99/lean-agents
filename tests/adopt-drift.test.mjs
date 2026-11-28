@@ -8,6 +8,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { adoptPlan, inventory } from '../scripts/lib/adopt.mjs';
 import { PINS } from '../scripts/lib/pins.mjs';
+import { tildePath } from './helpers/home-path.mjs';
 
 const j = path.join;
 const LEAN = path.resolve(import.meta.dirname, '..', 'scripts', 'lean.mjs');
@@ -55,7 +56,7 @@ test('the same plugin in the server config and tui.json is two needed rows with 
   const env = { PATH: process.env.PATH, NVM_DIR: j(h, '.nvm'), HOME: h }; // no inherited XDG_* or other vars
   const r = spawnSync(process.execPath, [LEAN, '--home', h, '--no-exec', '--adopt', '--json'], { encoding: 'utf8', env });
   const rows = JSON.parse(r.stdout).items.filter((i) => i.name === '@tarquinen/opencode-dcp@latest');
-  assert.deepEqual(rows.map((i) => i.file).sort(), ['~/.config/opencode/opencode.jsonc', '~/.config/opencode/tui.json']);
+  assert.deepEqual(rows.map((i) => i.file).sort(), [tildePath('.config', 'opencode', 'opencode.jsonc'), tildePath('.config', 'opencode', 'tui.json')]);
   assert.ok(rows.every((i) => !i.status.includes('duplicate')));
   const text = spawnSync(process.execPath, [LEAN, '--home', h, '--no-exec', '--adopt'], { encoding: 'utf8', env }).stdout;
   const lines = text.split('\n').filter((l) => l.includes('opencode-dcp'));

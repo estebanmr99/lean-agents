@@ -172,7 +172,7 @@ test('duplicate skills: same content is a note, different content is changed; th
   assert.match(rows.diff.detail, /differ; winner: unknown \(load order\)/);
   assert.match(rows['orca-cli'].detail, /Orca installs this skill/);
   assert.equal(r.skills.length, 3);
-  assert.deepEqual(r.skills.find((s) => s.name === 'diff').dirs.map((d) => d.replaceAll('\\', '/')), ['~/.agents/skills', '~/.claude/skills']);
+  assert.deepEqual(r.skills.find((s) => s.name === 'diff').dirs.map((d) => d.replaceAll('\\', '/')), ['~/.agents/skills', '~/.claude/skills']); // literal-tilde: normalized to forward slashes first
   assert.ok(r.skills[0].agents.includes('opencode'));
   assert.equal(r.ok, true);
 });
@@ -263,12 +263,12 @@ test('projectNode: nested cwd finds parent package.json with range checks', () =
   const ok24 = projectNode({ cwd: nested, home: h, nodeVersion: '24.1.0' });
   assert.equal(ok24.status, 'ok');
   assert.equal(ok24.item, 'project Node');
-  assert.equal(ok24.detail, 'Node 24.1.0 fits engines.node >=22 in ~/proj/package.json; VS Code or Cursor started outside this shell can resolve another Node');
+  assert.equal(ok24.detail, 'Node 24.1.0 fits engines.node >=22 in ~/proj/package.json; VS Code or Cursor started outside this shell can resolve another Node'); // literal-tilde: projectNode normalizes the path to /
 
   fs.writeFileSync(pkgPath, JSON.stringify({ engines: { node: '22.12.0' } }));
   const note24 = projectNode({ cwd: nested, home: h, nodeVersion: '24.1.0' });
   assert.equal(note24.status, 'note');
-  assert.equal(note24.detail, 'Node 24.1.0 is active but ~/proj/package.json asks for engines.node 22.12.0: run nvm use (or your version manager) in this project; VS Code or Cursor started outside this shell can resolve another Node');
+  assert.equal(note24.detail, 'Node 24.1.0 is active but ~/proj/package.json asks for engines.node 22.12.0: run nvm use (or your version manager) in this project; VS Code or Cursor started outside this shell can resolve another Node'); // literal-tilde: projectNode normalizes the path to /
 
   assert.equal(projectNode({ cwd: nested, home: h, nodeVersion: '22.5.0' }).status, 'note', 'below an exact pin');
   fs.writeFileSync(pkgPath, JSON.stringify({ engines: { node: '^22' } }));
@@ -276,7 +276,7 @@ test('projectNode: nested cwd finds parent package.json with range checks', () =
   fs.writeFileSync(pkgPath, JSON.stringify({ engines: { node: '22.12.0' } }));
   const ok22 = projectNode({ cwd: nested, home: h, nodeVersion: '22.12.0' });
   assert.equal(ok22.status, 'ok');
-  assert.equal(ok22.detail, 'Node 22.12.0 fits engines.node 22.12.0 in ~/proj/package.json; VS Code or Cursor started outside this shell can resolve another Node');
+  assert.equal(ok22.detail, 'Node 22.12.0 fits engines.node 22.12.0 in ~/proj/package.json; VS Code or Cursor started outside this shell can resolve another Node'); // literal-tilde: projectNode normalizes the path to /
 });
 
 test('doctor: with exec false and a cwd at a temp project includes a project Node row', () => {
@@ -290,7 +290,7 @@ test('doctor: with exec false and a cwd at a temp project includes a project Nod
   const row = rows.find((r) => r.item === 'project Node');
   assert.ok(row, 'found project Node row');
   assert.equal(row.status, 'ok');
-  assert.equal(row.detail, 'Node 24.1.0 fits engines.node >=22 in ~/my-app/package.json; VS Code or Cursor started outside this shell can resolve another Node');
+  assert.equal(row.detail, 'Node 24.1.0 fits engines.node >=22 in ~/my-app/package.json; VS Code or Cursor started outside this shell can resolve another Node'); // literal-tilde: projectNode normalizes the path to /
   const leanIdx = rows.findIndex((r) => r.item === 'lean-agents');
   const projIdx = rows.findIndex((r) => r.item === 'project Node');
   assert.equal(projIdx, leanIdx + 2);

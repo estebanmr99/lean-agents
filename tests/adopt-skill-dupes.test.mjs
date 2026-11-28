@@ -34,7 +34,7 @@ test('work-PC layout as real copies: all three folders are flagged, with clients
   for (const r of rows) {
     assert.ok(r.status.includes('duplicate')); assert.equal(r.action, 'ask');
     assert.equal(r.differs, false); assert.equal(r.linked, false);
-    assert.match(r.fix, /keep one folder \(e\.g\. ~\/\.agents\/skills\)/); assert.match(r.fix, /after a backup/);
+    assert.match(r.fix, /keep one folder \(e\.g\. ~\/\.agents\/skills\)/); assert.match(r.fix, /after a backup/); // literal-tilde: hardcoded message text
   }
   const by = Object.fromEntries(rows.map((r) => [r.file.split('/')[1], r.clients])); // each folder: the clients that read it together with another copy
   assert.deepEqual(by, { '.agents': ['cursor', 'opencode'], '.claude': ['opencode'], '.cursor': ['cursor'] });
