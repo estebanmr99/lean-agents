@@ -18,9 +18,16 @@ test('#475: spawnArgs on Windows runs a .cmd shim through cmd.exe with every arg
   assert.equal(r.args[3], '""C:\\Program Files\\nodejs\\npx.cmd" ^^^"-y^^^" ^^^"a^^^ b^^^ ^^^&^^^ c^^^""');
   assert.equal(r.opts.windowsVerbatimArguments, true);
   assert.equal('shell' in r.opts, false);
-  // A real .exe and every POSIX binary run directly.
-  assert.deepEqual(spawnArgs('rtk', ['x y'], 'win32', () => ['C:\\bin\\rtk.exe']), { file: 'rtk', args: ['x y'], opts: {} });
+  // A real .exe runs directly but by its absolute PATH match (#630), and every POSIX binary runs as the bare name.
+  assert.deepEqual(spawnArgs('rtk', ['x y'], 'win32', () => ['C:\\bin\\rtk.exe']), { file: 'C:\\bin\\rtk.exe', args: ['x y'], opts: {} });
+  assert.deepEqual(spawnArgs('C:\\bin\\rtk.exe', ['x y'], 'win32', () => { throw new Error('not called'); }), { file: 'C:\\bin\\rtk.exe', args: ['x y'], opts: {} });
   assert.deepEqual(spawnArgs('npx', ['x y'], 'linux', () => { throw new Error('not called'); }), { file: 'npx', args: ['x y'], opts: {} });
+});
+
+test('#630: spawnArgs on Windows returns the absolute .exe match, never the bare name', () => {
+  const r = spawnArgs('rtk', ['check'], 'win32', () => ['D:\\tools\\rtk.exe']);
+  assert.equal(r.file, 'D:\\tools\\rtk.exe');
+  assert.deepEqual(r.args, ['check']);
 });
 
 test('#475: tricky arguments reach the child unchanged (a .cmd shim on Windows, a script on POSIX)', () => {

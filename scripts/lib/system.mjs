@@ -10,10 +10,26 @@ import { CURL_RETRY } from './retry.mjs';
 
 const isWin = process.platform === 'win32';
 
+// `where` searches the current folder before PATH (#630); on Windows, drop a cwd match unless the cwd is on PATH.
+export function dropCwd(results, cwd = process.cwd(), pathVar = '', realpath = fs.realpathSync.native) {
+  // os.tmpdir() and PATH may spell a folder in 8.3 short form while `where` prints the long form (#630).
+  const real = (p) => { try { return realpath(p); } catch { return path.win32.resolve(p); } };
+  const norm = (p) => real(path.win32.resolve(p)).toLowerCase();
+  const here = norm(cwd);
+  // A quoted entry is the same folder; a relative entry (`.` included) resolves against the child's cwd.
+  const entry = (d) => norm(path.win32.resolve(cwd, d.replace(/^"|"$/g, '')));
+  const onPath = String(pathVar).split(path.win32.delimiter).filter(Boolean).some((d) => entry(d) === here);
+  return onPath ? results : results.filter((f) => norm(path.win32.dirname(f)) !== here);
+}
+
 // Every match, in PATH order. POSIX: `command -v` gets the name as "$1", never spliced into the script (#475); /bin/sh as shell: true used.
 const whereAll = (bin, env) => {
   const r = isWin ? spawnSync('where', [bin], { encoding: 'utf8', ...(env && { env }) }) : spawnSync('/bin/sh', ['-c', 'command -v "$1"', 'sh', bin], { encoding: 'utf8' });
-  return r.status === 0 ? r.stdout.trim().split(/\r?\n/).filter(Boolean) : [];
+  const all = r.status === 0 ? r.stdout.trim().split(/\r?\n/).filter(Boolean) : [];
+  if (!isWin) return all;
+  const e = env || process.env;
+  const key = Object.keys(e).find((k) => k.toLowerCase() === 'path');
+  return dropCwd(all, process.cwd(), key ? e[key] : '');
 };
 export const which = (bin) => whereAll(bin)[0] ?? null;
 
@@ -27,7 +43,9 @@ export function spawnArgs(bin, args, platform = process.platform, resolve = wher
   const direct = { file: bin, args, opts: {} };
   if (platform !== 'win32' || /\.exe$/i.test(bin)) return direct;
   const full = /\.(cmd|bat)$/i.test(bin) && path.win32.isAbsolute(bin) ? bin : resolve(bin).find((f) => /\.(exe|cmd|bat)$/i.test(f));
-  if (!full || /\.exe$/i.test(full)) return direct;
+  if (!full) return direct;
+  // libuv searches the cwd before PATH for a bare name (#630), so hand it the absolute .exe `where` found.
+  if (/\.exe$/i.test(full)) return { file: full, args, opts: {} };
   // The file in plain quotes (a Windows path cannot hold `"`): a ^-escaped path breaks the shim's own %~dp0.
   const line = [`"${full}"`, ...args.map(cmdArg)].join(' ');
   return { file: process.env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', `"${line}"`], opts: { windowsVerbatimArguments: true } };
