@@ -185,8 +185,8 @@ MOUNTED=1
 mkdir -p "$(dirname "${target}")"
 rm -rf "${target}.new"
 ditto "$MOUNT/Orca.app" "${target}.new"
-rm -rf "${target}"
 SWAPPING=1
+rm -rf "${target}"
 mv "${target}.new" "${target}"
 `;
       commands.push({
