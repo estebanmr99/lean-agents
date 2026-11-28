@@ -4,6 +4,40 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-28
+
+### Added
+- `/lean-update` works as a slash command in OpenCode 1.x and 2.x: lean-agents writes `~/.config/opencode/commands/lean-update.md` (owned file, undone by `--uninstall`, a user file with that name is kept); `--doctor` shows one `lean-update command` row per agent. OpenCode only for now; the other agents are the rest of #572 (#572)
+- `--remove-tools a,b` removes single tools (for example `gsd`) without a full uninstall: plan, confirm, their recorded undo commands and file edits, and they leave the saved tools so `--update` does not bring them back (#573)
+- `--update` inside an OpenCode session applies the steps that do not touch OpenCode and defers the others (and any file under the OpenCode config folder) until you close OpenCode and run `lean-agents --update` in a terminal; `--doctor` shows a `pending` row (#575)
+
+### Changed
+- Spanish rules (`core/AGENTS.es.md`) are a rule-for-rule translation of the trimmed English rules, so Spanish installs load the same short rule set (#539)
+- Tests build expected home paths with `tildePath(...)`, and `npm test` fails on a literal `~/` inside an assertion (#544)
+- The Windows fresh-machine nightly prints the masked install step log on failure (#557)
+- `npm test` replays the redacted 1.3.0 e2e-update artifacts and every question the lean-update skill prescribes, so an evaluator or skill-wording change is caught before a CI dispatch (#586)
+
+### Fixed
+- Marketplace plugin tags are checked against the sha recorded in `core/pins.json`, so a moved tag cannot install different code (#523)
+- `--adopt` cleanup line is printed only for a global whose folder name matches its package.json name, quotes `--prefix` for the platform's shell, and the printed list strips bidi and zero-width characters (#525)
+- `--doctor` shows a user edit inside an ignored marketplace entry; `--update` no longer folds a kept `keepIfChanged` value into the new user hash (#526)
+- A local-server test runs the PowerShell download retry on pwsh 7 and Windows PowerShell 5.1: a 503 then a 200 makes two requests, a 404 makes one (#540)
+- `scripts/release-gate.sh` validates `<version>` and reads repo files from the checkout root, so a subfolder run finds the audit and a bad version exits 2 (#542)
+- The gh opt-in test pins its PATH, so it no longer depends on the machine's gh (#549)
+- `--doctor` tells an absent agent CLI, a launcher-only stub (exit 127 or no version) and a runnable CLI apart, and names the `--install-agent` fix (#564). Only agent CLIs get this check; other tools that print no version keep their `ok unknown` row.
+- `--remove-tools` reverts files from an earlier install that have no per-tool record but sit under the tool's own folder, and keeps records for files it left because the user edited them; a saved tool with no record at all still warns and stays until `--uninstall` (#573)
+- `--remove-tools` no longer attributes every untagged file to a tool when a folder inside the user's home matches its hint (#573)
+- e2e-update no longer passes the OpenRouter key to the `opencode run` steps: only the step that starts the OpenCode service, the spend watcher and the budget/redact steps get it, and the agent steps fail if their own env carries it. The remaining same-user exposure (service env, `/proc`) is tracked in #617 (#579)
+- e2e-update redaction also removes any `sk-or-` key and fails the step when the key is unset; the evaluator accepts `||` after the cd target; the lean-update skill prescribes the exact summary-page question (#579)
+- A failed fresh Orca install no longer leaves a partial `Orca.app.new` (#580)
+- `scripts/release-gate.sh <version> <sha>` fails fast when the checkout HEAD is not the gated SHA, and fails on uncommitted or untracked changes in `core/`, `scripts/`, `docs/` or `changes/`. It reads its pins, audit and git state from its own checkout, not the caller's directory, so a release is never gated on stale or foreign files (#587)
+- The `orca-app` pin moves forward to 1.4.280 after going backwards in 1.3.0; the release gate now fails when any pin in `core/pins.json` is lower than in the previous release tag, unless the pin carries a `downgrade` note (#590)
+- `--update --add-tools copilot-usage` on OpenCode 2 now removes the hand-made meter from `cli.json` and a stale `tui.json`, and no longer loses an edit when two changes hit the same config file (#591)
+- `--doctor` (and the summary of `--update`, and `--adopt`) no longer leaves the OpenCode 2 background service running that its own `opencode debug config` probe started; a service you started is still kept (#592)
+- `copilot-usage` is OpenCode-only: it no longer writes a Claude Code statusline script or `statusLine` key, and `--update` removes the managed `~/.claude/lean-copilot-usage-statusline.mjs` that 1.3.0 left (an unmarked file with that name is kept), and also takes back our `statusLine` edit when `--update` has another pending `settings.json` change (#593)
+- Windows `which()` ignores a match in the current folder unless that folder is on PATH, so a stray `copilot.cmd` or `rtk.exe` in the cwd is no longer run (#630)
+- On Windows, a bare command with no PATH match no longer runs a file from the current folder (#636)
+
 ## [1.3.0] - 2026-11-27
 
 ### Added
