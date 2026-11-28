@@ -12,7 +12,7 @@ import path from 'node:path';
 import { rcFiles } from './shell-path.mjs';
 import { execFileSync } from 'node:child_process';
 import { backupLayout, sha256File } from './opencode-backup.mjs';
-import { which as findOnPath } from './system.mjs';
+import { which as findOnPath, sys32 } from './system.mjs';
 import { plan as planActions, renameRetry } from './fsops.mjs';
 
 const j = path.join;
@@ -104,7 +104,7 @@ try { $k.SetValue('Path', $new, [Microsoft.Win32.RegistryValueKind]::ExpandStrin
 [Environment]::SetEnvironmentVariable('LEAN_AGENTS_PATH_REFRESH', $null, 'User')
 'changed'
 `;
-export const winPathDefault = (op, dir) => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', WIN_PATH_PS], {
+export const winPathDefault = (op, dir) => execFileSync(sys32('WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-Command', WIN_PATH_PS], {
   encoding: 'utf8', windowsHide: true, env: { ...process.env, LEAN_PATH_DIR: dir, LEAN_PATH_OP: op },
 }).trim().split(/\r?\n/).pop();
 

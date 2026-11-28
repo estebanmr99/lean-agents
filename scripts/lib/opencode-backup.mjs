@@ -9,7 +9,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { countInChild } from './adopt.mjs';
-import { configHome, envDir } from './system.mjs';
+import { configHome, envDir, sys32 } from './system.mjs';
 import { privateDir, renameRetry } from './fsops.mjs';
 
 const j = path.join;
@@ -72,14 +72,14 @@ export function runningBlocker(commands, list = listProcesses, env = process.env
 // Image names of every running process. shortcut: found by image name only (the 2.x service, and 1.19's platform binary, which npm's node wrapper spawns: VERIFY), not by command line.
 export function listProcesses(platform = process.platform) {
   const win = platform === 'win32';
-  const out = execFileSync(win ? 'tasklist' : 'ps', win ? ['/FO', 'CSV', '/NH'] : ['-A', '-o', 'comm='], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const out = execFileSync(win ? sys32('tasklist.exe') : 'ps', win ? ['/FO', 'CSV', '/NH'] : ['-A', '-o', 'comm='], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   return out.split(/\r?\n/).map((l) => (win ? /^"([^"]*)"/.exec(l)?.[1] ?? '' : l)).filter(Boolean);
 }
 
 // PIDs of the running OpenCode processes, so a run can tell the service it started from the user's (#548).
 export function opencodePids(platform = process.platform) {
   const win = platform === 'win32';
-  return parseOpencodePids(execFileSync(win ? 'tasklist' : 'ps', win ? ['/FO', 'CSV', '/NH'] : ['-A', '-o', 'pid=,comm='], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }), win);
+  return parseOpencodePids(execFileSync(win ? sys32('tasklist.exe') : 'ps', win ? ['/FO', 'CSV', '/NH'] : ['-A', '-o', 'pid=,comm='], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }), win);
 }
 
 // The PID column of `tasklist /FO CSV /NH` (win) or `ps -A -o pid=,comm=`, kept for OpenCode's image names.

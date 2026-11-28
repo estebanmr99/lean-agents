@@ -10,6 +10,9 @@ import { CURL_RETRY } from './retry.mjs';
 
 const isWin = process.platform === 'win32';
 
+// Windows OS tools live outside PATH (#636): a bare name would be searched in the current folder first.
+export const sys32 = (...parts) => path.win32.join(process.env.SystemRoot || 'C:\\Windows', 'System32', ...parts);
+
 // `where` searches the current folder before PATH (#630); on Windows, drop a cwd match unless the cwd is on PATH.
 export function dropCwd(results, cwd = process.cwd(), pathVar = '', realpath = fs.realpathSync.native) {
   // os.tmpdir() and PATH may spell a folder in 8.3 short form while `where` prints the long form (#630).
@@ -24,7 +27,7 @@ export function dropCwd(results, cwd = process.cwd(), pathVar = '', realpath = f
 
 // Every match, in PATH order. POSIX: `command -v` gets the name as "$1", never spliced into the script (#475); /bin/sh as shell: true used.
 const whereAll = (bin, env) => {
-  const r = isWin ? spawnSync('where', [bin], { encoding: 'utf8', ...(env && { env }) }) : spawnSync('/bin/sh', ['-c', 'command -v "$1"', 'sh', bin], { encoding: 'utf8' });
+  const r = isWin ? spawnSync(sys32('where.exe'), [bin], { encoding: 'utf8', ...(env && { env }) }) : spawnSync('/bin/sh', ['-c', 'command -v "$1"', 'sh', bin], { encoding: 'utf8' });
   const all = r.status === 0 ? r.stdout.trim().split(/\r?\n/).filter(Boolean) : [];
   if (!isWin) return all;
   const e = env || process.env;
@@ -41,9 +44,11 @@ const META = /([()\][%!^"`<>&|;, *?])/g;
 const cmdArg = (a) => `"${String(a).replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, '$1$1')}"`.replace(META, '^$1').replace(META, '^$1');
 export function spawnArgs(bin, args, platform = process.platform, resolve = whereAll) {
   const direct = { file: bin, args, opts: {} };
-  if (platform !== 'win32' || /\.exe$/i.test(bin)) return direct;
-  const full = /\.(cmd|bat)$/i.test(bin) && path.win32.isAbsolute(bin) ? bin : resolve(bin).find((f) => /\.(exe|cmd|bat)$/i.test(f));
-  if (!full) return direct;
+  const absolute = path.win32.isAbsolute(bin);
+  if (platform !== 'win32' || (absolute && /\.exe$/i.test(bin))) return direct;
+  const full = /\.(cmd|bat)$/i.test(bin) && absolute ? bin : resolve(bin).find((f) => /\.(exe|cmd|bat)$/i.test(f));
+  // A bare name with no PATH match would be searched in the child's cwd by libuv (#636): never hand it over.
+  if (!full) return absolute ? direct : { file: bin, args, opts: {}, missing: true };
   // libuv searches the cwd before PATH for a bare name (#630), so hand it the absolute .exe `where` found.
   if (/\.exe$/i.test(full)) return { file: full, args, opts: {} };
   // The file in plain quotes (a Windows path cannot hold `"`): a ^-escaped path breaks the shim's own %~dp0.
@@ -51,7 +56,14 @@ export function spawnArgs(bin, args, platform = process.platform, resolve = wher
   return { file: process.env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', `"${line}"`], opts: { windowsVerbatimArguments: true } };
 }
 // The shim is looked up on the child's PATH, as cmd.exe did when `shell: true` ran it.
-export const spawnFor = (argv, opts = {}) => { const s = spawnArgs(argv[0], argv.slice(1), process.platform, (b) => whereAll(b, opts.env)); return spawnSync(s.file, s.args, { ...opts, ...s.opts }); };
+export const spawnFor = (argv, opts = {}) => {
+  const s = spawnArgs(argv[0], argv.slice(1), process.platform, (b) => whereAll(b, opts.env));
+  if (s.missing) {
+    const empty = opts.encoding ? '' : Buffer.alloc(0);
+    return { pid: 0, status: null, signal: null, stdout: empty, stderr: empty, output: [null, empty, empty], error: Object.assign(new Error(`spawn ${argv[0]} ENOENT`), { code: 'ENOENT' }) };
+  }
+  return spawnSync(s.file, s.args, { ...opts, ...s.opts });
+};
 
 // Windows .cmd/.bat files run through cmd.exe /d /s /c "<quoted file> <args>" (#475): no shell option, and a path with a cmd
 // metacharacter is refused (null) instead of being quoted. Args are fixed words from callers, so they need no quoting.
