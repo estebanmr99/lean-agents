@@ -287,7 +287,7 @@ curl -fsSL https://github.com/estebanmr99/lean-agents/releases/latest/download/i
 & ([scriptblock]::Create((irm https://github.com/estebanmr99/lean-agents/releases/latest/download/install.ps1))) -DryRun
 ```
 
-`LEAN_AGENTS_VERSION=1.3.0` fija un release. Ya instalado, `--dry-run`, `--doctor` y `--uninstall` no usan la red. Un checkout local (`bash install.sh` desde un clon) se confía tal cual; solo la descarga del release se comprueba con checksum.
+`LEAN_AGENTS_VERSION=1.4.0` fija un release. Ya instalado, `--dry-run`, `--doctor` y `--uninstall` no usan la red. Un checkout local (`bash install.sh` desde un clon) se confía tal cual; solo la descarga del release se comprueba con checksum.
 
 ## Por qué
 
@@ -579,7 +579,8 @@ lean-agents es pegamento. El trabajo pesado lo hacen estos proyectos; dales una 
 - [x] Sesiones de agentes en paralelo (`scripts/parallel.mjs`)
 - [x] Integraciones de Warp y Orca para quien ya las usa
 - [x] App y CLI de Antigravity en macOS, Linux y Windows (la carga en la app sigue en VERIFY)
-- [x] `v1.3.0` (último): un agente o `/lean-update` actualiza una instalación existente de punta a punta, también dentro de una sesión de OpenCode; `--update` mueve el pin de marketplace de un plugin de Claude, actualiza las apps Warp/Orca gestionadas, traduce las claves OAuth de MCP de OpenCode, edita `cli.json` de OpenCode 2 y quita un `/dcp` duplicado; las entradas MCP de Context Mode pasan `--agent`; una prueba manual `e2e-update` en CI.
+- [x] `v1.4.0` (último): `--remove-tools` quita una herramienta (por ejemplo GSD) sin desinstalar todo; `/lean-update` es un comando de barra en OpenCode; `--update` dentro de una sesión de OpenCode aplica lo que puede y deja el resto para después; los tags de marketplace se comprueban contra su sha fijado; en Windows nunca se ejecuta un comando de la carpeta actual; `--doctor` distingue un agente que es solo un lanzador y ya no deja el servicio de OpenCode en marcha.
+- [x] `v1.3.0`: un agente o `/lean-update` actualiza una instalación existente de punta a punta, también dentro de una sesión de OpenCode; `--update` mueve el pin de marketplace de un plugin de Claude, actualiza las apps Warp/Orca gestionadas, traduce las claves OAuth de MCP de OpenCode, edita `cli.json` de OpenCode 2 y quita un `/dcp` duplicado; las entradas MCP de Context Mode pasan `--agent`; una prueba manual `e2e-update` en CI.
 - [x] `v1.2.5`: rutas de home de Windows acortadas a `~` sin importar mayúsculas, un `core/AGENTS.md` más corto (1.599 bytes), fragmentos de changelog, un script de release gate compartido, reintentos de descarga en CI.
 - [x] `v1.2.4`: `--adopt` lista cada paquete npm global de cada Node de nvm, `--doctor` ya no marca `settings.json` tras `--update` en instalaciones hechas con 1.2.1, pin del plugin context-mode v2.1.7, harness de benchmark multiagente.
 - [x] `v1.2.3`: chequeo `--preflight`, una línea por paso con un log por ejecución, `--update` se detiene si OpenCode está abierto y no pregunta a mitad, procesos hijos sin `shell: true` (DEP0190), arreglos de rutas de home en Windows y de duplicados en `--adopt`. - [x] `v1.2.2`: RTK en OpenCode 2, `--upgrade-agent opencode` conserva servidores y plugins que antes perdía, versión de DCP alineada entre archivos, aviso de rtk antiguo, arreglos de doctor. - [x] `v1.2.1`: soporte de VS Code Insiders.
