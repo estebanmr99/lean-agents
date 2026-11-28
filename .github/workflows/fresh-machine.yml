@@ -119,6 +119,42 @@ jobs:
           $env:Path = "$env:Path;$([Environment]::GetEnvironmentVariable('Path', 'User'))"
           "npm prefix -g:"; npm prefix -g 2>&1
           "where context-mode / opencode:"; where.exe context-mode opencode 2>&1
+      # The install run's step logs: the last 200 lines of each, masked like scripts/lib/redact.mjs (redactText) does.
+      - name: Show fresh-machine step logs
+        if: failure()
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $home2 = Join-Path $env:RUNNER_TEMP 'fresh-home'
+          $logs = Join-Path $home2 '.config/lean-agents/logs'
+          $user = $env:USERNAME
+          $hostName = $env:COMPUTERNAME
+          # Env values of secret-named variables (SECRET_NAME in scripts/lib/network.mjs), 8+ chars, masked exactly.
+          $secretValues = @(Get-ChildItem Env: | Where-Object { $_.Name -match 'TOKEN|SECRET|PASSW|API_?KEY|(^|_)AUTH($|_)|CREDENTIAL|PRIVATE' -and $_.Value.Length -ge 8 } | ForEach-Object { $_.Value })
+          # The fresh home in either slash style and any letter case, as redact.mjs matches it.
+          $homePat = [regex]::Escape($home2.Replace('/', '\')).Replace('\\', '[\\/]') + '(?=[\\/]|$|[^\w.-])'
+          function Hide([string]$line) {
+            $out = $line
+            foreach ($v in $secretValues) { $out = $out.Replace($v, '<redacted>') }
+            $out = $out -replace '\b[a-z][a-z0-9+.-]*://[^\s/@]*@\S*', '<redacted-url>'
+            $out = $out -replace $homePat, '~'
+            $out = $out -replace '((?:/Users/|/home/|[A-Za-z]:[\\/]Users[\\/]))[^\\/\s]+', '$1<user>'
+            if ($user -and $user.Length -gt 1) { $out = $out -replace ('\b' + [regex]::Escape($user) + '\b'), '<user>' }
+            if ($hostName -and $hostName.Length -gt 2) { $out = $out -replace ('\b' + [regex]::Escape($hostName) + '\b'), '<host>' }
+            $out = $out -replace '[\w.+-]+@[\w-]+(\.[\w-]+)*\.[A-Za-z]{2,}\b', '<email>'
+            $out = $out -replace '\bAuthorization(["'']?\s*[:=]\s*["'']?)(Basic|Bearer|Token)\s+[^\s"'',;]+', 'Authorization$1$2 <token>'
+            $out = $out -replace '\beyJ[\w-]+\.eyJ[\w-]+\.[\w-]+', '<token>'
+            $out = $out -replace '\b(gh[pousr]_|github_pat_|sk-|xox[bp]-|glpat-|ya29\.|(?:sk|rk)_(?:live|test)_)[\w-]{8,}|\bnpm_[A-Za-z0-9]{8,}\b|\bhf_[A-Za-z0-9]{8,}\b|\bAKIA[0-9A-Z]{12,}|\bAIza[\w-]{20,}', '<token>'
+            $out = $out -replace '(aws_secret_access_key["'']?\s*[:=]\s*["'']?)[A-Za-z0-9/+=]{40}', '$1<token>'
+            $out = $out -replace '\b(Bearer|token)\s+[\w.~+/=-]{8,}', '$1 <token>'
+            $out = $out -replace '\b([\w-]*(?:api[_-]?key|password|passwd|secret|token)["'']?\s*[:=]\s*["'']?)[^\s"'',;&]+', '$1<redacted>'
+            $out
+          }
+          if (-not (Test-Path $logs)) { "No step logs in $logs"; exit 0 }
+          Get-ChildItem $logs -File | ForEach-Object {
+            "== $($_.Name) (last 200 lines)"
+            Get-Content $_.FullName -Tail 200 | ForEach-Object { Hide $_ }
+          }
 
   linux:
     needs: dist
