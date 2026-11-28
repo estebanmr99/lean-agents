@@ -11,8 +11,30 @@ if [ -z "$version" ]; then
   echo "usage: bash scripts/release-gate.sh [--pins-only] <version> [sha]" >&2
   exit 2
 fi
+# #587 (review): everything is read from the script's own checkout, never the caller's cwd, so the gate cd's there first.
+root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$root"
+head="$(git rev-parse --verify -q HEAD 2>/dev/null)" || { echo "::error::HEAD does not resolve to a commit in this checkout; commit first" >&2; exit 1; }
+# The pins, audit and gh repo are read from this checkout, so HEAD must be the commit being gated.
+if [ -n "${2:-}" ]; then
+  sha="$(git rev-parse --verify -q "${2}^{commit}" 2>/dev/null)" || { echo "::error::${2} does not resolve to a commit here; git fetch first" >&2; exit 1; }
+  if [ "$head" != "$sha" ]; then
+    echo "::error::checkout HEAD $head is not the gated SHA $sha; run git pull (or check out $sha) first" >&2
+    exit 1
+  fi
+else
+  sha="$head"
+  echo "::notice::gating HEAD $head"
+fi
+# Uncommitted or untracked edits in the gated paths would be gated instead of the SHA (#587).
+dirty="$(git status --porcelain -- core scripts docs changes)"
+if [ -n "$dirty" ]; then
+  echo "::error::core/, scripts/, docs/ or changes/ has uncommitted or untracked files; commit or discard them so the gate reads only the gated SHA:" >&2
+  printf '%s\n' "$dirty" >&2
+  exit 1
+fi
 # The release ships its own skill, so the pin must be the tag being released (#547).
-pin="$(node -e "process.stdout.write(String(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).pins['lean-update'].version))" "$(dirname "$0")/../core/pins.json")"
+pin="$(node -e "process.stdout.write(String(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).pins['lean-update'].version))" core/pins.json)"
 if [ "$pin" != "v$version" ]; then
   echo "::error::core/pins.json lean-update pin is $pin; the release must ship its own skill (set it to v$version)" >&2
   exit 1
@@ -20,7 +42,7 @@ fi
 # Compare against the highest v* tag that is not this release (not HEAD^: a release PR can hold several commits) (#590).
 prev="$(git tag --list 'v*' --sort=-v:refname 2>/dev/null | grep -vx "v$version" | head -n 1 || true)"
 if [ -n "$prev" ] && old="$(git show "$prev:core/pins.json" 2>/dev/null)"; then
-  OLD_PINS="$old" node --input-type=module - "$(cd "$(dirname "$0")/.." && pwd)" <<'NODE' || exit 1
+  OLD_PINS="$old" node --input-type=module - "$root" <<'NODE' || exit 1
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -34,9 +56,6 @@ process.exit(errors.length ? 1 : 0);
 NODE
 fi
 [ "$pins_only" = true ] && exit 0
-sha="${2:-$(git rev-parse HEAD)}"
-# gh matches only the full SHA; resolve a short one when the commit is present locally.
-sha=$(git rev-parse --verify --quiet "${sha}^{commit}" || printf '%s' "$sha")
 repo="${GITHUB_REPOSITORY:-$(gh repo view --json nameWithOwner --jq .nameWithOwner)}"
 
 audit="docs/audit-${version}.md"

@@ -846,3 +846,13 @@ The model writes one script that runs several tool calls and returns a summary. 
 | OpenCode: `codemode: false` or a deny on `execute` turns it off; --doctor row "OpenCode Code Mode" warns | [tools](https://opencode.ai/docs/tools/), [MCP servers](https://opencode.ai/docs/mcp-servers/) | 2026-11-23 |
 
 Shipped as `--tools code-mode` (opt-in, never in `--all-tools`): a `json` edit sets `env.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE` to `1` in the user `~/.claude/settings.json` only when absent, never a managed-settings value; the plan and the summary print the resume, terminal and login limits; `--uninstall` removes only the value lean-agents wrote. Verified 2026-11-23 on Claude Code 2.1.331: RTK rewrites and context-mode MCP calls work inside a Code Mode script (#304).
+
+## Release gate checkout check (#587, 2026-11-27)
+
+- `scripts/release-gate.sh` runs from its own checkout (`cd` to the script's root) and uses these git features. Minimum versions, checked 2026-11-28 in the tagged git man pages (coordinator-verified):
+  - `git rev-parse --verify -q` (git 1.5.6): <https://github.com/git/git/blob/v1.5.6/Documentation/git-rev-parse.txt>
+  - `<rev>^{commit}` (git 1.3.0): <https://github.com/git/git/blob/v1.3.0/Documentation/git-rev-parse.txt>
+  - `git status --porcelain -- <pathspec>` (git 1.7.0): <https://github.com/git/git/blob/v1.7.0/Documentation/git-status.txt>
+  - `git tag --list --sort=-v:refname` (pre-existing, #590; git 2.0.0, absent in 1.9.5): <https://github.com/git/git/blob/v2.0.0/Documentation/git-tag.txt>
+  - So the gate needs git 2.0.0 or later. `git -C <path>` (git 1.8.5) is not used: the gate changes directory instead.
+  - Ran on the local git shown by `git --version` on macOS (arm64). Not run on the `ubuntu-latest` runner yet.

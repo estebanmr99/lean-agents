@@ -10,12 +10,18 @@ import { spawnSync } from 'node:child_process';
 const SCRIPT = path.resolve(import.meta.dirname, '..', 'scripts', 'release-gate.sh');
 // The gate is bash 3.2, like macOS; Windows has no bash to run it against.
 const SKIP = process.platform === 'win32' && 'the gate is a bash script; release.yml runs it on ubuntu-latest';
-const SHA = '2be44eb';
-
 const PASSING_AUDIT = '# Audit 9.9.9\n\n## Summary\n\n- ok\n\n## Findings and issues\n\n- none\n';
 
-// A repo dir with docs/audit-9.9.9.md and a `gh` stub that answers with canned JSON.
-function fixture({ audit = PASSING_AUDIT, runs = [{ conclusion: 'success' }], issues = [], expectSha = SHA, pin = 'v9.9.9' } = {}) {
+// Runs git with a fixed identity and no signing, so the fixtures never read or write the real HOME's config.
+function git(dir, ...args) {
+  const r = spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.com', '-c', 'commit.gpgsign=false', '-c', 'tag.gpgsign=false', ...args], { cwd: dir, encoding: 'utf8' });
+  if (r.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${r.stderr}`);
+  return r.stdout.trim();
+}
+const headSha = (dir) => git(dir, 'rev-parse', 'HEAD');
+
+// A repo dir with docs/audit-9.9.9.md, a committed copy of the gate and a `gh` stub that answers with canned JSON.
+function fixture({ audit = PASSING_AUDIT, runs = [{ conclusion: 'success' }], issues = [], pin = 'v9.9.9' } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'release-gate-'));
   // The gate reads core/pins.json next to itself, so the fixture carries a copy of the script.
   fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
@@ -32,20 +38,24 @@ function fixture({ audit = PASSING_AUDIT, runs = [{ conclusion: 'success' }], is
   fs.mkdirSync(bin);
   fs.writeFileSync(path.join(dir, 'runs.json'), JSON.stringify(runs));
   fs.writeFileSync(path.join(dir, 'issues.json'), JSON.stringify(issues));
-  fs.writeFileSync(path.join(dir, 'gh-stub.mjs'), stubSource(dir, expectSha));
+  fs.writeFileSync(path.join(dir, 'gh-stub.mjs'), stubSource(dir));
   const gh = path.join(bin, 'gh');
   fs.writeFileSync(gh, `#!/bin/sh\nexec "${process.execPath}" "${path.join(dir, 'gh-stub.mjs')}" "$@"\n`);
   fs.chmodSync(gh, 0o755);
+  // #587: the gate reads core/ and scripts/ from the checkout, so the fixture is a committed repo.
+  git(dir, 'init', '-q');
+  git(dir, 'add', '-A');
+  git(dir, 'commit', '-q', '-m', 'base');
   return dir;
 }
 
 // The stub prints what gh + the gate's --jq would print for the two calls the gate makes.
-// It fails on a run lookup for any commit other than expectSha or any workflow other than ci.yml.
-function stubSource(dir, expectSha) {
+// It fails on a run lookup for any commit other than HEAD or any workflow other than ci.yml.
+function stubSource(dir) {
   return `import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 const dir = ${JSON.stringify(dir)};
-const expectSha = ${JSON.stringify(expectSha)};
 const args = process.argv.slice(2);
 const jq = args.includes('--jq') ? args[args.indexOf('--jq') + 1] : null;
 const flag = (name) => args.includes(name) ? args[args.indexOf(name) + 1] : null;
@@ -53,8 +63,9 @@ const read = (f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
 if (args[0] === 'run' && args[1] === 'list') {
   const commit = flag('--commit');
   const workflow = flag('--workflow');
-  if (commit !== expectSha || workflow !== 'ci.yml') {
-    console.error('unexpected gh run list: --commit ' + commit + ', --workflow ' + workflow + ' (want ' + expectSha + ', ci.yml)');
+  const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim();
+  if (commit !== head || workflow !== 'ci.yml') {
+    console.error('unexpected gh run list: --commit ' + commit + ', --workflow ' + workflow + ' (want ' + head + ', ci.yml)');
     process.exit(1);
   }
   const runs = read('runs.json');
@@ -75,16 +86,20 @@ if (args[0] === 'run' && args[1] === 'list') {
 
 const scriptIn = (dir) => path.join(dir, 'scripts', 'release-gate.sh');
 
-function gate(dir, sha = SHA) {
-  const r = spawnSync('bash', [scriptIn(dir), '9.9.9', sha], {
-    cwd: dir,
+// cwd defaults to the script's checkout; #587 review: a caller in another repo must not change what is gated.
+function runGate(dir, args, cwd = dir) {
+  const r = spawnSync('bash', [scriptIn(dir), ...args], {
+    cwd,
     encoding: 'utf8',
     env: { PATH: `${path.join(dir, 'bin')}${path.delimiter}${process.env.PATH}`, HOME: dir, GH_TOKEN: 'stub', GITHUB_REPOSITORY: 'o/r' },
   });
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
 }
 
-// #547: the pin check alone, offline: no gh, no audit file, no git.
+// Gates the given SHA, HEAD by default.
+const gate = (dir, sha = headSha(dir)) => runGate(dir, ['9.9.9', sha]);
+
+// #547: the pin check alone, offline: no gh, no audit file.
 function pinsGate(dir, version) {
   const r = spawnSync('bash', [scriptIn(dir), '--pins-only', version], {
     cwd: dir, encoding: 'utf8', env: { PATH: process.env.PATH, HOME: dir },
@@ -110,15 +125,100 @@ test('fails when the audit file is missing', SKIP, () => {
 });
 
 test('fails when no successful ci.yml run exists for the SHA', SKIP, () => {
-  const r = gate(fixture({ runs: [{ conclusion: 'failure' }] }));
+  const dir = fixture({ runs: [{ conclusion: 'failure' }] });
+  const r = gate(dir);
   assert.equal(r.code, 1, r.out);
-  assert.match(r.out, new RegExp(`no successful ci\\.yml run for ${SHA}`));
+  assert.match(r.out, new RegExp(`no successful ci\\.yml run for ${headSha(dir)}`));
 });
 
-test('fails when the SHA the gate asks about is not the one passed to it', SKIP, () => {
-  const r = gate(fixture(), 'deadbee');
+// #587: a checkout behind the gated SHA would gate its own stale pins, so it fails before any gh call.
+test('#587 fails fast when HEAD is not the gated SHA, before gh is called', SKIP, () => {
+  const dir = fixture();
+  const gated = headSha(dir);
+  git(dir, 'commit', '-q', '--allow-empty', '-m', 'newer');
+  const r = gate(dir, gated);
   assert.equal(r.code, 1, r.out);
-  assert.match(r.out, /unexpected gh run list: --commit deadbee/);
+  assert.match(r.out, new RegExp(`::error::checkout HEAD ${headSha(dir)} is not the gated SHA ${gated}; run git pull`));
+  assert.doesNotMatch(r.out, /unexpected gh/);
+});
+
+test('#587 a short SHA resolves to HEAD and passes the check', SKIP, () => {
+  const dir = fixture();
+  const r = gate(dir, headSha(dir).slice(0, 7));
+  assert.equal(r.code, 0, r.out);
+  assert.doesNotMatch(r.out, /not the gated SHA/);
+});
+
+// A git repo with one commit (or none) in a fresh temp dir: the "caller's cwd" for the tests below.
+function otherRepo({ committed = true } = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'release-gate-other-'));
+  git(dir, 'init', '-q');
+  if (committed) {
+    fs.writeFileSync(path.join(dir, 'README.md'), 'other\n');
+    git(dir, 'add', '-A');
+    git(dir, 'commit', '-q', '-m', 'other');
+  }
+  return dir;
+}
+
+// The gate's own checkout with no commit yet: script copied in, nothing committed.
+function unbornFixture() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'release-gate-unborn-'));
+  fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
+  fs.copyFileSync(SCRIPT, scriptIn(dir));
+  git(dir, 'init', '-q');
+  return dir;
+}
+
+// #587 review (HIGH): the gate reads pins and audit from its own checkout, so git must read that checkout too.
+test('#587 a SHA from another repo does not resolve in the gate checkout and fails', SKIP, () => {
+  const dir = fixture();
+  const other = otherRepo();
+  const r = runGate(dir, ['9.9.9', headSha(other)], other);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, new RegExp(`::error::${headSha(other)} does not resolve to a commit here; git fetch first`));
+});
+
+test('#587 an unborn gate checkout fails with a clear message, also when run from another repo', SKIP, () => {
+  const r = runGate(unbornFixture(), ['9.9.9'], otherRepo());
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /::error::HEAD does not resolve to a commit in this checkout; commit first/);
+  assert.doesNotMatch(r.out, /gating HEAD/);
+});
+
+test('#587 a SHA that does not resolve says git fetch first, not the raw string', SKIP, () => {
+  const dir = fixture();
+  const r = gate(dir, 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef');
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /::error::deadbeefdeadbeefdeadbeefdeadbeefdeadbeef does not resolve to a commit here; git fetch first/);
+});
+
+// #587 review (MEDIUM): the audit and changes/ fragments are gated too, so uncommitted edits there fail as well.
+test('#587 fails when docs/audit has uncommitted or untracked changes, and lists them', SKIP, () => {
+  const dir = fixture();
+  fs.writeFileSync(path.join(dir, 'docs', 'audit-9.9.9.md'), `${PASSING_AUDIT}\nedited\n`);
+  fs.mkdirSync(path.join(dir, 'changes'));
+  fs.writeFileSync(path.join(dir, 'changes', '9.md'), '### Fixed\n- x (#9)\n');
+  const r = gate(dir);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /::error::core[\\/], scripts[\\/], docs[\\/] or changes[\\/] has uncommitted or untracked files/);
+  assert.match(r.out, /M docs[\\/]audit-9\.9\.9\.md/);
+  assert.match(r.out, /\?\? changes[\\/]/);
+});
+
+test('#587 without a SHA argument the gate prints a notice with the HEAD it gates', SKIP, () => {
+  const dir = fixture();
+  const r = runGate(dir, ['9.9.9']);
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, new RegExp(`::notice::gating HEAD ${headSha(dir)}`));
+});
+
+test('#587 fails when core/pins.json has uncommitted changes', SKIP, () => {
+  const dir = fixture();
+  fs.writeFileSync(path.join(dir, 'core', 'pins.json'), JSON.stringify({ pins: { 'lean-update': { version: 'v9.9.9' } }, edited: true }));
+  const r = gate(dir);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /::error::core[\\/], scripts[\\/], docs[\\/] or changes[\\/] has uncommitted or untracked files/);
 });
 
 test('fails on an open audit issue, but release-proof issues are exempt', SKIP, () => {
@@ -178,13 +278,13 @@ function gitGate(oldOrca, newOrca, extra) {
     fs.copyFileSync(path.resolve(import.meta.dirname, '..', 'scripts', 'lib', f), path.join(lib, f));
   }
   const write = (orca, more) => fs.writeFileSync(path.join(dir, 'core', 'pins.json'), JSON.stringify({ pins: { 'lean-update': { version: 'v9.9.9' }, 'orca-app': { version: orca, ...more } } }));
-  const git = (...a) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.com', ...a], { cwd: dir, encoding: 'utf8' });
-  git('init', '-q');
   write(oldOrca);
-  git('add', 'core');
-  git('commit', '-q', '-m', 'old');
-  git('tag', 'v9.9.8');
+  git(dir, 'add', '-A');
+  git(dir, 'commit', '-q', '-m', 'old');
+  git(dir, 'tag', 'v9.9.8');
   write(newOrca, extra);
+  git(dir, 'add', '-A');
+  git(dir, 'commit', '-q', '-m', 'new');
   return gate(dir);
 }
 
