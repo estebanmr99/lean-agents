@@ -1446,7 +1446,7 @@ async function removeTools(o) {
     serena: ['serena'], playwright: ['playwright'], 'playwright-extension': ['playwright'], 'context-mode': ['context-mode'],
     rtk: ['rtk'], caveman: ['caveman'], autoskills: ['autoskills'], 'lean-migrate': ['lean-migrate'], 'coordinate': ['coordinate', 'coordinate-watch'], 'code-mode': ['code-mode'],
   };
-  const hints = (t, f) => !f.tool && (HINTS[t] ?? [t]).some((n) => f.path.split(/[\\/]/).some((p) => p === n || p.startsWith(`${n}-`) || p.endsWith(`-${n}`)));
+  const hints = (t, f) => !f.tool && (HINTS[t] ?? [t]).some((n) => path.relative(o.home, f.path).split(/[\\/]/).some((p) => p === n || p.startsWith(`${n}-`) || p.endsWith(`-${n}`)));
   const legacy = (t) => state.files.some((f) => hints(t, f));
   const hasRecord = (t) => state.files.some((f) => f.tool === t) || state.commands.some((c) => c.tool === t);
   // With no record of any kind there is nothing to revert: keep the tool saved so --update still manages it.

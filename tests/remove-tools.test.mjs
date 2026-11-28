@@ -98,6 +98,27 @@ test('--remove-tools ponytail: its own file is reverted, other tools stay', () =
   assert.match(r.stdout, /Removed: ponytail\./);
 });
 
+test('--remove-tools ponytail: a home folder ending in -ponytail does not claim other tools\' untagged files', () => {
+  const home = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'lean-rm-')), 'home-ponytail');
+  fs.mkdirSync(home);
+  const i = run(home, ['--no-exec', '--yes', '--agents', 'opencode-v2', '--tools', 'ponytail,i-have-adhd']);
+  assert.equal(i.status, 0, i.stderr);
+  const s = readState(home);
+  const others = s.files.filter((f) => f.tool === 'i-have-adhd');
+  assert.ok(others.length > 0, 'i-have-adhd installed files');
+  for (const f of others) delete f.tool;
+  writeState(home, s);
+  const paths = others.map((f) => f.path);
+
+  const r = run(home, ['--remove-tools', 'ponytail', '--yes']);
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  const after = readState(home);
+  for (const p of paths) {
+    assert.ok(fs.existsSync(p), `other tool's file stays: ${p}`);
+    assert.ok(after.files.some((f) => f.path === p), `other tool's record stays: ${p}`);
+  }
+});
+
 test('--remove-tools gsd: a 1.3.0 untagged file record is attributed and reverted', () => {
   const home = setup();
   const s = readState(home);
