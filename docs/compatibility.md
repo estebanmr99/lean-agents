@@ -864,8 +864,8 @@ Shipped as `--tools code-mode` (opt-in, never in `--all-tools`): a `json` edit s
 ## Release gate checkout check (#587, 2026-11-27)
 
 - `scripts/release-gate.sh` runs from its own checkout (`cd` to the script's root) and uses these git features. Minimum versions, checked 2026-11-28 in the tagged git man pages (coordinator-verified):
-  - `git rev-parse --show-toplevel` (git 1.7.0; #542): <https://github.com/git/git/blob/v1.7.0/Documentation/git-rev-parse.txt> **VERIFY** (v1.7.0 man page cited; not re-fetched here)
-  - `git merge-base --is-ancestor` (git 1.8.0; #542): <https://github.com/git/git/blob/v1.8.0/Documentation/git-merge-base.txt> **VERIFY** (v1.8.0 man page cited; not re-fetched here)
+  - `git rev-parse --show-toplevel` (git 1.7.0; #542): <https://github.com/git/git/blob/v1.7.0/Documentation/git-rev-parse.txt> lists `--show-toplevel`; the v1.6.6 page does not (both fetched 2026-11-28)
+  - `git merge-base --is-ancestor` (git 1.8.0; #542): <https://github.com/git/git/blob/master/Documentation/RelNotes/1.8.0.adoc> says "git merge-base" learned the "--is-ancestor A B" option (fetched 2026-11-28)
   - `git rev-parse --verify -q` (git 1.5.6): <https://github.com/git/git/blob/v1.5.6/Documentation/git-rev-parse.txt>
   - `<rev>^{commit}` (git 1.3.0): <https://github.com/git/git/blob/v1.3.0/Documentation/git-rev-parse.txt>
   - `git status --porcelain -- <pathspec>` (git 1.7.0): <https://github.com/git/git/blob/v1.7.0/Documentation/git-status.txt>
