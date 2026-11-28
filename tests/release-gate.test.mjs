@@ -99,6 +99,17 @@ function runGate(dir, args, cwd = dir) {
 // Gates the given SHA, HEAD by default.
 const gate = (dir, sha = headSha(dir)) => runGate(dir, ['9.9.9', sha]);
 
+// Runs the gate from stdin, so $0 is `bash` and the caller's cwd is the only path hint (a subfolder run).
+function runGateStdin(dir, args, cwd) {
+  const r = spawnSync('bash', ['-s', '--', ...args], {
+    cwd,
+    input: fs.readFileSync(SCRIPT),
+    encoding: 'utf8',
+    env: { PATH: `${path.join(dir, 'bin')}${path.delimiter}${process.env.PATH}`, HOME: dir, GH_TOKEN: 'stub', GITHUB_REPOSITORY: 'o/r' },
+  });
+  return { code: r.status, out: `${r.stdout}${r.stderr}` };
+}
+
 // #547: the pin check alone, offline: no gh, no audit file.
 function pinsGate(dir, version) {
   const r = spawnSync('bash', [scriptIn(dir), '--pins-only', version], {
@@ -110,6 +121,37 @@ function pinsGate(dir, version) {
 test('passes with the required headings, no open audit issues and a green ci.yml run', SKIP, () => {
   const r = gate(fixture());
   assert.equal(r.code, 0, r.out);
+});
+
+// #542: a version that is not x.y.z(-suffix) must not reach a path or a command.
+test('#542 a bad version exits 2 before any repo file is read', SKIP, () => {
+  const dir = fixture();
+  for (const version of ['../x', '1.4', '1.4.0;rm']) {
+    const r = runGate(dir, [version]);
+    assert.equal(r.code, 2, `${version}: ${r.out}`);
+    assert.match(r.out, /::error::invalid version/);
+  }
+});
+
+// #542: the audit must be read from the repo root, even when the gate is started from a subfolder.
+test('#542 a run from a subfolder reads docs/audit-<version>.md at the repo root', SKIP, () => {
+  const dir = fixture();
+  const sub = path.join(dir, 'a', 'b');
+  fs.mkdirSync(sub, { recursive: true });
+  const r = runGateStdin(dir, ['9.9.9', headSha(dir)], sub);
+  assert.equal(r.code, 0, r.out);
+  assert.doesNotMatch(r.out, /audit-9\.9\.9\.md is missing/);
+});
+
+// #542: mirror release.yml, which refuses a tag whose SHA is not on main.
+test('#542 fails when the gated SHA is not an ancestor of origin/main', SKIP, () => {
+  const dir = fixture();
+  const base = headSha(dir);
+  git(dir, 'update-ref', 'refs/remotes/origin/main', base);
+  git(dir, 'commit', '-q', '--allow-empty', '-m', 'not on main');
+  const r = gate(dir);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, new RegExp(`::error::${headSha(dir)} is not on main`));
 });
 
 test('fails when the audit uses "## Findings" instead of "## Findings and issues"', SKIP, () => {
