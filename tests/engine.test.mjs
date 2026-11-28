@@ -1051,8 +1051,10 @@ test('gh installs at user scope with brew or winget, only when asked for', () =>
       fs.writeFileSync(path.join(bin, 'gh'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
       fs.writeFileSync(path.join(bin, 'gh.cmd'), '@exit /b 0\r\n');
     }
-    const system = process.platform === 'win32' ? path.join(process.env.SystemRoot ?? 'D:\\Windows', 'System32') : null;
-    return { PATH: system ? `${bin}${path.delimiter}${system}` : bin, NVM_DIR: path.join(home, '.nvm'), HOME: home };
+    if (process.platform !== 'win32') return { PATH: bin, NVM_DIR: path.join(home, '.nvm'), HOME: home };
+    // `where` matches winget.cmd only through PATHEXT, and needs SystemRoot to start.
+    const { SystemRoot, PATHEXT } = process.env;
+    return { PATH: `${bin}${path.delimiter}${path.join(SystemRoot, 'System32')}`, NVM_DIR: path.join(home, '.nvm'), HOME: home, SystemRoot, PATHEXT };
   };
   const install = prereqFor('gh', process.platform === 'win32' ? 'winget' : 'brew').install[0];
   const command = `$ ${install.join(' ')}`;
