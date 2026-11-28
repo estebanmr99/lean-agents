@@ -10,10 +10,22 @@ import { CURL_RETRY } from './retry.mjs';
 
 const isWin = process.platform === 'win32';
 
+// `where` searches the current folder before PATH (#630); on Windows, drop a cwd match unless the cwd is on PATH.
+export function dropCwd(results, cwd = process.cwd(), pathVar = '') {
+  const norm = (p) => path.win32.resolve(p).toLowerCase();
+  const here = norm(cwd);
+  const onPath = String(pathVar).split(path.win32.delimiter).filter(Boolean).some((d) => norm(d) === here);
+  return onPath ? results : results.filter((f) => norm(path.win32.dirname(f)) !== here);
+}
+
 // Every match, in PATH order. POSIX: `command -v` gets the name as "$1", never spliced into the script (#475); /bin/sh as shell: true used.
 const whereAll = (bin, env) => {
   const r = isWin ? spawnSync('where', [bin], { encoding: 'utf8', ...(env && { env }) }) : spawnSync('/bin/sh', ['-c', 'command -v "$1"', 'sh', bin], { encoding: 'utf8' });
-  return r.status === 0 ? r.stdout.trim().split(/\r?\n/).filter(Boolean) : [];
+  const all = r.status === 0 ? r.stdout.trim().split(/\r?\n/).filter(Boolean) : [];
+  if (!isWin) return all;
+  const e = env || process.env;
+  const key = Object.keys(e).find((k) => k.toLowerCase() === 'path');
+  return dropCwd(all, process.cwd(), key ? e[key] : '');
 };
 export const which = (bin) => whereAll(bin)[0] ?? null;
 
