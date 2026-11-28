@@ -331,6 +331,14 @@ function as130(home, text = '// managed by lean-agents\nconsole.log("x");\n') {
   engine(home, bothArgs);
   fs.writeFileSync(script(home), text);
   const st = JSON.parse(fs.readFileSync(stateOf(home), 'utf8'));
+  const value = { type: 'command', command: 'node x' };
+  const sf = settingsOf(home);
+  const cfg = JSON.parse(fs.readFileSync(sf, 'utf8'));
+  cfg.statusLine = value;
+  fs.writeFileSync(sf, JSON.stringify(cfg, null, 2));
+  const entry = st.files.find((f) => f.path === sf);
+  entry.applied.push({ path: ['statusLine'], value, mode: 'setIfAbsent', keepIfChanged: true });
+  entry.hash = crypto.createHash('sha256').update(fs.readFileSync(sf, 'utf8')).digest('hex');
   st.files.push({ path: script(home), kind: 'file', created: true, backup: null, hash: crypto.createHash('sha256').update(text).digest('hex') });
   fs.writeFileSync(stateOf(home), JSON.stringify(st));
   return st;
@@ -354,4 +362,41 @@ test('--update keeps an unmarked user file with that name, and uninstall leaves 
   assert.ok(!JSON.parse(fs.readFileSync(stateOf(home), 'utf8')).files.some((f) => f.path === script(home)));
   engine(home, ['--uninstall']);
   assert.ok(fs.existsSync(script(home)));
+});
+
+// The reviewer's repro: settings.json also has a pending change, so the plan is `modify` and must not write our statusLine back.
+function pendingOther(home) {
+  const sf = settingsOf(home);
+  const cfg = JSON.parse(fs.readFileSync(sf, 'utf8'));
+  const key = Object.keys(cfg).find((k) => k !== 'statusLine' && !/^(\$schema)$/.test(k));
+  delete cfg[key];
+  fs.writeFileSync(sf, JSON.stringify(cfg, null, 2));
+}
+const hasRecord = (home) => JSON.parse(fs.readFileSync(stateOf(home), 'utf8')).files.some((f) => f.applied?.some((a) => a.path.join('.') === 'statusLine'));
+
+test('--update with another pending settings.json change still takes our statusLine back; uninstall stays clean', () => {
+  const home = tmp('home');
+  as130(home);
+  pendingOther(home);
+  engine(home, ['--update']);
+  assert.ok(!('statusLine' in JSON.parse(fs.readFileSync(settingsOf(home), 'utf8'))));
+  assert.ok(!hasRecord(home));
+  engine(home, ['--uninstall']);
+  if (fs.existsSync(settingsOf(home))) assert.ok(!('statusLine' in JSON.parse(fs.readFileSync(settingsOf(home), 'utf8'))));
+});
+
+test('--update leaves a user statusLine alone, with or without another pending change', () => {
+  const home = tmp('home');
+  as130(home);
+  const cfg = JSON.parse(fs.readFileSync(settingsOf(home), 'utf8'));
+  cfg.statusLine = { type: 'command', command: 'mine' };
+  fs.writeFileSync(settingsOf(home), JSON.stringify(cfg, null, 2));
+  pendingOther(home);
+  const cfg2 = JSON.parse(fs.readFileSync(settingsOf(home), 'utf8'));
+  cfg2.statusLine = { type: 'command', command: 'mine' };
+  fs.writeFileSync(settingsOf(home), JSON.stringify(cfg2, null, 2));
+  engine(home, ['--update']);
+  assert.equal(JSON.parse(fs.readFileSync(settingsOf(home), 'utf8')).statusLine.command, 'mine');
+  engine(home, ['--uninstall']);
+  assert.equal(JSON.parse(fs.readFileSync(settingsOf(home), 'utf8')).statusLine.command, 'mine');
 });

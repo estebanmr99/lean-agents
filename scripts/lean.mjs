@@ -968,9 +968,13 @@ async function install(o) {
   const previous = readState(o.home);
   // 1.3.0 wrote a Claude statusline script for copilot-usage; the meter is OpenCode-only now (#593).
   if (previous?.files) {
-    const r = retireOwned(previous.files, ['lean-copilot-usage-statusline.mjs']);
+    const retiring = ['lean-copilot-usage-statusline.mjs'];
+    const dirs = new Set(previous.files.filter((e) => retiring.includes(path.basename(e.path))).map((e) => path.dirname(e.path)));
+    const r = retireOwned(previous.files, retiring);
     previous.files = r.files;
     for (const p of r.removed) console.log(`  removed ${tilde(p, o.home)} (copilot-usage no longer covers Claude Code)`);
+    // The retire edited settings.json on disk: re-plan every entry for that folder, or apply() would write the old text back.
+    planned.forEach((x, i) => { if (x.kind === 'json' && x.status !== 'skip' && dirs.has(path.dirname(x.path))) planned[i] = plan([x], writeRoots(o), previous.files)[0]; });
   }
   const files = [];
   const ran = [];
