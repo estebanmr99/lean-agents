@@ -85,7 +85,8 @@ test('--remove-tools ponytail: its own file is reverted, other tools stay', () =
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-rm-pony-'));
   const i = run(home, ['--no-exec', '--yes', '--agents', 'opencode-v2', '--tools', 'ponytail']);
   assert.equal(i.status, 0, i.stderr);
-  const pony = path.join(home, '.config', 'ponytail', 'config.json');
+  // With --home, Windows keeps ponytail's config under <home>\AppData\Roaming (opencode-v2.mjs ponytailConfig).
+  const pony = process.platform === 'win32' ? path.join(home, 'AppData', 'Roaming', 'ponytail', 'config.json') : path.join(home, '.config', 'ponytail', 'config.json');
   const agent = path.join(home, '.config', 'opencode', 'agents', 'debug.md');
   assert.ok(fs.existsSync(pony));
   assert.ok(fs.existsSync(agent));
