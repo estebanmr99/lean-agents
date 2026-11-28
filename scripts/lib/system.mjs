@@ -11,11 +11,13 @@ import { CURL_RETRY } from './retry.mjs';
 const isWin = process.platform === 'win32';
 
 // `where` searches the current folder before PATH (#630); on Windows, drop a cwd match unless the cwd is on PATH.
-export function dropCwd(results, cwd = process.cwd(), pathVar = '') {
-  const norm = (p) => path.win32.resolve(p).toLowerCase();
+export function dropCwd(results, cwd = process.cwd(), pathVar = '', realpath = fs.realpathSync.native) {
+  // os.tmpdir() and PATH may spell a folder in 8.3 short form while `where` prints the long form (#630).
+  const real = (p) => { try { return realpath(p); } catch { return path.win32.resolve(p); } };
+  const norm = (p) => real(path.win32.resolve(p)).toLowerCase();
   const here = norm(cwd);
   // A quoted entry is the same folder; a relative entry (`.` included) resolves against the child's cwd.
-  const entry = (d) => path.win32.resolve(cwd, d.replace(/^"|"$/g, '')).toLowerCase();
+  const entry = (d) => norm(path.win32.resolve(cwd, d.replace(/^"|"$/g, '')));
   const onPath = String(pathVar).split(path.win32.delimiter).filter(Boolean).some((d) => entry(d) === here);
   return onPath ? results : results.filter((f) => norm(path.win32.dirname(f)) !== here);
 }

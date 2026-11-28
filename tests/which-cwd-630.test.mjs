@@ -36,6 +36,11 @@ test('dropCwd treats a "." PATH entry as the cwd', () => {
   assert.deepEqual(dropCwd(results, 'C:\\work', '.'), results);
 });
 
+test('dropCwd matches an 8.3 short-form cwd to the long-form result folder', () => {
+  const realpath = (p) => p.replace(/RUNNER~1/gi, 'runneradmin');
+  assert.deepEqual(dropCwd(['D:\\runneradmin\\x\\copilot.cmd'], 'D:\\RUNNER~1\\x', 'D:\\tools', realpath), []);
+});
+
 const winOnly = { skip: process.platform !== 'win32' && 'Windows-only' };
 
 function stubSetup({ onPath }) {
@@ -65,7 +70,7 @@ test('win32: a copilot.cmd in the cwd that is also on PATH is returned', winOnly
   assert.equal(s.status, 0, s.err);
   const got = JSON.parse(s.out);
   assert.ok(got);
-  assert.equal(path.win32.dirname(got).toLowerCase(), s.here.toLowerCase());
+  assert.equal(path.win32.dirname(fs.realpathSync.native(got)).toLowerCase(), fs.realpathSync.native(s.here).toLowerCase());
 });
 
 test('win32: spawnFor runs a bare .cmd from PATH, not the copy in the cwd', winOnly, () => {
