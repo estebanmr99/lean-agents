@@ -848,6 +848,6 @@ Shipped as `--tools code-mode` (opt-in, never in `--all-tools`): a `json` edit s
   - `git rev-parse --verify -q` (git 1.5.6): <https://github.com/git/git/blob/v1.5.6/Documentation/git-rev-parse.txt>
   - `<rev>^{commit}` (git 1.3.0): <https://github.com/git/git/blob/v1.3.0/Documentation/git-rev-parse.txt>
   - `git status --porcelain -- <pathspec>` (git 1.7.0): <https://github.com/git/git/blob/v1.7.0/Documentation/git-status.txt>
-  - So the gate needs git 1.7.0 or later. `git -C <path>` (git 1.8.5) is not used: the gate changes directory instead.
-  - `git tag --list --sort=` (pre-existing, #590): minimum **VERIFY** (not checked in the tagged man pages this session).
+  - `git tag --list --sort=-v:refname` (pre-existing, #590; git 2.0.0, absent in 1.9.5): <https://github.com/git/git/blob/v2.0.0/Documentation/git-tag.txt>
+  - So the gate needs git 2.0.0 or later. `git -C <path>` (git 1.8.5) is not used: the gate changes directory instead.
   - Ran on the local git shown by `git --version` on macOS (arm64). Not run on the `ubuntu-latest` runner yet.
