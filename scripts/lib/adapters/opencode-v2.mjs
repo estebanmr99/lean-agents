@@ -53,6 +53,7 @@ export function dcpConfigAction(dir, profile) {
   const contextWindow = profile?.context_window ?? 200000;
   return {
     kind: 'json',
+    tool: 'dcp',
     path: path.join(dir, 'dcp.jsonc'),
     edits: [
       { path: ['$schema'], value: 'https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json', mode: 'setIfAbsent' },
@@ -173,7 +174,7 @@ export function dcpTuiActions(dir, { v2 = false, fsx = fs } = {}) {
       try { plugins = parse(fsx.readFileSync(p, 'utf8'))?.[key]; } catch { continue; }
       const mine = (Array.isArray(plugins) ? plugins : []).filter((x) => typeof x === 'string' && (x === pkg || x.startsWith(`${pkg}@`)));
       if (mine.length) {
-        actions.push({ kind: 'json', path: p, edits: mine.map((value) => ({ path: [key], value, mode: 'arrayRemove', label: 'DCP', why: 'opencode.jsonc already loads its TUI part' })) });
+        actions.push({ kind: 'json', tool: 'dcp', path: p, edits: mine.map((value) => ({ path: [key], value, mode: 'arrayRemove', label: 'DCP', why: 'opencode.jsonc already loads its TUI part' })) });
       }
     }
     return actions;
@@ -187,7 +188,7 @@ export function dcpTuiActions(dir, { v2 = false, fsx = fs } = {}) {
       if (!Array.isArray(plugins) || !plugins.some(x => typeof x === 'string' && (x === pkg || x.startsWith(`${pkg}@`)))) continue;
       const edit = dcpPluginEdit('plugin');
       if (ours) edit.legacy = [...edit.legacy, ...plugins.filter(x => typeof x === 'string' && x.startsWith(`${pkg}@`) && /^\d+\.\d+\.\d+$/.test(x.slice(pkg.length + 1)))];
-      actions.push({ kind: 'json', path: p, edits: [{ ...edit, label: 'DCP', why: 'to match opencode.jsonc' }] });
+      actions.push({ kind: 'json', tool: 'dcp', path: p, edits: [{ ...edit, label: 'DCP', why: 'to match opencode.jsonc' }] });
     } catch (e) {
       // unreadable file: leave it alone
     }
@@ -294,19 +295,19 @@ export function opencodeShared({ home, dir, core, profile, opts, v2 = false }) {
   const actions = [];
   const commands = [];
   if (tools.includes('ponytail')) {
-    actions.push({ kind: 'json', path: ponytailConfig(home), edits: [{ path: ['defaultMode'], value: opts.ponytailMode, mode: 'setIfAbsent' }] });
+    actions.push({ kind: 'json', tool: 'ponytail', path: ponytailConfig(home), edits: [{ path: ['defaultMode'], value: opts.ponytailMode, mode: 'setIfAbsent' }] });
   }
   if (tools.includes('copilot-usage')) {
     // Own folder, so the hand-made copilot-usage-tui is never touched. 1.x loads it through a tui.json entry; 2.x discovers
     // plugins/<dir>/tui.js by itself (docs: opencode.ai/docs/build/plugins), so there is no config entry there.
     const file = path.join(dir, 'plugins', 'lean-copilot-usage', 'tui.js');
     const source = fs.readFileSync(fileURLToPath(new URL('../../../core/copilot-usage-tui.js', import.meta.url)), 'utf8');
-    actions.push({ kind: 'file', path: file, content: `// ${OWNED_MARK}\n${source}` });
-    if (!v2) actions.push({ kind: 'json', path: path.join(dir, 'tui.json'), edits: [{ path: ['plugin'], value: pathToFileURL(file).href, mode: 'arrayAdd' }] });
+    actions.push({ kind: 'file', tool: 'copilot-usage', path: file, content: `// ${OWNED_MARK}\n${source}` });
+    if (!v2) actions.push({ kind: 'json', tool: 'copilot-usage', path: path.join(dir, 'tui.json'), edits: [{ path: ['plugin'], value: pathToFileURL(file).href, mode: 'arrayAdd' }] });
     else {
       // A hand copy of the #123 meter is dead on OpenCode 2: the managed tool replaces its one config entry (#558).
       for (const hit of copilotMeterEntries(dir, { home })) {
-        actions.push({ kind: 'json', path: hit.config, edits: [{ path: [hit.key], value: hit.entry, mode: 'arrayRemove', label: 'hand-made copilot-usage', why: 'replaced by the managed tool' }] });
+        actions.push({ kind: 'json', tool: 'copilot-usage', path: hit.config, edits: [{ path: [hit.key], value: hit.entry, mode: 'arrayRemove', label: 'hand-made copilot-usage', why: 'replaced by the managed tool' }] });
       }
     }
   }
@@ -339,10 +340,11 @@ export function opencodeShared({ home, dir, core, profile, opts, v2 = false }) {
     });
     actions.push({
       kind: 'file',
+      tool: 'i-have-adhd',
       path: path.join(dir, 'plugins', 'i-have-adhd.ts'),
       content: `// ${OWNED_MARK}\nexport { default } from '../vendor/i-have-adhd/.opencode/plugins/i-have-adhd.mjs';\n`,
     });
-    if (opts.adhdAlways) actions.push({ kind: 'file', path: path.join(dir, '.i-have-adhd-always'), content: '', force: true });
+    if (opts.adhdAlways) actions.push({ kind: 'file', tool: 'i-have-adhd', path: path.join(dir, '.i-have-adhd-always'), content: '', force: true });
   }
   if (tools.includes('caveman')) {
     commands.push({
