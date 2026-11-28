@@ -42,6 +42,15 @@ export function serviceStopRow({ before, agents = [], pids = opencodePids }) {
   return !before.size && started.length ? { desc: 'stop the OpenCode 2 background service that lean-agents started', run: [['opencode', 'service', 'stop']] } : null;
 }
 
+// #592: a lean-agents call that may auto-start the OpenCode 2 service (the --doctor probes) notes the service state first;
+// stop() then runs the #548 stop only if that call started it. Nothing is listed unless OpenCode 2 is configured.
+export function serviceGuard({ agents = [], pids = opencodePids } = {}) {
+  if (!agents.includes('opencode-v2')) return { stop() {} };
+  let before = null;
+  try { before = new Set(pids()); } catch { /* cannot list: never stop what may be the user's */ }
+  return { stop(run) { const row = serviceStopRow({ before, agents, pids }); if (row) run(row.run[0]); } };
+}
+
 // #488: --update must not swap the OpenCode binary or rewrite its plugins while the 1.x app or the 2.x service runs.
 // A step touches OpenCode when its description or any argv word names it (the CLI upgrade, rtk init --opencode, gsd --opencode).
 // #546: a Skills CLI add/remove only copies skill files (read on the next session), so `filesOnly` keeps it out of this check.
