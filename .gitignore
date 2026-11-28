@@ -9,6 +9,7 @@ Thumbs.db
 node_modules/
 .serena/
 *.log
+!tests/fixtures/e2e/**/shim.log
 tmp/
 dist/
 *.md-e

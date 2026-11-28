@@ -157,13 +157,15 @@ test('prescribed question: a run-it ask after the yes is unanswered; the skill a
 });
 
 test('prescribed question: the step-6 summary-page offer is allowed as the last line after the yes', () => {
-  assert.match(SKILL, /offer to open it/);
+  // The skill has no quoted question for this offer, so the test pins the exact sentence it is based on.
+  assert.ok(SKILL.includes('tell the user it exists and offer to open it after they agree'));
   const result = afterYes('The summary page is at /tmp/x/summary.html. Want me to open it?');
   assert.equal(result.ok, true, result.failures.join('; '));
 });
 
 test('prescribed question: the restore offer only follows a failed read-back, so that run is not ok', () => {
-  assert.match(SKILL, /offer to restore/);
+  // No quoted question in the skill for this offer either: pin the exact sentence it is based on.
+  assert.ok(SKILL.includes('keep the backup, say where it is, and offer to restore.'));
   const result = evaluateUpdate({
     ...good(),
     doctor: { ok: false, behind: [{ tool: 'context-mode', installed: '2.1.4', pinned: '2.1.7' }] },

@@ -1,0 +1,4 @@
+npx -y context-mode@2.1.7 server
+lean-agents --doctor --json
+npx -y context-mode@2.1.7 server
+lean-agents --update --dry-run --yes --json
