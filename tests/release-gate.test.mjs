@@ -86,9 +86,10 @@ if (args[0] === 'run' && args[1] === 'list') {
 
 const scriptIn = (dir) => path.join(dir, 'scripts', 'release-gate.sh');
 
-function runGate(dir, args) {
+// cwd defaults to the script's checkout; #587 review: a caller in another repo must not change what is gated.
+function runGate(dir, args, cwd = dir) {
   const r = spawnSync('bash', [scriptIn(dir), ...args], {
-    cwd: dir,
+    cwd,
     encoding: 'utf8',
     env: { PATH: `${path.join(dir, 'bin')}${path.delimiter}${process.env.PATH}`, HOME: dir, GH_TOKEN: 'stub', GITHUB_REPOSITORY: 'o/r' },
   });
@@ -148,6 +149,63 @@ test('#587 a short SHA resolves to HEAD and passes the check', SKIP, () => {
   assert.doesNotMatch(r.out, /not the gated SHA/);
 });
 
+// A git repo with one commit (or none) in a fresh temp dir: the "caller's cwd" for the tests below.
+function otherRepo({ committed = true } = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'release-gate-other-'));
+  git(dir, 'init', '-q');
+  if (committed) {
+    fs.writeFileSync(path.join(dir, 'README.md'), 'other\n');
+    git(dir, 'add', '-A');
+    git(dir, 'commit', '-q', '-m', 'other');
+  }
+  return dir;
+}
+
+// The gate's own checkout with no commit yet: script copied in, nothing committed.
+function unbornFixture() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'release-gate-unborn-'));
+  fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
+  fs.copyFileSync(SCRIPT, scriptIn(dir));
+  git(dir, 'init', '-q');
+  return dir;
+}
+
+// #587 review (HIGH): the gate reads pins and audit from its own checkout, so git must read that checkout too.
+test('#587 a SHA from another repo does not resolve in the gate checkout and fails', SKIP, () => {
+  const dir = fixture();
+  const other = otherRepo();
+  const r = runGate(dir, ['9.9.9', headSha(other)], other);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, new RegExp(`::error::${headSha(other)} does not resolve to a commit here; git fetch first`));
+});
+
+test('#587 an unborn gate checkout fails with a clear message, also when run from another repo', SKIP, () => {
+  const r = runGate(unbornFixture(), ['9.9.9'], otherRepo());
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /::error::HEAD does not resolve to a commit in this checkout; commit first/);
+  assert.doesNotMatch(r.out, /gating HEAD/);
+});
+
+test('#587 a SHA that does not resolve says git fetch first, not the raw string', SKIP, () => {
+  const dir = fixture();
+  const r = gate(dir, 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef');
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /::error::deadbeefdeadbeefdeadbeefdeadbeefdeadbeef does not resolve to a commit here; git fetch first/);
+});
+
+// #587 review (MEDIUM): the audit and changes/ fragments are gated too, so uncommitted edits there fail as well.
+test('#587 fails when docs/audit has uncommitted or untracked changes, and lists them', SKIP, () => {
+  const dir = fixture();
+  fs.writeFileSync(path.join(dir, 'docs', 'audit-9.9.9.md'), `${PASSING_AUDIT}\nedited\n`);
+  fs.mkdirSync(path.join(dir, 'changes'));
+  fs.writeFileSync(path.join(dir, 'changes', '9.md'), '### Fixed\n- x (#9)\n');
+  const r = gate(dir);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /::error::core[\\/], scripts[\\/], docs[\\/] or changes[\\/] has uncommitted or untracked files/);
+  assert.match(r.out, /M docs[\\/]audit-9\.9\.9\.md/);
+  assert.match(r.out, /\?\? changes[\\/]/);
+});
+
 test('#587 without a SHA argument the gate prints a notice with the HEAD it gates', SKIP, () => {
   const dir = fixture();
   const r = runGate(dir, ['9.9.9']);
@@ -160,7 +218,7 @@ test('#587 fails when core/pins.json has uncommitted changes', SKIP, () => {
   fs.writeFileSync(path.join(dir, 'core', 'pins.json'), JSON.stringify({ pins: { 'lean-update': { version: 'v9.9.9' } }, edited: true }));
   const r = gate(dir);
   assert.equal(r.code, 1, r.out);
-  assert.match(r.out, /::error::core[\\/] or scripts[\\/] has uncommitted changes/);
+  assert.match(r.out, /::error::core[\\/], scripts[\\/], docs[\\/] or changes[\\/] has uncommitted or untracked files/);
 });
 
 test('fails on an open audit issue, but release-proof issues are exempt', SKIP, () => {
