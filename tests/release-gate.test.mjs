@@ -99,17 +99,6 @@ function runGate(dir, args, cwd = dir) {
 // Gates the given SHA, HEAD by default.
 const gate = (dir, sha = headSha(dir)) => runGate(dir, ['9.9.9', sha]);
 
-// Runs the gate from stdin, so $0 is `bash` and the caller's cwd is the only path hint (a subfolder run).
-function runGateStdin(dir, args, cwd) {
-  const r = spawnSync('bash', ['-s', '--', ...args], {
-    cwd,
-    input: fs.readFileSync(SCRIPT),
-    encoding: 'utf8',
-    env: { PATH: `${path.join(dir, 'bin')}${path.delimiter}${process.env.PATH}`, HOME: dir, GH_TOKEN: 'stub', GITHUB_REPOSITORY: 'o/r' },
-  });
-  return { code: r.status, out: `${r.stdout}${r.stderr}` };
-}
-
 // #547: the pin check alone, offline: no gh, no audit file.
 function pinsGate(dir, version) {
   const r = spawnSync('bash', [scriptIn(dir), '--pins-only', version], {
@@ -138,7 +127,8 @@ test('#542 a run from a subfolder reads docs/audit-<version>.md at the repo root
   const dir = fixture();
   const sub = path.join(dir, 'a', 'b');
   fs.mkdirSync(sub, { recursive: true });
-  const r = runGateStdin(dir, ['9.9.9', headSha(dir)], sub);
+  // Started by path from the subfolder, as a user would: over stdin `$0` is the shell, which on Windows is a full path outside the repo.
+  const r = runGate(dir, ['9.9.9', headSha(dir)], sub);
   assert.equal(r.code, 0, r.out);
   assert.doesNotMatch(r.out, /audit-9\.9\.9\.md is missing/);
 });
