@@ -97,7 +97,7 @@ export function checkoutUpdateCalled(transcript, releaseDir) {
   if (!transcript) return false;
   const targets = ['\\$\\{?LEAN_AGENTS_RELEASE_DIR\\}?'];
   if (releaseDir) targets.unshift(String(releaseDir).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  const cd = new RegExp(`(^|\\s)cd\\s+["']?(?:${targets.join('|')})["']?(?=\\s|;|&&|$)`);
+  const cd = new RegExp(`(^|\\s)cd\\s+["']?(?:${targets.join('|')})["']?(?=\\s|;|&&|\\|\\||$)`);
   for (const line of transcript.split('\n')) {
     let ev;
     try { ev = JSON.parse(line); } catch { continue; }
@@ -219,14 +219,20 @@ function consent() {
   return decision.action === 'fail' ? 1 : 0;
 }
 
+// Any OpenRouter-shaped key goes, not only the one in the env; an empty key fails the step so nothing is published
+// on the strength of a redaction that could not match the real key (#579).
+const redactAll = (text, key) => redactKey(text, key).replace(/sk-or-[A-Za-z0-9_-]{10,}/g, 'sk-or-REDACTED');
+
 function redact() {
   const input = arg('in');
   const output = arg('out');
   const key = process.env.OPENROUTER_API_KEY;
-  if (!input || !fs.existsSync(input)) return;
+  if (!key) { console.error('redact: OPENROUTER_API_KEY is empty or unset'); return 1; }
+  if (!input || !fs.existsSync(input)) return 0;
   const text = fs.readFileSync(input, 'utf8');
-  if (output) fs.writeFileSync(output, redactKey(text, key));
-  else process.stdout.write(redactKey(text, key));
+  if (output) fs.writeFileSync(output, redactAll(text, key));
+  else process.stdout.write(redactAll(text, key));
+  return 0;
 }
 
 function evaluate() {
@@ -260,7 +266,7 @@ async function main() {
   if (command === 'spend') return console.log((await spend()).toFixed(6)), 0;
   if (command === 'budget') return budget();
   if (command === 'consent') return consent();
-  if (command === 'redact') return redact(), 0;
+  if (command === 'redact') return redact();
   if (command === 'evaluate') return evaluate();
   console.error('usage: e2e-update.mjs spend | budget --start <usd> --max-usd <usd> | consent --transcript <file> | redact --in <file> --out <file> | evaluate --doctor <file> --record <file> --plugin-list <file> --pin-version <v> --current-version <v> --exit-code <n> --transcript <file> [--first-turn <file>] [--yes-turns <n>] [--source checkout|npm] [--shim-log <file>] [--release-dir <path>] [--settings <file>] [--out <file>]');
   return 2;
