@@ -958,6 +958,12 @@ jobs:
           # The flag the playwright-extension entry passes exists in the real package.
           npx -y "$(node -e "import('./scripts/lib/pins.mjs').then((m) => console.log(m.npmSpec('playwright-mcp')))")" --help > "$HOME/pw-help.txt"
           grep -q -- '--extension' "$HOME/pw-help.txt"
+          node scripts/lean.mjs --remove-tools gsd --yes > "$HOME/remove.txt"
+          cat "$HOME/remove.txt"
+          if grep -qE '^ *! ' "$HOME/remove.txt"; then exit 1; fi
+          test ! -e "$HOME/.gsd/defaults.json"
+          test -f "$HOME/.agents/skills/caveman/SKILL.md"
+          node -e "process.exit(JSON.parse(require('fs').readFileSync(process.env.HOME + '/.config/lean-agents/state.json', 'utf8')).options.tools.includes('gsd') ? 1 : 0)"
           node scripts/lean.mjs --uninstall --yes > "$HOME/uninstall.txt"
           cat "$HOME/uninstall.txt"
           if grep -qE '^ *! ' "$HOME/uninstall.txt"; then exit 1; fi
