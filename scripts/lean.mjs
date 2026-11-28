@@ -892,12 +892,19 @@ async function install(o) {
   let running = o.command === 'update' && o.exec ? runningBlocker(commands) : null;
   // #575: inside an OpenCode session only the OpenCode-touching steps wait; everything else applies, and the next run from a terminal finishes them.
   const deferred = [];
-  if (running && !o.dryRun && insideOpenCode() && running === opencodeRunningText()) {
+  const sawOpenCode = () => { try { return opencodeRunning(listProcesses()); } catch { return false; } };
+  if (o.command === 'update' && o.exec && !o.dryRun && insideOpenCode() && (running ? running === opencodeRunningText() : sawOpenCode())) {
     for (const c of commands.filter(touchesOpenCode)) { commands.splice(commands.indexOf(c), 1); deferred.push({ tool: c.tool, desc: c.desc }); }
+    // File, JSON and block edits inside the OpenCode config folder wait too; other agents' files still apply.
+    const ocDir = path.join(configHome(o.home), 'opencode') + path.sep;
+    for (const f of planned.filter((x) => x.status !== 'unchanged' && x.status !== 'skip' && path.resolve(x.path).startsWith(ocDir))) {
+      planned.splice(planned.indexOf(f), 1);
+      deferred.push({ tool: 'opencode', file: true, desc: `update ~/${path.relative(o.home, f.path).split(path.sep).join('/')}` });
+    }
     running = null;
     for (const d of deferred) (o.json ? console.error : console.log)(redactText(`deferred (OpenCode is running this session): ${d.desc}`, { home: o.home }));
   }
-  const deferredLine = () => deferred.length && (o.json ? console.error : console.log)(`Run lean-update again from a terminal, or after this OpenCode session ends, to finish ${deferred.length} deferred step${deferred.length === 1 ? '' : 's'}.`);
+  const deferredLine = () => deferred.length && (o.json ? console.error : console.log)(`Close OpenCode, then run \`lean-agents --update\` in a terminal to finish ${deferred.length} deferred step${deferred.length === 1 ? '' : 's'}.`);
   if (running && !o.dryRun) { p.close(); console.error(`! ${running}`); (o.json ? console.error : console.log)('nothing changed'); process.exitCode = 1; return; }
   if (running) (o.json ? console.error : console.log)(`! blocker: ${running}`); // --json keeps stdout JSON
   const noGit = migration ? null : gitHint(packageManager());
@@ -985,14 +992,14 @@ async function install(o) {
       f.userHash = u;
     }
   };
-  const pendingRec = () => (deferred.length ? { since: previous?.pending?.since ?? new Date().toISOString(), steps: deferred } : finished ? undefined : previous?.pending);
+  const pendingRec = () => (deferred.length ? { since: previous?.pending?.since ?? new Date().toISOString(), steps: deferred.map(({ file, ...d }) => d) } : finished ? undefined : previous?.pending);
   const save = () => {
     const state = {
       version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version,
       installedAt: previous?.installedAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       // A deferred step keeps its old pin, so the next --update still sees the tool as behind.
-      pins: Object.fromEntries(Object.entries(pinVersions()).map(([k, v]) => [k, deferred.some((d) => d.tool === pinTool(k)) && previous?.pins?.[k] ? previous.pins[k] : v])),
+      pins: Object.fromEntries(Object.entries(pinVersions()).map(([k, v]) => [k, deferred.some((d) => d.file || d.tool === pinTool(k)) ? previous?.pins?.[k] ?? 'unknown' : v])),
       options: o.migrate ? previous?.options ?? { migrateOnly: true, agents: o.agents, tools: [], privacy: o.privacy, network: o.network, gh: false, terminals: [], installTerminals: [], adoptedTerminals: [], declinedTerminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false, shell: 'git-bash' } : { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, keepUpdater: !!o.keepUpdater, gh: o.gh, terminals: o.terminals, installTerminals: o.installTerminals, adoptedTerminals: o.adoptedTerminals ?? [], declinedTerminals: o.declinedTerminals ?? [], unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun, shell: o.shell },
       ...(o.toolNode && { toolNode: { version: o.toolNode.version, installedByLean: !!o.toolNode.install || (previous?.toolNode?.version === o.toolNode.version && !!previous.toolNode.installedByLean) } }),
       files: [...(previous?.files ?? []), ...files],

@@ -20,7 +20,7 @@ function fixture({ ps = PS } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-defer-'));
   const bin = path.join(dir, 'bin');
   fs.mkdirSync(bin);
-  for (const [name, body] of [['ps', ps], ['opencode', OPENCODE], ['npx', NPX]]) fs.writeFileSync(path.join(bin, name), body, { mode: 0o755 });
+  for (const [name, body] of [['ps', ps], ['opencode', OPENCODE], ['npx', NPX], ['git', NPX]]) fs.writeFileSync(path.join(bin, name), body, { mode: 0o755 });
   const home = path.join(dir, 'home');
   fs.mkdirSync(home);
   const base = { PATH: `${bin}${path.delimiter}${path.dirname(process.execPath)}`, HOME: home };
@@ -45,7 +45,7 @@ test('inside OpenCode: the blocked step is deferred and recorded, exit 0, two me
   assert.equal(r.status, 0, r.stderr);
   assert.doesNotMatch(r.stderr, /you are running inside OpenCode/);
   assert.match(r.stderr, /^deferred \(OpenCode is running this session\): .+/m);
-  assert.match(r.stderr, /^Run lean-update again from a terminal, or after this OpenCode session ends, to finish \d+ deferred steps?\.$/m);
+  assert.match(r.stderr, /^Close OpenCode, then run `lean-agents --update` in a terminal to finish \d+ deferred steps?\.$/m);
   assert.equal(JSON.parse(r.stdout).ok, true);
   const pending = f.state().pending;
   const ran = f.state().commands.map((c) => c.desc);
@@ -89,5 +89,60 @@ test('--doctor shows the pending row', posix, () => {
   s.pending = { since: '2026-11-27T00:00:00.000Z', steps: [{ tool: 'gsd', desc: 'x' }] };
   fs.writeFileSync(f.stateFile, JSON.stringify(s));
   const r = f.lean(['--doctor', '--no-exec']);
-  assert.match(r.stdout, /pending.*1 OpenCode steps deferred from 2026-11-27; run --update outside OpenCode/);
+  assert.match(r.stdout, /pending.*1 OpenCode steps deferred from 2026-11-27; close OpenCode, then run `lean-agents --update` in a terminal/);
+  assert.match(r.stdout, /lean-agents --update/);
+});
+
+const BOTH = ['--yes', '--agents', 'opencode-v2,claude', '--no-core', '--tools', 'dcp', '--lang', 'en', '--profile', 'none', '--no-exec'];
+// Swap the ps stub so no OpenCode process shows: the "outside OpenCode" half of a test.
+const quiet = (f) => fs.writeFileSync(path.join(path.dirname(f.home), 'bin', 'ps'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+const setPins = (f, edit) => { const s = f.state(); edit(s.pins); fs.writeFileSync(f.stateFile, JSON.stringify(s)); };
+const ocFiles = (home) => {
+  const out = {};
+  const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else out[p] = fs.readFileSync(p, 'utf8'); } };
+  walk(path.join(home, '.config', 'opencode'));
+  return out;
+};
+
+test('a deferred OpenCode step keeps its old pin and is planned again outside OpenCode', posix, () => {
+  const f = fixture();
+  assert.equal(f.lean(INSTALL).status, 0);
+  setPins(f, (p) => { p['gsd-core'] = 'v0.0.1'; });
+  // No exit-code check: a behind gsd also plans the npx prerequisite step, which reads as missing under the stubs (#605).
+  const r = f.lean(['--update', '--yes', '--json'], { OPENCODE: '1' });
+  assert.ok(f.state().pending?.steps.some((s) => /GSD/.test(s.desc)), r.stderr);
+  assert.equal(f.state().pins['gsd-core'], 'v0.0.1');
+  quiet(f);
+  const again = f.lean(['--update', '--yes', '--json', '--dry-run']);
+  const j = JSON.parse(again.stdout);
+  assert.ok(j.commands.some((c) => /GSD/.test(c.desc)), 'the step is planned again');
+  assert.deepEqual(j.behind?.map((b) => b.tool), ['gsd-core']);
+});
+
+test('a deferred step with no previous pin still counts as behind', posix, () => {
+  const f = fixture();
+  assert.equal(f.lean(INSTALL).status, 0);
+  setPins(f, (p) => { delete p['gsd-core']; });
+  const r = f.lean(['--update', '--yes', '--json'], { OPENCODE: '1' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.notEqual(f.state().pins['gsd-core'], undefined);
+  quiet(f);
+  const j = JSON.parse(f.lean(['--update', '--yes', '--json', '--dry-run']).stdout);
+  assert.ok(j.commands.some((c) => /GSD/.test(c.desc)), 'planned again');
+  assert.deepEqual(j.behind?.map((b) => b.tool), ['gsd-core'], 'reported as behind');
+});
+
+test('inside OpenCode no file under the OpenCode config folder changes; other agents still update', posix, () => {
+  const f = fixture();
+  assert.equal(f.lean(BOTH).status, 0);
+  const claudeRules = path.join(f.home, '.claude', 'CLAUDE.md');
+  fs.writeFileSync(path.join(f.home, '.config', 'opencode', 'agents', 'debug.md'), '# managed by lean-agents\nstale\n');
+  fs.writeFileSync(claudeRules, '# managed by lean-agents\nstale\n');
+  const before = ocFiles(f.home);
+  const r = f.lean(['--update', '--yes', '--json'], { OPENCODE: '1' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(ocFiles(f.home), before);
+  assert.notEqual(fs.readFileSync(claudeRules, 'utf8'), '# managed by lean-agents\nstale\n');
+  assert.match(r.stderr, /^deferred \(OpenCode is running this session\): update ~\/\.config\/opencode\/agents\/debug\.md$/m);
+  assert.ok(f.state().pending.steps.some((s) => /opencode\/agents\/debug\.md/.test(s.desc)));
 });
