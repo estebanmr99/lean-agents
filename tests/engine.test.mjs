@@ -1475,7 +1475,7 @@ test('--update apps: adoption, hint (not JSON), no dry-run prompt, newer never d
   ok(base);
   // Non-interactive without the flag: one hint through the normal update-note channel.
   const dry = ok(['--update', '--yes', '--no-exec', '--dry-run'], { orca: '1.4.257' }).stdout;
-  assert.match(dry, /Orca app 1\.4\.257 -> 1\.4\.258 is not managed: run --update --install-terminal orca to update it/);
+  assert.match(dry, /Orca app 1\.4\.257 -> 1\.4\.280 is not managed: run --update --install-terminal orca to update it/);
   // --json stdout stays one JSON object; the hint goes to stderr.
   const json = ok(['--update', '--yes', '--no-exec', '--dry-run', '--json'], { orca: '1.4.257' });
   assert.match(json.stderr, /is not managed: run --update --install-terminal orca/);
@@ -1488,7 +1488,7 @@ test('--update apps: adoption, hint (not JSON), no dry-run prompt, newer never d
   // Newer than the pin: no row and no downgrade.
   const newer = ok(['--update', '--install-terminal', 'orca', '--yes', '--no-exec', '--dry-run'], { orca: '1.4.300' }).stdout;
   assert.doesNotMatch(newer, /orca app 1\.4\.300/);
-  assert.doesNotMatch(newer, /-> 1\.4\.258/);
+  assert.doesNotMatch(newer, /-> 1\.4\.280/);
 
   // --install-terminal adopts it: state remembers it as adopted and managed.
   ok(['--update', '--install-terminal', 'orca', '--yes', '--no-exec'], { orca: '1.4.257' });

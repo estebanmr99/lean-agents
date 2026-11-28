@@ -146,3 +146,60 @@ test('#547 the full gate fails on a lagging lean-update pin before it calls gh',
   assert.match(r.out, /lean-update pin is v9\.9\.8/);
   assert.doesNotMatch(r.out, /unexpected gh call/);
 });
+
+// #590: a pin that moves below the previous release tag fails the gate.
+import { pinDowngrades } from '../scripts/lib/pin-downgrades.mjs';
+
+const pin = (version, extra = {}) => ({ kind: 'download', version, ...extra });
+
+test('pinDowngrades: orca-app 1.4.264 -> 1.4.258 (the 1.3.0 change) is an error', () => {
+  const r = pinDowngrades({ 'orca-app': pin('1.4.264') }, { 'orca-app': pin('1.4.258') });
+  assert.deepEqual(r.errors, ['::error::pin downgrade: orca-app 1.4.264 -> 1.4.258']);
+  assert.deepEqual(r.notices, []);
+});
+
+test('pinDowngrades: a downgrade with a note passes with a notice', () => {
+  const r = pinDowngrades({ 'orca-app': pin('1.4.264') }, { 'orca-app': pin('1.4.258', { downgrade: 'upstream pulled 1.4.264' }) });
+  assert.deepEqual(r.errors, []);
+  assert.match(r.notices[0], /^::notice::pin downgrade: orca-app 1\.4\.264 -> 1\.4\.258 .*upstream pulled/);
+});
+
+test('pinDowngrades: upgrades, equal versions and new pins pass quietly', () => {
+  const r = pinDowngrades({ a: pin('1.0.0'), b: pin('2.0.0') }, { a: pin('1.0.1'), b: pin('2.0.0'), c: pin('0.0.1') });
+  assert.deepEqual(r, { errors: [], notices: [] });
+});
+
+// Real git repo with a v9.9.8 tag holding the old pins, then the gate on the new ones.
+function gitGate(oldOrca, newOrca, extra) {
+  const dir = fixture();
+  const lib = path.join(dir, 'scripts', 'lib');
+  fs.mkdirSync(lib, { recursive: true });
+  for (const f of ['pin-downgrades.mjs', 'update-plan.mjs', 'node-runtime.mjs', 'pins.mjs']) {
+    fs.copyFileSync(path.resolve(import.meta.dirname, '..', 'scripts', 'lib', f), path.join(lib, f));
+  }
+  const write = (orca, more) => fs.writeFileSync(path.join(dir, 'core', 'pins.json'), JSON.stringify({ pins: { 'lean-update': { version: 'v9.9.9' }, 'orca-app': { version: orca, ...more } } }));
+  const git = (...a) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.com', ...a], { cwd: dir, encoding: 'utf8' });
+  git('init', '-q');
+  write(oldOrca);
+  git('add', 'core');
+  git('commit', '-q', '-m', 'old');
+  git('tag', 'v9.9.8');
+  write(newOrca, extra);
+  return gate(dir);
+}
+
+test('gate fails on a pin downgrade against the previous tag', SKIP, () => {
+  const r = gitGate('1.4.264', '1.4.258');
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /::error::pin downgrade: orca-app 1\.4\.264 -> 1\.4\.258/);
+});
+
+test('gate passes a downgrade that carries a note, and prints a notice', SKIP, () => {
+  const r = gitGate('1.4.264', '1.4.258', { downgrade: 'upstream pulled 1.4.264' });
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /::notice::pin downgrade: orca-app/);
+});
+
+test('gate passes an upgrade against the previous tag', SKIP, () => {
+  assert.equal(gitGate('1.4.258', '1.4.280').code, 0);
+});
