@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { dropCwd } from '../scripts/lib/system.mjs';
+import { dropCwd, spawnFor } from '../scripts/lib/system.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SYSTEM = pathToFileURL(path.join(ROOT, 'scripts', 'lib', 'system.mjs')).href;
@@ -24,6 +24,16 @@ test('dropCwd keeps a cwd match when the cwd is on PATH', () => {
 test('dropCwd compares folders and PATH entries case-insensitively', () => {
   const results = ['C:\\Work\\copilot.cmd', 'C:\\Tools\\copilot.cmd'];
   assert.deepEqual(dropCwd(results, 'c:\\work\\', 'c:\\TOOLS'), ['C:\\Tools\\copilot.cmd']);
+});
+
+test('dropCwd treats a quoted PATH entry as the same folder', () => {
+  const results = ['C:\\work\\copilot.cmd'];
+  assert.deepEqual(dropCwd(results, 'C:\\work', '"C:\\work"'), results);
+});
+
+test('dropCwd treats a "." PATH entry as the cwd', () => {
+  const results = ['C:\\work\\copilot.cmd'];
+  assert.deepEqual(dropCwd(results, 'C:\\work', '.'), results);
 });
 
 const winOnly = { skip: process.platform !== 'win32' && 'Windows-only' };
@@ -56,4 +66,19 @@ test('win32: a copilot.cmd in the cwd that is also on PATH is returned', winOnly
   const got = JSON.parse(s.out);
   assert.ok(got);
   assert.equal(path.win32.dirname(got).toLowerCase(), s.here.toLowerCase());
+});
+
+test('win32: spawnFor runs a bare .cmd from PATH, not the copy in the cwd', winOnly, () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'which-630-spawn-'));
+  const here = path.join(root, 'here');
+  const tools = path.join(root, 'tools');
+  fs.mkdirSync(here);
+  fs.mkdirSync(tools);
+  fs.writeFileSync(path.join(here, 'fakebin.cmd'), '@echo off\r\necho CWDCOPY\r\n');
+  fs.writeFileSync(path.join(tools, 'fakebin.cmd'), '@echo off\r\necho PATHCOPY\r\n');
+  const system32 = path.win32.join(process.env.SystemRoot || 'C:\\Windows', 'System32');
+  const env = { PATH: [tools, system32].join(path.win32.delimiter), SystemRoot: process.env.SystemRoot, PATHEXT: process.env.PATHEXT };
+  const r = spawnFor(['fakebin'], { cwd: here, env, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim(), 'PATHCOPY');
 });

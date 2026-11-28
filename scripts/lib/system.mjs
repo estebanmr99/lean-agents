@@ -14,7 +14,9 @@ const isWin = process.platform === 'win32';
 export function dropCwd(results, cwd = process.cwd(), pathVar = '') {
   const norm = (p) => path.win32.resolve(p).toLowerCase();
   const here = norm(cwd);
-  const onPath = String(pathVar).split(path.win32.delimiter).filter(Boolean).some((d) => norm(d) === here);
+  // A quoted entry is the same folder; a relative entry (`.` included) resolves against the child's cwd.
+  const entry = (d) => path.win32.resolve(cwd, d.replace(/^"|"$/g, '')).toLowerCase();
+  const onPath = String(pathVar).split(path.win32.delimiter).filter(Boolean).some((d) => entry(d) === here);
   return onPath ? results : results.filter((f) => norm(path.win32.dirname(f)) !== here);
 }
 
@@ -39,7 +41,9 @@ export function spawnArgs(bin, args, platform = process.platform, resolve = wher
   const direct = { file: bin, args, opts: {} };
   if (platform !== 'win32' || /\.exe$/i.test(bin)) return direct;
   const full = /\.(cmd|bat)$/i.test(bin) && path.win32.isAbsolute(bin) ? bin : resolve(bin).find((f) => /\.(exe|cmd|bat)$/i.test(f));
-  if (!full || /\.exe$/i.test(full)) return direct;
+  if (!full) return direct;
+  // libuv searches the cwd before PATH for a bare name (#630), so hand it the absolute .exe `where` found.
+  if (/\.exe$/i.test(full)) return { file: full, args, opts: {} };
   // The file in plain quotes (a Windows path cannot hold `"`): a ^-escaped path breaks the shim's own %~dp0.
   const line = [`"${full}"`, ...args.map(cmdArg)].join(' ');
   return { file: process.env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', `"${line}"`], opts: { windowsVerbatimArguments: true } };
