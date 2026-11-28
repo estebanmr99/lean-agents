@@ -102,6 +102,17 @@ Never read, print or store my API keys or tokens.
 
 </div>
 
+### How to run /lean-update in each agent
+
+| Agent | Command | Where it comes from |
+| --- | --- | --- |
+| Claude Code, Cursor, Antigravity | `/lean-update` | the `lean-update` skill |
+| Copilot CLI | type `/lean-update` in your prompt | the `lean-update` skill (slash menu listing **VERIFY**) |
+| OpenCode 1.x and 2.x | `/lean-update` | `~/.config/opencode/commands/lean-update.md` (written by lean-agents; skills are not slash commands there) |
+| VS Code Copilot | ask for "lean-update" in chat | skill; a prompt file is not written yet (folder **VERIFY**) |
+
+`--doctor` shows a `lean-update command` row per agent.
+
 ## At a glance
 
 - **Rules:** one short global rule set, rendered for each agent.
