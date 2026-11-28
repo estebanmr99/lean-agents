@@ -45,8 +45,9 @@ export function serviceStopRow({ before, agents = [], pids = opencodePids }) {
 // #488: --update must not swap the OpenCode binary or rewrite its plugins while the 1.x app or the 2.x service runs.
 // A step touches OpenCode when its description or any argv word names it (the CLI upgrade, rtk init --opencode, gsd --opencode).
 // #546: a Skills CLI add/remove only copies skill files (read on the next session), so `filesOnly` keeps it out of this check.
+export const touchesOpenCode = (c) => !c.filesOnly && /opencode/i.test([c.desc, ...(c.run ?? []).flat()].join(' '));
 export function runningBlocker(commands, list = listProcesses, env = process.env) {
-  if (!commands.some((c) => !c.filesOnly && /opencode/i.test([c.desc, ...(c.run ?? []).flat()].join(' ')))) return null;
+  if (!commands.some(touchesOpenCode)) return null;
   let names;
   try { names = list(); } catch (e) { return `cannot list the running processes (${String(e.message).split('\n')[0]}): not safe to update OpenCode; close it, then run this again`; }
   return opencodeRunning(names) ? opencodeRunningText(env) : null;

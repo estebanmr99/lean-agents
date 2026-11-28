@@ -28,7 +28,7 @@ import { probePlugins } from './lib/plugin-health.mjs';
 import { adopt, inventory, saveState } from './lib/adopt.mjs';
 import { planPrereqs, pendingPrereqs, everythingAgents, undoArgv, nvmDirExistedBefore } from './lib/prereqs.mjs';
 import { upgradeInventory, formatUpgrade, nextRtkStep } from './lib/upgrade.mjs';
-import { backupOpencode, backupLayout, listProcesses, opencodeRunning, opencodePids, runningBlocker, serviceStopRow, opencodeRunningText } from './lib/opencode-backup.mjs';
+import { backupOpencode, backupLayout, listProcesses, opencodeRunning, opencodePids, runningBlocker, touchesOpenCode, insideOpenCode, serviceStopRow, opencodeRunningText } from './lib/opencode-backup.mjs';
 import { readBackupStamp } from './lib/backup-stamp.mjs';
 import { isActive, failAt, applyPreflight, verifyBackup, configDrift, createSteps, makeCtx, runApply, runUndo, restoreData } from './lib/opencode-upgrade.mjs';
 import { planOpencode1, installOpencode1, removeOpencode1, layout as opencode1Layout } from './lib/opencode1.mjs';
@@ -889,7 +889,22 @@ async function install(o) {
     else console.log(warn);
   }
 
-  const running = o.command === 'update' && o.exec ? runningBlocker(commands) : null;
+  let running = o.command === 'update' && o.exec ? runningBlocker(commands) : null;
+  // #575: inside an OpenCode session only the OpenCode-touching steps wait; everything else applies, and the next run from a terminal finishes them.
+  const deferred = [];
+  const sawOpenCode = () => { try { return opencodeRunning(listProcesses()); } catch { return false; } };
+  if (o.command === 'update' && o.exec && !o.dryRun && insideOpenCode() && (running ? running === opencodeRunningText() : sawOpenCode())) {
+    for (const c of commands.filter(touchesOpenCode)) { commands.splice(commands.indexOf(c), 1); deferred.push({ tool: c.tool, desc: c.desc }); }
+    // File, JSON and block edits inside the OpenCode config folder wait too; other agents' files still apply.
+    const ocDir = path.join(configHome(o.home), 'opencode') + path.sep;
+    for (const f of planned.filter((x) => x.status !== 'unchanged' && x.status !== 'skip' && path.resolve(x.path).startsWith(ocDir))) {
+      planned.splice(planned.indexOf(f), 1);
+      deferred.push({ tool: 'opencode', file: true, desc: `update ~/${path.relative(o.home, f.path).split(path.sep).join('/')}` });
+    }
+    running = null;
+    for (const d of deferred) (o.json ? console.error : console.log)(redactText(`deferred (OpenCode is running this session): ${d.desc}`, { home: o.home }));
+  }
+  const deferredLine = () => deferred.length && (o.json ? console.error : console.log)(`Close OpenCode, then run \`lean-agents --update\` in a terminal to finish ${deferred.length} deferred step${deferred.length === 1 ? '' : 's'}.`);
   if (running && !o.dryRun) { p.close(); console.error(`! ${running}`); (o.json ? console.error : console.log)('nothing changed'); process.exitCode = 1; return; }
   if (running) (o.json ? console.error : console.log)(`! blocker: ${running}`); // --json keeps stdout JSON
   const noGit = migration ? null : gitHint(packageManager());
@@ -977,12 +992,14 @@ async function install(o) {
       f.userHash = u;
     }
   };
+  const pendingRec = () => (deferred.length ? { since: previous?.pending?.since ?? new Date().toISOString(), steps: deferred.map(({ file, ...d }) => d) } : finished ? undefined : previous?.pending);
   const save = () => {
     const state = {
       version: JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version,
       installedAt: previous?.installedAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      pins: pinVersions(),
+      // A deferred step keeps its old pin, so the next --update still sees the tool as behind.
+      pins: Object.fromEntries(Object.entries(pinVersions()).map(([k, v]) => [k, deferred.some((d) => d.file || d.tool === pinTool(k)) ? previous?.pins?.[k] ?? 'unknown' : v])),
       options: o.migrate ? previous?.options ?? { migrateOnly: true, agents: o.agents, tools: [], privacy: o.privacy, network: o.network, gh: false, terminals: [], installTerminals: [], adoptedTerminals: [], declinedTerminals: [], unverified: {}, lang: 'en', profile: null, adhdAlways: false, ponytailMode: null, bun: false, shell: 'git-bash' } : { agents: o.agents, tools: o.chosenTools ?? o.tools, privacy: o.privacy, network: o.network, keepUpdater: !!o.keepUpdater, gh: o.gh, terminals: o.terminals, installTerminals: o.installTerminals, adoptedTerminals: o.adoptedTerminals ?? [], declinedTerminals: o.declinedTerminals ?? [], unverified: o.unverified, lang: o.lang, profile: o.profile, adhdAlways: o.adhdAlways, ponytailMode: o.ponytailMode, bun: o.bun, shell: o.shell },
       ...(o.toolNode && { toolNode: { version: o.toolNode.version, installedByLean: !!o.toolNode.install || (previous?.toolNode?.version === o.toolNode.version && !!previous.toolNode.installedByLean) } }),
       files: [...(previous?.files ?? []), ...files],
@@ -990,6 +1007,8 @@ async function install(o) {
       // --adopt --undo reads this; `adoptOnly` is not carried, so --update works after the install.
       ...(previous?.adopt && { adopt: previous.adopt }),
       ...(previous?.upgrade && { upgrade: previous.upgrade }),
+      // #575: steps left for a run outside OpenCode; cleared once a run finishes without deferring.
+      ...(pendingRec() && { pending: pendingRec() }),
       // A command that ran again replaces its earlier record, so --uninstall undoes it once.
       commands: [...(previous?.commands ?? []).filter((c) => !ran.some((r) => r.desc === c.desc)), ...ran].map(({ resumeKey, ...c }) => (finished ? c : { ...c, ...(resumeKey && { resumeKey }) })),
     };
@@ -1070,6 +1089,7 @@ async function install(o) {
     if (failed) {
       console.log(`\n${failed} step(s) failed; see the lines marked ! above. Backups: ${backupDir}`);
       ui?.summary('Summary', [`${failed} of ${commands.length} commands failed`, `Backups: ${backupDir}`], false);
+      deferredLine();
       process.exitCode = 1;
       return o.json && printApplied(o, files, report, errors);
     }
@@ -1077,6 +1097,7 @@ async function install(o) {
     save();
     if (o.json) printApplied(o, files, report, errors);
     console.log(`\nDone. Backups: ${backupDir}`);
+    deferredLine();
     if (!o.project) await summaryPage(o, { updated: o.command === 'update' ? report.filter((r) => r.ok).map((r) => r.desc) : [] });
     if (o.project) return console.log('Next: review and commit these files. Each teammate runs the installer once for the tools (rtk, context-mode, ...).');
     console.log('Next: restart your agents, log in to your providers, then run --doctor.');

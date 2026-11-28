@@ -205,6 +205,7 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
 
     add('lean-agents', 'ok', `v${state.version}, agents: ${o.agents.join(', ')}, privacy: ${o.privacy}`);
     add('node for lean-agents', nodeRow.status, nodeRow.detail);
+    if (state.pending?.steps?.length) add('pending', 'note', `${state.pending.steps.length} OpenCode steps deferred from ${String(state.pending.since).slice(0, 10)}; close OpenCode, then run \`lean-agents --update\` in a terminal`);
     const pn = projectNode({ cwd, home, nodeVersion: active, fsx });
     if (pn) add(pn.item, pn.status, pn.detail);
     if (nodeNote) add('context-mode', 'note', nodeNote);

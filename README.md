@@ -338,6 +338,7 @@ If you already use [Warp](https://www.warp.dev) or [Orca](https://github.com/sta
 - After an install it prints a "Still needed from you" list (Cursor login, User Rules, Orca's **Install CLI & Skills** and first launch); `--doctor` shows the same list with what is done.
 - `--uninstall` removes what it added. With the all-off network preset it prints the telemetry switches (Warp `telemetry_enabled = false`, Orca `DO_NOT_TRACK=1`) and never edits the apps' settings.
 - `--update` brings a managed Warp or Orca app up to its pin. An app you installed yourself and that is older than the pin is offered once; non-interactively it is adopted only with `--install-terminal orca|warp|both`, and an adopted app is never deleted by `--uninstall`.
+- `--update` inside an OpenCode session applies every step that does not touch OpenCode and defers the rest (the OpenCode upgrade, `gsd --opencode`, and every file under the OpenCode config folder): it prints `deferred (OpenCode is running this session): <step>` per step, exits 0, and you finish them by closing OpenCode, then running `lean-agents --update` in a terminal; `--doctor` shows a `pending` row until then (#575).
 
 Sources and unverified GUI facts: [docs/compatibility.md](docs/compatibility.md#terminals).
 
