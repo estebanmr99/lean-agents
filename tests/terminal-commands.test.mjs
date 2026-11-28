@@ -175,6 +175,90 @@ test('terminalCommands: the Orca update script keeps the old app when the copy f
   assert.ok(!fs.existsSync(`${copied.target}.new`), 'no .new is left after the swap');
 });
 
+test('terminalCommands: a failed fresh Orca install leaves no partial .new, a failed swap keeps the complete one', { skip: process.platform === 'win32' }, () => {
+  const run = ({ fresh, ditto, move }) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-agents-orca-'));
+    const bin = path.join(root, 'bin');
+    fs.mkdirSync(bin);
+    const target = path.join(root, 'Applications', 'Orca.app');
+    if (!fresh) {
+      fs.mkdirSync(target, { recursive: true });
+      fs.writeFileSync(path.join(target, 'marker'), 'old');
+    }
+    const stub = (name, body) => fs.writeFileSync(path.join(bin, name), `#!/bin/bash\n${body}\n`, { mode: 0o755 });
+    stub('curl', 'while [ $# -gt 0 ]; do if [ "$1" = "-o" ]; then shift; echo dmg > "$1"; fi; shift; done');
+    stub('node', 'exit 0');
+    stub('pgrep', 'exit 1');
+    stub('hdiutil', 'while [ $# -gt 0 ]; do if [ "$1" = "-mountpoint" ]; then shift; mkdir -p "$1/Orca.app"; echo new > "$1/Orca.app/marker"; fi; shift; done');
+    stub('ditto', ditto);
+    if (move) stub('mv', move);
+    const opts = { home: root, terminals: [], installTerminals: ['orca'], agents: [], platform: 'darwin', system: true };
+    const script = terminalCommands(fresh ? opts : { ...opts, updateApps: ['orca'] }).find((c) => c.tool === 'orca').run[0].at(-1);
+    const result = spawnSync('bash', ['-c', script], { cwd: root, env: { PATH: `${bin}:${process.env.PATH}`, HOME: root }, encoding: 'utf8' });
+    return { target, result };
+  };
+
+  const brokenCopy = run({ fresh: true, ditto: 'mkdir -p "$2"; echo partial > "$2/marker"; exit 1', move: 'exit 1' });
+  assert.notEqual(brokenCopy.result.status, 0, 'a failed fresh copy fails the script');
+  assert.ok(!fs.existsSync(`${brokenCopy.target}.new`), 'no partial .new is left after a failed fresh install');
+
+  const brokenSwap = run({ fresh: false, ditto: 'cp -R "$1" "$2"', move: 'exit 1' });
+  assert.notEqual(brokenSwap.result.status, 0, 'a failed swap fails the script');
+  assert.ok(fs.existsSync(`${brokenSwap.target}.new`), 'the complete .new survives a failed swap');
+  assert.equal(fs.readFileSync(path.join(`${brokenSwap.target}.new`, 'marker'), 'utf8').trim(), 'new');
+
+  const swapped = run({ fresh: true, ditto: 'cp -R "$1" "$2"', move: null });
+  assert.equal(swapped.result.status, 0, swapped.result.stderr);
+  assert.equal(fs.readFileSync(path.join(swapped.target, 'marker'), 'utf8').trim(), 'new');
+  assert.ok(!fs.existsSync(`${swapped.target}.new`), 'no .new is left after a successful install');
+});
+
+test('terminalCommands: Orca update cleans up on every failure and detaches the DMG once it is attached', { skip: process.platform === 'win32' }, () => {
+  const fetchOk = 'while [ $# -gt 0 ]; do if [ "$1" = "-o" ]; then shift; echo dmg > "$1"; fi; shift; done';
+  const mountNew = 'while [ $# -gt 0 ]; do if [ "$1" = "-mountpoint" ]; then shift; mkdir -p "$1/Orca.app"; echo new > "$1/Orca.app/marker"; fi; shift; done';
+  const run = ({ curl = fetchOk, verify = 'exit 0', attach = mountNew, ditto = 'cp -R "$1" "$2"' }) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-agents-orca-'));
+    const bin = path.join(root, 'bin');
+    fs.mkdirSync(bin);
+    const target = path.join(root, 'Applications', 'Orca.app');
+    fs.mkdirSync(target, { recursive: true });
+    fs.writeFileSync(path.join(target, 'marker'), 'old');
+    const log = path.join(root, 'hdiutil.log');
+    const stub = (name, body) => fs.writeFileSync(path.join(bin, name), `#!/bin/bash\n${body}\n`, { mode: 0o755 });
+    stub('curl', curl);
+    stub('node', verify);
+    stub('pgrep', 'exit 1');
+    stub('hdiutil', `echo "$*" >> '${log}'\n${attach}`);
+    stub('ditto', ditto);
+    const opts = { home: root, terminals: [], installTerminals: ['orca'], updateApps: ['orca'], agents: [], platform: 'darwin', system: true };
+    const script = terminalCommands(opts).find((c) => c.tool === 'orca').run[0].at(-1);
+    const result = spawnSync('bash', ['-c', script], { cwd: root, env: { PATH: `${bin}:${process.env.PATH}`, HOME: root }, encoding: 'utf8' });
+    return { target, result, hdiutil: fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '' };
+  };
+  const assertCleanFailure = (c, label) => {
+    assert.notEqual(c.result.status, 0, `${label}: the script fails`);
+    assert.ok(!fs.existsSync(`${c.target}.new`), `${label}: no Orca.app.new is left`);
+    assert.equal(fs.readFileSync(path.join(c.target, 'marker'), 'utf8').trim(), 'old', `${label}: the old app is untouched`);
+  };
+
+  const shaMismatch = run({ verify: 'exit 1' });
+  assertCleanFailure(shaMismatch, 'sha mismatch');
+  assert.ok(!/^detach /m.test(shaMismatch.hdiutil), 'nothing is attached before the sha check passes');
+
+  const download = run({ curl: 'exit 1' });
+  assertCleanFailure(download, 'download failure');
+  assert.ok(!/^detach /m.test(download.hdiutil), 'nothing is attached when the download fails');
+
+  const attachFails = run({ attach: 'exit 1' });
+  assertCleanFailure(attachFails, 'hdiutil attach failure');
+  assert.ok(/^attach /m.test(attachFails.hdiutil), 'hdiutil attach was tried');
+  assert.ok(!/^detach /m.test(attachFails.hdiutil), 'no detach when the attach itself failed');
+
+  const copyFails = run({ ditto: 'mkdir -p "$2"; echo partial > "$2/marker"; exit 1' });
+  assertCleanFailure(copyFails, 'failed copy on update');
+  assert.ok(/^detach /m.test(copyFails.hdiutil), 'the attached DMG is detached after a failed copy');
+});
+
 test('appUpdateTarget: home app updates in place, /Applications needs write access, running Orca is refused', () => {
   const local = path.join('/opt/x', 'Applications', 'Orca.app');
   assert.deepEqual(appUpdateTarget({ home: '/opt/x', app: 'orca', platform: 'darwin', system: false, exists: (p) => p === local }), { path: local });
