@@ -15,7 +15,7 @@ function rows(home, files, platform, json = true) {
 
 test('#493: a lowercase drive letter still prints as ~ in doctor --json (Windows)', () => {
   const items = rows('D:\\Data\\me', [{ path: 'd:\\Data\\me\\.copilot\\x.md', hash: 'h' }], 'win32');
-  assert.ok(items.includes('~\\.copilot\\x.md'), items.join(' | '));
+  assert.ok(items.includes('~\\.copilot\\x.md'), items.join(' | ')); // literal-tilde: doctor win32 path contract
   assert.ok(!items.some((i) => /Data\\me/i.test(i)));
   const text = rows('D:\\Data\\me', [{ path: 'd:\\Data\\me\\.copilot\\x.md', hash: 'h' }], 'win32', false);
   assert.match(text, /~\\\.copilot\\x\.md/);
@@ -23,12 +23,12 @@ test('#493: a lowercase drive letter still prints as ~ in doctor --json (Windows
 });
 
 test('#493: homeRel is case-insensitive on Windows only, and stops at a path boundary', () => {
-  assert.equal(homeRel('d:\\DATA\\ME\\a', 'D:\\Data\\me', 'win32'), '~\\a');
+  assert.equal(homeRel('d:\\DATA\\ME\\a', 'D:\\Data\\me', 'win32'), '~\\a'); // literal-tilde: explicit win32 contract
   assert.equal(homeRel('D:\\Data\\me2\\a', 'D:\\Data\\me', 'win32'), 'D:\\Data\\me2\\a');
   assert.equal(homeRel('/Srv/ME/a', '/Srv/me', 'darwin'), '/Srv/ME/a');
-  assert.equal(homeRel('/srv/me/a', '/srv/me', 'linux'), '~/a');
+  assert.equal(homeRel('/srv/me/a', '/srv/me', 'linux'), '~/a'); // literal-tilde: explicit linux contract
   assert.equal(homeRel('/srv/me', '/srv/me', 'linux'), '~');
-  assert.equal(homeRel('/srv/me/a', '/srv/me/', 'linux'), '~/a');
+  assert.equal(homeRel('/srv/me/a', '/srv/me/', 'linux'), '~/a'); // literal-tilde: explicit linux contract
 });
 
 test('#493: tilde in plan and failure lines matches any case on Windows only', () => {

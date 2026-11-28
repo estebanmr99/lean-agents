@@ -8,6 +8,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { inventory } from '../scripts/lib/adopt.mjs';
 import { upgradeInventory, formatUpgrade } from '../scripts/lib/upgrade.mjs';
+import { tildePath } from './helpers/home-path.mjs';
 
 const j = path.join;
 const skip = process.platform === 'win32' && 'the real-upgrade job covers Windows paths';
@@ -59,7 +60,7 @@ test('experimental and permission stay user-manual with a stated reason', { skip
 test('each upgrade row names its own file, so the two opencode-dcp rows read apart (#203)', { skip }, async () => {
   const r = await seed();
   const dcp = r.items.filter((i) => i.upgrade && /opencode-dcp/.test(i.name ?? ''));
-  assert.deepEqual(dcp.map((i) => i.file).sort(), ['~/.config/opencode/opencode.jsonc', '~/.config/opencode/tui.json']);
+  assert.deepEqual(dcp.map((i) => i.file).sort(), [tildePath('.config', 'opencode', 'opencode.jsonc'), tildePath('.config', 'opencode', 'tui.json')]);
   for (const line of formatUpgrade(r).split('\n').filter((l) => /opencode-dcp/.test(l))) assert.match(line, /\(~\/\.config\/opencode\/(opencode\.jsonc|tui\.json)\)$/);
 });
 

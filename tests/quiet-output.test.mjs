@@ -118,7 +118,7 @@ test('a log that cannot be written falls back to the terminal and the install go
 
 test('tilde only replaces a whole home folder, never an empty home or /', () => {
   assert.equal(tilde('$ cp /h/u/a /h/user2/b', '/h/u'), '$ cp ~/a /h/user2/b');
-  assert.equal(tilde('D:\\work\\x D:/work/y', 'D:\\work'), '~\\x ~/y');
+  assert.equal(tilde('D:\\work\\x D:/work/y', 'D:\\work'), '~\\x ~/y'); // literal-tilde: expected output mirrors the input separators
   assert.equal(tilde('/usr/bin', '/'), '/usr/bin');
   assert.equal(tilde('/usr/bin', ''), '/usr/bin');
 });

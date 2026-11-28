@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { inventory } from '../scripts/lib/adopt.mjs';
+import { tildePath } from './helpers/home-path.mjs';
 
 const j = path.join;
 const LEAN = path.resolve(import.meta.dirname, '..', 'scripts', 'lean.mjs');
@@ -67,7 +68,7 @@ test('lists each Cursor hook by event and basename, keep, no payload', { skip },
   assert.equal(owner('beforeSubmitPrompt:quoted-cursor-demo.js'), 'managed'); // quoted path with a space
   assert.equal(hooks.find((i) => i.name === 'beforeMCPExecution:powershell').note, 'Orca agent status hook'); // -enc alias
   const hook = hooks.find((i) => i.name === 'sessionStart:gsd-cursor-demo.js');
-  assert.equal(hook.kind, 'hook'); assert.deepEqual(hook.keyPath, ['hooks', 'sessionStart']); assert.equal(hook.file, '~/.cursor/hooks.json');
+  assert.equal(hook.kind, 'hook'); assert.deepEqual(hook.keyPath, ['hooks', 'sessionStart']); assert.equal(hook.file, tildePath('.cursor', 'hooks.json'));
   assert.equal(hooks.find((i) => i.name === 'sessionEnd:powershell').note, 'Orca agent status hook');
   assert.ok(!hooks.some((i) => i.name.includes('sekrit')));
 });

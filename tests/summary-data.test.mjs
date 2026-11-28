@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildSummary } from '../scripts/lib/summary-data.mjs';
 import { loginRows } from '../scripts/lib/logins.mjs';
+import { tildePath } from './helpers/home-path.mjs';
 
 const home = '/opt/lean-home';
 const applied = {
@@ -23,7 +24,7 @@ const logins = loginRows({ agents: ['claude'], gh: true, exec: false });
 test('model groups installed, kept, skipped, updated and the doctor result', () => {
   const m = buildSummary({ rows, applied, logins, updated: ['claude'], home, env: {} });
   assert.deepEqual(m.summary.installed, ['.claude/CLAUDE.md', '.config/opencode/opencode.json', 'install rtk']);
-  assert.deepEqual(m.summary.kept, ['~/.claude/CLAUDE.md']);
+  assert.deepEqual(m.summary.kept, [tildePath('.claude', 'CLAUDE.md')]);
   assert.deepEqual(m.summary.skipped, ['Copilot extension']);
   assert.deepEqual(m.summary.updated, ['claude']);
   assert.equal(m.ok, false);
