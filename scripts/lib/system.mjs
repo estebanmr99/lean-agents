@@ -44,18 +44,25 @@ export function cmdInvocation(file, args = [], comspec = process.env.ComSpec || 
 }
 
 // The version string as the binary prints it, pre-release tag included (2.0.1-beta): what an undo must reinstall.
-export function versionFull(bin, args = ['--version'], env = {}, timeout = 20000) {
-  if (!path.isAbsolute(bin) && !which(bin)) return null;
+function probeVersion(bin, args = ['--version'], env = {}, timeout = 20000) {
+  if (!path.isAbsolute(bin) && !which(bin)) return { version: null, status: null };
   const opts = { encoding: 'utf8', timeout, env: { ...allowedEnv(), ...env } };
   let r;
   if (isWin && path.isAbsolute(bin) && /\.(cmd|bat)$/i.test(bin)) {
     const inv = cmdInvocation(bin, args);
-    if (!inv) return 'unknown';
+    if (!inv) return { version: 'unknown', status: null };
     r = spawnSync(inv.file, inv.argv, { ...opts, windowsVerbatimArguments: true });
   } else r = spawnFor([bin, ...args], opts);
   const m = `${r.stdout}${r.stderr}`.match(/\d+\.\d+\.\d+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?/);
-  return m ? m[0] : 'unknown';
+  return { version: m ? m[0] : 'unknown', status: r.status };
 }
+
+export function versionFull(bin, args = ['--version'], env = {}, timeout = 20000) {
+  return probeVersion(bin, args, env, timeout).version;
+}
+
+// Doctor needs the exit status to tell a launcher stub (127) from a real CLI (#564).
+export const versionProbe = (bin, args, env, timeout) => probeVersion(bin, args, env, timeout);
 
 export const version = (bin, args, env) => versionFull(bin, args, env)?.replace(/-.*/, '') ?? null;
 
