@@ -57,6 +57,7 @@ function seeded() {
 }
 
 const byName = (g, name) => g.packages.filter((p) => p.name === name);
+const quote = (s) => process.platform === 'win32' ? `"${s}"` : `'${s}'`;
 
 test('meetsEngines reads the ranges npm packages declare', () => {
   assert.equal(meetsEngines('24.15.0', '>=22'), true);
@@ -96,8 +97,8 @@ test('npmGlobals lists every package under every Node, marks the active one and 
   assert.deepEqual(byName(g, 'fresh-cli')[0].status, []);
   assert.equal(g.packages.some((p) => p.name === 'npm'), false); // bundled with Node, not a user global
   assert.deepEqual(g.cleanup, [
-    { name: 'broken-pkg', node: '22.20.0', dir: s.oldDir },
-    { name: 'legacy-cli', node: '22.20.0', dir: s.oldDir },
+    { name: 'broken-pkg', folder: 'broken-pkg', node: '22.20.0', dir: s.oldDir },
+    { name: 'legacy-cli', folder: 'legacy-cli', node: '22.20.0', dir: s.oldDir },
   ]); // a name with a shell metacharacter gets no cleanup line
 });
 
@@ -107,8 +108,8 @@ test('inventory puts npmGlobals in the report with ~ paths and adds no plan step
   assert.deepEqual(r.npmGlobals.nodes.map((n) => [n.version, n.active]), [['22.20.0', false], ['24.15.0', true]]);
   assert.equal(r.npmGlobals.nodes[0].dir, `~${s.oldDir.slice(s.home.length)}`);
   assert.deepEqual(r.npmGlobals.cleanup, [
-    `npm uninstall -g broken-pkg --prefix ~${s.oldDir.slice(s.home.length)}`,
-    `npm uninstall -g legacy-cli --prefix ~${s.oldDir.slice(s.home.length)}`,
+    `npm uninstall -g broken-pkg --prefix ${quote(`~${s.oldDir.slice(s.home.length)}`)}`,
+    `npm uninstall -g legacy-cli --prefix ${quote(`~${s.oldDir.slice(s.home.length)}`)}`,
   ]);
   assert.deepEqual(r.plan.filter((l) => /legacy-cli|fresh-cli|needs-newer/.test(l)), []); // --yes never touches them
 });
@@ -132,7 +133,7 @@ test('--adopt and --adopt --json print the globals and write nothing', () => {
   assert.match(text.stdout, /Global npm packages under nvm \(active Node: 24\.15\.0\):/);
   for (const line of ['* 24.15.0   fresh-cli@1.2.0', 'legacy-cli@0.9.1  [not-active]', 'needs-newer@3.0.0  [engines-unmet]', 'broken-pkg@unknown', 'bad;name@1.0.0']) assert.ok(text.stdout.includes(line), line);
   assert.match(text.stdout, /Cleanup \(listed only, nothing runs automatically\):/);
-  assert.ok(text.stdout.includes(`- npm uninstall -g legacy-cli --prefix ~${s.oldDir.slice(s.home.length)}`));
+  assert.ok(text.stdout.includes(`- npm uninstall -g legacy-cli --prefix ${quote(`~${s.oldDir.slice(s.home.length)}`)}`));
   assert.equal(text.stdout.includes('npm uninstall -g bad;name'), false);
 
   assert.equal(treeHash(s.home), before);

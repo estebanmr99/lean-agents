@@ -160,7 +160,7 @@ export function npmGlobals(nvm, { env = process.env, fsx = fs } = {}) {
     const read = (dir, folder) => {
       let pkg = null;
       try { pkg = JSON.parse(fsx.readFileSync(j(dir, 'package.json'), 'utf8')); } catch { /* a failed install */ }
-      packages.push({ name: pkg?.name || folder, version: pkg?.version ?? null, node: n.version, dir: n.dir, engines: pkg?.engines?.node ?? null });
+      packages.push({ name: pkg?.name || folder, folder, version: pkg?.version ?? null, node: n.version, dir: n.dir, engines: pkg?.engines?.node ?? null });
     };
     let list;
     try { list = fsx.readdirSync(n.modules, { withFileTypes: true }); } catch { continue; }
@@ -187,7 +187,7 @@ export function npmGlobals(nvm, { env = process.env, fsx = fs } = {}) {
     active,
     nodes: nodes.map((n) => ({ version: n.version, dir: n.dir, active: n.version === active })),
     packages,
-    cleanup: packages.filter((p) => p.status.includes('not-active') && isNpmName(p.name)).map((p) => ({ name: p.name, node: p.node, dir: p.dir })),
+    cleanup: packages.filter((p) => p.status.includes('not-active') && isNpmName(p.name)).map((p) => ({ name: p.name, folder: p.folder, node: p.node, dir: p.dir })),
   };
 }
 

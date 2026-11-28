@@ -22,6 +22,8 @@ import { clients, launchOf, pinOf, classify, npmCopies, npmGlobals, skillDirs, d
 import { agentFor } from './context-mode.mjs';
 
 const j = path.join;
+// One shell argument for the printed cleanup line: POSIX single quote, Windows double quote (#525).
+const shellArg = (s, platform) => platform === 'win32' ? `"${s}"` : `'${s.replaceAll("'", "'\\''")}'`;
 const MANAGED_SKILLS = new Set(Object.entries(PINS).filter(([, p]) => p.kind === 'skill').map(([k]) => k));
 const MANAGED_HOOK = /\b(rtk|context-mode|gsd)\b/;
 // A pre-release sorts below its release (#204). shortcut: two pre-releases of one core compare equal, no -beta.2 vs -beta.10 order; upgrade when a pinned tool ships two.
@@ -284,11 +286,18 @@ export async function inventory({ home, env = process.env, platform = process.pl
 
   // --- Every global npm package under every nvm Node (#465): disclosure only, cleanup stays a printed line
   const g = npmGlobals(nvm, { env });
+  const globalCleanup = [];
+  // Only the folder npm installed a global in can be removed by name: a manifest naming another package would remove the wrong one (#525).
+  for (const c of g.cleanup) {
+    if (!isNpmName(c.name) || c.folder !== c.name) continue;
+    globalCleanup.push(`npm uninstall -g ${c.folder} --prefix ${shellArg(rel(c.dir), platform)}`);
+  }
   const globals = {
     active: g.active,
     nodes: g.nodes.map((n) => ({ ...n, dir: rel(n.dir) })),
     packages: g.packages.map((p) => ({ name: p.name, version: p.version, node: p.node, active: p.active, engines: p.engines, status: p.status })),
-    cleanup: g.cleanup.filter((c) => isNpmName(c.name)).map((c) => `npm uninstall -g ${c.name} --prefix ${rel(c.dir)}`),
+    // A manifest name that differs from its folder would remove a different package: no line for it (#525).
+    cleanup: globalCleanup,
   };
 
   // --- Known hand-made stopgaps: listed with their managed replacement
@@ -334,7 +343,8 @@ export async function adopt(o) {
     if (i.kind === 'skill' && i.fix) console.log(`            ${i.clients.join(' and ')} loads it twice: ${Object.entries(i.hashes).map(([d, h]) => `${d} ${h}`).join(', ')} (${i.differs ? 'differs' : 'identical'}); ${i.fix}`);
   }
   console.log(`  user-owned items kept untouched: ${r.items.filter((i) => i.owner === 'user' && i.action === 'keep').length}`);
-  const clean = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, '');
+  // C0/C1 plus bidi overrides/isolates, line/paragraph separators and zero-width characters (#525).
+  const clean = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069]/g, '');
   if (r.npmGlobals.packages.length) {
     const g = r.npmGlobals;
     console.log(`Global npm packages under nvm (active Node: ${g.active ?? 'unknown'}):`);
