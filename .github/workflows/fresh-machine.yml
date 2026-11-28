@@ -119,6 +119,31 @@ jobs:
           $env:Path = "$env:Path;$([Environment]::GetEnvironmentVariable('Path', 'User'))"
           "npm prefix -g:"; npm prefix -g 2>&1
           "where context-mode / opencode:"; where.exe context-mode opencode 2>&1
+      # The engine's step logs (the failing step's full output lives here): the last 200 lines of each, masked like redactText does.
+      - name: Show fresh-machine step logs
+        if: failure()
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $home2 = Join-Path $env:RUNNER_TEMP 'fresh-home'
+          $logs = Join-Path $home2 '.config/lean-agents/logs'
+          $user = $env:USERNAME
+          function Hide([string]$line) {
+            $out = $line.Replace($home2, '~')
+            if ($user) { $out = $out -replace [regex]::Escape($user), '<user>' }
+            $out = $out -replace '\b[a-z][a-z0-9+.-]*://[^\s/@]*@\S*', '<redacted-url>'
+            $out = $out -replace '[\w.+-]+@[\w-]+(\.[\w-]+)*\.[A-Za-z]{2,}\b', '<email>'
+            $out = $out -replace '\beyJ[\w-]+\.eyJ[\w-]+\.[\w-]+', '<token>'
+            $out = $out -replace '\b(gh[pousr]_|github_pat_|sk-|xox[bp]-|glpat-|npm_|hf_)[\w-]{8,}', '<token>'
+            $out = $out -replace '\b(Bearer|token)\s+[\w.~+/=-]{8,}', '$1 <token>'
+            $out = $out -replace '(?i)\b([\w-]*(?:api[_-]?key|password|passwd|secret|token)["'']?\s*[:=]\s*["'']?)[^\s"'',;&]+', '$1<redacted>'
+            $out
+          }
+          if (-not (Test-Path $logs)) { "No step logs in $logs"; exit 0 }
+          Get-ChildItem $logs -File | ForEach-Object {
+            "== $($_.Name) (last 200 lines)"
+            Get-Content $_.FullName -Tail 200 | ForEach-Object { Hide $_ }
+          }
 
   linux:
     needs: dist
