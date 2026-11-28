@@ -11,8 +11,16 @@ if [ -z "$version" ]; then
   echo "usage: bash scripts/release-gate.sh [--pins-only] <version> [sha]" >&2
   exit 2
 fi
-# #587 (review): everything is read from the script's own checkout, never the caller's cwd, so the gate cd's there first.
-root="$(cd "$(dirname "$0")/.." && pwd)"
+# Same version shape as VERSION_RE in scripts/changelog.mjs: /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/
+version_re='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
+if ! [[ "$version" =~ $version_re ]]; then
+  echo "::error::invalid version \"$version\" (expected x.y.z or x.y.z-suffix)" >&2
+  exit 2
+fi
+# #542: resolve the repo root from the script's own checkout (git 1.7.0), never the caller's cwd, then cd there.
+# Anchoring on $0 keeps #587 (a caller in another repo must not change what is gated) and still works from a subfolder.
+cd "$(dirname "$0")"
+root="$(git rev-parse --show-toplevel)" || { echo "::error::not inside a git checkout; run the gate from the repo" >&2; exit 1; }
 cd "$root"
 head="$(git rev-parse --verify -q HEAD 2>/dev/null)" || { echo "::error::HEAD does not resolve to a commit in this checkout; commit first" >&2; exit 1; }
 # The pins, audit and gh repo are read from this checkout, so HEAD must be the commit being gated.
@@ -25,6 +33,10 @@ if [ -n "${2:-}" ]; then
 else
   sha="$head"
   echo "::notice::gating HEAD $head"
+fi
+# Same check as release.yml: only a commit on main can be released. Skipped when origin/main is not fetched locally.
+if git rev-parse --verify -q origin/main >/dev/null 2>&1; then
+  git merge-base --is-ancestor "$sha" origin/main || { echo "::error::$sha is not on main" >&2; exit 1; }
 fi
 # Uncommitted or untracked edits in the gated paths would be gated instead of the SHA (#587).
 dirty="$(git status --porcelain -- core scripts docs changes)"
