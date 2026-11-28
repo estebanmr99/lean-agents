@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'jsonc-parser';
-import { sha, homeRel, userHash } from './fsops.mjs';
+import { sha, homeRel, userHash, hasMark } from './fsops.mjs';
 import { PINS, npmSpec, behindPins, nodeRange, rtkPin, rtkTooOld } from './pins.mjs';
 import { version, quiet, findAgy, antigravityFootprint, wingetAnswer, configHome } from './system.mjs';
 import { redactText } from './redact.mjs';
@@ -209,6 +209,13 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
     const pn = projectNode({ cwd, home, nodeVersion: active, fsx });
     if (pn) add(pn.item, pn.status, pn.detail);
     if (nodeNote) add('context-mode', 'note', nodeNote);
+    // #572: how /lean-update is reached per agent: skills are slash commands in all but OpenCode, which gets a command file.
+    const hasSkill = ownSkills(state).has('lean-update');
+    for (const a of o.agents) {
+      const cmd = path.join(configHome(home), 'opencode', 'commands', 'lean-update.md');
+      const ok = a.startsWith('opencode') ? fsx.existsSync(cmd) && hasMark(fsx.readFileSync(cmd, 'utf8')) : hasSkill;
+      add(`lean-update command (${a})`, ok ? 'ok' : 'note', ok ? `/lean-update (${a.startsWith('opencode') ? 'command file' : 'skill'})` : 'missing');
+    }
     if (o.agents.includes('opencode-v1')) add('OpenCode 1.x: supported; lean-agents will not upgrade it', 'ok');
     const shell = shellNotice();
     if (shell) add('shell', shell.ok ? 'ok' : 'note', shell.text);

@@ -282,6 +282,13 @@ const vendorUndo = (vendor) => [process.execPath, '--input-type=module', '-e',
   SCRIPT(pathToFileURL(fileURLToPath(new URL('../fsops.mjs', import.meta.url))).href, pathToFileURL(fileURLToPath(new URL('../system.mjs', import.meta.url))).href), vendor];
 
 // Everything that is the same on OpenCode 1.x and 2.x: files and commands, not config keys.
+export const LEAN_UPDATE_COMMAND = `---
+description: Update lean-agents and the tools it manages
+---
+<!-- ${OWNED_MARK} -->
+Load the \`lean-update\` skill and follow it. Arguments: $ARGUMENTS
+`;
+
 export function opencodeShared({ home, dir, core, profile, opts, v2 = false }) {
   const tools = opts.tools;
   const actions = [];
@@ -303,6 +310,8 @@ export function opencodeShared({ home, dir, core, profile, opts, v2 = false }) {
       }
     }
   }
+  // OpenCode skills are not slash commands (opencode.ai/docs/commands, 2026-11-27); this command only points at the lean-update skill (#572).
+  actions.push({ kind: 'file', path: path.join(dir, 'commands', 'lean-update.md'), content: LEAN_UPDATE_COMMAND });
   for (const agent of core.agents) {
     actions.push({ kind: 'file', path: path.join(dir, 'agents', `${agent.name}.md`), content: renderOpenCodeAgent(agent, profile) });
   }

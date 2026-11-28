@@ -519,6 +519,14 @@ What `--migrate` reads (session 19, issue #34). Sources were collected by the `r
 
 Upstream sources, all checked 2026-11-05: Claude Code [memory](https://code.claude.com/docs/en/memory), [sub-agents](https://code.claude.com/docs/en/sub-agents), [skills](https://code.claude.com/docs/en/skills), [slash commands](https://code.claude.com/docs/en/slash-commands), [MCP](https://code.claude.com/docs/en/mcp), [hooks](https://code.claude.com/docs/en/hooks). VS Code [custom instructions](https://code.visualstudio.com/docs/copilot/customization/custom-instructions), [custom agents](https://code.visualstudio.com/docs/copilot/customization/custom-agents), [prompt files](https://code.visualstudio.com/docs/copilot/customization/prompt-files), [agent skills](https://code.visualstudio.com/docs/copilot/customization/agent-skills), [MCP servers](https://code.visualstudio.com/docs/copilot/customization/mcp-servers), [hooks](https://code.visualstudio.com/docs/copilot/customization/hooks). Cursor [rules](https://cursor.com/docs/context/rules), [subagents](https://cursor.com/docs/subagents), [skills](https://cursor.com/docs/skills), [MCP](https://cursor.com/docs/context/mcp), [hooks](https://cursor.com/docs/agent/hooks); `.cursor/commands` appears only in the 1.6 changelog. OpenCode [config](https://opencode.ai/docs/config), [rules](https://opencode.ai/docs/rules), [agents](https://opencode.ai/docs/agents), [commands](https://opencode.ai/docs/commands), [skills](https://opencode.ai/docs/skills), [MCP servers](https://opencode.ai/docs/mcp-servers), [v1 to v2 migration](https://opencode.ai/v2/docs/migrate-v1). Copilot CLI [customization how-tos](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot).
 
+### `/lean-update` as a slash command (#572)
+
+| Agent | How `/lean-update` runs | Source | Checked |
+| --- | --- | --- | --- |
+| Claude Code, Copilot CLI, Cursor, Antigravity | the installed `lean-update` skill is invocable as `/lean-update`; nothing extra is written | upstream skills docs (see Migration sources above) | 2026-11-27 |
+| OpenCode 1.x and 2.x | skills are not slash commands; lean-agents writes `~/.config/opencode/commands/lean-update.md` (`description` frontmatter, `$ARGUMENTS`) that loads the skill | [commands](https://opencode.ai/docs/commands/) | 2026-11-27 |
+| VS Code Copilot | prompt files `*.prompt.md` run as `/name`, but the user-level folder is **VERIFY** (`<VS Code user dir>/prompts`); lean-agents writes none yet; the skill is the path meanwhile | [prompt files](https://code.visualstudio.com/docs/copilot/customization/prompt-files) | 2026-11-25 |
+
 What it writes, per target (user scope | `--project`):
 
 | Target | Agents | Skills, prompts | Rules | MCP |
