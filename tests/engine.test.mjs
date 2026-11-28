@@ -182,6 +182,16 @@ test('core rules keep the full safety, subagent and explain wording', () => {
   assert.ok(Buffer.byteLength(core) <= 1600, 'core/AGENTS.md stays within the 1,600-byte limit');
 });
 
+test('AGENTS.es.md mirrors the English rules line for line, placeholders included', () => {
+  const lines = (name) => fs.readFileSync(path.join(ROOT, 'core', name), 'utf8').trimEnd().split('\n');
+  const en = lines('AGENTS.md');
+  const es = lines('AGENTS.es.md');
+  const slots = (rows) => rows.flatMap((line, i) => (line.match(/\{\{\w+\}\}/g) ?? []).map((p) => `${i}:${p}`));
+  assert.equal(es.length, en.length, 'one Spanish line per English rule');
+  assert.deepEqual(slots(es), slots(en), 'placeholders sit on the same lines');
+  assert.ok(fs.statSync(path.join(ROOT, 'core', 'AGENTS.es.md')).size <= 2000, 'core/AGENTS.es.md stays within the 2,000-byte limit');
+});
+
 test('rules say when to use each installed tool', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-home-'));
   lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--tools', 'playwright', '--lang', 'en', '--privacy', 'standard']);
