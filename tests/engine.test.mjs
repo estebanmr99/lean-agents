@@ -1043,7 +1043,7 @@ test('gh installs at user scope with brew or winget, only when asked for', () =>
   assert.equal(prereqFor('gh', null).install, null);
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-gh-'));
   const f = path.join(home, '.config', 'lean-agents', 'state.json');
-  lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--no-tools', '--no-gh', '--lang', 'en']);
+  lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--no-tools', '--lang', 'en']);
   assert.equal(JSON.parse(fs.readFileSync(f, 'utf8')).options.gh, false);
   const out = lean(home, ['--yes', '--no-exec', '--agents', 'claude', '--no-tools', '--lang', 'en', '--gh']);
   assert.match(out, /gh auth login/);

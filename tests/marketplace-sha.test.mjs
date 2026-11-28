@@ -32,6 +32,11 @@ test('marketplaceDrift: an unvalidated repo or tag never reaches the resolver', 
   assert.throws(() => marketplaceDrift({ x: { kind: 'marketplace', source: 'a/b', version: 'v1 $(id)', sha: sha('a') } }, resolve), /bad marketplace repo or tag/);
 });
 
+test('marketplaceDrift: a marketplace pin without a sha fails instead of being skipped', () => {
+  const resolve = () => sha('a');
+  assert.throws(() => marketplaceDrift({ x: { kind: 'marketplace', source: 'a/b', version: 'v1' } }, resolve), /no sha/);
+});
+
 test('parseLsRemote: an annotated tag uses the peeled sha', () => {
   const out = `${sha('d')}\trefs/tags/v1.0.0\n${sha('e')}\trefs/tags/v1.0.0^{}\n`;
   assert.equal(parseLsRemote(out, 'v1.0.0'), sha('e'));
