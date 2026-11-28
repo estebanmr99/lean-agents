@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const ENGINE = path.join(ROOT, 'scripts', 'lean.mjs');
-const env = { PATH: process.env.PATH, NVM_DIR: path.join(os.tmpdir(), 'no-nvm') };
+const env = { PATH: process.env.PATH, NVM_DIR: path.join(os.tmpdir(), 'no-nvm'), LEAN_AGENTS_NODE: '24.22.2' };
 
 const run = (home, args) => spawnSync(process.execPath, [ENGINE, '--home', home, '--lang', 'en', '--profile', 'none', ...args], { encoding: 'utf8', env: { ...env, HOME: home } });
 const stateFile = (home) => path.join(home, '.config', 'lean-agents', 'state.json');
