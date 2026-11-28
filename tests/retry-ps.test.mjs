@@ -32,14 +32,20 @@ else {
 try { & $env:LA_FN $env:LA_URL $env:LA_OUT; exit 0 } catch { [Console]::Error.WriteLine($_); exit 1 }
 `;
 
+const TIMEOUT_MS = 60000;
+
 const run = (shell, fn, url, out) => new Promise((resolve) => {
   const env = { ...process.env, LA_ROOT: root, LA_FN: fn, LA_URL: url, LA_OUT: out };
   delete env.HTTPS_PROXY; delete env.NO_PROXY;
-  const child = spawn(shell, ['-NoProfile', '-NonInteractive', '-Command', driver], { env });
+  const child = spawn(shell, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', driver], { env });
   let stderr = '';
+  const timer = setTimeout(() => {
+    child.kill();
+    resolve({ status: null, timedOut: true, stderr: `${shell} did not exit within ${TIMEOUT_MS / 1000}s` });
+  }, TIMEOUT_MS);
   child.stderr.on('data', (chunk) => { stderr += chunk; });
-  child.on('error', (err) => resolve({ status: null, stderr: String(err) }));
-  child.on('close', (status) => resolve({ status, stderr }));
+  child.on('error', (err) => { clearTimeout(timer); resolve({ status: null, stderr: String(err) }); });
+  child.on('close', (status) => { clearTimeout(timer); resolve({ status, stderr }); });
 });
 
 const shells = ['pwsh', ...(process.platform === 'win32' ? ['powershell.exe'] : [])];
@@ -48,7 +54,10 @@ for (const shell of shells) {
   const skip = missing && `${shell} not found on PATH`;
   if (skip) console.log(`# skipping ${shell}: ${skip}`);
   for (const fn of ['Invoke-Download', 'Invoke-RetryDownload']) {
-    const tmp = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'lean-ps-')), 'out.txt');
+    const tmp = () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lean-ps-'));
+      return { dir, out: path.join(dir, 'out.txt') };
+    };
 
     test(`${shell} ${fn}: a 503 once, then 200: two requests and success`, { skip }, async () => {
       let hits = 0;
@@ -57,13 +66,16 @@ for (const shell of shells) {
         res.statusCode = hits === 1 ? 503 : 200;
         res.end(hits === 1 ? 'busy' : 'ok');
       });
+      const { dir, out } = tmp();
       try {
-        const out = tmp();
         const result = await run(shell, fn, url, out);
         assert.equal(result.status, 0, result.stderr);
         assert.equal(hits, 2);
         assert.equal(fs.readFileSync(out, 'utf8'), 'ok');
-      } finally { await stop(server); }
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+        await stop(server);
+      }
     });
 
     test(`${shell} ${fn}: a 404 is requested once and fails`, { skip }, async () => {
@@ -73,11 +85,15 @@ for (const shell of shells) {
         res.statusCode = 404;
         res.end('missing');
       });
+      const { dir, out } = tmp();
       try {
-        const result = await run(shell, fn, url, tmp());
-        assert.equal(result.status, 1, 'the download fails');
+        const result = await run(shell, fn, url, out);
+        assert.equal(result.status, 1, result.stderr || 'the download fails');
         assert.equal(hits, 1);
-      } finally { await stop(server); }
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+        await stop(server);
+      }
     });
   }
 }
