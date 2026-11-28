@@ -479,8 +479,31 @@ test('e2e-update workflow: the agent steps never carry the key (#579)', () => {
   const agentSteps = steps.filter((x) => agent.includes(x.split('\n')[0]));
   for (const name of agent) assert.ok(!withKey.includes(name), `${name} carries the key`);
   for (const s of agentSteps) {
-    assert.match(s, /\[ -z "\$\{OPENROUTER_API_KEY:-\}" \] \|\| \{ echo "::error::key visible to the agent shell"; exit 1; \}/);
+    assert.match(s, /\[ -z "\$\{OPENROUTER_API_KEY:-\}" \] \|\| \{ echo "::error::this step env carries the key \(this does not prove the agent shell cannot read it, see #617\)"; exit 1; \}/);
   }
   assert.ok(withKey.includes('Start the OpenCode service'));
   assert.match(text, /accepted risk[^\n]*#523/);
+});
+
+test('e2e-update workflow: keyed commands run only in steps that carry the key, agent steps never do', () => {
+  const text = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'e2e-update.yml'), 'utf8');
+  const steps = text.split(/^ {6}- name: /m).slice(1);
+  let keyed = 0;
+  let agent = 0;
+  for (const step of steps) {
+    const name = step.split('\n')[0];
+    const env = step.split(/^ {8}run:/m)[0];
+    const isAgent = /^ {8}run:/m.test(step) && /opencode run /.test(step.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n'));
+    // The smoke step's failure diagnostic pipes redact with `|| true`; that empty diagnostic is tracked separately.
+    if (/e2e-update\.mjs (budget|spend|redact)\b/.test(step) && !(isAgent && !/e2e-update\.mjs (budget|spend)\b/.test(step))) {
+      keyed++;
+      assert.match(env, /OPENROUTER_API_KEY: \$\{\{ secrets\.OPENROUTER_API_KEY \}\}/, `step "${name}" calls a keyed command without the key`);
+    }
+    const code = step.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+    if (/^ {2,}(timeout \d+ )?(\S+ )*opencode run /m.test(code) && /^ {8}run:/m.test(step)) {
+      agent++;
+      assert.doesNotMatch(env, /OPENROUTER_API_KEY: /, `agent step "${name}" must not carry the key`);
+    }
+  }
+  assert.ok(keyed >= 3 && agent >= 2);
 });

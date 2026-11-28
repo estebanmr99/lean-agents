@@ -286,7 +286,8 @@ jobs:
           MODEL: ${{ inputs.model }}
         run: |
           set -euo pipefail
-          [ -z "${OPENROUTER_API_KEY:-}" ] || { echo "::error::key visible to the agent shell"; exit 1; }
+          # Only proves this step env does not carry the key; the agent shell can still read the service env (#617).
+          [ -z "${OPENROUTER_API_KEY:-}" ] || { echo "::error::this step env carries the key (this does not prove the agent shell cannot read it, see #617)"; exit 1; }
           if ! timeout 180 opencode run --agent build -m "$MODEL" --format json "Reply with the single word OK." > "$E2E_RAW/smoke.jsonl" 2> "$E2E_RAW/smoke.err"; then
             for name in smoke.jsonl smoke.err; do
               echo "--- $name (first 400 chars, redacted) ---" >&2
@@ -308,7 +309,8 @@ jobs:
           SOURCE: ${{ inputs.source }}
         run: |
           set -euo pipefail
-          [ -z "${OPENROUTER_API_KEY:-}" ] || { echo "::error::key visible to the agent shell"; exit 1; }
+          # Only proves this step env does not carry the key; the agent shell can still read the service env (#617).
+          [ -z "${OPENROUTER_API_KEY:-}" ] || { echo "::error::this step env carries the key (this does not prove the agent shell cannot read it, see #617)"; exit 1; }
           if [ "$SOURCE" = checkout ]; then
             export PATH="$E2E_RAW/shim:$PATH"
             export LEAN_AGENTS_RELEASE_DIR="$GITHUB_WORKSPACE"
@@ -376,6 +378,13 @@ jobs:
               *) echo "::error::the agent stopped on a question: $decision"; exit 1 ;;
             esac
           fi
+
+      - name: Check the budget after the agent run
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          MAX_USD: ${{ inputs.max_usd }}
+        run: |
+          set -euo pipefail
           set +e
           node tests/e2e-update.mjs budget --start "$(cat "$E2E_RAW/spend-before.txt")" --max-usd "$MAX_USD" > "$E2E_RAW/budget.txt" 2>&1
           status=$?
