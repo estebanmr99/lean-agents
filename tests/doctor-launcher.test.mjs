@@ -20,15 +20,15 @@ function withPath(dir, fn) {
   }
 }
 
-function stub(dir, body) {
-  const file = path.join(dir, win ? 'copilot.cmd' : 'copilot');
+function stub(dir, body, name = 'copilot') {
+  const file = path.join(dir, win ? `${name}.cmd` : name);
   fs.writeFileSync(file, body);
   if (!win) fs.chmodSync(file, 0o755);
   return file;
 }
 
-function rows(home) {
-  const state = { version: '0', commands: [], files: [], options: { agents: ['copilot-cli'], tools: [], privacy: 'standard', network: preset('on') } };
+function rows(home, options = {}) {
+  const state = { version: '0', commands: [], files: [], options: { agents: ['copilot-cli'], tools: [], privacy: 'standard', network: preset('on'), ...options } };
   const run = () => ({ ok: false, failed: false, status: 1, out: '' });
   let out = '';
   const write = process.stdout.write;
@@ -58,6 +58,15 @@ test('a stub that prints a version is runnable', () => {
   const row = withPath(dir, () => rows(home).find((r) => r.item === 'copilot on PATH'));
   assert.equal(row.status, 'ok');
   assert.equal(row.detail, '1.2.3');
+});
+
+test('a non-agent bin that prints no version keeps its ok unknown row', () => {
+  const home = tmp();
+  const dir = tmp();
+  stub(dir, win ? '@echo off\r\necho hello\r\n' : '#!/bin/sh\necho hello\n', 'uvx');
+  const row = withPath(dir, () => rows(home, { tools: ['serena'] }).find((r) => r.item === 'uvx on PATH'));
+  assert.equal(row.status, 'ok');
+  assert.equal(row.detail, 'unknown');
 });
 
 test('no stub is absent', () => {

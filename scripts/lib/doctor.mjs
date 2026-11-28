@@ -273,13 +273,10 @@ function doctorChecks({ home, state, exec, nodeVersion = process.versions.node, 
         const p = versionProbe(at, undefined, childEnv(network));
         const v = p.version;
         if (bin === 'rtk' && rtkTooOld(v)) { add('rtk on PATH', 'error', `${v}, older than ${rtkPin().min} (lean-agents min): update it and make it first on PATH`); continue; }
-        // #564: a launcher on PATH that exits 127 or prints no version is not the real CLI.
-        if (v && (p.status === 127 || v === 'unknown')) {
+        // #564: a launcher on PATH that exits 127 or prints no version is not the real CLI. Only agent CLIs have a launcher.
+        if (AGENT_INSTALL[bin] && v && (p.status === 127 || v === 'unknown')) {
           const agent = AGENT_INSTALL[bin];
-          const detail = agent
-            ? `launcher only: no real ${bin} CLI. Fix: lean-agents --install-agent ${agent}`
-            : `launcher only: no real ${bin} CLI (its --version printed nothing). Install it from its own docs`;
-          add(at === bin ? `${bin} on PATH` : `${bin} found outside PATH`, 'error', detail);
+          add(at === bin ? `${bin} on PATH` : `${bin} found outside PATH`, 'error', `launcher only: no real ${bin} CLI. Fix: lean-agents --install-agent ${agent}`);
           continue;
         }
         add(at === bin ? `${bin} on PATH` : `${bin} found outside PATH`, v ? 'ok' : 'error', v ?? 'not found');
