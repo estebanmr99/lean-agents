@@ -28,7 +28,7 @@ import { probePlugins } from './lib/plugin-health.mjs';
 import { adopt, inventory, saveState } from './lib/adopt.mjs';
 import { planPrereqs, pendingPrereqs, everythingAgents, undoArgv, nvmDirExistedBefore } from './lib/prereqs.mjs';
 import { upgradeInventory, formatUpgrade, nextRtkStep } from './lib/upgrade.mjs';
-import { backupOpencode, backupLayout, listProcesses, opencodeRunning, opencodePids, runningBlocker, touchesOpenCode, insideOpenCode, serviceStopRow, opencodeRunningText } from './lib/opencode-backup.mjs';
+import { backupOpencode, backupLayout, listProcesses, opencodeRunning, opencodePids, runningBlocker, touchesOpenCode, insideOpenCode, serviceStopRow, opencodeRunningText, OPENCODE_STOP_FAILED } from './lib/opencode-backup.mjs';
 import { readBackupStamp } from './lib/backup-stamp.mjs';
 import { isActive, failAt, applyPreflight, verifyBackup, configDrift, createSteps, makeCtx, runApply, runUndo, restoreData } from './lib/opencode-upgrade.mjs';
 import { planOpencode1, installOpencode1, removeOpencode1, layout as opencode1Layout } from './lib/opencode1.mjs';
@@ -1290,7 +1290,7 @@ function stopStartedOpenCode(o, before) {
   const ok = run(row.run[0], { dryRun: false, log: (l) => say(tilde(l, o.home)), json: o.json });
   say(ok
     ? 'lean-agents stopped the OpenCode 2 background service its commands started.'
-    : '! lean-agents could not stop the OpenCode 2 background service its commands started: run `opencode service stop` by hand.');
+    : OPENCODE_STOP_FAILED);
 }
 
 // How to update rtk with the package manager at hand (the #467 skip warning and the upgrade plan share it).

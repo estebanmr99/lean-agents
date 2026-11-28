@@ -175,8 +175,10 @@ export function projectNode({ cwd, home, nodeVersion, fsx = fs }) {
 // #592: the probes below run `opencode debug config`, which auto-starts the OpenCode 2 service. Every caller (--doctor, the --update
 // summary, --adopt) goes through here, so the service is stopped again only when these checks started it (#548).
 export function doctor(opts) {
+  // Without exec no probe runs, so nothing starts a service: list nothing and stop nothing.
+  if (!opts.exec) return doctorChecks(opts);
   const guard = serviceGuard({ agents: opts.state?.options?.agents });
-  try { return doctorChecks(opts); } finally { guard.stop(opts.run ?? quiet); }
+  try { return doctorChecks(opts); } finally { guard.stop(opts.run ?? quiet, opts.json ? console.error : console.log); }
 }
 
 function doctorChecks({ home, state, exec, nodeVersion = process.versions.node, json = false, run = quiet, env = process.env, platform = process.platform, fsx = fs, cwd = process.cwd(), probe = [], probed = false, collect = null }) {

@@ -26,6 +26,7 @@ exit 0
 `;
 const PS = `#!/bin/sh
 D=\${0%/*}
+echo "ps $*" >> "$D/argv.log"
 [ -s "$D/running" ] || exit 0
 read -r PID < "$D/running"
 case "$*" in *pid=*) echo "  $PID opencode" ;; *) echo opencode ;; esac
@@ -77,4 +78,15 @@ test('--update leaves no service running that its run started', posix, () => {
   f.lean(['--update', '--yes']);
   assert.match(f.log(), /^debug config$/m, 'the update summary probe should start the service in this stub');
   assert.equal(f.running(), '', 'the service the update started is still running');
+});
+
+// #592: with exec off no probe runs, so the doctor must not list processes or stop the service the user runs.
+test('--doctor --no-exec neither lists processes nor stops the service', posix, () => {
+  const f = fixture();
+  f.setup();
+  f.start(4242);
+  f.lean(['--doctor', '--no-exec', '--json']);
+  assert.doesNotMatch(f.log(), /^ps /m);
+  assert.doesNotMatch(f.log(), /^service stop$/m);
+  assert.equal(f.running(), '4242');
 });
