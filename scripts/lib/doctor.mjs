@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { parse } from 'jsonc-parser';
 import { sha, homeRel, userHash, hasMark } from './fsops.mjs';
 import { PINS, npmSpec, behindPins, nodeRange, rtkPin, rtkTooOld } from './pins.mjs';
-import { version, quiet, findAgy, antigravityFootprint, wingetAnswer, configHome } from './system.mjs';
+import { version, versionProbe, quiet, findAgy, antigravityFootprint, wingetAnswer, configHome } from './system.mjs';
 import { redactText } from './redact.mjs';
 import { satisfies, compare, nodeSkipLine, minVersion, findNvm, nodeAt, installedNodes, nodeFloorFix } from './node-runtime.mjs';
 import { mcpLaunches, classify, duplicateSkills, skillDirs } from './inventory.mjs';
@@ -15,10 +15,13 @@ import { proxyReport, childEnv, fromPrivacy } from './network.mjs';
 import { leftovers } from './parallel.mjs';
 import { pluginHealth, dcpRow, codeModeRow } from './plugin-health.mjs';
 import { configPath, localPluginFiles, legacyTuiShape, copilotMeterShape } from './adapters/opencode-v2.mjs';
+import { serviceGuard } from './opencode-backup.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const CORE_AGENTS = ['debug', 'explore', 'planner', 'research', 'review'];
 const SECRET_KEY = /(key|token|secret|password|auth)/i;
+// #564: the lean-agents command that installs each agent CLI the doctor probes.
+const AGENT_INSTALL = { claude: 'claude', opencode: 'opencode-v2', copilot: 'copilot-cli', agy: 'antigravity' };
 
 export function redact(value) {
   if (Array.isArray(value)) return value.map(redact);
@@ -171,7 +174,16 @@ export function projectNode({ cwd, home, nodeVersion, fsx = fs }) {
   }
 }
 
-export function doctor({ home, state, exec, nodeVersion = process.versions.node, json = false, run = quiet, env = process.env, platform = process.platform, fsx = fs, cwd = process.cwd(), probe = [], probed = false, collect = null }) {
+// #592: the probes below run `opencode debug config`, which auto-starts the OpenCode 2 service. Every caller (--doctor, the --update
+// summary, --adopt) goes through here, so the service is stopped again only when these checks started it (#548).
+export function doctor(opts) {
+  // Without exec no probe runs, so nothing starts a service: list nothing and stop nothing.
+  if (!opts.exec) return doctorChecks(opts);
+  const guard = serviceGuard({ agents: opts.state?.options?.agents });
+  try { return doctorChecks(opts); } finally { guard.stop(opts.run ?? quiet, opts.json ? console.error : console.log); }
+}
+
+function doctorChecks({ home, state, exec, nodeVersion = process.versions.node, json = false, run = quiet, env = process.env, platform = process.platform, fsx = fs, cwd = process.cwd(), probe = [], probed = false, collect = null }) {
   const rows = [];
   const add = (item, status, detail = '') => rows.push({ item, status, detail });
 
@@ -258,8 +270,15 @@ export function doctor({ home, state, exec, nodeVersion = process.versions.node,
           }
         }
         const at = bin === 'agy' ? findAgy(home, platform, env) ?? bin : bin;
-        const v = version(at, undefined, childEnv(network));
+        const p = versionProbe(at, undefined, childEnv(network));
+        const v = p.version;
         if (bin === 'rtk' && rtkTooOld(v)) { add('rtk on PATH', 'error', `${v}, older than ${rtkPin().min} (lean-agents min): update it and make it first on PATH`); continue; }
+        // #564: a launcher on PATH that exits 127 or prints no version is not the real CLI. Only agent CLIs have a launcher.
+        if (AGENT_INSTALL[bin] && v && (p.status === 127 || v === 'unknown')) {
+          const agent = AGENT_INSTALL[bin];
+          add(at === bin ? `${bin} on PATH` : `${bin} found outside PATH`, 'error', `launcher only: no real ${bin} CLI. Fix: lean-agents --install-agent ${agent}`);
+          continue;
+        }
         add(at === bin ? `${bin} on PATH` : `${bin} found outside PATH`, v ? 'ok' : 'error', v ?? 'not found');
       }
       // VS Code: stable or Insiders, whichever is on PATH.

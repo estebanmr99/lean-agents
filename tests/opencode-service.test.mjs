@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { serviceStopRow, runningBlocker, OPENCODE_RUNNING, OPENCODE_RUNNING_INSIDE } from '../scripts/lib/opencode-backup.mjs';
+import { serviceStopRow, serviceGuard, runningBlocker, OPENCODE_RUNNING, OPENCODE_RUNNING_INSIDE } from '../scripts/lib/opencode-backup.mjs';
 import { leanUpdateCommands } from '../scripts/lib/lean-update.mjs';
 import { claudeAdapter } from '../scripts/lib/adapters/claude.mjs';
 import { copilotAdapter } from '../scripts/lib/adapters/copilot-cli.mjs';
@@ -49,6 +49,41 @@ test('cannot list the processes: nothing is stopped', () => {
 
 test('the before list could not be read: nothing is stopped', () => {
   assert.equal(serviceStopRow({ before: null, agents: ['opencode-v2'], pids: () => [42] }), null);
+});
+
+// #592: a guarded call (the --doctor probes) stops the service only when the call itself started it.
+test('#592: a guard stops the service its call started', () => {
+  const ran = [];
+  let pids = [];
+  const g = serviceGuard({ agents: ['opencode-v2'], pids: () => pids });
+  pids = [42];
+  g.stop((argv) => ran.push(argv.join(' ')));
+  assert.deepEqual(ran, ['opencode service stop']);
+});
+
+test('#592: a guard leaves a service that was running before its call', () => {
+  const ran = [];
+  let pids = [7];
+  const g = serviceGuard({ agents: ['opencode-v2'], pids: () => pids });
+  pids = [7, 42];
+  g.stop((argv) => ran.push(argv));
+  assert.deepEqual(ran, []);
+});
+
+test('#592: a guard lists nothing and stops nothing without OpenCode 2', () => {
+  let listed = 0;
+  const ran = [];
+  const g = serviceGuard({ agents: ['claude'], pids: () => { listed += 1; return [42]; } });
+  g.stop((argv) => ran.push(argv));
+  assert.equal(listed, 0);
+  assert.deepEqual(ran, []);
+});
+
+test('#592: a guard whose process list cannot be read never stops anything', () => {
+  const ran = [];
+  const g = serviceGuard({ agents: ['opencode-v2'], pids: () => { throw new Error('ps failed'); } });
+  g.stop((argv) => ran.push(argv));
+  assert.deepEqual(ran, []);
 });
 
 test('the refusal names the safe service stop command', () => {

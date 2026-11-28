@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { backupOpencode, opencodeRunning, neededBytes, stamp, sha256File } from '../scripts/lib/opencode-backup.mjs';
+import { backupOpencode, opencodeRunning, neededBytes, stamp, sha256File, parseOpencodePids, serviceGuard, OPENCODE_STOP_FAILED } from '../scripts/lib/opencode-backup.mjs';
 
 const j = path.join;
 // Hermetic: a test runner inside an OpenCode session must not change the refusal wording.
@@ -205,4 +205,22 @@ test('lean.mjs: --backup on an empty home refuses (exit 1) and writes nothing; -
   const undo = lean(home, ['--upgrade-agent', 'opencode', '--backup', '--undo']);
   assert.match(undo.stderr, /no --undo/);
   fs.rmSync(home, { recursive: true, force: true });
+});
+
+// #592: the Windows branch of opencodePids is parsed here, so it runs on every OS (CI's Linux legs too).
+test('parseOpencodePids reads tasklist CSV and ps output', () => {
+  const win = '"opencode.exe","4242","Console","1","100,000 K"\r\n"explorer.exe","99","Console","1","1 K"\r\n';
+  assert.deepEqual(parseOpencodePids(win, true), [4242]);
+  assert.deepEqual(parseOpencodePids('  12 opencode\n  13 bash\n  14 /opt/x/opencode\n', false), [12, 14]);
+});
+
+// #592: a failed stop prints the same manual line as --update's stop row, and never throws.
+test('serviceGuard prints the manual stop line when the stop fails', () => {
+  const seen = [[], [777]];
+  const pids = () => seen.shift() ?? [777];
+  const ran = [];
+  const said = [];
+  serviceGuard({ agents: ['opencode-v2'], pids }).stop((argv) => { ran.push(argv); return { ok: false }; }, (l) => said.push(l));
+  assert.deepEqual(ran, [['opencode', 'service', 'stop']]);
+  assert.deepEqual(said, [OPENCODE_STOP_FAILED]);
 });

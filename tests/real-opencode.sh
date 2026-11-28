@@ -63,6 +63,8 @@ lean_run --yes --no-exec --agents opencode-v2 \
   --tools serena,playwright,playwright-extension,ponytail,rtk --privacy strict --profile anthropic-api
 # A real --update with one already-installed tool: it runs the adapter and the end-of-run doctor, and must stop the service.
 lean_run --update --yes --tools rtk
+# #592: --doctor's probe starts the OpenCode 2 service; lean_run fails if one is left that was not running before. Exit code not asserted.
+lean_run --doctor || true
 
 # Proves the file name the migration guide gives for the old tui.json.
 LC_ALL=C grep -aq 'opencode/cli.json' "$(command -v opencode)"
