@@ -61,7 +61,7 @@ test('the step-log step tails the fresh HOME logs, masked, and nothing else', (t
     'token ghp_EXAMPLEEXAMPLE0123 api_key=abc123secret',
     'Authorization: Basic dXNlcjpwYXNz',
     'aws AKIAEXAMPLE1234567 gcp AIzaSyEXAMPLE0123456789abc',
-    'tokens ya29.EXAMPLEtokenvalue sk_live_EXAMPLEKEY0123',
+    'tokens ya29.EXAMPLEtokenvalue sk_live_EXAMPLEKEY0123', // gitleaks:allow (fake values the test asserts are never printed)
     'aws_secret_access_key=EXAMPLEKEYEXAMPLEKEYEXAMPLEKEYEXAMPLEKEY',
     'env value supersecretvalue',
   ];
