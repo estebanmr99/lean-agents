@@ -19,9 +19,10 @@ Release audit of lean-agents for 1.4.0 (2026-11-28). Range: v1.3.0..35e115e (mai
 - **Shipped changes:** see the `[1.4.0]` section of `CHANGELOG.md`. Security-relevant: marketplace tags are checked against the pinned sha (#523); `--adopt` cleanup output is quoted and stripped of bidi characters (#525); on Windows a command is never run from the current folder, by `which()` (#630) or by a bare-name spawn (#636); Windows tools run from System32.
 - **Findings:** no HIGH. Two MEDIUM, both tracked (#640, #617/#579). LOW findings accepted or tracked below.
 - **Owner-only gates:**
-  - Tag v1.4.0 (owner pre-approved tagging on 2026-11-27).
-  - Release run and npm environment approval by the owner.
-  - OIDC publish proof: npm shows 1.4.0 as `latest` with provenance.
+  - Tag v1.4.0 (owner pre-approved tagging on 2026-11-27). Tagged on 661982e after `ci.yml` run 46123884361 passed on it and `release-gate.sh 1.4.0` exited 0.
+  - Release run green: `release.yml` run 46124631710 passed on the tag (2026-11-28); the owner approved the npm environment.
+  - OIDC publish proof: npm shows 1.4.0 as `latest`, with SLSA provenance (`https://slsa.dev/provenance/v1`, checked 2026-11-28).
+  - Proof: `e2e-update` run 46123891719 (from 1.3.0) passed on 661982e.
 
 ## Findings and issues
 
