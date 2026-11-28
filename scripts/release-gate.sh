@@ -11,6 +11,22 @@ if [ -z "$version" ]; then
   echo "usage: bash scripts/release-gate.sh [--pins-only] <version> [sha]" >&2
   exit 2
 fi
+# #587: the pins and audit files are read from this checkout, so HEAD must be the commit being gated.
+if [ -n "${2:-}" ]; then
+  want="$(git rev-parse --verify --quiet "${2}^{commit}" || printf '%s' "$2")"
+  head="$(git rev-parse HEAD 2>/dev/null || true)"
+  if [ "$head" != "$want" ]; then
+    echo "::error::checkout HEAD ${head:-none} is not the gated SHA $want; run git pull (or check out $want) first" >&2
+    exit 1
+  fi
+else
+  echo "::notice::gating HEAD $(git rev-parse HEAD 2>/dev/null || echo none)"
+fi
+# Uncommitted edits in core/ or scripts/ would be gated instead of the SHA (#587).
+if git rev-parse --git-dir >/dev/null 2>&1 && [ -n "$(git status --porcelain -- ':/core' ':/scripts')" ]; then
+  echo "::error::core/ or scripts/ has uncommitted changes; commit or discard them so the gate reads only the gated SHA" >&2
+  exit 1
+fi
 # The release ships its own skill, so the pin must be the tag being released (#547).
 pin="$(node -e "process.stdout.write(String(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).pins['lean-update'].version))" "$(dirname "$0")/../core/pins.json")"
 if [ "$pin" != "v$version" ]; then

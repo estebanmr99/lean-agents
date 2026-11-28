@@ -841,3 +841,7 @@ The model writes one script that runs several tool calls and returns a summary. 
 | OpenCode: `codemode: false` or a deny on `execute` turns it off; --doctor row "OpenCode Code Mode" warns | [tools](https://opencode.ai/docs/tools/), [MCP servers](https://opencode.ai/docs/mcp-servers/) | 2026-11-23 |
 
 Shipped as `--tools code-mode` (opt-in, never in `--all-tools`): a `json` edit sets `env.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE` to `1` in the user `~/.claude/settings.json` only when absent, never a managed-settings value; the plan and the summary print the resume, terminal and login limits; `--uninstall` removes only the value lean-agents wrote. Verified 2026-11-23 on Claude Code 2.1.331: RTK rewrites and context-mode MCP calls work inside a Code Mode script (#304).
+
+## Release gate checkout check (#587, 2026-11-27)
+
+- `scripts/release-gate.sh` uses `git rev-parse --verify --quiet <sha>^{commit}`, `git rev-parse HEAD` and `git status --porcelain -- ':/core' ':/scripts'` (`:/` pathspec from the repo root). Ran on the local git shown by `git --version` on macOS (arm64). Not run on the `ubuntu-latest` runner yet; minimum git for `:/` and `--porcelain`: **VERIFY** (no web access in this session).
